@@ -19,3 +19,11 @@
 
 # Go workspace file
 go.work
+
+# OSM output data
+*.json
+
+# FAA output data
+*.DAT
+*.dat
+
