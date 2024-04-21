@@ -13,12 +13,6 @@
 #include <optional>
 #include <set>
 
-/*
-Its possible to perform automatic resource management using RA2 or smart ptrs provided in the <memory> header
-vulkan obkects created directly with vkCreateXX or allocated through other objects with functions like vkAllocateXXX
-destroy with vkDestroyXXX or vkFreeXXX. all share pAllocator param that allows you to specify callbacks for a custom memory allocator
-*/
-
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -127,7 +121,7 @@ private:
 
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr); // (width, height, windowTitle, windowMoniter, OpenGLparam)
 
-        // window is resizeable
+        // window is resizeable + detection of resize
         glfwSetWindowUserPointer(window, this);
         glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
@@ -163,6 +157,7 @@ private:
         vkDeviceWaitIdle(device);
     }
 
+    // special fctn for recreating swapchain
     void cleanupSwapChain() {
         for (auto framebuffer : swapChainFramebuffers) {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -207,6 +202,7 @@ private:
     }
 
     void recreateSwapChain() {
+        // handle minimization
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
         while (width == 0 || height == 0) {
@@ -214,9 +210,12 @@ private:
             glfwWaitEvents();
         }
 
-        vkDeviceWaitIdle(device);
+        vkDeviceWaitIdle(device);   // don't touch resources still in use
 
-        cleanupSwapChain();
+        cleanupSwapChain();         // make sure old versions are cleaned up
+        // we could also recreate render pass
+        // this approach stops all rendering before creating the swapchan - there is a way to do this while rendering is in-flight
+        //  by passing prev swapchain to oldSwapChain field in the VkSwapchainCreateInfoKHR struct and then destroy it later
 
         createSwapChain();
         createImageViews();
@@ -801,8 +800,10 @@ private:
         // acquire img from swapchain
         uint32_t imageIndex;
         // third param is a timeout for an img to become available, last param is for the index of the swap chain img that becomes available
+        // vkAcquireNextImageKHR tells us when we need to recreate the swapchain w/ ERROR_OUT_OF_DATE or SUBOPTIMAL_KHR
         VkResult result = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
+        // avoiding deadlock
         if (result == VK_ERROR_OUT_OF_DATE_KHR) {
             recreateSwapChain();
             return;
@@ -854,6 +855,7 @@ private:
         result = vkQueuePresentKHR(presentQueue, &presentInfo);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized) {
+            // handle resizing
             framebufferResized = false;
             recreateSwapChain();
         } else if (result != VK_SUCCESS) {
@@ -1177,9 +1179,16 @@ TOC:
 -frames in flight: allow the rendering of one frame to not interfere with the recording of the next -> need multiple cmd buffers, semaphores, fences
 (SWAP CHAIN RECREATION)
 -swap chain recreation: necessary to handle more circumstances like window resizing
+
+(VERTEX BUFFERS - instead of hardcoding shader)
+
 */
 
 /*
+Its possible to perform automatic resource management using RA2 or smart ptrs provided in the <memory> header
+vulkan obkects created directly with vkCreateXX or allocated through other objects with functions like vkAllocateXXX
+destroy with vkDestroyXXX or vkFreeXXX. all share pAllocator param that allows you to specify callbacks for a custom memory allocator
+
 many strucuts in vulkan require you to specify the type in the sType member
 a lot of info in Vulkan is passed through structs instead of fctn params
 
