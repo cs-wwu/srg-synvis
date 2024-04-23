@@ -6,9 +6,10 @@
 [Notes](https://docs.google.com/document/d/1eqsyck9LMbmbHWKJkRScVJnAsD-FjPVy4paW8LULAXU/edit?usp=sharing)
 
 ## Conversions
+`1 Nautical Mile = 1 Arcminute`
+`1 Arc Minute = 1852 meters` at the equator.
 | Conversion Table   | **Nautical Mile (NM)** | **Degree (°)** | **Minute (‘)** | **Second (“)** | **Meter (m)** |
 |--------------------|------------------------|----------------|----------------|----------------|---------------|
-| **1 Nautical Mile (NM)** | 1                | 60             | 60\*60         | 60\*60\*60     | 1852          |
 | **1 Degree (°)**   | 1/60                   | 1              | 60             | 360            | 1852\*60      |
 | **1 Minute (')**   | 1/360                  | 1/60           | 1              | 60             | 1852          |
 | **1 Second (")**   | 1/(60\*60\*60)         | 1/(60\*60)     | 1/60           | 1              | 1852/60       |
@@ -16,7 +17,6 @@
 
 | Exact Conversions   | **Nautical Mile (NM)** | **Degree (°)** | **Minute (‘)** | **Second (“)** | **Meter (m)** |
 |---------------------|------------------------|----------------|----------------|----------------|---------------|
-| **1 Nautical Mile (NM)** | 1                 | 60             | 360            | 21600          | 1852          |
 | **1 Degree (°)**    | 0.01666...             | 1              | 60             | 360            | 111120        |
 | **1 Minute (')**    | 0.0002777...           | 0.01666...     | 1              | 60             | 1852          |
 | **1 Second (")**    | 0.00000462962          | 0.0002777...   | 0.01666...     | 1              | 30.8666...    |
@@ -43,8 +43,10 @@ is 1 byte unisigned integers. This is relatively useless to us.
 - The `swb` file shows land/water per tile. The data is 1 byte unsigned integers.
 0 for land, 255 for water.
 
-Coordinates for the file (e.g. `n01w001.hgt`) represent a region from 
-1°N to just below 2°N latitude, and 1°W to just below 2°W longitude.
+Coordinates for the file (e.g. `n01e001.hgt`) represent a region from 
+1°N to just below 2°N latitude, and 1°E to just below 2°E longitude. Note that
+since West and South are techincally negative coordinates, this "seems" like
+it's inverted when in the western or southern latitude and/or longitude.
 
 We'll want to standardize our world coordinates as `(lat, lon, hgt)`.
 Note that the data from NASA's tiles are about one arcsecond by one arcsecond.

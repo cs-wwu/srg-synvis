@@ -27,3 +27,8 @@ go.work
 *.DAT
 *.dat
 
+# Zip Files and NASA Data
+*.zip
+*is_water
+coords/
+
