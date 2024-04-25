@@ -20,7 +20,10 @@
 #include <set>
 
 const uint32_t WIDTH = 800;
-const uint32_t HEIGHT = 600;
+const uint32_t HEIGHT = 480;
+
+// const std::string MODEL_PATH = "models/viking_room.obj";
+// const std::string TEXTURE_PATH = "textures/viking_room.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 
@@ -127,10 +130,10 @@ struct UniformBufferObject {
 
 // array of vertex data; interleaving color and position data
 const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {0.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    {{-0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+    {{0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+    {{0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
 };
 
 const std::vector<uint16_t> indices = {
@@ -449,6 +452,8 @@ private:
         }
 
         VkPhysicalDeviceFeatures deviceFeatures{};
+            deviceFeatures.wideLines = VK_TRUE;
+        //vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
 
         VkDeviceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -703,7 +708,7 @@ private:
         rasterizer.depthClampEnable = VK_FALSE;     // if set to true, fragments out of planes are clamped rather than discarded -> shadow maps
         rasterizer.rasterizerDiscardEnable = VK_FALSE;
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // could be line or point, reqruies enabling gpu feature
-        rasterizer.lineWidth = 1.0f;    // any line thicker than 1.0 requires enabling wideLines GPU feature
+        //rasterizer.lineWidth = 1.0f;    // any line thicker than 1.0 requires enabling wideLines GPU feature
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;  // alters depth value -> shadow mapping
@@ -737,7 +742,8 @@ private:
         // for using dynamic state - ignore special configurations of pipeline
         std::vector<VkDynamicState> dynamicStates = {
             VK_DYNAMIC_STATE_VIEWPORT,
-            VK_DYNAMIC_STATE_SCISSOR
+            VK_DYNAMIC_STATE_SCISSOR,
+            VK_DYNAMIC_STATE_LINE_WIDTH
         };
         VkPipelineDynamicStateCreateInfo dynamicState{};
         dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -1076,6 +1082,10 @@ private:
             scissor.extent = swapChainExtent;
             vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
+            // Vk linewidth{};
+
+            vkCmdSetLineWidth(commandBuffer, 5.0);
+
             VkBuffer vertexBuffers[] = {vertexBuffer};
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
@@ -1122,8 +1132,8 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-        // rotate around z axis uses time variable - rotates at 90 degrees/second
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        // rotate around z axis uses time variable - rotates at 60 degrees/second
+        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(60.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         // (eye position, center position, and up axis)
         ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
         // (45 degree vertical field of view, aspect ratiom new and far veiw planes
@@ -1399,6 +1409,7 @@ private:
             bool layerFound = false;
 
             for (const auto& layerProperties : availableLayers) {
+                // std::cout << layerProperties.layerName << "\n";
                 if (strcmp(layerName, layerProperties.layerName) == 0) {
                     layerFound = true;
                     break;
