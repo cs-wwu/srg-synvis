@@ -1,6 +1,6 @@
 #!/bin/bash
 # This script comes straight from NASA
-# To use itm you must make an Earthdata account
+# To use you must make an Earthdata account
 
 GREP_OPTIONS=''
 
@@ -9,7 +9,7 @@ netrc=$(mktemp netrc.XXXXXXXXXX)
 chmod 0600 "$cookiejar" "$netrc"
 function finish {
   rm -rf "$cookiejar" "$netrc"
-  ./process_dem.sh
+  # ./download.sh             # Bandaid for processing all DEMs after downloading
 }
 
 trap finish EXIT

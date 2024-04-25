@@ -33,17 +33,20 @@ for file in *.zip; do
     coord="${file#NASADEM_HGT_}"     # Remove NASADEM_HGT_
     coord="${coord%.zip}"            # Remove .zip
 
+    create_dir "coords/$coord"
+
     unzip_file "$file" "coords/$coord"
 
     remove_files "$file"
 
     remove_files "coords/$coord/$coord.num"
 
-    zip -q -r "coords/$coord.zip" . -i "coord/$coord"
+    zip -q -r "coords/$coord" "coords/$coord"
+
+    echo "Zipped coords/$coord"
 
     rm -rf "coords/$coord"
 
-    echo "Zipped coords/$coord"
 done
 
 echo "Processed all zip files."
