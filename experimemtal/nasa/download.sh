@@ -1,6 +1,4 @@
 #!/bin/bash
-# This script comes straight from NASA
-# To use you must make an Earthdata account
 
 GREP_OPTIONS=''
 
@@ -9,7 +7,6 @@ netrc=$(mktemp netrc.XXXXXXXXXX)
 chmod 0600 "$cookiejar" "$netrc"
 function finish {
   rm -rf "$cookiejar" "$netrc"
-  # ./download.sh             # Bandaid for processing all DEMs after downloading
 }
 
 trap finish EXIT
@@ -29,14 +26,14 @@ exit_with_error() {
     echo
     echo $1
     echo
-    echo "https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n48w122.zip"
+    echo "https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w125.zip"
     echo
     exit 1
 }
 
 prompt_credentials
   detect_app_approval() {
-    approved=`curl -s -b "$cookiejar" -c "$cookiejar" -L --max-redirs 5 --netrc-file "$netrc" https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n48w122.zip -w '\n%{http_code}' | tail  -1`
+    approved=`curl -s -b "$cookiejar" -c "$cookiejar" -L --max-redirs 5 --netrc-file "$netrc" https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w125.zip -w '\n%{http_code}' | tail  -1`
     if [ "$approved" -ne "200" ] && [ "$approved" -ne "301" ] && [ "$approved" -ne "302" ]; then
         # User didn't approve the app. Direct users to approve the app in URS
         exit_with_error "Please ensure that you have authorized the remote application by visiting the link below "
@@ -45,7 +42,7 @@ prompt_credentials
 
 setup_auth_curl() {
     # Firstly, check if it require URS authentication
-    status=$(curl -s -z "$(date)" -w '\n%{http_code}' https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n48w122.zip | tail -1)
+    status=$(curl -s -z "$(date)" -w '\n%{http_code}' https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w125.zip | tail -1)
     if [[ "$status" -ne "200" && "$status" -ne "304" ]]; then
         # URS authentication is required. Now further check if the application/remote service is approved.
         detect_app_approval
@@ -97,6 +94,10 @@ fetch_urls() {
 }
 
 fetch_urls <<'EDSCEOF'
-https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n48w122.zip
-https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n45w125.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w125.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w121.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w120.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w124.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w122.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w123.zip
 EDSCEOF

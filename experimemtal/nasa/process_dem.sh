@@ -1,7 +1,6 @@
 #!/bin/bash
 # Cooper Morgan
-# Unfinished, removed is_water, haven't begun compress_swb
-# At this point I'll use zip
+# Use zip to compress files after processing them
 
 create_dir() {
     if [ ! -d "$1" ]; then
@@ -29,26 +28,36 @@ if [ ! -d "coords" ]; then
     echo "Created the coords directory"
 fi
 
+if [ ! -f "convert" ]; then
+    gcc -o convert convert.c
+    echo "Compiled conert.c to convert"
+fi
+
 for file in *.zip; do
     coord="${file#NASADEM_HGT_}"     # Remove NASADEM_HGT_
     coord="${coord%.zip}"            # Remove .zip
 
+    # Unzip the data and remove the zip files
     create_dir "coords/$coord"
 
     unzip_file "$file" "coords/$coord"
 
-    remove_files "$file"
+    # remove_files "$file"
 
     remove_files "coords/$coord/$coord.num"
 
-    zip -q -r "coords/$coord" "coords/$coord"
+    ./convert "coords/$coord/$coord.hgt" "coords/$coord/$coord.raw"
+    echo "$coord processed"
 
-    echo "Zipped coords/$coord"
+    # Re-compress the data and remove the old data
+    # zip -q -r "coords/$coord" "coords/$coord"
 
-    rm -rf "coords/$coord"
+    # echo "Zipped coords/$coord"
+
+    # rm -rf "coords/$coord"
 
 done
 
 echo "Processed all zip files."
-
+echo "coords/ KB used:"
 du -BK coords/
