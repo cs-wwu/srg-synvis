@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "OSM/main";
+
+message SomeMessage {
+
+    message Osm3s {
+        google.protobuf.Timestamp timestamp_osm_base = 1;
+        string copyright = 2;
+    }
+
+    message Bounds {
+        double minlat = 1;
+        double minlon = 2;
+        double maxlat = 3;
+        double maxlon = 4;
+    }
+
+    message Geometry {
+        double lat = 1;
+        double lon = 2;
+    }
+
+    message Tags {
+        repeated string tag = 1;
+    }
+
+    message Elements {
+        string type = 1;
+        uint32 id = 2;
+        Bounds bounds = 3;
+        repeated uint64 nodes = 4;
+        repeated Geometry geometry = 5;
+        Tags tags = 6;
+    }
+
+    double version = 1;
+    string generator = 2;
+    Osm3s osm3s = 3;
+    repeated Elements elements = 4;
+}
