@@ -1,8 +1,8 @@
 CC=gcc
 
-is_water: is_water.c
-	$(CC) -o is_water is_water.c
+convert: convert.c
+	$(CC) -o convert.o convert.c
 
 clean:
-	rm -f is_water
+	rm -f *.o
 
