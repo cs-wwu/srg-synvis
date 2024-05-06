@@ -32,7 +32,7 @@ def process_heightmap_file(file_path):
             interpolated_colors[:, :, i] = np.interp(normalized_image, np.linspace(0, 1, 3), color_gradient[:, i])
 
         # Save the image
-        cv2.imwrite(output_path, interpolated_colors, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        cv2.imwrite(output_path, interpolated_colors, [cv2.IMWRITE_PNG_COMPRESSION, 5])
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
