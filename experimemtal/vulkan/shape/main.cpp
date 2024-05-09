@@ -28,11 +28,12 @@
 #include <optional>
 #include <set>
 #include <unordered_map>
+#include <functional>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 480;
 
-const std::string MODEL_PATH = "models/mountains.obj";
+const std::string MODEL_PATH = "models/vase.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
@@ -93,6 +94,7 @@ struct SwapChainSupportDetails {
 struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
+    glm::vec3 normal;
     glm::vec2 texCoord;
 
     // tell vulkan how to pass this data to vertex shader once uploaded to GPU mem
@@ -111,8 +113,8 @@ struct Vertex {
     }
 
     // how to handle vertex input
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+    static std::array<VkVertexInputAttributeDescription, 4> getAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions{};
         // how to extract a vertex attribute from a chunk of data
         // position attribute
         attributeDescriptions[0].binding = 0;   //  which binding data from
@@ -127,31 +129,58 @@ struct Vertex {
         attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;   // vec3
         attributeDescriptions[1].offset = offsetof(Vertex, color);
 
+        // normal lighting
         attributeDescriptions[2].binding = 0;
         attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+        attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;   // vec3
+        attributeDescriptions[2].offset = offsetof(Vertex, normal);
+
+        // texture mapping
+        attributeDescriptions[3].binding = 0;
+        attributeDescriptions[3].location = 3;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[3].offset = offsetof(Vertex, texCoord);
 
         return attributeDescriptions;
     }
 
     bool operator==(const Vertex& other) const {
-        return pos == other.pos && color == other.color && texCoord == other.texCoord;
+        return pos == other.pos && color == other.color && normal == other.normal && texCoord == other.texCoord;
     }
 };
+
+namespace lve {
+    template<typename T, typename... Rest>
+    void hashCombine (std::size_t& seed, const T& v, const Rest&... rest) {
+        seed ^= std::hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        (hashCombine(seed, rest), ...);
+    };
+}
 
 namespace std {
     template<> struct hash<Vertex> {
         size_t operator()(Vertex const& vertex) const {
-            return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+            size_t seed = 0;
+            //return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec3>()(vertex.normal) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+            lve::hashCombine(seed, vertex.pos, vertex.color, vertex.normal, vertex.texCoord);
+            return seed;
         }
     };
 }
 
 struct UniformBufferObject {
-    alignas(16) glm::mat4 model;
+    /*alignas(16) glm::mat4 model;
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
+    alignas(16) glm::vec3 lightPos; //vec4? align
+    alignas(16) glm::vec4 lightColor;
+    */
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+    //glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
+    //glm::vec3 lightPos{-1.f}; //vec4? align
+    //alignas(16) glm::vec4 lightColor{1.f};
 };
 
 /*
@@ -1190,19 +1219,39 @@ private:
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
 
-                vertex.pos = {
-                    attrib.vertices[3 * index.vertex_index + 0],
-                    attrib.vertices[3 * index.vertex_index + 1],
-                    attrib.vertices[3 * index.vertex_index + 2]
-                };
+                if (index.vertex_index >= 0) {
+                    vertex.pos = {
+                        attrib.vertices[3 * index.vertex_index + 0],
+                        attrib.vertices[3 * index.vertex_index + 1],
+                        attrib.vertices[3 * index.vertex_index + 2],
+                    };
 
-                // obj formate assumes coordinate where 0 is bottom of img, but file has been uploaded into vulkan were 0 is top: flip vertical component
-                vertex.texCoord = {
-                    attrib.texcoords[2 * index.texcoord_index + 0],
-                    1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                };
+                    vertex.color = {
+                        attrib.colors[3 * index.vertex_index + 0],
+                        attrib.colors[3 * index.vertex_index + 1],
+                        attrib.colors[3 * index.vertex_index + 2],
+                    };
+                }
 
-                vertex.color = {1.0f, 1.0f, 1.0f};
+                if (index.normal_index >= 0) {
+                    vertex.normal = {
+                        attrib.normals[3 * index.normal_index + 0],
+                        attrib.normals[3 * index.normal_index + 1],
+                        attrib.normals[3 * index.normal_index + 2],
+                    };
+                }
+
+                if (index.texcoord_index >= 0) {
+                    // obj formate assumes coordinate where 0 is bottom of img, but file has been uploaded into vulkan were 0 is top: flip vertical component
+                    vertex.texCoord = {
+                        attrib.texcoords[2 * index.texcoord_index + 0],
+                        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                    };
+                    /*vertex.texCoord = {
+                        attrib.texcoords[2 * index.texcoord_index + 0],
+                        attrib.texcoords[2 * index.texcoord_index + 1]
+                    };*/
+                }
 
                 // keep track of seen vertices
                 if (uniqueVertices.count(vertex) == 0) {
@@ -1536,7 +1585,9 @@ private:
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
+        /*
         // calculate time in seconds since rendering has started
+        // could put this in main window loop
         static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
@@ -1544,14 +1595,40 @@ private:
         UniformBufferObject ubo{};
         // rotate around z axis uses time variable - rotates at 60 degrees/second
         ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        
+        // Apply scaling transformation
+        glm::vec3 scaleVector(0.08f, 0.08f, 0.08f); // Scale factor along each axis
+        ubo.model = glm::scale(ubo.model, scaleVector);
+        
         // (eye position, center position, and up axis)
-        ubo.view = glm::lookAt(glm::vec3(10.0f, 10.0f, 10.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::lookAt(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         // (45 degree vertical field of view, aspect ratio new and far veiw planes
         ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
         ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
 
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));*/
         // note - more efficient way to pass changing values to the shader is to pass a small buffer of data is push constants
+        
+        
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+        // rotate around y axis uses time variable - rotates at 60 degrees/second
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        
+        // Apply scaling transformation
+        glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
+        ubo.model = glm::scale(ubo.model, scaleVector);
+        
+        // (eye position, center position, and up axis)
+        ubo.view = glm::lookAt(glm::vec3(5.0f, -5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        // (45 degree vertical field of view, aspect ratio new and far veiw planes
+        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
+        //ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
+
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     void drawFrame() {
