@@ -34,6 +34,7 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 480;
 
 const std::string MODEL_PATH = "models/vase.obj";
+//const std::string MODEL_PATH = "models/mountains.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
@@ -169,18 +170,17 @@ namespace std {
 }
 
 struct UniformBufferObject {
-    /*alignas(16) glm::mat4 model;
-    alignas(16) glm::mat4 view;
-    alignas(16) glm::mat4 proj;
-    alignas(16) glm::vec3 lightPos; //vec4? align
-    alignas(16) glm::vec4 lightColor;
-    */
-    glm::mat4 model;
+    glm::mat4 model;    // object to world space - local obj vertices coordinate
+    glm::mat4 view;     // world to camera space - camera looking at scene from viewpoint
+    glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
+
+    glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
+    glm::vec3 lightPos{0.8f, 1.0f, 0.4f};  // careful with alignment
+    alignas(16) glm::vec4 lightColor{1.f};
+
+    /*glm::mat4 model;
     glm::mat4 view;
-    glm::mat4 proj;
-    //glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
-    //glm::vec3 lightPos{-1.f}; //vec4? align
-    //alignas(16) glm::vec4 lightColor{1.f};
+    glm::mat4 proj;*/
 };
 
 /*
@@ -752,7 +752,8 @@ private:
         uboLayoutBinding.descriptorCount = 1;   // # of vars in the array of UBO
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;  // for img sampling descriptors
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;   // which shader stages the descriptor is going to be referenced - could be VK_SHADER_STAGE_ALL_GRAPHICS
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;   // which shader stages the descriptor is going to be referenced
+        //uboLayoutBinding.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
 
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
@@ -1585,25 +1586,27 @@ private:
     }
 
     void updateUniformBuffer(uint32_t currentImage) {
-        /*
         // calculate time in seconds since rendering has started
         // could put this in main window loop
-        static auto startTime = std::chrono::high_resolution_clock::now();
+        
+        /*static auto startTime = std::chrono::high_resolution_clock::now();
         auto currentTime = std::chrono::high_resolution_clock::now();
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
         // rotate around z axis uses time variable - rotates at 60 degrees/second
-        ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        //ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
         // Apply scaling transformation
-        glm::vec3 scaleVector(0.08f, 0.08f, 0.08f); // Scale factor along each axis
+        glm::vec3 scaleVector(0.5f, 1.5f, 0.5f); // Scale factor along each axis
         ubo.model = glm::scale(ubo.model, scaleVector);
         
         // (eye position, center position, and up axis)
-        ubo.view = glm::lookAt(glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::rotate(ubo.view, time* glm::radians(15.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         // (45 degree vertical field of view, aspect ratio new and far veiw planes
-        ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
+        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
         ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
 
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));*/
@@ -1623,10 +1626,11 @@ private:
         ubo.model = glm::scale(ubo.model, scaleVector);
         
         // (eye position, center position, and up axis)
-        ubo.view = glm::lookAt(glm::vec3(5.0f, -5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::rotate(ubo.view, time* glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         // (45 degree vertical field of view, aspect ratio new and far veiw planes
         ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
-        //ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
+        ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
 
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
