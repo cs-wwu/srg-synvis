@@ -1,34 +1,4 @@
-#define GLFW_INCLUDE_VULKAN // GLFW will automatically load the Vulkan header and include its own definitions
-#include <GLFW/glfw3.h>
-
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#define TINYOBJLOADER_IMPLEMENTATION
-#include "tiny_obj_loader.h"
-
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
-#include <algorithm>
-#include <chrono>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <cstdint>
-#include <limits>
-#include <array>
-#include <optional>
-#include <set>
-#include <unordered_map>
-#include <functional>
+#include "precompiled.h"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 480;
@@ -139,7 +109,7 @@ struct Vertex {
         // texture mapping
         attributeDescriptions[3].binding = 0;
         attributeDescriptions[3].location = 3;
-        attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;      // vec2
         attributeDescriptions[3].offset = offsetof(Vertex, texCoord);
 
         return attributeDescriptions;
