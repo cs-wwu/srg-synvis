@@ -58,6 +58,7 @@ for file in *.zip; do
 
 done
 
+rm convert
 echo "Processed all zip files."
 echo "coords/ KB used:"
 du -BK coords/

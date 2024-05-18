@@ -94,5 +94,5 @@ fetch_urls() {
 }
 
 fetch_urls <<'EDSCEOF'
-https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n47w122.zip
+https://e4ftl01.cr.usgs.gov//DP109/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n48w123.zip
 EDSCEOF
