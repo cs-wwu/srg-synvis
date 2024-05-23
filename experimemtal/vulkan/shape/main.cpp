@@ -35,7 +35,7 @@ VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMes
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
 }
-// cleans debug messenger
+// clean debug messenger
 void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator) {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
     if (func != nullptr) {
@@ -145,7 +145,7 @@ struct UniformBufferObject {
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
     glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
-    glm::vec3 lightPos{0.8f, 1.0f, 0.4f};  // careful with alignment
+    glm::vec3 lightPos{1.0f, 1.0f, 1.0f};  // careful with alignment
     alignas(16) glm::vec4 lightColor{1.f};
 
     /*glm::mat4 model;
@@ -153,25 +153,29 @@ struct UniformBufferObject {
     glm::mat4 proj;*/
 };
 
-/*
+
 // array of vertex data; interleaving color and position data
 const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},
+    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
+    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 1
+    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},     // 2
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},    // 3
 
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},  // 4
+    {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},   // 5
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 6
+    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
 };
 
-const std::vector<uint16_t> indices = {
+const std::vector<uint32_t> indices = {
     0, 1, 2, 2, 3, 0,
-    4, 5, 6, 6, 7, 4
+    4, 7, 6, 6, 5, 4,
+    5, 6, 2, 2, 1, 5,
+    3, 2, 6, 6, 7, 3,   // top
+    4, 0, 3, 3, 7, 4,
+    0, 4, 5, 5, 1, 0
 };
-*/
+
 
 class HelloTriangleApplication {
 public:
@@ -218,8 +222,8 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    //std::vector<Vertex> vertices;
+    //std::vector<uint32_t> indices;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -275,7 +279,7 @@ private:
         createTextureImage();
         createTextureImageView();
         createTextureSampler();
-        loadModel();
+        //loadModel();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -805,6 +809,7 @@ private:
         rasterizer.polygonMode = VK_POLYGON_MODE_FILL;  // could be line or point, reqruies enabling gpu feature
         //rasterizer.lineWidth = 1.0f;    // any line thicker than 1.0 requires enabling wideLines GPU feature
         rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+        //rasterizer.cullMode = VK_CULL_MODE_NONE;
         rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterizer.depthBiasEnable = VK_FALSE;  // alters depth value -> shadow mapping
 
@@ -975,7 +980,6 @@ private:
     void createTextureImage() {
         int texWidth, texHeight, texChannels;
         // returns ptr to first element in an array of pixel values laid out row by row w/ 4bytes per pixel
-        // stbi_uc* pixels = stbi_load("textures/point.jpeg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
 
@@ -1169,7 +1173,7 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-    void loadModel() {
+/*    void loadModel() {
         tinyobj::attrib_t attrib;   // holds all positions, normals, and texture coordinates
         std::vector<tinyobj::shape_t> shapes;  // all seperate objs and their faces
         // each face is an array of vertices, each vertex contains the indices of the position, normal, and texture coordinate attributes
@@ -1186,7 +1190,7 @@ private:
         // combine all faces into a single model
         for (const auto& shape : shapes) {
             // triangulation ensures 3 vertices per face, so we can dump into vertices vector
-            // index variable is of tupe tinyobj::index_t, which has vertex_ndex, normal_index, and texcoord_index members, which will be used to index into attrib arrays
+            // index variable is of type tinyobj::index_t, which has vertex_ndex, normal_index, and texcoord_index members, which will be used to index into attrib arrays
             for (const auto& index : shape.mesh.indices) {
                 Vertex vertex{};
 
@@ -1218,10 +1222,10 @@ private:
                         attrib.texcoords[2 * index.texcoord_index + 0],
                         1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
                     };
-                    /*vertex.texCoord = {
-                        attrib.texcoords[2 * index.texcoord_index + 0],
-                        attrib.texcoords[2 * index.texcoord_index + 1]
-                    };*/
+                    //vertex.texCoord = {
+                    //    attrib.texcoords[2 * index.texcoord_index + 0],
+                    //    attrib.texcoords[2 * index.texcoord_index + 1]
+                    //};
                 }
 
                 // keep track of seen vertices
@@ -1233,7 +1237,7 @@ private:
                 indices.push_back(uniqueVertices[vertex]);
             }
         }
-    }
+    }*/
 
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -1265,7 +1269,7 @@ private:
 
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, indices.data(), (size_t) bufferSize);
+        memcpy(data, indices.data(), (size_t) bufferSize);
         vkUnmapMemory(device, stagingBufferMemory);
 
         createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
@@ -1592,7 +1596,8 @@ private:
         ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
         // Apply scaling transformation
-        glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
+        //glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
+        glm::vec3 scaleVector(5.0f, 5.0f, 5.0f);
         ubo.model = glm::scale(ubo.model, scaleVector);
         
         // (eye position, center position, and up axis)
