@@ -145,7 +145,7 @@ struct UniformBufferObject {
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
     glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
-    glm::vec3 lightPos{1.0f, 1.0f, 1.0f};  // careful with alignment
+    glm::vec3 lightPos{-0.5f, -1.0f, 0.0f};  // careful with alignment
     alignas(16) glm::vec4 lightColor{1.f};
 
     /*glm::mat4 model;
@@ -155,15 +155,15 @@ struct UniformBufferObject {
 
 
 // array of vertex data; interleaving color and position data
-const std::vector<Vertex> vertices = {
+/*const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
-    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 1
-    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},     // 2
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},    // 3
+    {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 1
+    {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},     // 2
+    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 3
 
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},  // 4
-    {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},   // 5
-    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 6
+    {{-0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // 4
+    {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
+    {{0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
     {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
 };
 
@@ -174,6 +174,30 @@ const std::vector<uint32_t> indices = {
     3, 2, 6, 6, 7, 3,   // top
     4, 0, 3, 3, 7, 4,
     0, 4, 5, 5, 1, 0
+};*/
+
+const std::vector<Vertex> vertices = {
+    {{0.8f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
+    {{0.7f, 0.1f, 0.2f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 1
+    {{0.7f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},     // 2
+    {{0.6f, 0.3f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 3
+    {{0.5f, 0.1f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // 4
+    {{0.5f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
+    {{0.4f, 0.2f, 0.2f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
+    {{0.4f, 0.2f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
+    {{0.3f, 0.0f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // 4
+    {{0.f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
+    {{0.2f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
+    {{0.3f, 0.0f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
+};
+
+const std::vector<uint32_t> indices = {
+    0,1,2,
+    2,3,4,
+    4,5,6,
+    6,7,8,
+    8,9,10,
+    10,11,9
 };
 
 
@@ -280,6 +304,7 @@ private:
         createTextureImageView();
         createTextureSampler();
         //loadModel();
+        //loadhm();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -981,7 +1006,7 @@ private:
         int texWidth, texHeight, texChannels;
         // returns ptr to first element in an array of pixel values laid out row by row w/ 4bytes per pixel
         stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
+        VkDeviceSize imageSize = texWidth * texHeight * 4;  // 4 channels (RGBA)
 
         if (!pixels) {
             throw std::runtime_error("failed to load texture image!");
@@ -1237,6 +1262,27 @@ private:
                 indices.push_back(uniqueVertices[vertex]);
             }
         }
+    }*/
+
+    /*void loadhm() {
+        int texWidth, texHeight, texChannels;
+        int length = 3601 ??
+        stbi_uc* pixels = stbi_load(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        VkDeviceSize imageSize = texWidth * texHeight * 4;  // 4 channels (RGBA)
+
+        if (!pixels) {
+            throw std::runtime_error("failed to load heightmap!");
+        }
+
+        // iterate through and push_back vec3 of x,y (position), z (read data) + basic form, color, texture values
+        // at the same time, record indice data (except for last col and last row)
+        for (int i=0; i<imageSize, i++) {
+            vertices.pushback();
+            if (not last col and not last row) {
+                indices.insert(indices.end(), (i, i+length, i+length+1, i+length+1, i+1, i))
+            }
+        }
+
     }*/
 
     void createVertexBuffer() {
@@ -1595,7 +1641,6 @@ private:
         // rotate around y axis uses time variable - rotates at 60 degrees/second
         ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         
-        // Apply scaling transformation
         //glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
         glm::vec3 scaleVector(5.0f, 5.0f, 5.0f);
         ubo.model = glm::scale(ubo.model, scaleVector);
