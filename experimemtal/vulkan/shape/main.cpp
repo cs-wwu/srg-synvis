@@ -1267,11 +1267,15 @@ private:
             }
         }
     }*/
+
     void loadhm() {
         int texWidth, texHeight, texChannels;
         int length = 3601;
         //float scale = 60/1852;
         float scale = 200;
+        // open png as pixel array (int16 array)
+        //stbi_uc* pixels = stbi_load(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+        //VkDeviceSize imageSize = texWidth * texHeight * 4;  // 4 channels (RGBA)
 
         // load image
         uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
@@ -1287,7 +1291,7 @@ private:
                 float height = static_cast<float>(pixels[y * 3601 +x]) / 65535.0f;  // normalize
                 vertices.push_back({
                     glm::vec3(x, y, height * scale), 
-                    glm::vec3(0.5f, 0.5f, 0.5f),
+                    glm::vec3(1.0f, 1.0f, 1.0f),
                     glm::vec3(0.5f, 0.5f, 0.5f),
                     glm::vec2(0.0f, 0.0f)
                 });
@@ -1313,7 +1317,32 @@ private:
                 indices.push_back(botRight);
             }
         }
-        stbi_image_free(pixels); 
+
+        stbi_image_free(pixels);
+
+
+        /*
+        // iterate through and push_back vec3 of x,y (position), z (read data) + basic form, color, texture values
+        // on the same interation, record indice data (except for last col and last row)
+        int end = imageSize-length; // don't iterate through last row
+        int row = -1;
+        for (int i=0; i<end, i++) {
+            Vertex vertex{};
+            if (i%length == 0) {
+                row++;
+            }
+            vertex.pos = {i%length,row,pixels[i]};
+            vertex.color = {1.0f, 1.0f, 1.0f};
+            vertex.normal = {1.0f, 1.0f, 1.0f};
+            vertex.texCoord = {0.0f, 0.0f};
+            vertices.pushback(vertex);
+
+            if ((i+1) % length != 0) {  // if not last col
+                indices.insert(indices.end(), (i, i+length, i+length+1, i+length+1, i+1, i))
+            }
+        }
+        */
+        
     }
 
     void createVertexBuffer() {
@@ -1670,17 +1699,18 @@ private:
 
         UniformBufferObject ubo{};
         // rotate around y axis uses time variable - rotates at 60 degrees/second
-        ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        //ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         //ubo.model = glm::mat4(1.0f);
         
-        glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
+        //glm::vec3 scaleVector(.50f, .50f, .50f); // Scale factor along each axis
         ubo.model = glm::scale(ubo.model, scaleVector);
+        ubo.model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.5f, -0.5f, 0.0f));
         
         // (eye position, center position, and up axis)
-        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        ubo.view = glm::rotate(ubo.view, time* glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        ubo.view = glm::rotate(ubo.view, time* glm::radians(15.0f), glm::vec3(1.0f, 0.0f, 0.0f));
         // (45 degree vertical field of view, aspect ratio new and far veiw planes
-        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 100.0f);
+        ubo.proj = glm::perspective(glm::radians(120.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
         ubo.proj[1][1] *= -1;   // so image isnt' rendered upsidedown
 
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
