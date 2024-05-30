@@ -4,7 +4,6 @@ const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 480;
 
 const std::string MODEL_PATH = "models/vase.obj";
-//const std::string MODEL_PATH = "models/mountains.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
 const std::string HM_PATH = "textures/output.png";
 
@@ -178,32 +177,6 @@ const std::vector<uint32_t> indices = {
     0, 4, 5, 5, 1, 0
 };
 */
-
-/* const std::vector<Vertex> vertices = {
-    {{0.8f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
-    {{0.7f, 0.1f, 0.2f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 1
-    {{0.7f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},     // 2
-    {{0.6f, 0.3f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 3
-    {{0.5f, 0.1f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // 4
-    {{0.5f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
-    {{0.4f, 0.2f, 0.2f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
-    {{0.4f, 0.2f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
-    {{0.3f, 0.0f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},  // 4
-    {{0.f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
-    {{0.2f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
-    {{0.3f, 0.0f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
-}; 
-
-const std::vector<uint32_t> indices = {
-    0,1,2,
-    2,3,4,
-    4,5,6,
-    6,7,8,
-    8,9,10,
-    10,11,9
-};
-*/
-
 
 class HelloTriangleApplication {
 public:
@@ -1658,10 +1631,10 @@ private:
         // Rotate the model
         ubo.model = glm::rotate(ubo.model, glm::radians(time * 15.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // Set the view matrix
-        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        // Set the view matrix (eye position, center position, up axis)
+        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
-        // Set the projection matrix
+        // Set the projection matrix (field of view, aspect ration, near view plane, far view plane)
         ubo.proj = glm::perspective(glm::radians(120.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
         ubo.proj[1][1] *= -1; // Invert Y for Vulkan
 
@@ -1897,11 +1870,9 @@ private:
             if (presentSupport) {
                 indices.presentFamily = i;
             }
-
             if (indices.isComplete()) {
                 break;
             }
-
             i++;
         }
 
@@ -1943,12 +1914,10 @@ private:
                     break;
                 }
             }
-
             if (!layerFound) {
                 return false;
             }
         }
-
         return true;
     }
 
@@ -1997,7 +1966,7 @@ int main() {
 TOC:
 (SETUP)
 -resource management (create, cleanup)
--integreating GLFW (initWindow)
+-integrating GLFW (initWindow)
 -initialize Vulkan library by creating an instance
 -validation layers (help with debugging)
     -need to be enabled by specifying their name
@@ -2104,7 +2073,6 @@ TOC:
     -obj far away will sample their textures from smaller mip imgs
     -increases file size by 33% but increases rendering speed and quality
     -each of the mip imgs is stored in different levels of VkImage. mip 0 is original, and mip levels afterwards are the mipchain
-
 */
 
 /*
@@ -2121,6 +2089,4 @@ pattern:
     ptr to next variable that stores the handle to the new object
 
 almost every operation in Vulkan requires commands to be submitted to a queue
-
-renderdoc?
 */
