@@ -6,6 +6,7 @@ const uint32_t HEIGHT = 480;
 const std::string MODEL_PATH = "models/vase.obj";
 //const std::string MODEL_PATH = "models/mountains.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
+const std::string HM_PATH = "textures/output.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 
@@ -154,8 +155,9 @@ struct UniformBufferObject {
 };
 
 
+/*
 // array of vertex data; interleaving color and position data
-/*const std::vector<Vertex> vertices = {
+const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
     {{0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 1
     {{0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},     // 2
@@ -174,9 +176,10 @@ const std::vector<uint32_t> indices = {
     3, 2, 6, 6, 7, 3,   // top
     4, 0, 3, 3, 7, 4,
     0, 4, 5, 5, 1, 0
-};*/
+};
+*/
 
-const std::vector<Vertex> vertices = {
+/* const std::vector<Vertex> vertices = {
     {{0.8f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},   // 0
     {{0.7f, 0.1f, 0.2f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},    // 1
     {{0.7f, 0.1f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 0.0f}},     // 2
@@ -189,7 +192,7 @@ const std::vector<Vertex> vertices = {
     {{0.f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 5
     {{0.2f, 0.3f, 0.3f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f}},    // 6
     {{0.3f, 0.0f, 0.1f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}},   // 7
-};
+}; 
 
 const std::vector<uint32_t> indices = {
     0,1,2,
@@ -199,6 +202,7 @@ const std::vector<uint32_t> indices = {
     8,9,10,
     10,11,9
 };
+*/
 
 
 class HelloTriangleApplication {
@@ -246,8 +250,8 @@ private:
     VkImageView textureImageView;
     VkSampler textureSampler;
 
-    //std::vector<Vertex> vertices;
-    //std::vector<uint32_t> indices;
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
     VkBuffer vertexBuffer;
     VkDeviceMemory vertexBufferMemory;
     VkBuffer indexBuffer;
@@ -304,7 +308,7 @@ private:
         createTextureImageView();
         createTextureSampler();
         //loadModel();
-        //loadhm();
+        loadhm();
         createVertexBuffer();
         createIndexBuffer();
         createUniformBuffers();
@@ -1017,7 +1021,7 @@ private:
         // buffer should be in host visible mem and usable as a transfer source so that we can copy an image
         createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        // copy the pixel values we got from img loading libaray to buffer
+        // copy the pixel values we got from img loading libary to buffer
         void* data;
         vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
             memcpy(data, pixels, static_cast<size_t>(imageSize));
@@ -1263,27 +1267,54 @@ private:
             }
         }
     }*/
-
-    /*void loadhm() {
+    void loadhm() {
         int texWidth, texHeight, texChannels;
-        int length = 3601 ??
-        stbi_uc* pixels = stbi_load(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;  // 4 channels (RGBA)
+        int length = 3601;
+        //float scale = 60/1852;
+        float scale = 200;
+
+        // load image
+        uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
+        std::cout << "opened file\n";
 
         if (!pixels) {
             throw std::runtime_error("failed to load heightmap!");
         }
 
-        // iterate through and push_back vec3 of x,y (position), z (read data) + basic form, color, texture values
-        // at the same time, record indice data (except for last col and last row)
-        for (int i=0; i<imageSize, i++) {
-            vertices.pushback();
-            if (not last col and not last row) {
-                indices.insert(indices.end(), (i, i+length, i+length+1, i+length+1, i+1, i))
+        // generate vertices
+        for (int y=0; y<length; ++y) {
+            for (int x=0; x<length; ++x) {
+                float height = static_cast<float>(pixels[y * 3601 +x]) / 65535.0f;  // normalize
+                vertices.push_back({
+                    glm::vec3(x, y, height * scale), 
+                    glm::vec3(0.5f, 0.5f, 0.5f),
+                    glm::vec3(0.5f, 0.5f, 0.5f),
+                    glm::vec2(0.0f, 0.0f)
+                });
             }
         }
 
-    }*/
+        // generate indices
+        for (int y=0; y<length-1; ++y) {
+            for (int x=0; x<length-1; ++x) {
+                uint32_t topLeft = y * 3601 + x;
+                uint32_t topRight = topLeft + 1;
+                uint32_t botLeft = (y+1) * 3601 + x;
+                uint32_t botRight = botLeft + 1;
+
+                // first triangle
+                indices.push_back(topLeft);
+                indices.push_back(botLeft);
+                indices.push_back(topRight);
+
+                // second triangle
+                indices.push_back(topRight);
+                indices.push_back(botLeft);
+                indices.push_back(botRight);
+            }
+        }
+        stbi_image_free(pixels); 
+    }
 
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
@@ -1640,9 +1671,9 @@ private:
         UniformBufferObject ubo{};
         // rotate around y axis uses time variable - rotates at 60 degrees/second
         ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(5.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        //ubo.model = glm::mat4(1.0f);
         
-        //glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
-        glm::vec3 scaleVector(5.0f, 5.0f, 5.0f);
+        glm::vec3 scaleVector(10.0f, 10.0f, 10.0f); // Scale factor along each axis
         ubo.model = glm::scale(ubo.model, scaleVector);
         
         // (eye position, center position, and up axis)
