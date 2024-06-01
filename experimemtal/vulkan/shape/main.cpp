@@ -1,13 +1,32 @@
 #include "precompiled.h"
 
+/* Screen Size */
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 480;
 
+/* Hardcoded paths */
 const std::string MODEL_PATH = "models/vase.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
 const std::string HM_PATH = "textures/output.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
+
+/* Camera Settings */
+
+// Define camera parameters
+glm::vec3 cameraPos = glm::vec3(1.0f, 1.0f, 1.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float cameraSpeed = 0.05f;
+float mouseSensitivity = 0.1f;
+
+// Define mouse input variables
+bool firstMouse = true;
+float yaw = -90.0f;
+float pitch = 0.0f;
+float lastX = 800.0f / 2.0;
+float lastY = 600.0f / 2.0;
+
 
 // for validation layers
 const std::vector<const char*> validationLayers = {
@@ -178,7 +197,7 @@ const std::vector<uint32_t> indices = {
 };
 */
 
-class HelloTriangleApplication {
+class Application {
 public:
     void run() {
         initWindow();
@@ -259,7 +278,7 @@ private:
     }
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        auto app = reinterpret_cast<Application*>(glfwGetWindowUserPointer(window));
         app->framebufferResized = true;
     }
 
@@ -289,6 +308,156 @@ private:
         createDescriptorSets();
         createCommandBuffers();
         createSyncObjects();
+    }
+
+    /*    void loadModel() {
+        tinyobj::attrib_t attrib;   // holds all positions, normals, and texture coordinates
+        std::vector<tinyobj::shape_t> shapes;  // all seperate objs and their faces
+        // each face is an array of vertices, each vertex contains the indices of the position, normal, and texture coordinate attributes
+        std::vector<tinyobj::material_t> materials; 
+        std::string warn, err;
+
+        // loaded into library's data structure by calling tinyobj::LoadObj fctn
+        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+            throw std::runtime_error(warn + err);
+        }
+
+        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+
+        // combine all faces into a single model
+        for (const auto& shape : shapes) {
+            // triangulation ensures 3 vertices per face, so we can dump into vertices vector
+            // index variable is of type tinyobj::index_t, which has vertex_ndex, normal_index, and texcoord_index members, which will be used to index into attrib arrays
+            for (const auto& index : shape.mesh.indices) {
+                Vertex vertex{};
+
+                if (index.vertex_index >= 0) {
+                    vertex.pos = {
+                        attrib.vertices[3 * index.vertex_index + 0],
+                        attrib.vertices[3 * index.vertex_index + 1],
+                        attrib.vertices[3 * index.vertex_index + 2],
+                    };
+
+                    vertex.color = {
+                        attrib.colors[3 * index.vertex_index + 0],
+                        attrib.colors[3 * index.vertex_index + 1],
+                        attrib.colors[3 * index.vertex_index + 2],
+                    };
+                }
+
+                if (index.normal_index >= 0) {
+                    vertex.normal = {
+                        attrib.normals[3 * index.normal_index + 0],
+                        attrib.normals[3 * index.normal_index + 1],
+                        attrib.normals[3 * index.normal_index + 2],
+                    };
+                }
+
+                if (index.texcoord_index >= 0) {
+                    // obj formate assumes coordinate where 0 is bottom of img, but file has been uploaded into vulkan were 0 is top: flip vertical component
+                    vertex.texCoord = {
+                        attrib.texcoords[2 * index.texcoord_index + 0],
+                        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+                    };
+                    //vertex.texCoord = {
+                    //    attrib.texcoords[2 * index.texcoord_index + 0],
+                    //    attrib.texcoords[2 * index.texcoord_index + 1]
+                    //};
+                }
+
+                // keep track of seen vertices
+                if (uniqueVertices.count(vertex) == 0) {
+                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+                    vertices.push_back(vertex);
+                }
+
+                indices.push_back(uniqueVertices[vertex]);
+            }
+        }
+    }*/
+
+    /** @brief Loads height map data and adds it to vertices and indices for rendering*/
+    void loadhm() {
+        int texWidth, texHeight, texChannels;
+        int length = 3601;
+        float scale = 1.0f; // Normalize to 0 to 1
+
+        // Load image
+        uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
+        std::cout << "opened file\n";
+
+        if (!pixels) {
+            throw std::runtime_error("failed to load heightmap!");
+        }
+
+        // Generate vertices
+        for (int y = 0; y < length; ++y) {
+            for (int x = 0; x < length; ++x) {
+                float height = static_cast<float>(pixels[y * length + x] - 32737.0f) / 65535.0f;  // Normalize height
+                float normX = static_cast<float>(x) / static_cast<float>(length - 1);  // Normalize x
+                float normY = static_cast<float>(y) / static_cast<float>(length - 1);  // Normalize y
+                vertices.push_back({
+                    glm::vec3(normX, normY, height * scale),
+                    glm::vec3(1.0f, 1.0f, 1.0f),
+                    glm::vec3(0.5f, 0.5f, 0.5f),
+                    glm::vec2(0.0f, 0.0f)
+                });
+            }
+        }
+
+        // Generate indices
+        for (int y = 0; y < length - 1; ++y) {
+            for (int x = 0; x < length - 1; ++x) {
+                uint32_t topLeft = y * length + x;
+                uint32_t topRight = topLeft + 1;
+                uint32_t botLeft = (y + 1) * length + x;
+                uint32_t botRight = botLeft + 1;
+
+                // First triangle
+                indices.push_back(topLeft);
+                indices.push_back(botLeft);
+                indices.push_back(topRight);
+
+                // Second triangle
+                indices.push_back(topRight);
+                indices.push_back(botLeft);
+                indices.push_back(botRight);
+            }
+        }
+
+        stbi_image_free(pixels);
+    }
+
+    /** @brief Updates the uniform buffer for lighting and rotation */
+    void updateUniformBuffer(uint32_t currentImage) {
+        // Calculate time for rotation speed
+        static auto startTime = std::chrono::high_resolution_clock::now();
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+        UniformBufferObject ubo{};
+
+        // Scale the model
+        glm::vec3 scaleVector(2.0f, 2.0f, 2.0f); // Normalized scale factor
+        ubo.model = glm::scale(glm::mat4(1.0f), scaleVector);
+
+        // Translate to center the heightmap
+        float centerX = 0.5f; // Center of normalized coordinates
+        float centerY = 0.5f; // Center of normalized coordinates
+        ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
+
+        // Rotate the model
+        ubo.model = glm::rotate(ubo.model, glm::radians(time * 15.0f), glm::vec3(0.0f, 0.0f, 1.0f));    // Correct rotation is 0, 0, 1
+
+        // Set the view matrix (eye position, center position, up axis)
+        ubo.view = glm::lookAt(cameraPos, cameraFront, cameraUp);
+
+        // Set the projection matrix (field of view, aspect ratio, near view plane, far view plane)
+        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
+        // ubo.proj[1][1] *= -1; // Invert Y for Vulkan
+
+        // Copy the uniform buffer data
+        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
     void mainLoop() {
@@ -1175,122 +1344,6 @@ private:
         endSingleTimeCommands(commandBuffer);
     }
 
-/*    void loadModel() {
-        tinyobj::attrib_t attrib;   // holds all positions, normals, and texture coordinates
-        std::vector<tinyobj::shape_t> shapes;  // all seperate objs and their faces
-        // each face is an array of vertices, each vertex contains the indices of the position, normal, and texture coordinate attributes
-        std::vector<tinyobj::material_t> materials; 
-        std::string warn, err;
-
-        // loaded into library's data structure by calling tinyobj::LoadObj fctn
-        if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
-            throw std::runtime_error(warn + err);
-        }
-
-        std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
-        // combine all faces into a single model
-        for (const auto& shape : shapes) {
-            // triangulation ensures 3 vertices per face, so we can dump into vertices vector
-            // index variable is of type tinyobj::index_t, which has vertex_ndex, normal_index, and texcoord_index members, which will be used to index into attrib arrays
-            for (const auto& index : shape.mesh.indices) {
-                Vertex vertex{};
-
-                if (index.vertex_index >= 0) {
-                    vertex.pos = {
-                        attrib.vertices[3 * index.vertex_index + 0],
-                        attrib.vertices[3 * index.vertex_index + 1],
-                        attrib.vertices[3 * index.vertex_index + 2],
-                    };
-
-                    vertex.color = {
-                        attrib.colors[3 * index.vertex_index + 0],
-                        attrib.colors[3 * index.vertex_index + 1],
-                        attrib.colors[3 * index.vertex_index + 2],
-                    };
-                }
-
-                if (index.normal_index >= 0) {
-                    vertex.normal = {
-                        attrib.normals[3 * index.normal_index + 0],
-                        attrib.normals[3 * index.normal_index + 1],
-                        attrib.normals[3 * index.normal_index + 2],
-                    };
-                }
-
-                if (index.texcoord_index >= 0) {
-                    // obj formate assumes coordinate where 0 is bottom of img, but file has been uploaded into vulkan were 0 is top: flip vertical component
-                    vertex.texCoord = {
-                        attrib.texcoords[2 * index.texcoord_index + 0],
-                        1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-                    };
-                    //vertex.texCoord = {
-                    //    attrib.texcoords[2 * index.texcoord_index + 0],
-                    //    attrib.texcoords[2 * index.texcoord_index + 1]
-                    //};
-                }
-
-                // keep track of seen vertices
-                if (uniqueVertices.count(vertex) == 0) {
-                    uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                    vertices.push_back(vertex);
-                }
-
-                indices.push_back(uniqueVertices[vertex]);
-            }
-        }
-    }*/
-
-    void loadhm() {
-        int texWidth, texHeight, texChannels;
-        int length = 3601;
-        //float scale = 60/1852;
-        float scale = 2000; // TODO exageration
-
-        // load image
-        uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
-        std::cout << "opened file\n";
-
-        if (!pixels) {
-            throw std::runtime_error("failed to load heightmap!");
-        }
-
-        // generate vertices
-        for (int y = 0; y < length; ++y) {
-            for (int x = 0; x < length; ++x) {
-                float height = static_cast<float>(pixels[y * 3601 + x]) / 65535.0f;  // normalize
-                vertices.push_back({
-                    glm::vec3(x, y, height * scale), 
-                    glm::vec3(1.0f, 1.0f, 1.0f),
-                    glm::vec3(0.5f, 0.5f, 0.5f),
-                    glm::vec2(0.0f, 0.0f)
-                });
-            }
-        }
-
-        // generate indices
-        for (int y = 0; y < length-1; ++y) {
-            for (int x = 0; x < length-1; ++x) {
-                uint32_t topLeft = y * 3601 + x;
-                uint32_t topRight = topLeft + 1;
-                uint32_t botLeft = (y + 1) * 3601 + x;
-                uint32_t botRight = botLeft + 1;
-
-                // first triangle
-                indices.push_back(topLeft);
-                indices.push_back(botLeft);
-                indices.push_back(topRight);
-
-                // second triangle
-                indices.push_back(topRight);
-                indices.push_back(botLeft);
-                indices.push_back(botRight);
-            }
-        }
-
-        stbi_image_free(pixels); 
-    }
-
     void createVertexBuffer() {
         VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -1611,37 +1664,6 @@ private:
         }
     }
 
-    void updateUniformBuffer(uint32_t currentImage) {
-        // Calculate time for rotation speed
-        static auto startTime = std::chrono::high_resolution_clock::now();
-        auto currentTime = std::chrono::high_resolution_clock::now();
-        float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
-
-        UniformBufferObject ubo{};
-
-        // Scale the model
-        glm::vec3 scaleVector(0.50f, 0.50f, 0.50f); // Scale factor along each axis
-        ubo.model = glm::scale(glm::mat4(1.0f), scaleVector);
-
-        // Translate to center the heightmap
-        float centerX = 3601.0f / 2.0f;
-        float centerY = 3601.0f / 2.0f;
-        ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
-
-        // Rotate the model
-        ubo.model = glm::rotate(ubo.model, glm::radians(time * 15.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-        // Set the view matrix (eye position, center position, up axis)
-        ubo.view = glm::lookAt(glm::vec3(5.0f, 5.0f, 5.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-        // Set the projection matrix (field of view, aspect ration, near view plane, far view plane)
-        ubo.proj = glm::perspective(glm::radians(120.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
-        ubo.proj[1][1] *= -1; // Invert Y for Vulkan
-
-        // Copy the uniform buffer data
-        memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
-    }
-
     void drawFrame() {
         // wait to draw frame until previous is finished
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
@@ -1950,7 +1972,7 @@ private:
 };
 
 int main() {
-    HelloTriangleApplication app;
+    Application app;
 
     try {
         app.run();
