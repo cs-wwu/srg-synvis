@@ -447,7 +447,7 @@ private:
         ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
 
         // Rotate the model
-        ubo.model = glm::rotate(ubo.model, glm::radians(time * 15.0f), glm::vec3(0.0f, 0.0f, 1.0f));    // Correct rotation is 0, 0, 1
+        ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));    // Correct rotation is 0, 0, 1
 
         // Set the view matrix (eye position, center position, up axis)
         ubo.view = glm::lookAt(cameraPos, cameraFront, cameraUp);
@@ -460,10 +460,58 @@ private:
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
+    void processInput() {
+        // Check if the cursor is within the window boundaries
+        if (glfwGetWindowAttrib(window, GLFW_HOVERED)) {
+            // Check for mouse input (Look around)
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            float xOffset = xpos - lastX;
+            float yOffset = lastY - ypos; // Reversed since y-coordinates range from bottom to top
+            lastX = xpos;
+            lastY = ypos;
+
+            float sensitivity = 0.1f; // Adjust sensitivity as needed
+            xOffset *= sensitivity;
+            yOffset *= sensitivity;
+
+            yaw += xOffset;
+            pitch += yOffset;
+
+            // Clamp pitch to avoid flipping
+            if (pitch > 89.0f)
+                pitch = 89.0f;
+            if (pitch < -89.0f)
+                pitch = -89.0f;
+
+            // Calculate new camera front direction
+            glm::vec3 front;
+            front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+            front.y = sin(glm::radians(pitch));
+            front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+            cameraFront = glm::normalize(front);
+        }
+
+        // Check for keyboard input (WASD movement)
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            cameraPos += cameraSpeed * cameraFront;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            cameraPos -= cameraSpeed * cameraFront;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+        
+        // Print camera position and pitch
+        std::cout << "Camera Position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
+        std::cout << "Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
+    }
+
     void mainLoop() {
         // runs until window is closed
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            processInput();
             drawFrame();
         }
         // to exit w/o problems when closing window
