@@ -32,3 +32,5 @@ go.work
 *is_water
 coords/
 
+# Vulkan out file
+experimemtal/vulkan/shape/VulkanTest
