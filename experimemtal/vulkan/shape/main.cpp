@@ -163,13 +163,10 @@ struct UniformBufferObject {
     glm::mat4 view;     // world to camera space - camera looking at scene from viewpoint
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
-    glm::vec4 ambient{1.f, 1.f, 1.f, .02f};
-    glm::vec3 lightPos{-0.5f, -1.0f, 0.0f};  // careful with alignment
-    alignas(16) glm::vec4 lightColor{1.f};
+    glm::vec4 ambient{1.f, 1.f, 1.f, .01f};  // r,g,b, opacity
+    glm::vec3 lightPos{1.0f, -1.f, 1.0f};  // careful with alignment
+    alignas(16) glm::vec4 lightColor{.8f};
 
-    /*glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;*/
 };
 
 
