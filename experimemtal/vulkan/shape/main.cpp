@@ -14,8 +14,8 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 /* Camera Settings */
 
 // Define camera parameters
-glm::vec3 cameraPos = glm::vec3(1.0f, 1.0f, 1.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 cameraPos = glm::vec3(0.0f, -0.75f, 2.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, -1.0f, 0.0f);
 glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 float cameraSpeed = 0.05f;
 float mouseSensitivity = 0.1f;
@@ -164,7 +164,7 @@ struct UniformBufferObject {
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
     glm::vec4 ambient{1.f, 1.f, 1.f, .01f};  // r,g,b, opacity
-    glm::vec3 lightPos{1.0f, -1.f, 1.0f};  // careful with alignment
+    glm::vec3 lightPos{1.0f, -1.0f, 1.0f};  // careful with alignment
     alignas(16) glm::vec4 lightColor{.8f};
 
 };
@@ -390,11 +390,11 @@ private:
         // Generate vertices
         for (int y = 0; y < length; ++y) {
             for (int x = 0; x < length; ++x) {
-                float height = static_cast<float>(pixels[y * length + x] - 32737.0f) / 65535.0f;  // Normalize height
+                float height = static_cast<float>(pixels[y * length + x] - 32737.0f) / 65535.0f; // Normalize height
                 float normX = static_cast<float>(x) / static_cast<float>(length - 1);  // Normalize x
-                float normY = static_cast<float>(y) / static_cast<float>(length - 1);  // Normalize y
+                float normZ = static_cast<float>(y) / static_cast<float>(length - 1);  // Normalize z
                 vertices.push_back({
-                    glm::vec3(normX, normY, height * scale),
+                    glm::vec3(normX, height * scale, normZ), // Notice -height to invert y-axis
                     glm::vec3(1.0f, 1.0f, 1.0f),
                     glm::vec3(0.5f, 0.5f, 0.5f),
                     glm::vec2(0.0f, 0.0f)
@@ -436,31 +436,50 @@ private:
 
         // Scale the model
         glm::vec3 scaleVector(2.0f, 2.0f, 2.0f); // Normalized scale factor
-        ubo.model = glm::scale(glm::mat4(1.0f), scaleVector);
+        ubo.model = glm::mat4(1.0f); // Used for initialization
+        ubo.model = glm::scale(ubo.model, scaleVector); // Used for scaling 
 
         // Translate to center the heightmap
         float centerX = 0.5f; // Center of normalized coordinates
         float centerY = 0.5f; // Center of normalized coordinates
         ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
 
-        // Rotate the model
-        ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));    // Correct rotation is 0, 0, 1
 
-        // Set the view matrix (eye position, center position, up axis)
-        ubo.view = glm::lookAt(cameraPos, cameraFront, cameraUp);
+        // Rotate the model
+        ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // Correct rotation is 0, 0, 1
+
+        // Manually create the view matrix for now TODO
+        glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraFront);
+        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraUp, cameraDirection));
+        glm::vec3 cameraUpNew = glm::cross(cameraDirection, cameraRight);
+
+        glm::mat4 view = glm::mat4(1.0f);
+        view[0][0] = cameraRight.x;
+        view[1][0] = cameraRight.y;
+        view[2][0] = cameraRight.z;
+        view[0][1] = cameraUpNew.x;
+        view[1][1] = cameraUpNew.y;
+        view[2][1] = cameraUpNew.z;
+        view[0][2] = cameraDirection.x;
+        view[1][2] = cameraDirection.y;
+        view[2][2] = cameraDirection.z;
+        view = glm::translate(view, -cameraPos);
+
+        ubo.view = view;
 
         // Set the projection matrix (field of view, aspect ratio, near view plane, far view plane)
         ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
-        // ubo.proj[1][1] *= -1; // Invert Y for Vulkan
+        ubo.proj[1][1] *= -1; // Invert Y for Vulkan
 
         // Copy the uniform buffer data
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
+    /** @brief Processes user input to move the camera. 
+     *         This is then applied in updating the uniform buffer.
+    */
     void processInput() {
-        // Check if the cursor is within the window boundaries
         if (glfwGetWindowAttrib(window, GLFW_HOVERED)) {
-            // Check for mouse input (Look around)
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
             float xOffset = xpos - lastX;
@@ -487,21 +506,21 @@ private:
             front.y = sin(glm::radians(pitch));
             front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
             cameraFront = glm::normalize(front);
-        }
 
-        // Check for keyboard input (WASD movement)
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-            cameraPos += cameraSpeed * cameraFront;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-            cameraPos -= cameraSpeed * cameraFront;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-            cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-            cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-        
-        // Print camera position and pitch
-        std::cout << "Camera Position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
-        std::cout << "Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
+            // Check for keyboard input (WASD movement)
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+                cameraPos += cameraSpeed * cameraFront;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+                cameraPos -= cameraSpeed * cameraFront;
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+                cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+                cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+
+            // Print camera position and pitch
+            std::cout << "Camera Position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
+            std::cout << "Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
+        }
     }
 
     void mainLoop() {
@@ -1812,11 +1831,11 @@ private:
         return availableFormats[0];
     }
 
-    // 4 possible modes
-    // VK_PRESENT_MODE_IMMEDIATE_KHR: images submitted are transferred to the screen right away (tearing)
-    // VK_PRESENT_MODE_FIFO_KHR: swap chain is a queue
-    // VK_PRESENT_MODE_FIFO_RELAXED_KHR: only differs from prior if the application was late and queue was empty at last vertical blank: images transfers right away (tearing)
-    // VK_PRESENT_MODE_MAILBOX_KHR: another variation of second mode but avoids tearing
+    /* 4 possible modes
+    VK_PRESENT_MODE_IMMEDIATE_KHR: images submitted are transferred to the screen right away (tearing)
+    VK_PRESENT_MODE_FIFO_KHR: swap chain is a queue
+    VK_PRESENT_MODE_FIFO_RELAXED_KHR: only differs from prior if the application was late and queue was empty at last vertical blank: images transfers right away (tearing)
+    VK_PRESENT_MODE_MAILBOX_KHR: another variation of second mode but avoids tearing */
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes) {
         for (const auto& availablePresentMode : availablePresentModes) {
             if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
