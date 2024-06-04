@@ -14,14 +14,13 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 /* Camera Settings */
 
 // Define camera parameters
-#define START_CAMERA_POS    glm::vec3(0.0f, -0.75f, 2.0f)
+#define START_CAMERA_POS    glm::vec3(1740.0f, 30.0f, 2760.0f)
 #define START_CAMERA_FRONT  glm::vec3(0.0f, -1.0f, 0.0f)
 #define START_CAMERA_UP     glm::vec3(0.0f, 1.0f, 0.0f)
-#define CAMERA_SPEED        0.025f
-#define MOUSE_SENSITIVITY   0.005f;
+#define CAMERA_SPEED        1.0f  // Should be 0.25f for normalized between 0 and 1
+#define MOUSE_SENSITIVITY   0.005f
 
 // Define mouse input variables
-bool firstMouse = true;
 float lastX = 800.0f / 2.0;
 float lastY = 600.0f / 2.0;
 
@@ -179,8 +178,8 @@ struct UniformBufferObject {
     glm::mat4 view;     // world to camera space - camera looking at scene from viewpoint
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
-    glm::vec4 ambient{1.f, 1.f, 1.f, .02f};  // r,g,b, opacity
-    glm::vec3 lightPos{0.0f, 0.0f, 1.1f};  // careful with alignment
+    glm::vec4 ambient{1.0f, 1.0f, 1.0f, 0.02f};  // r,g,b, opacity
+    glm::vec3 lightPos{0.0f, 10000.0f, 0.0f};  // careful with alignment
     alignas(16) glm::vec4 lightColor{.7f};
 };
 
@@ -393,7 +392,8 @@ private:
     void loadhm() {
         int texWidth, texHeight, texChannels;
         int length = 3601;
-        float scale = 1.0f; // Normalize to 0 to 1
+        // float scale = 1.0f;
+        float scale = 60.0f / 1852.0f;
 
         // Load image
         uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
@@ -405,9 +405,14 @@ private:
         // Generate vertices
         for (int y = 0; y < length; ++y) {
             for (int x = 0; x < length; ++x) {
-                float height = static_cast<float>(pixels[y * length + x] - 32737.0f) / 65535.0f; // Normalize height
-                float normX = static_cast<float>(x) / static_cast<float>(length - 1);  // Normalize x
-                float normZ = static_cast<float>(y) / static_cast<float>(length - 1);  // Normalize z
+                // float height = static_cast<float>(pixels[y * length + x] - 32768.0f) / 65535.0f; // Normalize height
+                // float normX = static_cast<float>(x) / static_cast<float>(length - 1);  // Normalize x
+                // float normZ = static_cast<float>(y) / static_cast<float>(length - 1);  // Normalize z
+
+                float height = static_cast<float>(pixels[y * length + x] - 32768.0f);
+                float normX = static_cast<float>(x);
+                float normZ = static_cast<float>(y);
+
                 vertices.push_back({
                     glm::vec3(normX, height * scale, normZ), // Notice -height to invert y-axis
                     glm::vec3(1.0f, 1.0f, 1.0f),
@@ -448,11 +453,7 @@ private:
         float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
         UniformBufferObject ubo{};
-
-        // Scale the model
-        glm::vec3 scaleVector(2.0f, 2.0f, 2.0f); // Normalized scale factor
         ubo.model = glm::mat4(1.0f); // Used for initialization
-        ubo.model = glm::scale(ubo.model, scaleVector); // Used for scaling 
 
         // Translate to center the heightmap
         float centerX = 0.5f; // Center of normalized coordinates
@@ -460,12 +461,12 @@ private:
         ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
 
         // Rotate the model
-        // ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // Correct rotation is 0, 0, 1
+        // ubo.model = glm::rotate(ubo.model, glm::radians(time * 2.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // Correct rotation is 0, 1, 0
 
         ubo.view = camera.getViewMatrix();
 
         // Set the projection matrix (field of view, aspect ratio, near view plane, far view plane)
-        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.0001f, 1000.0f);
+        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 3601.0f);
         ubo.proj[1][1] *= -1; // Invert Y for Vulkan
 
         // Copy the uniform buffer data
@@ -504,7 +505,7 @@ private:
             front.z = sin(yaw) * cos(pitch);
             camera.front = glm::normalize(front);
 
-            // Check for keyboard input (WASD movement)
+            // Check for keyboard input (WASD, Space, Ctrl movements)
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
                 camera.position += camera.speed * camera.front;
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -528,6 +529,7 @@ private:
             drawFrame();
             // Print camera position and pitch
             std::cout << "Camera Position: (" << camera.position.x << ", " << camera.position.y << ", " << camera.position.z << ")" << std::endl;
+            std::cout << "Degree Position: 122." << std::round((3601 - camera.position.x) / 60) << "°W, 48." << std::round(camera.position.z / 60) << "°N, " << camera.position.y * (1852/60) << " meters" << std::endl;
             std::cout << "Camera Front: (" << camera.front.x << ", " << camera.front.y << ", " << camera.front.z << ")" << std::endl;
         }
         // to exit w/o problems when closing window
