@@ -14,18 +14,34 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 /* Camera Settings */
 
 // Define camera parameters
-glm::vec3 cameraPos = glm::vec3(0.0f, -0.75f, 2.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, -1.0f, 0.0f);
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-float cameraSpeed = 0.05f;
-float mouseSensitivity = 0.1f;
+#define START_CAMERA_POS    glm::vec3(0.0f, -0.75f, 2.0f)
+#define START_CAMERA_FRONT  glm::vec3(0.0f, -1.0f, 0.0f)
+#define START_CAMERA_UP     glm::vec3(0.0f, 1.0f, 0.0f)
+#define CAMERA_SPEED        0.025f
+#define MOUSE_SENSITIVITY   0.005f;
 
 // Define mouse input variables
 bool firstMouse = true;
-float yaw = -90.0f;
-float pitch = 0.0f;
 float lastX = 800.0f / 2.0;
 float lastY = 600.0f / 2.0;
+
+/** Camera struct for movement */
+struct Camera {
+    glm::vec3 position; // (x, y, z)
+    glm::vec3 front;    // Where the front of the camera is
+    glm::vec3 up;       // Where above the camera is
+    float velocity;
+    float speed;
+
+    // Camera constructor
+    Camera()
+        : position(START_CAMERA_POS), front(START_CAMERA_FRONT), up(START_CAMERA_UP), speed(CAMERA_SPEED) {}
+
+    // Function to update the camera's view matrix
+    glm::mat4 getViewMatrix() const {
+        return glm::lookAt(position, position + front, up);
+    }
+};
 
 
 // for validation layers
@@ -163,10 +179,9 @@ struct UniformBufferObject {
     glm::mat4 view;     // world to camera space - camera looking at scene from viewpoint
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
 
-    glm::vec4 ambient{1.f, 1.f, 1.f, .01f};  // r,g,b, opacity
-    glm::vec3 lightPos{1.0f, -1.0f, 1.0f};  // careful with alignment
-    alignas(16) glm::vec4 lightColor{.8f};
-
+    glm::vec4 ambient{1.f, 1.f, 1.f, .02f};  // r,g,b, opacity
+    glm::vec3 lightPos{0.0f, 0.0f, 1.1f};  // careful with alignment
+    alignas(16) glm::vec4 lightColor{.7f};
 };
 
 
@@ -205,6 +220,7 @@ public:
 
 private:
     GLFWwindow* window;
+    Camera camera;
 
     VkInstance instance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -381,7 +397,6 @@ private:
 
         // Load image
         uint16_t* pixels = stbi_load_16(HM_PATH.c_str(), &texWidth, &texHeight, &texChannels, 1);
-        std::cout << "opened file\n";
 
         if (!pixels) {
             throw std::runtime_error("failed to load heightmap!");
@@ -397,7 +412,7 @@ private:
                     glm::vec3(normX, height * scale, normZ), // Notice -height to invert y-axis
                     glm::vec3(1.0f, 1.0f, 1.0f),
                     glm::vec3(0.5f, 0.5f, 0.5f),
-                    glm::vec2(0.0f, 0.0f)
+                    glm::vec2(normZ, normX)
                 });
             }
         }
@@ -444,31 +459,13 @@ private:
         float centerY = 0.5f; // Center of normalized coordinates
         ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
 
-
         // Rotate the model
-        ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // Correct rotation is 0, 0, 1
+        // ubo.model = glm::rotate(ubo.model, glm::radians(time * 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // Correct rotation is 0, 0, 1
 
-        // Manually create the view matrix for now TODO
-        glm::vec3 cameraDirection = glm::normalize(cameraPos - cameraFront);
-        glm::vec3 cameraRight = glm::normalize(glm::cross(cameraUp, cameraDirection));
-        glm::vec3 cameraUpNew = glm::cross(cameraDirection, cameraRight);
-
-        glm::mat4 view = glm::mat4(1.0f);
-        view[0][0] = cameraRight.x;
-        view[1][0] = cameraRight.y;
-        view[2][0] = cameraRight.z;
-        view[0][1] = cameraUpNew.x;
-        view[1][1] = cameraUpNew.y;
-        view[2][1] = cameraUpNew.z;
-        view[0][2] = cameraDirection.x;
-        view[1][2] = cameraDirection.y;
-        view[2][2] = cameraDirection.z;
-        view = glm::translate(view, -cameraPos);
-
-        ubo.view = view;
+        ubo.view = camera.getViewMatrix();
 
         // Set the projection matrix (field of view, aspect ratio, near view plane, far view plane)
-        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f, 1000.0f);
+        ubo.proj = glm::perspective(glm::radians(90.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.0001f, 1000.0f);
         ubo.proj[1][1] *= -1; // Invert Y for Vulkan
 
         // Copy the uniform buffer data
@@ -479,47 +476,47 @@ private:
      *         This is then applied in updating the uniform buffer.
     */
     void processInput() {
-        if (glfwGetWindowAttrib(window, GLFW_HOVERED)) {
+        if (glfwGetWindowAttrib(window, GLFW_FOCUSED)) {
             double xpos, ypos;
             glfwGetCursorPos(window, &xpos, &ypos);
             float xOffset = xpos - lastX;
-            float yOffset = lastY - ypos; // Reversed since y-coordinates range from bottom to top
+            float yOffset = lastY - ypos;
             lastX = xpos;
             lastY = ypos;
 
-            float sensitivity = 0.1f; // Adjust sensitivity as needed
+            float sensitivity = MOUSE_SENSITIVITY;
             xOffset *= sensitivity;
             yOffset *= sensitivity;
 
-            yaw += xOffset;
-            pitch += yOffset;
+            float yaw = atan2(camera.front.z, camera.front.x) + xOffset;
+            float pitch = asin(camera.front.y) + yOffset;
 
             // Clamp pitch to avoid flipping
-            if (pitch > 89.0f)
-                pitch = 89.0f;
-            if (pitch < -89.0f)
-                pitch = -89.0f;
+            if (pitch > glm::radians(89.0f))
+                pitch = glm::radians(89.0f);
+            if (pitch < -glm::radians(89.0f))
+                pitch = -glm::radians(89.0f);
 
             // Calculate new camera front direction
             glm::vec3 front;
-            front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-            front.y = sin(glm::radians(pitch));
-            front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-            cameraFront = glm::normalize(front);
+            front.x = cos(yaw) * cos(pitch);
+            front.y = sin(pitch);
+            front.z = sin(yaw) * cos(pitch);
+            camera.front = glm::normalize(front);
 
             // Check for keyboard input (WASD movement)
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-                cameraPos += cameraSpeed * cameraFront;
+                camera.position += camera.speed * camera.front;
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-                cameraPos -= cameraSpeed * cameraFront;
+                camera.position -= camera.speed * camera.front;
             if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-                cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+                camera.position -= glm::normalize(glm::cross(camera.front, camera.up)) * camera.speed;
             if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-                cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-
-            // Print camera position and pitch
-            std::cout << "Camera Position: (" << cameraPos.x << ", " << cameraPos.y << ", " << cameraPos.z << ")" << std::endl;
-            std::cout << "Pitch: " << pitch << ", Yaw: " << yaw << std::endl;
+                camera.position += glm::normalize(glm::cross(camera.front, camera.up)) * camera.speed;
+            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+                camera.position -= camera.speed * camera.up;
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+                camera.position += camera.speed * camera.up;
         }
     }
 
@@ -529,6 +526,9 @@ private:
             glfwPollEvents();
             processInput();
             drawFrame();
+            // Print camera position and pitch
+            std::cout << "Camera Position: (" << camera.position.x << ", " << camera.position.y << ", " << camera.position.z << ")" << std::endl;
+            std::cout << "Camera Front: (" << camera.front.x << ", " << camera.front.y << ", " << camera.front.z << ")" << std::endl;
         }
         // to exit w/o problems when closing window
         vkDeviceWaitIdle(device);
