@@ -99,7 +99,7 @@ struct SwapChainSupportDetails {
 struct Vertex {
     glm::vec3 pos;
     glm::vec3 color;
-    glm::vec3 normal;
+    glm::vec3 normal;    // perpendicular vector used for lighting
     glm::vec2 texCoord;
 
     // tell vulkan how to pass this data to vertex shader once uploaded to GPU mem
@@ -179,9 +179,13 @@ struct UniformBufferObject {
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
     glm::mat4 normalM;  // for lighting
 
+    glm::vec3 lightDir = glm::normalize(glm::vec3{0.0f, 0.1f, 0.1f});
+
+    /*
     glm::vec4 ambient{1.0f, 1.0f, 1.0f, 0.02f};  // r,g,b, opacity
     glm::vec3 lightPos{0.0f, 10000.0f, 0.0f};  // careful with alignment
     alignas(16) glm::vec4 lightColor{.7f};
+    */
 };
 
 
@@ -389,6 +393,21 @@ private:
         }
     }*/
 
+    void calculateNormals() {
+        int length = 3601;
+        for (int y = 0; y < length - 1; ++y) {
+            for (int x = 0; x < length - 1; ++x) {
+                glm::vec3 current = vertices[y * length + x].pos;
+                glm::vec3 right = vertices[y * length + (x + 1)].pos;
+                glm::vec3 down = vertices[(y + 1) * length + x].pos;
+
+                glm::vec3 normal = glm::normalize(glm::cross(down - current, right - current));
+
+                vertices[y * length + x].normal = normal;
+            }
+        }
+    }
+
     /** @brief Loads height map data and adds it to vertices and indices for rendering*/
     void loadhm() {
         int texWidth, texHeight, texChannels;
@@ -417,7 +436,7 @@ private:
                 vertices.push_back({
                     glm::vec3(normX, height * scale, normZ), // Notice -height to invert y-axis
                     glm::vec3(1.0f, 1.0f, 1.0f),
-                    glm::vec3(1.0f, 1.0f, 1.0f),
+                    glm::vec3(0.0f),
                     glm::vec2(normZ / static_cast<float>(length - 1), normX / static_cast<float>(length - 1))
                 });
             }
@@ -442,7 +461,7 @@ private:
                 indices.push_back(botRight);
             }
         }
-
+        calculateNormals();
         stbi_image_free(pixels);
     }
 
