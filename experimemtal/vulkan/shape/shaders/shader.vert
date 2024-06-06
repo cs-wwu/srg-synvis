@@ -4,6 +4,7 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
+    mat4 normalM;
 
     vec4 ambient;
     vec3 lightPos;
@@ -23,13 +24,14 @@ void main() {
     vec4 positionWorld = ubo.model * vec4(inPosition, 1.0);
     gl_Position = ubo.proj * ubo.view * positionWorld;
 
-    vec3 world = normalize(mat3(ubo.model) * inNormal);
-    vec3 direction = ubo.lightPos - positionWorld.xyz;
-    float attenuation = 1.0 / dot(direction, direction);  // distance squared
+    vec3 normalWorld = normalize(mat3(ubo.normalM) * inNormal);
+
+    vec3 directiontoLight = ubo.lightPos - positionWorld.xyz;
+    float attenuation = 1.0 / dot(directiontoLight, directiontoLight);  // distance squared
 
     vec3 lcolor = ubo.lightColor.xyz * ubo.lightColor.w * attenuation;
     vec3 alight = ubo.ambient.xyz * ubo.ambient.w;
-    vec3 diffuse = lcolor * max(dot(world, normalize(direction)), 0);
+    vec3 diffuse = lcolor * max(dot(normalWorld, normalize(directiontoLight)), 0);
 
     fragColor = (diffuse + alight) * inColor;
     fragTexCoord = inTexCoord;

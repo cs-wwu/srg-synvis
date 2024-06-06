@@ -177,6 +177,7 @@ struct UniformBufferObject {
     glm::mat4 model;    // object to world space - local obj vertices coordinate
     glm::mat4 view;     // world to camera space - camera looking at scene from viewpoint
     glm::mat4 proj;     // camera to clip and screen space - 3d to 2d perspective effect transformation
+    glm::mat4 normalM;  // for lighting
 
     glm::vec4 ambient{1.0f, 1.0f, 1.0f, 0.02f};  // r,g,b, opacity
     glm::vec3 lightPos{0.0f, 10000.0f, 0.0f};  // careful with alignment
@@ -416,8 +417,8 @@ private:
                 vertices.push_back({
                     glm::vec3(normX, height * scale, normZ), // Notice -height to invert y-axis
                     glm::vec3(1.0f, 1.0f, 1.0f),
-                    glm::vec3(0.5f, 0.5f, 0.5f),
-                    glm::vec2(normZ, normX)
+                    glm::vec3(1.0f, 1.0f, 1.0f),
+                    glm::vec2(normZ / static_cast<float>(length - 1), normX / static_cast<float>(length - 1))
                 });
             }
         }
@@ -454,11 +455,13 @@ private:
 
         UniformBufferObject ubo{};
         ubo.model = glm::mat4(1.0f); // Used for initialization
+        //ubo.normalM = glm::mat4(1.0f);
 
         // Translate to center the heightmap
         float centerX = 0.5f; // Center of normalized coordinates
         float centerY = 0.5f; // Center of normalized coordinates
         ubo.model = glm::translate(ubo.model, glm::vec3(-centerX, -centerY, 0.0f));
+        ubo.normalM = glm::transpose(glm::inverse(ubo.model));
 
         // Rotate the model
         // ubo.model = glm::rotate(ubo.model, glm::radians(time * 2.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // Correct rotation is 0, 1, 0
