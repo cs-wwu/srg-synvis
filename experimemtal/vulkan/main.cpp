@@ -7,7 +7,7 @@ const uint32_t HEIGHT = 480;
 /* Hardcoded paths */
 const std::string MODEL_PATH = "models/vase.obj";
 const std::string TEXTURE_PATH = "textures/checkers.png";
-const std::string HM_PATH = "textures/output.png";
+const std::string HM_PATH = "textures/n48w123.png";
 
 const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 
@@ -18,7 +18,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 #define START_CAMERA_FRONT  glm::vec3(0.0f, -1.0f, 0.0f)
 #define START_CAMERA_UP     glm::vec3(0.0f, 1.0f, 0.0f)
 #define CAMERA_SPEED        1.0f  // Should be 0.25f for normalized between 0 and 1
-#define MOUSE_SENSITIVITY   0.005f
+#define MOUSE_SENSITIVITY   0.01f
 
 // Define mouse input variables
 float lastX = 800.0f / 2.0;
@@ -563,6 +563,17 @@ private:
                 camera.position -= camera.speed * camera.up;
             if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
                 camera.position += camera.speed * camera.up;
+	        if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {    // Changes camera speed with SHIFT
+                if (camera.speed == CAMERA_SPEED) {
+                    camera.speed *= 2;
+                } else if (camera.speed == CAMERA_SPEED * 2) {
+                        camera.speed *= 2;
+                } else if (camera.speed == CAMERA_SPEED * 4) {
+                        camera.speed = CAMERA_SPEED / 2;
+                } else {
+                        camera.speed = CAMERA_SPEED;
+                }
+            }
         }
     }
 
@@ -576,8 +587,7 @@ private:
 
             float longitude = 48 + ((3600 - camera.position.z) / 3600);
             float latitude = 122 + ((3600 - camera.position.x) / 3600);
-            std::cout << "Degree Position: " << longitude << "°N, " << latitude << "°W, " << camera.position.y * (1852/60) << " meters" << std::endl;
-            std::cout << "Camera Direction: " << getDirection(glm::degrees(atan2(camera.front.z, camera.front.x))) << std::endl;
+            std::cout << longitude << "°N, " << latitude << "°W, " << camera.position.y * (1852/60) << " m, " << "facing " << getDirection(glm::degrees(atan2(camera.front.z, camera.front.x))) << std::endl;
         }
         // to exit w/o problems when closing window
         vkDeviceWaitIdle(device);
