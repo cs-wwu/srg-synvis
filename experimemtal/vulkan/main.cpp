@@ -14,7 +14,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 /* Camera Settings */
 
 // Define camera parameters
-#define START_CAMERA_POS    glm::vec3(1740.0f, 30.0f, 2760.0f)
+#define START_CAMERA_POS    glm::vec3(1740.0f, 30.0f, 957.0f)
 #define START_CAMERA_FRONT  glm::vec3(0.0f, -1.0f, 0.0f)
 #define START_CAMERA_UP     glm::vec3(0.0f, 1.0f, 0.0f)
 #define CAMERA_SPEED        1.0f  // Should be 0.25f for normalized between 0 and 1
@@ -495,6 +495,29 @@ private:
         memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
     }
 
+    /* Returns the cardinal direction written into the 
+       direction buffer as two characters and an EOS */
+    std::string getDirection(float degrees) {
+        if (degrees < -157.25)
+            return "W";
+        else if (degrees < -112.25)
+            return "NW";
+        else if (degrees < -67.75)
+            return "N";
+        else if (degrees < -22.25)
+            return "NE";
+        else if (degrees < 22.25)
+            return "E";
+        else if (degrees < 67.75)
+            return "SE";
+        else if (degrees < 112.25)
+            return "S";
+        else if (degrees < 157.25)
+            return "SW";
+        else
+            return "W";
+    }
+
     /** @brief Processes user input to move the camera. 
      *         This is then applied in updating the uniform buffer.
     */
@@ -550,9 +573,11 @@ private:
             processInput();
             drawFrame();
             // Print camera position and pitch
-            std::cout << "Camera Position: (" << camera.position.x << ", " << camera.position.y << ", " << camera.position.z << ")" << std::endl;
-            std::cout << "Degree Position: 122." << std::round((3601 - camera.position.x) / 60) << "°W, 48." << std::round(camera.position.z / 60) << "°N, " << camera.position.y * (1852/60) << " meters" << std::endl;
-            std::cout << "Camera Front: (" << camera.front.x << ", " << camera.front.y << ", " << camera.front.z << ")" << std::endl;
+
+            float longitude = 48 + ((3600 - camera.position.z) / 3600);
+            float latitude = 122 + ((3600 - camera.position.x) / 3600);
+            std::cout << "Degree Position: " << longitude << "°N, " << latitude << "°W, " << camera.position.y * (1852/60) << " meters" << std::endl;
+            std::cout << "Camera Direction: " << getDirection(glm::degrees(atan2(camera.front.z, camera.front.x))) << std::endl;
         }
         // to exit w/o problems when closing window
         vkDeviceWaitIdle(device);
@@ -1688,6 +1713,32 @@ private:
         // (commandBuffer, details of render pass, how drawing commands w/in the render pass will be provided)
         // inline for primary, secondary_command_buffers for secondary
         vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+            // set background to skyblue
+            // Clear the framebuffer with the specified clear color
+            int width, height;
+            // queries the resolution of window in pixels
+            glfwGetFramebufferSize(window, &width, &height);
+
+            VkClearValue clearColor = {};
+            clearColor.color.float32[0] = 0.05f; // Red
+            clearColor.color.float32[1] = 0.05f; // Green
+            clearColor.color.float32[2] = 0.25f; // Blue
+            clearColor.color.float32[3] = 1.0f;   // Alpha (opacity)
+
+            VkClearAttachment clearAttachment = {};
+            clearAttachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            clearAttachment.colorAttachment = 0;
+            clearAttachment.clearValue = clearColor;
+
+            VkClearRect clearRect = {};
+            clearRect.rect.offset = {0, 0};
+            clearRect.rect.extent = {static_cast<unsigned int>(width), static_cast<unsigned int>(height)}; // Replace WIDTH and HEIGHT with actual framebuffer dimensions
+            clearRect.baseArrayLayer = 0; // Specify the base array layer to clear (usually 0 for single-layer images)
+            clearRect.layerCount = 1; // Specify the number of layers to clear (should be 1 for single-layer images)
+
+            vkCmdClearAttachments(commandBuffers[currentFrame], 1, &clearAttachment, 1, &clearRect);
+
             // drawing !!
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
