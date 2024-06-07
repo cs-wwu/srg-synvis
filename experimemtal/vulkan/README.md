@@ -19,11 +19,11 @@ sudo apt install libxxf86vm-dev libxi-dev
 
 For the shader compiler
     download Google's binaries and copy glslc to `/usr/local`
-    `sudo git clone https://github.com/google/shaderc/tree/main/glslc`
+    ```sudo git clone https://github.com/google/shaderc/tree/main/glslc```
 
 
 Additionally, for the Linux Tarball Vulkan SDK on RPi OS
-`sudo apt install xz-utils`
+```sudo apt install xz-utils```
 
 ```
 sudo apt install libglm-dev cmake libxcb-dri3-0 libxcb-present0 libpciaccess0 \
