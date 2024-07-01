@@ -21,15 +21,6 @@ For the shader compiler
 Additionally, for the Linux Tarball Vulkan SDK on RPi OS
 ```sudo apt install xz-utils```
 
-```
-sudo apt install libglm-dev cmake libxcb-dri3-0 libxcb-present0 libpciaccess0 \
-libpng-dev libxcb-keysyms1-dev libxcb-dri3-dev libx11-dev g++ gcc \
-libmirclient-dev libwayland-dev libxrandr-dev libxcb-randr0-dev libxcb-ewmh-dev \
-git python python3 bison libx11-xcb-dev liblz4-dev libzstd-dev python3-distutils \
-ocaml-core ninja-build pkg-config libxml2-dev wayland-protocols qtcreator \
-qtbase5-dev qt5-qmake qtbase5-dev-tools
-```
-
 Run the `vulkansdk` script with `./vulkansdk -j 1` to restrict building to one CPU. 
 
 
