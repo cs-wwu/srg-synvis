@@ -17,7 +17,7 @@ const int MAX_FRAMES_IN_FLIGHT = 2; // 1 for gpu, 1 for cpu
 #define START_CAMERA_POS    glm::vec3(1740.0f, 30.0f, 957.0f)
 #define START_CAMERA_FRONT  glm::vec3(0.0f, -1.0f, 0.0f)
 #define START_CAMERA_UP     glm::vec3(0.0f, 1.0f, 0.0f)
-#define CAMERA_SPEED        1.0f  // Should be 0.25f for normalized between 0 and 1
+#define CAMERA_SPEED        1.0f 
 #define MOUSE_SENSITIVITY   0.01f
 
 // Define mouse input variables
@@ -392,6 +392,18 @@ private:
             }
         }
     }*/
+
+    /* Takes a glm::vec3 of (longitutde in degrees, height in meters, latitude in degrees) 
+       and converts them to glm::vec3 in all arc minutes
+       @param coords glm::vec3 (lat, height, lon)
+    */
+    glm::vec3 degrees_to_minutes(glm::vec3 coords) {
+        float longitude = ((3600 - coords.z) / 3600);
+        float latitude = ((3600 - coords.x) / 3600);
+        float height = coords.y * 60.0f / 1852.0f;
+    
+        return glm::vec3(latitude, height, longitude);
+    }
 
     void calculateNormals() {
         int length = 3601;

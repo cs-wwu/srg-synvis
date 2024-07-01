@@ -4,17 +4,13 @@ To run the file, use `make test`
 For Linux pre-install
 
 ```
-sudo apt install mesa-vulkan-drivers vulkan-tools
-sudo apt install libvulkan-dev
-sudo apt install vulkan-validationlayers-dev spirv-tools
+sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools
 ```
 
-Run vkcube to check if correct so far
+Run `vkcube` to check if correct so far
 
 ```
-sudo apt install libglfw3-dev
-sudo apt install libglm-dev
-sudo apt install libxxf86vm-dev libxi-dev
+sudo apt -y install libglfw3-dev libglm-dev libxi-dev
 ```
 
 For the shader compiler
