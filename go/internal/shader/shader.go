@@ -4,44 +4,49 @@ import (
 	"fmt"
 	"os"
 
-    "github.com/cs-wwu/srg-synvis/go/pkg/utils"
-
 	gs "github.com/celer/gshaderc"
 )
 
-type ShaderKind int
-
-const (
-	VertexShader ShaderKind = iota
-)
-
-func CompileShader(filename string, kind ShaderKind) ([]byte, error) {
+// Compiles the shader specified by filename, and its type
+// It saves the shader to the filepath with .spv on the end
+func CompileShader(filepath string, shaderType gs.ShaderType) error {
 	options := gs.NewCompilerOptions()
 	defer options.Release()
 	compiler := gs.NewCompiler()
 	defer compiler.Release()
-	data, err := os.ReadFile(filename)
-	utils.orPanic(err)
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to read shader file %s: %v", filepath, err)
+	}
 
-	result := compiler.CompileIntoSPV(string(data), shaderType, filename, entryPoint, optinos)
-	utils.orPanic(result.Error()) // TODO not sure if this works as inteded
+	entryPoint := "main"
+	result := compiler.CompileIntoSPV(string(data), shaderType, filepath, entryPoint, options)
+	if result.Error() != nil {
+		return fmt.Errorf("failed to compile shader %s: %v", filepath, result.Error())
+	}
 	defer result.Release()
+
+	// Write the compiled shader to a new file
+	outputFilename := filepath + ".spv"
+	err = os.WriteFile(outputFilename, result.Bytes(), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write compiled shader to file %s: %v", outputFilename, err)
+	}
+
+	return nil
 }
 
-// LoadShader loads and compiles both vertex and fragment shaders
-func LoadShader(vertexShaderPath, fragmentShaderPath string) ([]byte, []byte, error) {
-	compiler := gs.NewCompiler()
-	defer compiler.Release()
-
-	vertexShader, err := compiler.CompileIntoSPV()
+// Compiles both the fragment and vertex shaders pointed to by the filepaths
+func CompileShaders(vertexShaderPath, fragmentShaderPath string) error {
+	err := CompileShader(vertexShaderPath, gs.VertexShader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compile vertex shader: %v", err)
+		return fmt.Errorf("failed to compile vertex shader: %v", err)
 	}
 
-	fragmentShader, err := compiler.CompileIntoSPV()
+	err = CompileShader(fragmentShaderPath, gs.FragmentShader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to compile fragment shader: %v", err)
+		return fmt.Errorf("failed to compile fragment shader: %v", err)
 	}
 
-	return vertexShader, fragmentShader, nil
+	return nil
 }

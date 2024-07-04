@@ -4,7 +4,7 @@ import (
 	vk "github.com/vulkan-go/vulkan"
 )
 
-// Global util for panicing on different errors
+// Global util for panicking on different errors
 func orPanic(err interface{}) {
 	switch v := err.(type) {
 	case error:

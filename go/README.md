@@ -11,6 +11,18 @@ NOTE: When adding new modules and requirements, run `go mod tidy` in the
  - Vulkan SDK
  - GLFW
 
+For Linux pre-install
+
+```bash
+sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools
+```
+
+Run `vkcube` to check if correct so far
+
+```bash
+sudo apt -y install libglfw3-dev libglm-dev libxi-dev libshaderc-dev
+```
+
 ## Installation
 
 1. Clone the Repository
