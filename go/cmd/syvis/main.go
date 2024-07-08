@@ -99,19 +99,19 @@ func initVulkan() {
 
 func main() {
 	flag.Parse()
-
+	
 	// Initialize Necessary Items and run the app
-	utils.orPanic(glfw.Init())
+	utils.OrPanic(glfw.Init())
 	defer glfw.Terminate()
 	vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
-	utils.orPanic(vk.Init())
+	utils.OrPanic(vk.Init())
 
 	app := initWindow(*windowWidth, *windowHeight)
 	defer app.Window.Destroy() // cleanup fctn?
 	initVulkan()
 
 	platform, err := as.NewPlatform(app)
-	utils.orPanic(err)
+	utils.OrPanic(err)
 	defer platform.Destroy()
 
 	// mainLoop

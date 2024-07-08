@@ -2,10 +2,11 @@ package utils
 
 import (
 	vk "github.com/vulkan-go/vulkan"
+	lin "github.com/xlab/linmath"
 )
 
 // Global util for panicking on different errors
-func orPanic(err interface{}) {
+func OrPanic(err interface{}) {
 	switch v := err.(type) {
 	case error:
 		if v != nil {
@@ -22,4 +23,14 @@ func orPanic(err interface{}) {
 	default:
 		panic("unsupported type")
 	}
+}
+
+// Takes a Vec3 of (long (Deg), height (m), lat (Deg)) and converts them to
+// Vec3 in arc minutes for a global uniform coordinate system
+func DegToMins(coords lin.Vec3) lin.Vec3 {
+	latitude := ((3600 - coords[0]) / 3600)  // X - Latitude from Degrees
+	height := coords[1] * 60.0 / 1852        // Y - Height from Meters
+	longitude := ((3600 - coords[2]) / 3600) // Z - Longitude from Degrees
+
+	return lin.Vec3{latitude, height, longitude}
 }

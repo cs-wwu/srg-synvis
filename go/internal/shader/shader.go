@@ -38,12 +38,14 @@ func CompileShader(filepath string, shaderType gs.ShaderType) error {
 
 // Compiles both the fragment and vertex shaders pointed to by the filepaths
 func CompileShaders(vertexShaderPath, fragmentShaderPath string) error {
-	err := CompileShader(vertexShaderPath, gs.VertexShader)
+	vertShaderType := gs.ShaderType(gs.VertexShader) //	Pull Shader Type
+	err := CompileShader(vertexShaderPath, vertShaderType)
 	if err != nil {
 		return fmt.Errorf("failed to compile vertex shader: %v", err)
 	}
 
-	err = CompileShader(fragmentShaderPath, gs.FragmentShader)
+	fragShaderType := gs.ShaderType(gs.FragmentShader) // Pull Shader Type
+	err = CompileShader(fragmentShaderPath, fragShaderType)
 	if err != nil {
 		return fmt.Errorf("failed to compile fragment shader: %v", err)
 	}
