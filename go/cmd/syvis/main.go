@@ -49,6 +49,8 @@ func main() {
 	// mainLoop
 	for !app.Window.ShouldClose() {
 		glfw.PollEvents()
+		// processInput();
+		// drawFrame();
 
 		// Check if framebuffer was resized
 		if app.FramebufferResized {

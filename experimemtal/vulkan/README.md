@@ -10,7 +10,7 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 Run `vkcube` to check if correct so far
 
 ```
-sudo apt -y install libglfw3-dev libglm-dev libxi-dev
+sudo apt -y install libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev
 ```
 
 For the shader compiler
