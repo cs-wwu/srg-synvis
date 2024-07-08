@@ -1,3 +1,4 @@
+// Package utils provides utility functions that may be used across packages
 package utils
 
 import (
@@ -37,23 +38,24 @@ func DegToMins(coords lin.Vec3) lin.Vec3 {
 
 // Returns cardinal direction from degrees
 func GetDirection(degrees float64) string { // TODO float32/float64
-	if (degrees < -157.25) {
+	if degrees < -157.25 {
 		return "W"
-	} else if (degrees < -112.25) {
+	} else if degrees < -112.25 {
 		return "NW"
-	} else if (degrees < -67.75) {
+	} else if degrees < -67.75 {
 		return "N"
-	} else if (degrees < -22.25) {
+	} else if degrees < -22.25 {
 		return "NE"
-	} else if (degrees < 22.25) {
+	} else if degrees < 22.25 {
 		return "E"
-	} else if (degrees < 67.75) {
+	} else if degrees < 67.75 {
 		return "SE"
-	} else if (degrees < 112.25) {
+	} else if degrees < 112.25 {
 		return "S"
-	} else if (degrees < 157.25) {
+	} else if degrees < 157.25 {
 		return "SW"
 	} else {
 		return "W"
 	}
 }
+

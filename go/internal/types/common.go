@@ -1,3 +1,4 @@
+// Package types provides universal types used across packages
 package types
 
 import (
@@ -35,9 +36,10 @@ type Camera struct {
 
 // GetViewMatrix returns the camera's view matrix
 func (c *Camera) GetViewMatrix() ln.Mat4x4 {
-	result := ln.Mat4x4{}
 	center := ln.Vec3{}
 	center.Add(c.Pos, c.Front)
+
+	result := ln.Mat4x4{}
 	result.LookAt(c.Pos, &center, c.Up)
 	return result
 }
