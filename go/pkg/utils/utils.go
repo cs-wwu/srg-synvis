@@ -34,3 +34,26 @@ func DegToMins(coords lin.Vec3) lin.Vec3 {
 
 	return lin.Vec3{latitude, height, longitude}
 }
+
+// Returns cardinal direction from degrees
+func GetDirection(degrees float64) string { // TODO float32/float64
+	if (degrees < -157.25) {
+		return "W"
+	} else if (degrees < -112.25) {
+		return "NW"
+	} else if (degrees < -67.75) {
+		return "N"
+	} else if (degrees < -22.25) {
+		return "NE"
+	} else if (degrees < 22.25) {
+		return "E"
+	} else if (degrees < 67.75) {
+		return "SE"
+	} else if (degrees < 112.25) {
+		return "S"
+	} else if (degrees < 157.25) {
+		return "SW"
+	} else {
+		return "W"
+	}
+}
