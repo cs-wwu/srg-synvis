@@ -189,7 +189,7 @@ func Unzip(zipFile, targetDir string) error {
 				return fmt.Errorf("failed to create file at %s: %v", extractPath, err)
 			}
 
-			outFile, err := os.OpenFile(extractPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode().Perm())
+			outFile, err := os.OpenFile(extractPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode().Perm())
 			if err != nil {
 				return fmt.Errorf("failed to open file at %s: %v", extractPath, err)
 			}
