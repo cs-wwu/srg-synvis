@@ -1,8 +1,6 @@
 package renderer
 
 import (
-	"github.com/cs-wwu/srg-synvis/go/internal/types"
-
 	ln "github.com/xlab/linmath"
 )
 
@@ -13,9 +11,17 @@ var (
 	CAMERA_SPEED       = float32(1.0)
 )
 
+type Camera struct {
+	Pos   *ln.Vec3 // (x, y, z)
+	Up    *ln.Vec3 // Front of the camera
+	Front *ln.Vec3 // Above the camera
+
+	Speed float32 // Camera speed
+}
+
 // NewCamera creates and initializes a new Camera
-func NewCamera() *types.Camera {
-	return &types.Camera{
+func NewCamera() *Camera {
+	return &Camera{
 		Pos:   &START_CAMERA_POS,
 		Up:    &START_CAMERA_UP,
 		Front: &START_CAMERA_FRONT,
@@ -23,3 +29,12 @@ func NewCamera() *types.Camera {
 	}
 }
 
+// GetViewMatrix returns the camera's view matrix
+func (c *Camera) GetViewMatrix() ln.Mat4x4 {
+	center := ln.Vec3{}
+	center.Add(c.Pos, c.Front)
+
+	result := ln.Mat4x4{}
+	result.LookAt(c.Pos, &center, c.Up)
+	return result
+}
