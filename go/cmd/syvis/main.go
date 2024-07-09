@@ -17,6 +17,10 @@ import (
 	"github.com/xlab/closer"
 )
 
+// #cgo LDFLAGS: -lshaderc_combined -lSPIRV-Tools-opt -lSPIRV-Tools -lMachineIndependent -lOSDependent -lGenericCodeGen -lOGLCompiler
+// #include <shaderc/shaderc.h>
+import "C"
+
 var (
 	windowWidth        = flag.Int("width", 800, "The beginning window width")
 	windowHeight       = flag.Int("height", 600, "The beginning window height")
