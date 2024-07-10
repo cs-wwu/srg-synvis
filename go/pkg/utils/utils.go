@@ -2,6 +2,8 @@
 package utils
 
 import (
+	"fmt"
+	
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -11,7 +13,7 @@ func OrPanic(err interface{}) {
 	switch v := err.(type) {
 	case error:
 		if v != nil {
-			panic(err)
+			panic(v)
 		}
 	case vk.Result:
 		if err := vk.Error(v); err != nil {
@@ -22,10 +24,12 @@ func OrPanic(err interface{}) {
 			panic("condition failed: != true")
 		}
 	default:
-		panic("unsupported type")
+		// Check if err is nil before panicking
+		if err != nil {
+			panic(fmt.Sprintf("unsupported type: %T", err))
+		}
 	}
 }
-
 // Takes a Vec3 of (long (Deg), height (m), lat (Deg)) and converts them to
 // Vec3 in arc minutes for a global uniform coordinate system
 func DegToMins(coords lin.Vec3) lin.Vec3 {

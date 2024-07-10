@@ -820,7 +820,7 @@ func (app *Application) VulkanContextPrepare() error {
 }
 
 // main.cpp recordComandBuffer -> as called by drawFrame?
-func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),	// different: no flags
@@ -834,15 +834,15 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 	})
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
-		RenderPass:  s.renderPass,
+		RenderPass:  app.renderPass,
 		Framebuffer: res.Framebuffer(), // swapChainFramebuffers[imageIndex];
 		RenderArea: vk.Rect2D{
 			Offset: vk.Offset2D{
 				X: 0, Y: 0,
 			},
 			Extent: vk.Extent2D{
-				Width:  s.width,
-				Height: s.height,
+				Width:  app.width,
+				Height: app.height,
 			},
 		},
 		ClearValueCount: 2,
@@ -851,16 +851,16 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 	
 	// vkCmdClearAttachments() for background color only?
 	
-	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, s.pipeline)
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	
-	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, s.pipelineLayout,
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 	
 	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
 		// x = 0.0,
 		// y = 0.0,
-		Width:    float32(s.width),
-		Height:   float32(s.height),
+		Width:    float32(app.width),
+		Height:   float32(app.height),
 		MinDepth: 0.0,
 		MaxDepth: 1.0,
 	}})
@@ -869,8 +869,8 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 			X: 0, Y: 0,
 		},
 		Extent: vk.Extent2D{
-			Width:  s.width,
-			Height: s.height,
+			Width:  app.width,
+			Height: app.height,
 		},
 	}})
 	
@@ -891,8 +891,8 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 	vk.CmdEndRenderPass(cmd)
 
 	// below code is not in main.cpp -> unless transitionImageLayout? (called in createTextureImage)
-	graphicsQueueIndex := s.Context().Platform().GraphicsQueueFamilyIndex()
-	presentQueueIndex := s.Context().Platform().PresentQueueFamilyIndex()
+	graphicsQueueIndex := app.Context().Platform().GraphicsQueueFamilyIndex()
+	presentQueueIndex := app.Context().Platform().PresentQueueFamilyIndex()
 	if graphicsQueueIndex != presentQueueIndex {
 		// Separate Present Queue Case
 		// We have to transfer ownership from the graphics queue family to the

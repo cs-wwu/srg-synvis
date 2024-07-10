@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/go/internal/renderer"
-	"github.com/cs-wwu/srg-synvis/go/internal/shader"
 	"github.com/cs-wwu/srg-synvis/go/pkg/utils"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -17,9 +16,6 @@ import (
 	"github.com/xlab/closer"
 )
 
-// #cgo LDFLAGS: -lshaderc_combined -lSPIRV-Tools-opt -lSPIRV-Tools -lMachineIndependent -lOSDependent -lGenericCodeGen -lOGLCompiler
-// #include <shaderc/shaderc.h>
-import "C"
 
 var (
 	windowWidth        = flag.Int("width", 800, "The beginning window width")
@@ -35,8 +31,6 @@ func init() {
 
 func main() {
 	flag.Parse()
-
-	shader.CompileShaders(*vertexShaderPath, *fragmentShaderPath)
 
 	// Initialize Necessary Items and run the app
 	utils.OrPanic(glfw.Init())
