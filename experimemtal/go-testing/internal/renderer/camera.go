@@ -6,9 +6,9 @@ import (
 
 var (
 	// For Heightmap
-	// START_CAMERA_POS   = ln.Vec3{1740.0, 30.0, 957.0}
-	// START_CAMERA_UP    = ln.Vec3{0.0, 1.0, 0.0}
-	// START_CAMERA_FRONT = ln.Vec3{0.0, -1.0, 0.}
+	// START_CAMERA_POS   = lin.Vec3{1740.0, 30.0, 957.0}
+	// START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
+	// START_CAMERA_FRONT = lin.Vec3{0.0, -1.0, 0.0}
 	START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}

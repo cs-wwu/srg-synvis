@@ -504,7 +504,6 @@ func (app *Application) prepareCubeDataBuffers() {
 
 func (s *Application) prepareDescriptorLayout() {
 	dev := s.Context().Device()
-
 	var descLayout vk.DescriptorSetLayout
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,

@@ -16,9 +16,9 @@ const (
 	scale  = 60.0 / 1852.0 // Meters to Arcminutes
 )
 
-func LoadHM(hmPath string) ([]types.Vertex, []uint32, error) {
+func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 	var vertices []types.Vertex
-	var indices []uint32
+	var indices []types.Index
 
 	file, err := os.Open(hmPath)
 	if err != nil {
@@ -68,9 +68,9 @@ func LoadHM(hmPath string) ([]types.Vertex, []uint32, error) {
 	// Generate indices
 	for y := 0; y < length-1; y++ {
 		for x := 0; x < length-1; x++ {
-			topLeft := uint32(y*length + x)
+			topLeft := types.Index(y*length + x)
 			topRight := topLeft + 1
-			botLeft := uint32((y+1)*length + x)
+			botLeft := types.Index((y+1)*length + x)
 			botRight := botLeft + 1
 
 			// First triangle
