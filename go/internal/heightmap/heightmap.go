@@ -164,7 +164,7 @@ func Unzip(zipFile, targetDir string) error {
 	// Open zip file
 	reader, err := zip.OpenReader(zipFile)
 	if err != nil {
-		fmt.Errorf("failed to create zipfile reader %s: %v", zipFile, err)
+		return fmt.Errorf("failed to create zipfile reader %s: %v", zipFile, err)
 	}
 	defer reader.Close()
 
