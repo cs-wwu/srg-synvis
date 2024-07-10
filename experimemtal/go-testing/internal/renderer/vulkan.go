@@ -18,15 +18,16 @@ import (
 )
 
 func NewApplication(spinAngle float32) *Application {
+	camera := NewCamera()
+	
 	a := &Application{
 		spinAngle: spinAngle,
-		eyeVec:    &lin.Vec3{0.0, 3.0, 5.0},
-		originVec: &lin.Vec3{0.0, 0.0, 0.0},
-		upVec:     &lin.Vec3{0.0, 1.0, 0.0},
+		camera:    camera,
 	}
-
+	
+	// 45 FOV, Aspect 1.0
 	a.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
-	a.viewMatrix.LookAt(a.eyeVec, a.originVec, a.upVec)
+	a.viewMatrix = a.camera.GetViewMatrix()
 	a.modelMatrix.Identity()
 	a.projectionMatrix[1][1] *= -1 // Flip projection matrix from GL to Vulkan orientation.
 	return a
@@ -58,9 +59,7 @@ type Application struct {
 	viewMatrix       lin.Mat4x4
 	modelMatrix      lin.Mat4x4
 
-	eyeVec    *lin.Vec3
-	originVec *lin.Vec3
-	upVec     *lin.Vec3
+	camera *Camera
 
 	spinAngle float32
 }
@@ -980,4 +979,3 @@ func fileToBytes(filename string) []byte {
 
 	return data
 }
-

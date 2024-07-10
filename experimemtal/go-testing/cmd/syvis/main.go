@@ -112,6 +112,11 @@ func main() {
 
 	fpsDelay := time.Second / 60
 	fpsTicker := time.NewTicker(fpsDelay)
+
+	// Additional ticker for printing FPS
+	fpsPrintTicker := time.NewTicker(time.Second)
+	var frameCount int
+
 	for {
 		select {
 		case <-exitC:
@@ -120,6 +125,7 @@ func main() {
 			window.Destroy()
 			glfw.Terminate()
 			fpsTicker.Stop()
+			fpsPrintTicker.Stop()
 			doneC <- struct{}{}
 			return
 		case <-fpsTicker.C:
@@ -138,6 +144,13 @@ func main() {
 			}
 			_, err = app.Context().PresentImage(imageIdx)
 			orPanic(err)
+
+			// Increment the frame count
+			frameCount++
+		case <-fpsPrintTicker.C:
+			// Print the FPS and reset the frame count
+			log.Printf("FPS: %d", frameCount)
+			frameCount = 0
 		}
 	}
 }
