@@ -83,6 +83,7 @@ func main() {
 			glfw.PollEvents()
 			app.NextFrame()
 
+			// main.cpp calls AcquireNextImage in drawFrame()
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			utils.OrPanic(err)
 			if outdated {

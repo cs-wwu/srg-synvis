@@ -58,6 +58,7 @@ type Application struct {
 	projectionMatrix lin.Mat4x4
 	viewMatrix       lin.Mat4x4
 	modelMatrix      lin.Mat4x4
+	uniformBuffersMapped []unsafe.Pointer
 
 	camera *Camera
 
@@ -777,6 +778,32 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
+func (app *Application) prepareUniformBuffers() {
+	dev := app.Context().Device()
+	res := app.Context().SwapchainImageResources()
+
+	var first unsafe.Pointer
+	// make it size of 4 -> in main.cpp MAXFRAMESINFLIGHT was 2
+	for i := 0 ; i < 4; i++ {
+		app.uniformBuffersMapped = append(app.uniformBuffersMapped, first)
+	}
+
+	var MVP, VP lin.Mat4x4
+	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
+	MVP.Mult(&VP, &app.modelMatrix)
+
+	for i := 0; i < 4; i++ {
+		// createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+
+		// map buffer after creation to get a ptr that we can write data to
+		// buffer stays mapped to this ptr the whole time
+		data := MVP.Data()
+		ret := vk.MapMemory(dev, res[i].UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &app.uniformBuffersMapped[i])
+		utils.OrPanic(as.NewError(ret))
+		// this memory is unmapped in the cleanup function
+	}
+}
+
 func (s *Application) VulkanContextPrepare() error {
 	dim := s.Context().SwapchainDimensions()
 	s.height = dim.Height
@@ -791,6 +818,7 @@ func (s *Application) VulkanContextPrepare() error {
 	s.prepareDescriptorPool()
 	s.prepareDescriptorSet()
 	s.prepareFramebuffers()
+	s.prepareUniformBuffers()
 
 	swapchainImageResources := s.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
@@ -801,12 +829,19 @@ func (s *Application) VulkanContextPrepare() error {
 
 func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
+	res := app.Context().SwapchainImageResources()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+
+	// TODO change 4 to MAX_FRAMES_IN_FLIGHT
+	for i := 0; i < 4; i++ {
+		vk.DestroyBuffer(dev, res[i].UniformBuffer(), nil);
+		vk.FreeMemory(dev, res[i].UniformMemory(), nil);
+	}
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
@@ -816,30 +851,43 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
-	var Model lin.Mat4x4
-	Model.Dup(&app.modelMatrix)
+	// var Model lin.Mat4x4
+	// Model.Dup(&app.modelMatrix)
 	// Rotate around the Y axis
-	app.modelMatrix.Rotate(&Model, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
+	app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
 }
 
+// likely called every frame by asche
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
-	dev := app.Context().Device()
-	res := app.Context().SwapchainImageResources()[imageIdx]
+	// dev := s.Context().Device()
+	// res := s.Context().SwapchainImageResources()[imageIdx]
+
+	// var MVP, VP lin.Mat4x4
+	// VP.Mult(&s.projectionMatrix, &s.viewMatrix)
+	// MVP.Mult(&VP, &s.modelMatrix)
+
+	// data := MVP.Data()
+	// var pData unsafe.Pointer
+	// ret := vk.MapMemory(dev, res.UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &pData)
+	// orPanic(as.NewError(ret))
+
+	// n := vk.Memcopy(pData, data)
+	// if n != len(data) {
+	// 	log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
+	// }
+	// vk.UnmapMemory(dev, res.UniformMemory())
+	// return nil
+	
 
 	var MVP, VP lin.Mat4x4
 	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
 	MVP.Mult(&VP, &app.modelMatrix)
 
 	data := MVP.Data()
-	var pData unsafe.Pointer
-	ret := vk.MapMemory(dev, res.UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &pData)
-	utils.OrPanic(as.NewError(ret))
-
-	n := vk.Memcopy(pData, data)
+	n := vk.Memcopy(app.uniformBuffersMapped[imageIdx], data)
 	if n != len(data) {
 		log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
 	}
-	vk.UnmapMemory(dev, res.UniformMemory())
 	return nil
 }
 
