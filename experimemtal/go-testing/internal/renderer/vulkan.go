@@ -831,19 +831,12 @@ func (app *Application) VulkanContextPrepare() error {
 
 func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
-	res := app.Context().SwapchainImageResources()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
-
-	// TODO change 4 to MAX_FRAMES_IN_FLIGHT
-	for i := 0; i < 4; i++ {
-		vk.DestroyBuffer(dev, res[i].UniformBuffer(), nil)
-		vk.FreeMemory(dev, res[i].UniformMemory(), nil)
-	}
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
