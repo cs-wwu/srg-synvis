@@ -20,11 +20,10 @@ func init() {
 type Application struct {
 	*renderer.Application
 	debugEnabled bool
-	windowHandle *glfw.Window
 }
 
 func (a *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
-	surfPtr, err := a.windowHandle.CreateWindowSurface(instance, nil)
+	surfPtr, err := a.WindowHandle.CreateWindowSurface(instance, nil)
 	if err != nil {
 		log.Println(err)
 		return vk.NullSurface
@@ -65,7 +64,7 @@ func (a *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
 }
 
 func (a *Application) VulkanInstanceExtensions() []string {
-	extensions := a.windowHandle.GetRequiredInstanceExtensions()
+	extensions := a.WindowHandle.GetRequiredInstanceExtensions()
 	if a.debugEnabled {
 		extensions = append(extensions, "VK_EXT_debug_report")
 	}
@@ -92,7 +91,7 @@ func main() {
 	glfw.WindowHint(glfw.Resizable, glfw.False)
 	window, err := glfw.CreateWindow(int(reqDim.Width), int(reqDim.Height), "Vulkan", nil, nil)
 	orPanic(err)
-	app.windowHandle = window
+	app.WindowHandle = window
 
 	// creates a new platform, also initializes Vulkan context in the app
 	platform, err := as.NewPlatform(app)

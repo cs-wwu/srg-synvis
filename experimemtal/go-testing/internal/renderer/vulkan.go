@@ -12,6 +12,7 @@ import (
 
 	"go-testing/pkg/utils"
 
+	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -19,12 +20,12 @@ import (
 
 func NewApplication(spinAngle float32) *Application {
 	camera := NewCamera()
-	
+
 	a := &Application{
 		spinAngle: spinAngle,
 		camera:    camera,
 	}
-	
+
 	// 45 FOV, Aspect 1.0
 	a.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
 	a.viewMatrix = a.camera.GetViewMatrix()
@@ -55,12 +56,13 @@ type Application struct {
 
 	frameIndex int
 
-	projectionMatrix lin.Mat4x4
-	viewMatrix       lin.Mat4x4
-	modelMatrix      lin.Mat4x4
+	projectionMatrix     lin.Mat4x4
+	viewMatrix           lin.Mat4x4
+	modelMatrix          lin.Mat4x4
 	uniformBuffersMapped []unsafe.Pointer
 
-	camera *Camera
+	camera       *Camera
+	WindowHandle *glfw.Window
 
 	spinAngle float32
 }
@@ -784,7 +786,7 @@ func (app *Application) prepareUniformBuffers() {
 
 	var first unsafe.Pointer
 	// make it size of 4 -> in main.cpp MAXFRAMESINFLIGHT was 2
-	for i := 0 ; i < 4; i++ {
+	for i := 0; i < 4; i++ {
 		app.uniformBuffersMapped = append(app.uniformBuffersMapped, first)
 	}
 
@@ -839,8 +841,8 @@ func (app *Application) VulkanContextCleanup() error {
 
 	// TODO change 4 to MAX_FRAMES_IN_FLIGHT
 	for i := 0; i < 4; i++ {
-		vk.DestroyBuffer(dev, res[i].UniformBuffer(), nil);
-		vk.FreeMemory(dev, res[i].UniformMemory(), nil);
+		vk.DestroyBuffer(dev, res[i].UniformBuffer(), nil)
+		vk.FreeMemory(dev, res[i].UniformMemory(), nil)
 	}
 
 	for i := 0; i < len(app.textures); i++ {
@@ -854,6 +856,10 @@ func (app *Application) NextFrame() {
 	// var Model lin.Mat4x4
 	// Model.Dup(&app.modelMatrix)
 	// Rotate around the Y axis
+	app.camera.ProcessInput(app.WindowHandle)
+	
+	app.viewMatrix = app.camera.GetViewMatrix()
+
 	app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
 }
 
@@ -877,14 +883,13 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	// }
 	// vk.UnmapMemory(dev, res.UniformMemory())
 	// return nil
-	
 
 	var MVP, VP lin.Mat4x4
 	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
 	MVP.Mult(&VP, &app.modelMatrix)
 
 	data := MVP.Data()
-	
+
 	n := vk.Memcopy(app.uniformBuffersMapped[imageIdx], data)
 	if n != len(data) {
 		log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))

@@ -1,6 +1,9 @@
 package renderer
 
 import (
+	"math"
+
+	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
 )
 
@@ -9,18 +12,25 @@ var (
 	// START_CAMERA_POS   = lin.Vec3{1740.0, 30.0, 957.0}
 	// START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	// START_CAMERA_FRONT = lin.Vec3{0.0, -1.0, 0.0}
+
+	// For Cube Model
 	START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}
 	CAMERA_SPEED       = float32(1.0)
+	LOOK_SENSITIVITY   = float32(0.01)
 )
 
 type Camera struct {
-	Pos   *lin.Vec3 // (x, y, z)
-	Up    *lin.Vec3 // Front of the camera
-	Front *lin.Vec3 // Above the camera
+	Pos      *lin.Vec3 // (x, y, z)
+	Up       *lin.Vec3 // Up Direction of the camera
+	Front    *lin.Vec3 // Front direction of the camera
+	Right    *lin.Vec3 // Right direction of the Camera
+	WorldUp  *lin.Vec3 // Global up vector
+	Rotation *lin.Quat // Quaternion for Rotation
 
-	Speed float32 // Camera speed
+	Speed       float32 // Camera speed
+	Sensitivity float32 // Camera sensitivity
 }
 
 // NewCamera creates and initializes a new Camera
@@ -28,12 +38,24 @@ func NewCamera() *Camera {
 	pos := START_CAMERA_POS
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
+	worldUp := START_CAMERA_UP
+
+	var rotation lin.Quat
+	rotation.Identity()
+
+	right := lin.Vec3{}
+	right.MultCross(&front, &worldUp)
+	right.Norm(&right)
 
 	return &Camera{
-		Pos:   &pos,
-		Up:    &up,
-		Front: &front,
-		Speed: CAMERA_SPEED,
+		Pos:         &pos,
+		Up:          &up,
+		Front:       &front,
+		Right:       &right,
+		WorldUp:     &worldUp,
+		Rotation:    &rotation,
+		Speed:       CAMERA_SPEED,
+		Sensitivity: LOOK_SENSITIVITY,
 	}
 }
 
@@ -45,4 +67,100 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	result := lin.Mat4x4{}
 	result.LookAt(c.Pos, &center, c.Up)
 	return result
+}
+
+// Processes input from the glfw window and moves the camera accordingly
+// This function is mainly for debugging purposes
+// Uses WASD for movement, and arrow keys for viewing
+func (c *Camera) ProcessInput(window *glfw.Window) {
+	if window.GetAttrib(glfw.Focused) == glfw.True {
+		tmp := lin.Vec3{}
+
+		// Camera Movement
+		if window.GetKey(glfw.KeyW) == glfw.Press { // Forward
+			tmp.Scale(c.Front, c.Speed)
+			c.Pos.Add(c.Pos, &tmp)
+		}
+		if window.GetKey(glfw.KeyS) == glfw.Press { // Backward
+			tmp.Scale(c.Front, c.Speed)
+			c.Pos.Sub(c.Pos, &tmp)
+		}
+		if window.GetKey(glfw.KeyA) == glfw.Press { // Left
+			tmp.MultCross(c.Front, c.Up)
+			tmp.Norm(&tmp)
+			tmp.Scale(&tmp, c.Speed)
+			c.Pos.Sub(c.Pos, &tmp)
+		}
+		if window.GetKey(glfw.KeyD) == glfw.Press { // Right
+			tmp.MultCross(c.Front, c.Up)
+			tmp.Norm(&tmp)
+			tmp.Scale(&tmp, c.Speed)
+			c.Pos.Add(c.Pos, &tmp)
+		}
+
+		// Camera Viewing using quaternions
+		if window.GetKey(glfw.KeyUp) == glfw.Press { // Up
+			pitchQuat := QuatRotate(lin.DegreesToRadians(c.Sensitivity), c.Right)
+			c.Rotation.Mult(c.Rotation, &pitchQuat)
+		}
+		if window.GetKey(glfw.KeyDown) == glfw.Press { // Down
+			pitchQuat := QuatRotate(lin.DegreesToRadians(-c.Sensitivity), c.Right)
+			c.Rotation.Mult(c.Rotation, &pitchQuat)
+		}
+		if window.GetKey(glfw.KeyLeft) == glfw.Press { // Left
+			yawQuat := QuatRotate(lin.DegreesToRadians(c.Sensitivity), c.WorldUp)
+			c.Rotation.Mult(c.Rotation, &yawQuat)
+		}
+		if window.GetKey(glfw.KeyRight) == glfw.Press { // Right
+			yawQuat := QuatRotate(lin.DegreesToRadians(-c.Sensitivity), c.WorldUp)
+			c.Rotation.Mult(c.Rotation, &yawQuat)
+		}
+
+		// Update the camera's front, right, and up vectors
+		// c.updateCameraVectors()
+	}
+}
+
+// Update the camera's front, right, and up vectors based on the current rotation
+func (c *Camera) updateCameraVectors() {
+	front := lin.Vec3{0, 0, -1}
+	front = RotateQuat(&front, c.Rotation)
+	front.Norm(&front)
+	c.Front = &front
+
+	right := lin.Vec3{1, 0, 0}
+	right = RotateQuat(&right, c.Rotation)
+	right.Norm(&right)
+	c.Right = &right
+
+	up := lin.Vec3{0, 1, 0}
+	up = RotateQuat(&up, c.Rotation)
+	up.Norm(&up)
+	c.Up = &up
+}
+
+// Helper Functions for Quaternion Rotations
+
+// QuatRotate creates a quaternion representing a rotation around an axis
+func QuatRotate(angle float32, axis *lin.Vec3) lin.Quat {
+	halfAngle := angle / 2
+	s := float32(math.Sin(float64(halfAngle)))
+	return lin.Quat{
+		float32(math.Cos(float64(halfAngle))),
+		axis[0] * s,
+		axis[1] * s,
+		axis[2] * s,
+	}
+}
+
+// RotateQuat rotates a vector by a quaternion
+func RotateQuat(vec *lin.Vec3, quat *lin.Quat) lin.Vec3 {
+	qv := lin.Quat{0, vec[0], vec[1], vec[2]}
+	qConj := lin.Quat{quat[0], -quat[1], -quat[2], -quat[3]}
+
+	tmp := lin.Quat{}
+	tmp.Mult(quat, &qv)
+	tmp.Mult(&tmp, &qConj)
+
+	return lin.Vec3{tmp[1], tmp[2], tmp[3]}
 }
