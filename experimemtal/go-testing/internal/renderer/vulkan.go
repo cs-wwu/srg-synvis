@@ -65,10 +65,10 @@ type Application struct {
 	spinAngle float32
 }
 
-func (s *Application) prepareDepth() {
-	dev := s.Context().Device()
+func (app *Application) prepareDepth() {
+	dev := app.Context().Device()
 	depthFormat := vk.FormatD16Unorm
-	s.depth = &Depth{
+	app.depth = &Depth{
 		format: depthFormat,
 	}
 	ret := vk.CreateImage(dev, &vk.ImageCreateInfo{
@@ -76,8 +76,8 @@ func (s *Application) prepareDepth() {
 		ImageType: vk.ImageType2d,
 		Format:    depthFormat,
 		Extent: vk.Extent3D{
-			Width:  s.width,
-			Height: s.height,
+			Width:  app.width,
+			Height: app.height,
 			Depth:  1,
 		},
 		MipLevels:   1,
@@ -85,28 +85,28 @@ func (s *Application) prepareDepth() {
 		Samples:     vk.SampleCount1Bit,
 		Tiling:      vk.ImageTilingOptimal,
 		Usage:       vk.ImageUsageFlags(vk.ImageUsageDepthStencilAttachmentBit),
-	}, nil, &s.depth.image)
+	}, nil, &app.depth.image)
 	utils.OrPanic(as.NewError(ret))
 
 	var memReqs vk.MemoryRequirements
-	vk.GetImageMemoryRequirements(dev, s.depth.image, &memReqs)
+	vk.GetImageMemoryRequirements(dev, app.depth.image, &memReqs)
 	memReqs.Deref()
 
-	memProps := s.Context().Platform().MemoryProperties()
+	memProps := app.Context().Platform().MemoryProperties()
 	memTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
 		vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), vk.MemoryPropertyDeviceLocalBit)
-	s.depth.memAlloc = &vk.MemoryAllocateInfo{
+	app.depth.memAlloc = &vk.MemoryAllocateInfo{
 		SType:           vk.StructureTypeMemoryAllocateInfo,
 		AllocationSize:  memReqs.Size,
 		MemoryTypeIndex: memTypeIndex,
 	}
 
 	var mem vk.DeviceMemory
-	ret = vk.AllocateMemory(dev, s.depth.memAlloc, nil, &mem)
+	ret = vk.AllocateMemory(dev, app.depth.memAlloc, nil, &mem)
 	utils.OrPanic(as.NewError(ret))
-	s.depth.mem = mem
+	app.depth.mem = mem
 
-	ret = vk.BindImageMemory(dev, s.depth.image, s.depth.mem, 0)
+	ret = vk.BindImageMemory(dev, app.depth.image, app.depth.mem, 0)
 	utils.OrPanic(as.NewError(ret))
 
 	var view vk.ImageView
@@ -119,20 +119,20 @@ func (s *Application) prepareDepth() {
 			LayerCount: 1,
 		},
 		ViewType: vk.ImageViewType2d,
-		Image:    s.depth.image,
+		Image:    app.depth.image,
 	}, nil, &view)
 	utils.OrPanic(as.NewError(ret))
-	s.depth.view = view
+	app.depth.view = view
 }
 
 var texEnabled = []string{
 	"assets/textures/gopher.png",
 }
 
-func (s *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
+func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	usage vk.ImageUsageFlagBits, memoryProps vk.MemoryPropertyFlagBits) *Texture {
 
-	dev := s.Context().Device()
+	dev := app.Context().Device()
 	texFormat := vk.FormatR8g8b8a8Unorm
 	_, width, height, err := loadTextureData(path, 0)
 	if err != nil {
@@ -168,7 +168,7 @@ func (s *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	vk.GetImageMemoryRequirements(dev, tex.image, &memReqs)
 	memReqs.Deref()
 
-	memProps := s.Context().Platform().MemoryProperties()
+	memProps := app.Context().Platform().MemoryProperties()
 	memTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
 		vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), memoryProps)
 	tex.memAlloc = &vk.MemoryAllocateInfo{
@@ -210,12 +210,12 @@ func (s *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	return tex
 }
 
-func (s *Application) setImageLayout(image vk.Image, aspectMask vk.ImageAspectFlagBits,
+func (app *Application) setImageLayout(image vk.Image, aspectMask vk.ImageAspectFlagBits,
 	oldImageLayout, newImageLayout vk.ImageLayout,
 	srcAccessMask vk.AccessFlagBits,
 	srcStages, dstStages vk.PipelineStageFlagBits) {
 
-	cmd := s.Context().CommandBuffer()
+	cmd := app.Context().CommandBuffer()
 	if cmd == nil {
 		utils.OrPanic(errors.New("vulkan: command buffer not initialized"))
 	}
@@ -257,11 +257,11 @@ func (s *Application) setImageLayout(image vk.Image, aspectMask vk.ImageAspectFl
 		0, 0, nil, 0, nil, 1, []vk.ImageMemoryBarrier{imageMemoryBarrier})
 }
 
-func (s *Application) prepareTextures() {
-	dev := s.Context().Device()
+func (app *Application) prepareTextures() {
+	dev := app.Context().Device()
 	texFormat := vk.FormatR8g8b8a8Unorm
 	var props vk.FormatProperties
-	gpu := s.Context().Platform().PhysicalDevice()
+	gpu := app.Context().Platform().PhysicalDevice()
 	vk.GetPhysicalDeviceFormatProperties(gpu, texFormat, &props)
 	props.Deref()
 
@@ -269,15 +269,15 @@ func (s *Application) prepareTextures() {
 		var tex *Texture
 
 		if (props.LinearTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureSampledImageBit) != 0) &&
-			!s.useStagingBuffers {
+			!app.useStagingBuffers {
 			// -> device can texture using linear textures
 
-			tex = s.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageSampledBit,
+			tex = app.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageSampledBit,
 				vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
 
 			// Nothing in the pipeline needs to be complete to start, and don't allow fragment
 			// shader to run until layout transition completes
-			s.setImageLayout(tex.image, vk.ImageAspectColorBit,
+			app.setImageLayout(tex.image, vk.ImageAspectColorBit,
 				vk.ImageLayoutPreinitialized, tex.imageLayout,
 				vk.AccessHostWriteBit,
 				vk.PipelineStageTopOfPipeBit, vk.PipelineStageFragmentShaderBit)
@@ -286,22 +286,22 @@ func (s *Application) prepareTextures() {
 			//  Must use staging buffer to copy linear texture to optimized
 			log.Println("vulkan warn: using staging buffers")
 
-			staging := s.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageTransferSrcBit,
+			staging := app.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageTransferSrcBit,
 				vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
-			tex = s.prepareTextureImage(path, vk.ImageTilingOptimal,
+			tex = app.prepareTextureImage(path, vk.ImageTilingOptimal,
 				vk.ImageUsageTransferDstBit|vk.ImageUsageSampledBit, vk.MemoryPropertyDeviceLocalBit)
 
-			s.setImageLayout(staging.image, vk.ImageAspectColorBit,
+			app.setImageLayout(staging.image, vk.ImageAspectColorBit,
 				vk.ImageLayoutPreinitialized, vk.ImageLayoutTransferSrcOptimal,
 				vk.AccessHostWriteBit,
 				vk.PipelineStageTopOfPipeBit, vk.PipelineStageTransferBit)
 
-			s.setImageLayout(tex.image, vk.ImageAspectColorBit,
+			app.setImageLayout(tex.image, vk.ImageAspectColorBit,
 				vk.ImageLayoutPreinitialized, vk.ImageLayoutTransferDstOptimal,
 				vk.AccessHostWriteBit,
 				vk.PipelineStageTopOfPipeBit, vk.PipelineStageTransferBit)
 
-			cmd := s.Context().CommandBuffer()
+			cmd := app.Context().CommandBuffer()
 			if cmd == nil {
 				utils.OrPanic(errors.New("vulkan: command buffer not initialized"))
 			}
@@ -328,7 +328,7 @@ func (s *Application) prepareTextures() {
 						Depth:  1,
 					},
 				}})
-			s.setImageLayout(tex.image, vk.ImageAspectColorBit,
+			app.setImageLayout(tex.image, vk.ImageAspectColorBit,
 				vk.ImageLayoutTransferDstOptimal, tex.imageLayout,
 				vk.AccessTransferWriteBit,
 				vk.PipelineStageTransferBit, vk.PipelineStageFragmentShaderBit)
@@ -380,13 +380,13 @@ func (s *Application) prepareTextures() {
 		return tex
 	}
 
-	s.textures = make([]*Texture, 0, len(texEnabled))
+	app.textures = make([]*Texture, 0, len(texEnabled))
 	for _, texFile := range texEnabled {
-		s.textures = append(s.textures, prepareTex(texFile))
+		app.textures = append(app.textures, prepareTex(texFile))
 	}
 }
 
-func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
@@ -400,27 +400,27 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 	})
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
-		RenderPass:  s.renderPass,
+		RenderPass:  app.renderPass,
 		Framebuffer: res.Framebuffer(),
 		RenderArea: vk.Rect2D{
 			Offset: vk.Offset2D{
 				X: 0, Y: 0,
 			},
 			Extent: vk.Extent2D{
-				Width:  s.width,
-				Height: s.height,
+				Width:  app.width,
+				Height: app.height,
 			},
 		},
 		ClearValueCount: 2,
 		PClearValues:    clearValues,
 	}, vk.SubpassContentsInline)
 
-	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, s.pipeline)
-	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, s.pipelineLayout,
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
-		Width:    float32(s.width),
-		Height:   float32(s.height),
+		Width:    float32(app.width),
+		Height:   float32(app.height),
 		MinDepth: 0.0,
 		MaxDepth: 1.0,
 	}})
@@ -429,8 +429,8 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 			X: 0, Y: 0,
 		},
 		Extent: vk.Extent2D{
-			Width:  s.width,
-			Height: s.height,
+			Width:  app.width,
+			Height: app.height,
 		},
 	}})
 
@@ -439,8 +439,8 @@ func (s *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cm
 	// vk.ImageLayoutColorAttachmentOptimal to vk.ImageLayoutPresentSrc
 	vk.CmdEndRenderPass(cmd)
 
-	graphicsQueueIndex := s.Context().Platform().GraphicsQueueFamilyIndex()
-	presentQueueIndex := s.Context().Platform().PresentQueueFamilyIndex()
+	graphicsQueueIndex := app.Context().Platform().GraphicsQueueFamilyIndex()
+	presentQueueIndex := app.Context().Platform().PresentQueueFamilyIndex()
 	if graphicsQueueIndex != presentQueueIndex {
 		// Separate Present Queue Case
 		//
@@ -503,8 +503,8 @@ func (app *Application) prepareCubeDataBuffers() {
 	}
 }
 
-func (s *Application) prepareDescriptorLayout() {
-	dev := s.Context().Device()
+func (app *Application) prepareDescriptorLayout() {
+	dev := app.Context().Device()
 	var descLayout vk.DescriptorSetLayout
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
@@ -523,22 +523,22 @@ func (s *Application) prepareDescriptorLayout() {
 			}},
 	}, nil, &descLayout)
 	utils.OrPanic(as.NewError(ret))
-	s.descLayout = descLayout
+	app.descLayout = descLayout
 
 	var pipelineLayout vk.PipelineLayout
 	ret = vk.CreatePipelineLayout(dev, &vk.PipelineLayoutCreateInfo{
 		SType:          vk.StructureTypePipelineLayoutCreateInfo,
 		SetLayoutCount: 1,
 		PSetLayouts: []vk.DescriptorSetLayout{
-			s.descLayout,
+			app.descLayout,
 		},
 	}, nil, &pipelineLayout)
 	utils.OrPanic(as.NewError(ret))
-	s.pipelineLayout = pipelineLayout
+	app.pipelineLayout = pipelineLayout
 }
 
-func (s *Application) prepareRenderPass() {
-	dev := s.Context().Device()
+func (app *Application) prepareRenderPass() {
+	dev := app.Context().Device()
 	// The initial layout for the color and depth attachments will be vk.LayoutUndefined
 	// because at the start of the renderpass, we don't care about their contents.
 	// At the start of the subpass, the color attachment's layout will be transitioned
@@ -552,7 +552,7 @@ func (s *Application) prepareRenderPass() {
 		SType:           vk.StructureTypeRenderPassCreateInfo,
 		AttachmentCount: 2,
 		PAttachments: []vk.AttachmentDescription{{
-			Format:         s.Context().SwapchainDimensions().Format,
+			Format:         app.Context().SwapchainDimensions().Format,
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpStore,
@@ -561,7 +561,7 @@ func (s *Application) prepareRenderPass() {
 			InitialLayout:  vk.ImageLayoutUndefined,
 			FinalLayout:    vk.ImageLayoutPresentSrc,
 		}, {
-			Format:         s.depth.format,
+			Format:         app.depth.format,
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpDontCare,
@@ -585,7 +585,7 @@ func (s *Application) prepareRenderPass() {
 		}},
 	}, nil, &renderPass)
 	utils.OrPanic(as.NewError(ret))
-	s.renderPass = renderPass
+	app.renderPass = renderPass
 }
 
 func (app *Application) preparePipeline() {
@@ -804,25 +804,25 @@ func (app *Application) prepareUniformBuffers() {
 	}
 }
 
-func (s *Application) VulkanContextPrepare() error {
-	dim := s.Context().SwapchainDimensions()
-	s.height = dim.Height
-	s.width = dim.Width
+func (app *Application) VulkanContextPrepare() error {
+	dim := app.Context().SwapchainDimensions()
+	app.height = dim.Height
+	app.width = dim.Width
 
-	s.prepareDepth()
-	s.prepareTextures()
-	s.prepareCubeDataBuffers()
-	s.prepareDescriptorLayout()
-	s.prepareRenderPass()
-	s.preparePipeline()
-	s.prepareDescriptorPool()
-	s.prepareDescriptorSet()
-	s.prepareFramebuffers()
-	s.prepareUniformBuffers()
+	app.prepareDepth()
+	app.prepareTextures()
+	app.prepareCubeDataBuffers()
+	app.prepareDescriptorLayout()
+	app.prepareRenderPass()
+	app.preparePipeline()
+	app.prepareDescriptorPool()
+	app.prepareDescriptorSet()
+	app.prepareFramebuffers()
+	app.prepareUniformBuffers()
 
-	swapchainImageResources := s.Context().SwapchainImageResources()
+	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
-		s.drawBuildCommandBuffer(res, res.CommandBuffer())
+		app.drawBuildCommandBuffer(res, res.CommandBuffer())
 	}
 	return nil
 }
@@ -884,6 +884,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	MVP.Mult(&VP, &app.modelMatrix)
 
 	data := MVP.Data()
+	
 	n := vk.Memcopy(app.uniformBuffersMapped[imageIdx], data)
 	if n != len(data) {
 		log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
@@ -891,7 +892,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	return nil
 }
 
-func (s *Application) Destroy() {}
+func (app *Application) Destroy() {}
 
 type Texture struct {
 	sampler vk.Sampler
