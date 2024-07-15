@@ -8,4 +8,7 @@ require (
 	github.com/vulkan-go/vulkan v0.0.0-20221209234627-c0a353ae26c8
 	github.com/xlab/closer v1.1.0
 	github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
+	golang.org/x/term v0.22.0
 )
+
+require golang.org/x/sys v0.22.0 // indirect

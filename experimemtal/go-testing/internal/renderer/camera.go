@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -17,8 +18,8 @@ var (
 	START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}
-	CAMERA_SPEED       = float32(1.0)
-	LOOK_SENSITIVITY   = float32(0.01)
+	CAMERA_SPEED       = float32(0.2)
+	LOOK_SENSITIVITY   = float32(0.03)
 )
 
 type Camera struct {
@@ -98,27 +99,54 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			c.Pos.Add(c.Pos, &tmp)
 		}
 
+		yaw := c.getYaw()
+		pitch := c.getPitch()
+
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // Up
-			pitchQuat := QuatRotate(lin.DegreesToRadians(c.Sensitivity), c.Right)
-			c.Rotation.Mult(c.Rotation, &pitchQuat)
+			pitch += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyDown) == glfw.Press { // Down
-			pitchQuat := QuatRotate(lin.DegreesToRadians(-c.Sensitivity), c.Right)
-			c.Rotation.Mult(c.Rotation, &pitchQuat)
+			pitch -= float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyLeft) == glfw.Press { // Left
-			yawQuat := QuatRotate(lin.DegreesToRadians(c.Sensitivity), c.WorldUp)
-			c.Rotation.Mult(c.Rotation, &yawQuat)
+			yaw -= float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // Right
-			yawQuat := QuatRotate(lin.DegreesToRadians(-c.Sensitivity), c.WorldUp)
-			c.Rotation.Mult(c.Rotation, &yawQuat)
+			yaw += float64(c.Sensitivity)
 		}
 
-		// Update the camera's front, right, and up vectors
+		front := calcFrontVector(pitch, yaw)
+		c.Front = &front
+		// Update the camera's front, right, and up vectors for quaternions
 		// c.updateCameraVectors()
 	}
+}
+
+// Calculate the front vector without quaternions, from pitch and yaw
+func calcFrontVector(pitch, yaw float64) lin.Vec3 {
+	// Clamping to avoid flipping
+	if pitch > float64(lin.DegreesToRadians(89.0)) {
+		pitch = float64(lin.DegreesToRadians(89.0))
+	}
+	if pitch < -float64(lin.DegreesToRadians(89)) {
+		pitch = -float64(lin.DegreesToRadians(89.0))
+	}
+
+	var front lin.Vec3
+	front[0] = float32(math.Cos((yaw)) * math.Cos(pitch))
+	front[1] = float32(math.Sin((pitch)))
+	front[2] = float32(math.Sin(yaw) * math.Cos(pitch))
+	front.Norm(&front)
+	return front
+}
+
+func (c *Camera) getYaw() float64 {
+	return math.Atan2(float64(c.Front[2]), float64(c.Front[0]))
+}
+
+func (c *Camera) getPitch() float64 {
+	return math.Asin(float64(c.Front[1]))
 }
 
 // Update the camera's front, right, and up vectors based on the current rotation
@@ -137,6 +165,8 @@ func (c *Camera) updateCameraVectors() {
 	up = RotateQuat(&up, c.Rotation)
 	up.Norm(&up)
 	c.Up = &up
+
+	fmt.Printf("Front: %v, Right: %v, Up: %v, Rot: %v\n", c.Front, c.Right, c.Up, c.Rotation)
 }
 
 // Helper Functions for Quaternion Rotations

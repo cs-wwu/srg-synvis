@@ -3,6 +3,7 @@ package heightmap
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -12,19 +13,76 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"golang.org/x/term"
 )
 
 const (
 	length = 3601
 )
 
+var (
+	client *http.Client
+)
+
 type Elevations [length][length]int16
 type Pixels [length][length]uint16
 
+func init() {
+	jar, _ := cookiejar.New(nil)
+	client = &http.Client{
+		Jar: jar,
+	}
+}
+
+func promptCredentials() (string, string, error) {
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Print("Enter your Earthdata Login username: ")
+	username, err := reader.ReadString('\n')
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read username: %v", err)
+	}
+	username = strings.TrimSpace(username)
+
+	fmt.Print("Enter your Earthdata Login password: ")
+	passwordBytes, err := term.ReadPassword(0)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read password: %v", err)
+	}
+	password := string(passwordBytes)
+	fmt.Println() // Add a newline after the password input
+
+	return username, password, nil
+}
+
+func authenticateEarthdata(username, password string) error {
+	authUrl := "https://e4ftl01.cr.usgs.gov/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_n00e006.zip"
+
+	data := url.Values{
+		"username": {username},
+		"password": {password},
+	}
+
+	resp, err := client.PostForm(authUrl, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("authentication failed: %s", resp.Status)
+	}
+
+	return nil
+}
+
 // Heightmap formatted as "NASADEM_HGT_[NS]\d{2}[EW]\d{3}.hgt"
-// TODO not sure how to push EarthData login
 func heightmapToBytes(HGTFilepath string) ([]byte, error) {
 	// Open the heightmap file
 	hgtFile, err := os.Open(HGTFilepath)
