@@ -15,10 +15,10 @@ type Vertex struct {
 type Index int32
 
 type UniformBufferObject struct {
-	Model   ln.Mat4x4 // object to world space
-	View    ln.Mat4x4 // world to camera space
-	Proj    ln.Mat4x4 // camera to clip and screen space
-	NormalM ln.Mat4x4 // for lighting
+	Model*   ln.Mat4x4 // object to world space
+	View*    ln.Mat4x4 // world to camera space
+	Proj*    ln.Mat4x4 // camera to clip and screen space
+	NormalM* ln.Mat4x4 // for lighting
 
 	LightDir ln.Vec3 // Need to initialize this as
 }

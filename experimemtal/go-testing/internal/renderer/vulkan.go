@@ -59,10 +59,16 @@ type Application struct {
 
 	frameIndex int
 
+	// these belong in ubo
 	projectionMatrix     lin.Mat4x4
 	viewMatrix           lin.Mat4x4
 	modelMatrix          lin.Mat4x4
-	uniformBuffersMapped []unsafe.Pointer
+	// 
+	// uniformBuffersMapped []unsafe.Pointer
+	vertices	 	[]types.Vertex
+	indices		 	[]types.Index
+	vertexBuffer 	vk.Buffer
+	indexBuffer     vk.Buffer
 
 	camera       *Camera
 	WindowHandle *glfw.Window
@@ -481,40 +487,27 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 // this function is doing same thing as create uniform buffers,
 // except also initializing data for cube
 // need to split this into ubo, vertex, and indice buffer creation
-// func (app *Application) prepareCubeDataBuffers() {
-// 	dev := app.Context().Device()
-
-// 	var VP lin.Mat4x4
-// 	var MVP lin.Mat4x4
-// 	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
-// 	MVP.Mult(&VP, &app.modelMatrix)
-
-// 	data := utils.VkTexCubeUniform{
-// 		Mvp: MVP,
-// 	}
-// 	for i := 0; i < 12*3; i++ {
-// 		data.Position[i][0] = utils.GVertexBufferData[i*3]
-// 		data.Position[i][1] = utils.GVertexBufferData[i*3+1]
-// 		data.Position[i][2] = utils.GVertexBufferData[i*3+2]
-// 		data.Position[i][3] = 1.0
-// 		data.Attr[i][0] = utils.GUVBufferData[2*i]
-// 		data.Attr[i][1] = utils.GUVBufferData[2*i+1]
-// 		data.Attr[i][2] = 0
-// 		data.Attr[i][3] = 0
-// 	}
-
-// 	dataRaw := data.Data()
-// 	memProps := app.Context().Platform().MemoryProperties()
-// 	swapchainImageResources := app.Context().SwapchainImageResources()
-// 	for _, res := range swapchainImageResources {
-// 		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
-// 		res.SetUniformBuffer(buf.Buffer, buf.Memory)
-// 	}
-// }
-
-func (app *Application) prepareUniformBuffers() {
+func (app *Application) prepareCubeDataBuffers() {
 	dev := app.Context().Device()
-	data = utils.Uni
+
+	var VP lin.Mat4x4
+	var MVP lin.Mat4x4
+	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
+	MVP.Mult(&VP, &app.modelMatrix)
+
+	data := utils.VkTexCubeUniform{
+		Mvp: MVP,
+	}
+	for i := 0; i < 12*3; i++ {
+		data.Position[i][0] = utils.GVertexBufferData[i*3]
+		data.Position[i][1] = utils.GVertexBufferData[i*3+1]
+		data.Position[i][2] = utils.GVertexBufferData[i*3+2]
+		data.Position[i][3] = 1.0
+		data.Attr[i][0] = utils.GUVBufferData[2*i]
+		data.Attr[i][1] = utils.GUVBufferData[2*i+1]
+		data.Attr[i][2] = 0
+		data.Attr[i][3] = 0
+	}
 
 	dataRaw := data.Data()
 	memProps := app.Context().Platform().MemoryProperties()
@@ -524,6 +517,56 @@ func (app *Application) prepareUniformBuffers() {
 		res.SetUniformBuffer(buf.Buffer, buf.Memory)
 	}
 }
+
+// func (app *Application) prepareUniformBuffers() {
+// 	dev := app.Context().Device()
+
+// 	model := new(lin.Mat4x4)
+// 	view := new(lin.Mat4x4)
+// 	proj := new(lin.Mat4x4)
+// 	norm := new(lin.Mat4x4)
+// 	ld := lin.Vec3{0.0, 0.1, 0.1}
+// 	data := types.UniformBufferObject{
+// 		// TODO check if initializing to correct vals
+// 		Model: model,
+// 		View: view,
+// 		Proj: proj,
+// 		NormalM: norm,
+// 		LightDir: ld,
+// 	}
+
+// 	dataRaw := data.Data()	// need to write our own
+// 	memProps := app.Context().Platform().MemoryProperties()
+// 	swapchainImageResources := app.Context().SwapchainImageResources()
+// 	for _, res := range swapchainImageResources {
+// 		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
+// 		res.SetUniformBuffer(buf.Buffer, buf.Memory)
+// 	}
+// }
+
+// // TODO cpp uses a staging buffer during this for optimization -> copybuffer
+// // should be called after filling vertices
+// func (app *Application) prepareVertexBuffer() {
+// 	dev := app.Context().Device()
+
+// 	data := app.vertices 	// vertices is an array of vertices
+
+// 	dataRaw := data.Data()	// need to write our own
+// 	memProps := app.Context().Platform().MemoryProperties()
+// 	app.vertexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit).Buffer
+// }
+
+// // TODO cpp uses a staging buffer during this for optimization -> copybuffer
+// // should be called after filling indices
+// func (app *Application) prepareIndexBuffer() {
+// 	dev := app.Context().Device()
+
+// 	data := app.indices
+
+// 	dataRaw := data.Data()	// need to write our own
+// 	memProps := app.Context().Platform().MemoryProperties()
+// 	app.indexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit).Buffer
+// }
 
 func (app *Application) prepareDescriptorLayout() {
 	dev := app.Context().Device()
@@ -808,6 +851,9 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 	app.prepareCubeDataBuffers()
+	// app.prepareUniformBuffers()
+	// app.prepareVertexBuffer()
+	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
@@ -853,17 +899,17 @@ func (app *Application) NextFrame() {
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
-	dev := s.Context().Device()
-	res := s.Context().SwapchainImageResources()[imageIdx]
+	dev := app.Context().Device()
+	res := app.Context().SwapchainImageResources()[imageIdx]
 
 	var MVP, VP lin.Mat4x4
-	VP.Mult(&s.projectionMatrix, &s.viewMatrix)
-	MVP.Mult(&VP, &s.modelMatrix)
+	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
+	MVP.Mult(&VP, &app.modelMatrix)
 
 	data := MVP.Data()
 	var pData unsafe.Pointer
 	ret := vk.MapMemory(dev, res.UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &pData)
-	orPanic(as.NewError(ret))
+	utils.OrPanic(as.NewError(ret))
 
 	n := vk.Memcopy(pData, data)
 	if n != len(data) {
