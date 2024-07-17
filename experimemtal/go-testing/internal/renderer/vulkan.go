@@ -522,12 +522,22 @@ func (app *Application) prepareCubeDataBuffers() {
 // 	dev := app.Context().Device()
 
 // 	model := new(lin.Mat4x4)
-// 	view := new(lin.Mat4x4)
+// 	model.Identity()
+
+// 	// view := new(lin.Mat4x4)
+// 	viewm := app.camera.GetViewMatrix()
+// 	view := &viewm
+
 // 	proj := new(lin.Mat4x4)
+// 	proj.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
+// 	proj[1][1] *= -1
+	
+// 	// TODO check if initializing to correct vals
 // 	norm := new(lin.Mat4x4)
+// 	norm.Identity()
 // 	ld := lin.Vec3{0.0, 0.1, 0.1}
+
 // 	data := types.UniformBufferObject{
-// 		// TODO check if initializing to correct vals
 // 		Model: model,
 // 		View: view,
 // 		Proj: proj,
@@ -535,7 +545,7 @@ func (app *Application) prepareCubeDataBuffers() {
 // 		LightDir: ld,
 // 	}
 
-// 	dataRaw := data.Data()	// need to write our own
+// 	dataRaw := data.Data()
 // 	memProps := app.Context().Platform().MemoryProperties()
 // 	swapchainImageResources := app.Context().SwapchainImageResources()
 // 	for _, res := range swapchainImageResources {
@@ -545,25 +555,25 @@ func (app *Application) prepareCubeDataBuffers() {
 // }
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
-// // should be called after filling vertices
+// // should be called after filling vertices: loadhm()
 // func (app *Application) prepareVertexBuffer() {
 // 	dev := app.Context().Device()
 
-// 	data := app.vertices 	// vertices is an array of vertices
+// 	data := &app.vertices[0] 	// vertices is an array of vertices
 
-// 	dataRaw := data.Data()	// need to write our own
+// 	dataRaw := data.Data()
 // 	memProps := app.Context().Platform().MemoryProperties()
 // 	app.vertexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit).Buffer
 // }
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
-// // should be called after filling indices
+// // should be called after filling indices: loadhm()
 // func (app *Application) prepareIndexBuffer() {
 // 	dev := app.Context().Device()
 
-// 	data := app.indices
+// 	data := &app.indices[0]
 
-// 	dataRaw := data.Data()	// need to write our own
+// 	dataRaw := data.Data()
 // 	memProps := app.Context().Platform().MemoryProperties()
 // 	app.indexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit).Buffer
 // }
@@ -661,12 +671,56 @@ func (app *Application) preparePipeline() {
 	fs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/cube.frag.spv"))
 	utils.OrPanic(err)
 
+	// note .cpp does not have a pipelinecache
 	var pipelineCache vk.PipelineCache
 	ret := vk.CreatePipelineCache(dev, &vk.PipelineCacheCreateInfo{
 		SType: vk.StructureTypePipelineCacheCreateInfo,
 	}, nil, &pipelineCache)
 	utils.OrPanic(as.NewError(ret))
 	app.pipelineCache = pipelineCache
+
+	// bindingDescription := [1]vk.VertexInputBindingDescription{
+	// 	{
+	// 	Binding: 0,
+	// 	Stride: uint32(unsafe.Sizeof(types.Vertex{})),
+	// 	InputRate: vk.VertexInputRateVertex,
+	// 	},
+	// }
+
+	// var v types.Vertex
+	// posOffset := uintptr(unsafe.Pointer(&v.Pos)) - uintptr(unsafe.Pointer(&v))
+	// colorOffset := uintptr(unsafe.Pointer(&v.Color)) - uintptr(unsafe.Pointer(&v))
+	// normalOffset := uintptr(unsafe.Pointer(&v.Normal)) - uintptr(unsafe.Pointer(&v))
+	// tcOffset := uintptr(unsafe.Pointer(&v.TexCoord)) - uintptr(unsafe.Pointer(&v))
+
+	// attributeDescription := [4]vk.VertexInputAttributeDescription{
+	// 	{
+	// 		Binding: 0,
+	// 		Location: 0,
+	// 		Format: vk.FormatR32g32b32Sfloat,
+	// 		// Offset: offsetof(Vertex, pos),
+	// 		// Offset: reflect.Offset(types.Vertex.Pos),
+	// 		Offset: uint32(posOffset),
+	// 	},
+	// 	{
+	// 		Binding: 0,
+	// 		Location: 1,
+	// 		Format: vk.FormatR32g32b32Sfloat,
+	// 		Offset: uint32(colorOffset),
+	// 	},
+	// 	{
+	// 		Binding: 0,
+	// 		Location: 2,
+	// 		Format: vk.FormatR32g32b32Sfloat,
+	// 		Offset: uint32(normalOffset),
+	// 	},
+	// 	{
+	// 		Binding: 0,
+	// 		Location: 3,
+	// 		Format: vk.FormatR32g32Sfloat,
+	// 		Offset: uint32(tcOffset),
+	// 	},
+	// }
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
@@ -683,6 +737,10 @@ func (app *Application) preparePipeline() {
 		},
 		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
 			SType: vk.StructureTypePipelineVertexInputStateCreateInfo,
+			// VertexBindingDescriptionCount: 1,
+			// VertexAttributeDescriptionCount: uint32(len(attributeDescription)),
+			// PVertexBindingDescriptions: bindingDescription[:],
+			// PVertexAttributeDescriptions: attributeDescription[:],
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
@@ -851,7 +909,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 	app.prepareCubeDataBuffers()
-	// app.prepareUniformBuffers()
+	// app.prepareUniformBuffers()	// need to be called after loadhm()
 	// app.prepareVertexBuffer()
 	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()

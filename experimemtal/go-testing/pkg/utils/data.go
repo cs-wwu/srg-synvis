@@ -14,6 +14,7 @@ type VkTexCubeUniform struct {
 
 const VkTexCubeUniformSize = int(unsafe.Sizeof(VkTexCubeUniform{}))
 
+// creating a byte array of size VkTexCubeUniformSize
 func (u *VkTexCubeUniform) Data() []byte {
 	const m = 0x7fffffff
 	return (*[m]byte)(unsafe.Pointer(u))[:VkTexCubeUniformSize]
