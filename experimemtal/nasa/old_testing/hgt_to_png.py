@@ -14,6 +14,8 @@ def read_hgt_file(file_path):
 def normalize_elevations(elevations):
     # Normalize to [0, 65535]
     normalized = ((elevations - min_elevation) / (max_elevation - min_elevation) * 65535).astype(np.uint16)
+    for i in range(3601):
+        print(f"pixels[{i}][0]: {normalized[i][0]}")
     return normalized
 
 def save_to_png(elevations, output_path):
@@ -42,7 +44,7 @@ def write_hgt_file(elevations, output_path):
         f.write(elevations.astype('>i2').tobytes())
 
 
-hgt_file = 'coords/n48w123/n48w123.hgt'
+hgt_file = '../heightmaps/n48w123/n48w123.hgt'
 png_file = 'output.png'
 
 elevations = read_hgt_file(hgt_file)
