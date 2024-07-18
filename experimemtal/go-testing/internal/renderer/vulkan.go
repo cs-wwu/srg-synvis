@@ -68,7 +68,10 @@ type Application struct {
 	vertices	 	[]types.Vertex
 	indices		 	[]types.Index
 	vertexBuffer 	vk.Buffer
+	vertexBufferMemory vk.DeviceMemory
 	indexBuffer     vk.Buffer
+	indexBufferMemory vk.DeviceMemory
+	ubo types.UniformBufferObject
 
 	camera       *Camera
 	WindowHandle *glfw.Window
@@ -518,6 +521,52 @@ func (app *Application) prepareCubeDataBuffers() {
 	}
 }
 
+func (app *Application) prepareUniformBuffers() {
+	dev := app.Context().Device()
+
+	var VP lin.Mat4x4
+	var MVP lin.Mat4x4
+	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
+	MVP.Mult(&VP, &app.modelMatrix)
+
+	data := types.UBOp{
+		MVP: MVP,
+	}
+
+	dataRaw := data.Data()
+	memProps := app.Context().Platform().MemoryProperties()
+	swapchainImageResources := app.Context().SwapchainImageResources()
+	for _, res := range swapchainImageResources {
+		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
+		res.SetUniformBuffer(buf.Buffer, buf.Memory)
+	}
+}
+
+// TODO cpp uses a staging buffer during this for optimization -> copybuffer
+// should be called after filling vertices: loadhm()
+// TODO check if freed
+func (app *Application) prepareVertexBuffer() {
+	dev := app.Context().Device()
+
+	data := types.Vertexp{}
+	for i := 0; i < 12*3; i++ {
+		data.Position[i][0] = utils.GVertexBufferData[i*3]
+		data.Position[i][1] = utils.GVertexBufferData[i*3+1]
+		data.Position[i][2] = utils.GVertexBufferData[i*3+2]
+		data.Position[i][3] = 1.0
+		data.Attr[i][0] = utils.GUVBufferData[2*i]
+		data.Attr[i][1] = utils.GUVBufferData[2*i+1]
+		data.Attr[i][2] = 0
+		data.Attr[i][3] = 0
+	}
+
+	dataRaw := data.Data()
+	memProps := app.Context().Platform().MemoryProperties()
+	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
+	app.vertexBufferMemory = buf.Memory
+	app.vertexBuffer = buf.Buffer
+}
+
 // func (app *Application) prepareUniformBuffers() {
 // 	dev := app.Context().Device()
 
@@ -556,26 +605,37 @@ func (app *Application) prepareCubeDataBuffers() {
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // // should be called after filling vertices: loadhm()
+// // TODO check if freed
 // func (app *Application) prepareVertexBuffer() {
 // 	dev := app.Context().Device()
 
+	// // possible error here - not correct initialization
 // 	data := &app.vertices[0] 	// vertices is an array of vertices
+//	data := types.GVertexBufferData
+//	datap := &data[0]
 
 // 	dataRaw := data.Data()
 // 	memProps := app.Context().Platform().MemoryProperties()
-// 	app.vertexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit).Buffer
+//	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
+//	app.vertexBufferMemory = buf.Memory
+//	app.vertexBuffer = buf.Buffer
 // }
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // // should be called after filling indices: loadhm()
+// // TODO check if freed
 // func (app *Application) prepareIndexBuffer() {
 // 	dev := app.Context().Device()
 
 // 	data := &app.indices[0]
+//	data := types.GIndexBufferData
+//	datap := &data[0]
 
 // 	dataRaw := data.Data()
 // 	memProps := app.Context().Platform().MemoryProperties()
-// 	app.indexBuffer = as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit).Buffer
+// 	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit)
+// 	app.indexBufferMemory = buf.Memory
+// 	app.indexBuffer = buf.Buffer
 // }
 
 func (app *Application) prepareDescriptorLayout() {
@@ -722,6 +782,7 @@ func (app *Application) preparePipeline() {
 	// 	},
 	// }
 
+
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
 		Layout:     app.pipelineLayout,
@@ -862,7 +923,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
+				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
 		}, {

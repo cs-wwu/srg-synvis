@@ -6,7 +6,119 @@ import (
 	ln "github.com/xlab/linmath"
 )
 
+type Vertexp struct {
+	Position [12 * 3][4]float32
+	Attr     [12 * 3][4]float32
+}
+
+type UBOp struct {
+	MVP ln.Mat4x4
+}
+
+const UBOSizep = int(unsafe.Sizeof(UBOp{}))
+func (u *UBOp) Data() []byte {
+	const m = 0x7fffffff
+	return (*[m]byte)(unsafe.Pointer(u))[:UBOSizep]
+}
+
+const VertexpSize = int(unsafe.Sizeof(Vertexp{}))
+func (u *Vertexp) Data() []byte {
+	const m = 0x7fffffff
+	return (*[m]byte)(unsafe.Pointer(u))[:VertexpSize]
+}
+
+var GVertexData = []float32{
+	-1.0, -1.0, -1.0, // -X side
+	-1.0, -1.0, 1.0,
+	-1.0, 1.0, 1.0,
+	-1.0, 1.0, 1.0,
+	-1.0, 1.0, -1.0,
+	-1.0, -1.0, -1.0,
+
+	-1.0, -1.0, -1.0, // -Z side
+	1.0, 1.0, -1.0,
+	1.0, -1.0, -1.0,
+	-1.0, -1.0, -1.0,
+	-1.0, 1.0, -1.0,
+	1.0, 1.0, -1.0,
+
+	-1.0, -1.0, -1.0, // -Y side
+	1.0, -1.0, -1.0,
+	1.0, -1.0, 1.0,
+	-1.0, -1.0, -1.0,
+	1.0, -1.0, 1.0,
+	-1.0, -1.0, 1.0,
+
+	-1.0, 1.0, -1.0, // +Y side
+	-1.0, 1.0, 1.0,
+	1.0, 1.0, 1.0,
+	-1.0, 1.0, -1.0,
+	1.0, 1.0, 1.0,
+	1.0, 1.0, -1.0,
+
+	1.0, 1.0, -1.0, // +X side
+	1.0, 1.0, 1.0,
+	1.0, -1.0, 1.0,
+	1.0, -1.0, 1.0,
+	1.0, -1.0, -1.0,
+	1.0, 1.0, -1.0,
+
+	-1.0, 1.0, 1.0, // +Z side
+	-1.0, -1.0, 1.0,
+	1.0, 1.0, 1.0,
+	-1.0, -1.0, 1.0,
+	1.0, -1.0, 1.0,
+	1.0, 1.0, 1.0,
+}
+
+var GUVBufferData = []float32{
+	0.0, 1.0, // -X side
+	1.0, 1.0,
+	1.0, 0.0,
+	1.0, 0.0,
+	0.0, 0.0,
+	0.0, 1.0,
+
+	1.0, 1.0, // -Z side
+	0.0, 0.0,
+	0.0, 1.0,
+	1.0, 1.0,
+	1.0, 0.0,
+	0.0, 0.0,
+
+	1.0, 0.0, // -Y side
+	1.0, 1.0,
+	0.0, 1.0,
+	1.0, 0.0,
+	0.0, 1.0,
+	0.0, 0.0,
+
+	1.0, 0.0, // +Y side
+	0.0, 0.0,
+	0.0, 1.0,
+	1.0, 0.0,
+	0.0, 1.0,
+	1.0, 1.0,
+
+	1.0, 0.0, // +X side
+	0.0, 0.0,
+	0.0, 1.0,
+	0.0, 1.0,
+	1.0, 1.0,
+	1.0, 0.0,
+
+	0.0, 0.0, // +Z side
+	0.0, 1.0,
+	1.0, 0.0,
+	0.0, 1.0,
+	1.0, 1.0,
+	1.0, 0.0,
+}
+
+
+
 type Vertex struct {
+	// possible error here: define number of vertices
 	Pos      ln.Vec3
 	Color    ln.Vec3
 	Normal   ln.Vec3
@@ -56,7 +168,7 @@ var GVertexBufferData = []Vertex{
     {ln.Vec3{-0.5, 0.5, -0.5}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{1.0, 1.0}},   // 7
 }
 
-var GIndexBufferData = []uint32{
+var GIndexBufferData = []Index{
     0, 1, 2, 2, 3, 0,
     4, 7, 6, 6, 5, 4,
     5, 6, 2, 2, 1, 5,
