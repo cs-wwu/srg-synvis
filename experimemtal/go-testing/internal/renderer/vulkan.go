@@ -923,7 +923,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
+				Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
 		}, {
