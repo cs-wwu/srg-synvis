@@ -555,10 +555,7 @@ func (app *Application) prepareVertexBuffer() {
 
 	data := types.Vertexp{}
 	for i := 0; i < 12*3; i++ {
-		data.Position[i][0] = types.GVertexData[i*3]
-		data.Position[i][1] = types.GVertexData[i*3+1]
-		data.Position[i][2] = types.GVertexData[i*3+2]
-		data.Position[i][3] = 1.0
+		data.Position[i] = types.GVertexData[i]
 		data.Attr[i][0] = types.GUVBufferData[2*i]
 		data.Attr[i][1] = types.GUVBufferData[2*i+1]
 		data.Attr[i][2] = 0
