@@ -429,6 +429,8 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 		PClearValues:    clearValues,
 	}, vk.SubpassContentsInline)
 
+	// vk.CmdClearAttachments(cmd, 1, &clearAttachment, 1, &clearRect)
+
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
@@ -449,6 +451,8 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 	}})
 
 	vk.CmdDraw(cmd, 12*3, 1, 0, 0)
+	// vk.CmdDrawIndexed(cmd, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0) // TODO change for index buffer
+
 	// Note that ending the renderpass changes the image's layout from
 	// vk.ImageLayoutColorAttachmentOptimal to vk.ImageLayoutPresentSrc
 	vk.CmdEndRenderPass(cmd)
@@ -544,18 +548,19 @@ func (app *Application) prepareUniformBuffers() {
 
 // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // should be called after filling vertices: loadhm()
-// TODO check if freed
+// note this is implented as a buffer binded in descriptors sets
+// in cpp we instead individually bind each member of the vertex struct
 func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
 	data := types.Vertexp{}
 	for i := 0; i < 12*3; i++ {
-		data.Position[i][0] = utils.GVertexBufferData[i*3]
-		data.Position[i][1] = utils.GVertexBufferData[i*3+1]
-		data.Position[i][2] = utils.GVertexBufferData[i*3+2]
+		data.Position[i][0] = types.GVertexData[i*3]
+		data.Position[i][1] = types.GVertexData[i*3+1]
+		data.Position[i][2] = types.GVertexData[i*3+2]
 		data.Position[i][3] = 1.0
-		data.Attr[i][0] = utils.GUVBufferData[2*i]
-		data.Attr[i][1] = utils.GUVBufferData[2*i+1]
+		data.Attr[i][0] = types.GUVBufferData[2*i]
+		data.Attr[i][1] = types.GUVBufferData[2*i+1]
 		data.Attr[i][2] = 0
 		data.Attr[i][3] = 0
 	}
@@ -605,7 +610,6 @@ func (app *Application) prepareVertexBuffer() {
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // // should be called after filling vertices: loadhm()
-// // TODO check if freed
 // func (app *Application) prepareVertexBuffer() {
 // 	dev := app.Context().Device()
 
@@ -623,7 +627,7 @@ func (app *Application) prepareVertexBuffer() {
 
 // // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // // should be called after filling indices: loadhm()
-// // TODO check if freed
+// // TODO free
 // func (app *Application) prepareIndexBuffer() {
 // 	dev := app.Context().Device()
 
@@ -643,7 +647,7 @@ func (app *Application) prepareDescriptorLayout() {
 	var descLayout vk.DescriptorSetLayout
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
-		BindingCount: 2,
+		BindingCount: 3,
 		PBindings: []vk.DescriptorSetLayoutBinding{
 			{
 				Binding:         0,
@@ -652,6 +656,11 @@ func (app *Application) prepareDescriptorLayout() {
 				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageVertexBit),
 			}, {
 				Binding:         1,
+				DescriptorType:  vk.DescriptorTypeUniformBuffer,
+				DescriptorCount: 1,
+				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageVertexBit),
+			}, {
+				Binding:         2,
 				DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 				DescriptorCount: uint32(len(texEnabled)),
 				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
@@ -742,22 +751,20 @@ func (app *Application) preparePipeline() {
 	// bindingDescription := [1]vk.VertexInputBindingDescription{
 	// 	{
 	// 	Binding: 0,
-	// 	Stride: uint32(unsafe.Sizeof(types.Vertex{})),
+	// 	Stride: uint32(unsafe.Sizeof(types.Vertexp{})),
 	// 	InputRate: vk.VertexInputRateVertex,
 	// 	},
 	// }
 
-	// var v types.Vertex
-	// posOffset := uintptr(unsafe.Pointer(&v.Pos)) - uintptr(unsafe.Pointer(&v))
-	// colorOffset := uintptr(unsafe.Pointer(&v.Color)) - uintptr(unsafe.Pointer(&v))
-	// normalOffset := uintptr(unsafe.Pointer(&v.Normal)) - uintptr(unsafe.Pointer(&v))
-	// tcOffset := uintptr(unsafe.Pointer(&v.TexCoord)) - uintptr(unsafe.Pointer(&v))
+	// var v types.Vertexp
+	// posOffset := uintptr(unsafe.Pointer(&v.Position)) - uintptr(unsafe.Pointer(&v))
+	// attrOffset := uintptr(unsafe.Pointer(&v.Attr)) - uintptr(unsafe.Pointer(&v))
 
-	// attributeDescription := [4]vk.VertexInputAttributeDescription{
+	// attributeDescription := [2]vk.VertexInputAttributeDescription{
 	// 	{
 	// 		Binding: 0,
 	// 		Location: 0,
-	// 		Format: vk.FormatR32g32b32Sfloat,
+	// 		Format: vk.FormatR32g32b32a32Sfloat,
 	// 		// Offset: offsetof(Vertex, pos),
 	// 		// Offset: reflect.Offset(types.Vertex.Pos),
 	// 		Offset: uint32(posOffset),
@@ -765,23 +772,11 @@ func (app *Application) preparePipeline() {
 	// 	{
 	// 		Binding: 0,
 	// 		Location: 1,
-	// 		Format: vk.FormatR32g32b32Sfloat,
-	// 		Offset: uint32(colorOffset),
+	// 		Format: vk.FormatR32g32b32a32Sfloat,
+	// 		Offset: uint32(attrOffset),
 	// 	},
-	// 	{
-	// 		Binding: 0,
-	// 		Location: 2,
-	// 		Format: vk.FormatR32g32b32Sfloat,
-	// 		Offset: uint32(normalOffset),
-	// 	},
-	// 	{
-	// 		Binding: 0,
-	// 		Location: 3,
-	// 		Format: vk.FormatR32g32Sfloat,
-	// 		Offset: uint32(tcOffset),
-	// 	},
-	// }
 
+	// }
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
@@ -806,6 +801,7 @@ func (app *Application) preparePipeline() {
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
 			Topology: vk.PrimitiveTopologyTriangleList,
+			// PrimitiveRestartEnable: vk.False,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
 			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
@@ -824,6 +820,7 @@ func (app *Application) preparePipeline() {
 		},
 		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
 			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			// SampleShadingEnable: vk.False,
 			RasterizationSamples: vk.SampleCount1Bit,
 		},
 		PViewportState: &vk.PipelineViewportStateCreateInfo{
@@ -878,8 +875,11 @@ func (app *Application) prepareDescriptorPool() {
 	ret := vk.CreateDescriptorPool(dev, &vk.DescriptorPoolCreateInfo{
 		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
 		MaxSets:       uint32(len(swapchainImageResources)),
-		PoolSizeCount: 2,
+		PoolSizeCount: 3,
 		PPoolSizes: []vk.DescriptorPoolSize{{
+			Type:            vk.DescriptorTypeUniformBuffer,
+			DescriptorCount: uint32(len(swapchainImageResources)),
+		},  {
 			Type:            vk.DescriptorTypeUniformBuffer,
 			DescriptorCount: uint32(len(swapchainImageResources)),
 		}, {
@@ -916,19 +916,31 @@ func (app *Application) prepareDescriptorSet() {
 
 		res.SetDescriptorSet(set)
 
-		vk.UpdateDescriptorSets(dev, 2, []vk.WriteDescriptorSet{{
+		vk.UpdateDescriptorSets(dev, 3, []vk.WriteDescriptorSet{{
 			SType:           vk.StructureTypeWriteDescriptorSet,
+			DstBinding:      0,
 			DstSet:          set,
 			DescriptorCount: 1,
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
+				Range:  vk.DeviceSize(types.UBOSizep),
+				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
-		}, {
-			SType:           vk.StructureTypeWriteDescriptorSet,
+		}, {SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      1,
+			DstSet:          set,
+			DescriptorCount: 1,
+			DescriptorType:  vk.DescriptorTypeUniformBuffer,
+			PBufferInfo: []vk.DescriptorBufferInfo{{
+				Offset: 0,
+				Range:  vk.DeviceSize(types.VertexpSize),
+				Buffer: app.vertexBuffer,
+			}},
+		},	{
+			SType:           vk.StructureTypeWriteDescriptorSet,
+			DstBinding:      2,
 			DstSet:          set,
 			DescriptorCount: uint32(len(texEnabled)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
@@ -969,9 +981,9 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.prepareDepth()
 	app.prepareTextures()
-	app.prepareCubeDataBuffers()
-	// app.prepareUniformBuffers()	// need to be called after loadhm()
-	// app.prepareVertexBuffer()
+	// app.prepareCubeDataBuffers()
+	app.prepareUniformBuffers()	// need to be called after loadhm()
+	app.prepareVertexBuffer()
 	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
@@ -999,6 +1011,10 @@ func (app *Application) VulkanContextCleanup() error {
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
 	}
+
+	vk.DestroyBuffer(dev, app.vertexBuffer, nil);
+	vk.FreeMemory(dev, app.vertexBufferMemory, nil);
+
 	app.depth.Destroy(dev)
 	return nil
 }
