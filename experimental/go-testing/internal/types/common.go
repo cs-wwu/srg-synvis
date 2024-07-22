@@ -3,17 +3,17 @@ package types
 
 import (
 	"unsafe"
-	ln "github.com/xlab/linmath"
+	lin "github.com/xlab/linmath"
 )
 
 type Vertexp struct {
-	Position [12 * 3]ln.Vec4
+	Position [12 * 3]lin.Vec4
 	// _ 		 [12 * 3]float32				// alignas(16) 
 	Attr     [12 * 3][4]float32
 }
 
 type UBOp struct {
-	MVP ln.Mat4x4
+	MVP lin.Mat4x4
 }
 
 const UBOSizep = int(unsafe.Sizeof(UBOp{}))
@@ -27,7 +27,7 @@ func (u *Vertexp) Data() []byte {
 	return (*[VertexpSize]byte)(unsafe.Pointer(u))[:]
 }
 
-var GVertexData = []ln.Vec4{
+var GVertexData = []lin.Vec4{
 	{-1.0, -1.0, -1.0, 1.0},	// -X side
 	{-1.0, -1.0, 1.0, 1.0},
 	{-1.0, 1.0, 1.0, 1.0},
@@ -119,21 +119,21 @@ var GUVBufferData = []float32{
 
 type Vertex struct {
 	// possible error here: define number of vertices
-	Pos      ln.Vec3
-	Color    ln.Vec3
-	Normal   ln.Vec3
-	TexCoord ln.Vec2
+	Pos      lin.Vec3
+	Color    lin.Vec3
+	Normal   lin.Vec3
+	TexCoord lin.Vec2
 }
 
 type Index int32
 
 type UniformBufferObject struct {
-	Model*   ln.Mat4x4 // object to world space
-	View*    ln.Mat4x4 // world to camera space
-	Proj*    ln.Mat4x4 // camera to clip and screen space
-	NormalM* ln.Mat4x4 // for lighting
+	Model*   lin.Mat4x4 // object to world space
+	View*    lin.Mat4x4 // world to camera space
+	Proj*    lin.Mat4x4 // camera to clip and screen space
+	NormalM* lin.Mat4x4 // for lighting
 
-	LightDir ln.Vec3 // Need to initialize this as
+	LightDir lin.Vec3 // Need to initialize this as
 }
 
 // creating a byte slice array of size UniformBufferObject
@@ -157,15 +157,15 @@ func (u *Index) Data() []byte {
 }
 
 var GVertexBufferData = []Vertex{
-    {ln.Vec3{-0.5, -0.5, 0.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{1.0, 0.0}},   // 0
-    {ln.Vec3{0.5, -0.5, 0.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{0.0, 1.0}},    // 1
-    {ln.Vec3{0.5, 0.5, 0.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{1.0, 0.0}},     // 2
-    {ln.Vec3{-0.5, 0.5, 0.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{0.0, 1.0}},    // 3
+    {lin.Vec3{-0.5, -0.5, 0.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{1.0, 0.0}},   // 0
+    {lin.Vec3{0.5, -0.5, 0.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{0.0, 1.0}},    // 1
+    {lin.Vec3{0.5, 0.5, 0.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{1.0, 0.0}},     // 2
+    {lin.Vec3{-0.5, 0.5, 0.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{0.0, 1.0}},    // 3
 
-    {ln.Vec3{-0.5, -0.5, -0.5}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{0.0, 0.0}},  // 4
-    {ln.Vec3{0.5, -0.5, -0.5}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{1.0, 1.0}},   // 5
-    {ln.Vec3{0.5, 0.5, -0.5}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{0.0, 0.0}},    // 6
-    {ln.Vec3{-0.5, 0.5, -0.5}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec3{1.0, 1.0, 1.0}, ln.Vec2{1.0, 1.0}},   // 7
+    {lin.Vec3{-0.5, -0.5, -0.5}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{0.0, 0.0}},  // 4
+    {lin.Vec3{0.5, -0.5, -0.5}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{1.0, 1.0}},   // 5
+    {lin.Vec3{0.5, 0.5, -0.5}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{0.0, 0.0}},    // 6
+    {lin.Vec3{-0.5, 0.5, -0.5}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec3{1.0, 1.0, 1.0}, lin.Vec2{1.0, 1.0}},   // 7
 }
 
 var GIndexBufferData = []Index{

@@ -8,7 +8,7 @@ import (
 
 	"go-testing/internal/types"
 
-	ln "github.com/xlab/linmath"
+	lin "github.com/xlab/linmath"
 )
 
 const (
@@ -94,9 +94,9 @@ func calculateNormals(vertices *[]types.Vertex) {
 			down := (*vertices)[(y+1)*length+x].Pos
 
 			// Funky way of doing math with linmath
-			var normal ln.Vec3
-			var a ln.Vec3
-			var b ln.Vec3
+			var normal lin.Vec3
+			var a lin.Vec3
+			var b lin.Vec3
 			a.Sub(&down, &current)
 			b.Sub(&right, &current)
 			normal.MultCross(&a, &b)

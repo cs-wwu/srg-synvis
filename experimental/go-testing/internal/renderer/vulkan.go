@@ -10,8 +10,8 @@ import (
 	"os"
 	"unsafe"
 
-	"go-testing/pkg/utils"
 	"go-testing/internal/types"
+	"go-testing/pkg/utils"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
@@ -19,7 +19,14 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-const MAXFRAMES = 4;	// in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
+const (
+	MAXFRAMES = 4    // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
+	LENGTH    = 3601 // TODO change this to 3601 * 9
+)
+
+var texEnabled = []string{
+	"assets/textures/gopher.png",
+}
 
 func NewApplication(spinAngle float32) *Application {
 	camera := NewCamera()
@@ -29,7 +36,7 @@ func NewApplication(spinAngle float32) *Application {
 		camera:    camera,
 	}
 
-	// 45 FOV, Aspect 1.0
+	// 45 FOV, Aspect 1.0, Near plane, Far Plane
 	a.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
 	a.viewMatrix = a.camera.GetViewMatrix()
 	a.modelMatrix.Identity()
@@ -60,18 +67,18 @@ type Application struct {
 	frameIndex int
 
 	// these belong in ubo
-	projectionMatrix     lin.Mat4x4
-	viewMatrix           lin.Mat4x4
-	modelMatrix          lin.Mat4x4
-	// 
+	projectionMatrix lin.Mat4x4
+	viewMatrix       lin.Mat4x4
+	modelMatrix      lin.Mat4x4
+	//
 	// uniformBuffersMapped []unsafe.Pointer
-	vertices	 	[]types.Vertex
-	indices		 	[]types.Index
-	vertexBuffer 	vk.Buffer
+	vertices           []types.Vertex
+	indices            []types.Index
+	vertexBuffer       vk.Buffer
 	vertexBufferMemory vk.DeviceMemory
-	indexBuffer     vk.Buffer
-	indexBufferMemory vk.DeviceMemory
-	ubo types.UniformBufferObject
+	indexBuffer        vk.Buffer
+	indexBufferMemory  vk.DeviceMemory
+	ubo                types.UniformBufferObject
 
 	camera       *Camera
 	WindowHandle *glfw.Window
@@ -137,10 +144,6 @@ func (app *Application) prepareDepth() {
 	}, nil, &view)
 	utils.OrPanic(as.NewError(ret))
 	app.depth.view = view
-}
-
-var texEnabled = []string{
-	"assets/textures/gopher.png",
 }
 
 func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
@@ -582,7 +585,7 @@ func (app *Application) prepareVertexBuffer() {
 // 	proj := new(lin.Mat4x4)
 // 	proj.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
 // 	proj[1][1] *= -1
-	
+
 // 	// TODO check if initializing to correct vals
 // 	norm := new(lin.Mat4x4)
 // 	norm.Identity()
@@ -610,7 +613,7 @@ func (app *Application) prepareVertexBuffer() {
 // func (app *Application) prepareVertexBuffer() {
 // 	dev := app.Context().Device()
 
-	// // possible error here - not correct initialization
+// // possible error here - not correct initialization
 // 	data := &app.vertices[0] 	// vertices is an array of vertices
 //	data := types.GVertexBufferData
 //	datap := &data[0]
@@ -816,7 +819,7 @@ func (app *Application) preparePipeline() {
 			}},
 		},
 		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
-			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			SType: vk.StructureTypePipelineMultisampleStateCreateInfo,
 			// SampleShadingEnable: vk.False,
 			RasterizationSamples: vk.SampleCount1Bit,
 		},
@@ -876,7 +879,7 @@ func (app *Application) prepareDescriptorPool() {
 		PPoolSizes: []vk.DescriptorPoolSize{{
 			Type:            vk.DescriptorTypeUniformBuffer,
 			DescriptorCount: uint32(len(swapchainImageResources)),
-		},  {
+		}, {
 			Type:            vk.DescriptorTypeUniformBuffer,
 			DescriptorCount: uint32(len(swapchainImageResources)),
 		}, {
@@ -925,7 +928,7 @@ func (app *Application) prepareDescriptorSet() {
 				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
-		}, {SType:           vk.StructureTypeWriteDescriptorSet,
+		}, {SType: vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      1,
 			DstSet:          set,
 			DescriptorCount: 1,
@@ -935,7 +938,7 @@ func (app *Application) prepareDescriptorSet() {
 				Range:  vk.DeviceSize(types.VertexpSize),
 				Buffer: app.vertexBuffer,
 			}},
-		},	{
+		}, {
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      2,
 			DstSet:          set,
@@ -979,7 +982,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 	// app.prepareCubeDataBuffers()
-	app.prepareUniformBuffers()	// need to be called after loadhm()
+	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
 	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
@@ -1009,8 +1012,8 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
-	vk.DestroyBuffer(dev, app.vertexBuffer, nil);
-	vk.FreeMemory(dev, app.vertexBufferMemory, nil);
+	vk.DestroyBuffer(dev, app.vertexBuffer, nil)
+	vk.FreeMemory(dev, app.vertexBufferMemory, nil)
 
 	app.depth.Destroy(dev)
 	return nil
@@ -1021,7 +1024,7 @@ func (app *Application) NextFrame() {
 	// Model.Dup(&app.modelMatrix)
 	// Rotate around the Y axis
 	app.camera.ProcessInput(app.WindowHandle)
-	
+
 	app.viewMatrix = app.camera.GetViewMatrix()
 
 	app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
