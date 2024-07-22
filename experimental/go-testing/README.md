@@ -33,6 +33,7 @@ Download Go from the official site. (Version might change)
 cd ~
 wget https://go.dev/dl/go1.22.5.linux-arm64.tar.gz
 tar -xzf go1.22.5.linux-arm64.tar.gz # Might need sudo
+rm go1.22.5.linux-arm64.tar.gz
 ```
 
 Add the following to the bottom of your `~/.profile`
