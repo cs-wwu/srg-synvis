@@ -1,5 +1,7 @@
 # go-testing
 
+Experimental vulkan testing in `Go`.
+
 ## To-Do List
 
 - [x] Pull the VKCube Repo
@@ -20,6 +22,9 @@
 
 ## Requirements
 
+Note: These instructions are based on the application being run on a
+RaspberryPi (which is linux-arm64).
+
 1. Install `Go`
 
 Download Go from the official site. (Version might change)
@@ -31,6 +36,7 @@ tar -xzf go1.22.5.linux-arm64.tar.gz # Might need sudo
 ```
 
 Add the following to the bottom of your `~/.profile`
+
 ```bash
 # Set GOPATH to the default user workspace if it is not already set
 if [ -z "$GOPATH" ]; then
