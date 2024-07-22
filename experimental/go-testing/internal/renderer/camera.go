@@ -98,6 +98,15 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			tmp.Scale(&tmp, c.Speed)
 			c.Pos.Add(c.Pos, &tmp)
 		}
+		if window.GetKey(glfw.KeySpace) == glfw.Press { // Upp
+			tmp.Scale(c.Up, c.Speed)
+			c.Pos.Add(c.Pos, &tmp) 
+		}
+		if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Down
+			tmp.Scale(c.Up, c.Speed)
+			c.Pos.Sub(c.Pos, &tmp) 
+		}
+
 
 		yaw := c.getYaw()
 		pitch := c.getPitch()
