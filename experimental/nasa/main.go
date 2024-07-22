@@ -415,19 +415,19 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 			return fmt.Errorf("failed to convert %s to png: %v", heightmap, err)
 		}
 
-		// os.RemoveAll(outputDir)
+		os.RemoveAll(outputDir)
 	}
 
 	return nil
 }
 
 // Example Usage
-// func main() {
-// 	targetDir := "heightmaps/"
-// 	heightmaps := []string{"n48w123"}
-// 	err := ProcessHeightmaps(heightmaps, targetDir)
-// 	if err != nil {
-// 		fmt.Printf("failed to process heightmaps: %v", err)
-// 		os.Exit(1)
-// 	}
-// }
+func main() {
+	targetDir := "heightmaps/"
+	heightmaps := []string{"n48w123"}
+	err := ProcessHeightmaps(heightmaps, targetDir)
+	if err != nil {
+		fmt.Printf("failed to process heightmaps: %v", err)
+		os.Exit(1)
+	}
+}
