@@ -988,12 +988,12 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Timing function to test loading heightmap
 	start := time.Now()
-	vertices, indices, err := mesh.LoadHM(HGT_PATH)
-	fmt.Printf("Took %.4v seconds to load heightmap\n", time.Since(start))
+	vertices, _, err := mesh.LoadHM(HGT_PATH)
+	fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
 
 	utils.OrPanic(err)
-	app.vertices = vertices
-	app.indices = indices
+	app.vertices = vertices[:]
+	// app.indices = indices
 
 	// app.prepareCubeDataBuffers()
 	app.prepareUniformBuffers() // need to be called after loadhm()

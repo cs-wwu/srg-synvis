@@ -17,8 +17,9 @@ const (
 )
 
 func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
-	var vertices []types.Vertex
-	var indices []types.Index
+	// Preallocate slices
+	vertices := make([]types.Vertex, length*length)
+	indices := make([]types.Index, 6*(length-1)*(length-1))
 
 	file, err := os.Open(hmPath)
 	if err != nil {
@@ -53,7 +54,7 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 			normX := float32(x)
 			normZ := float32(y)
 
-			vertices = append(vertices, types.Vertex{
+			vertices[y*length + x] = types.Vertex{
 				Pos:    [3]float32{normX, height * scale, normZ},
 				Color:  [3]float32{1.0, 1.0, 1.0},
 				Normal: [3]float32{0.0, 0.0, 0.0},
@@ -61,11 +62,12 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 					normZ / float32(length-1),
 					normX / float32(length-1),
 				},
-			})
+			}
 		}
 	}
 
 	// Generate indices
+	indexPos := 0
 	for y := 0; y < length-1; y++ {
 		for x := 0; x < length-1; x++ {
 			topLeft := types.Index(y*length + x)
@@ -74,10 +76,16 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 			botRight := botLeft + 1
 
 			// First triangle
-			indices = append(indices, topLeft, botLeft, topRight)
+			indices[indexPos] = topLeft
+			indices[indexPos+1] = botLeft
+			indices[indexPos+2] = topRight
+			indexPos += 3
 
 			// Second triangle
-			indices = append(indices, topRight, botLeft, botRight)
+			indices[indexPos] = topRight
+			indices[indexPos+1] = botLeft
+			indices[indexPos+2] = botRight
+			indexPos += 3
 		}
 	}
 
@@ -106,4 +114,3 @@ func calculateNormals(vertices *[]types.Vertex) {
 		}
 	}
 }
-
