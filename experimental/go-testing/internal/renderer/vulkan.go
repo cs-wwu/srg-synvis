@@ -3,13 +3,16 @@ package renderer
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
 	"log"
 	"os"
+	"time"
 	"unsafe"
 
+	"go-testing/internal/mesh"
 	"go-testing/internal/types"
 	"go-testing/pkg/utils"
 
@@ -22,6 +25,7 @@ import (
 const (
 	MAXFRAMES = 4    // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
 	LENGTH    = 3601 // TODO change this to 3601 * 9
+	HGT_PATH  = "assets/heightmaps/n48w123.png"	// TODO hardcoded
 )
 
 var texEnabled = []string{
@@ -981,6 +985,16 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.prepareDepth()
 	app.prepareTextures()
+
+	// Timing function to test loading heightmap
+	start := time.Now()
+	vertices, indices, err := mesh.LoadHM(HGT_PATH)
+	fmt.Printf("Took %.4v seconds to load heightmap\n", time.Since(start))
+
+	utils.OrPanic(err)
+	app.vertices = vertices
+	app.indices = indices
+
 	// app.prepareCubeDataBuffers()
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
