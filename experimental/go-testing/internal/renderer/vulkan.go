@@ -3,16 +3,14 @@ package renderer
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
 	"log"
 	"os"
-	"time"
 	"unsafe"
 
-	"go-testing/internal/mesh"
+	// "go-testing/internal/mesh"
 	"go-testing/internal/types"
 	"go-testing/pkg/utils"
 
@@ -954,14 +952,14 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Timing function to test loading heightmap
-	start := time.Now()
-	vertices, indices, err := mesh.LoadHM(HGT_PATH)
-	fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
-	utils.OrPanic(err)
-	app.vertices = vertices[:]
-	app.indices = indices[:]
+	// start := time.Now()
+	// vertices, indices, err := mesh.LoadHM(HGT_PATH)
+	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
+	// utils.OrPanic(err)
+	// app.vertices = vertices[:]
+	// app.indices = indices[:]
 
-	// app.initCubeDimensions() // Test function for vertices and indices
+	app.initCubeDimensions() // Test function for vertices and indices
 
 	// app.prepareCubeDataBuffers()
 	app.prepareUniformBuffers() // need to be called after loadhm()
