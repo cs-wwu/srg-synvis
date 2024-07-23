@@ -23,9 +23,9 @@ import (
 )
 
 const (
-	MAXFRAMES = 4    // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
-	LENGTH    = 3601 // TODO change this to 3601 * 9
-	HGT_PATH  = "assets/heightmaps/n48w123.png"	// TODO hardcoded
+	MAXFRAMES = 4                               // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
+	LENGTH    = 3601                            // TODO change this to 3601 * 9
+	HGT_PATH  = "assets/heightmaps/n48w123.png" // TODO hardcoded
 )
 
 var texEnabled = []string{
@@ -35,17 +35,17 @@ var texEnabled = []string{
 func NewApplication(spinAngle float32) *Application {
 	camera := NewCamera()
 
-	a := &Application{
+	app := &Application{
 		spinAngle: spinAngle,
 		camera:    camera,
 	}
 
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	a.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
-	a.viewMatrix = a.camera.GetViewMatrix()
-	a.modelMatrix.Identity()
-	a.projectionMatrix[1][1] *= -1 // Flip projection matrix from GL to Vulkan orientation.
-	return a
+	app.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 3600.0)
+	app.viewMatrix = app.camera.GetViewMatrix()
+	app.modelMatrix.Identity()
+	app.projectionMatrix[1][1] *= -1 // Flip projection matrix from GL to Vulkan orientation.
+	return app
 }
 
 type Application struct {
@@ -457,8 +457,11 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 		},
 	}})
 
-	vk.CmdDraw(cmd, 12*3, 1, 0, 0)
-	// vk.CmdDrawIndexed(cmd, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0) // TODO change for index buffer
+	// Bind vertex buffer
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
+
+	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
+	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
 
 	// Note that ending the renderpass changes the image's layout from
 	// vk.ImageLayoutColorAttachmentOptimal to vk.ImageLayoutPresentSrc
@@ -497,41 +500,6 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 	utils.OrPanic(as.NewError(ret))
 }
 
-// cube buffers are acting as uniform buffers
-// this function is doing same thing as create uniform buffers,
-// except also initializing data for cube
-// need to split this into ubo, vertex, and indice buffer creation
-func (app *Application) prepareCubeDataBuffers() {
-	dev := app.Context().Device()
-
-	var VP lin.Mat4x4
-	var MVP lin.Mat4x4
-	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
-	MVP.Mult(&VP, &app.modelMatrix)
-
-	data := utils.VkTexCubeUniform{
-		Mvp: MVP,
-	}
-	for i := 0; i < 12*3; i++ {
-		data.Position[i][0] = utils.GVertexBufferData[i*3]
-		data.Position[i][1] = utils.GVertexBufferData[i*3+1]
-		data.Position[i][2] = utils.GVertexBufferData[i*3+2]
-		data.Position[i][3] = 1.0
-		data.Attr[i][0] = utils.GUVBufferData[2*i]
-		data.Attr[i][1] = utils.GUVBufferData[2*i+1]
-		data.Attr[i][2] = 0
-		data.Attr[i][3] = 0
-	}
-
-	dataRaw := data.Data()
-	memProps := app.Context().Platform().MemoryProperties()
-	swapchainImageResources := app.Context().SwapchainImageResources()
-	for _, res := range swapchainImageResources {
-		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
-		res.SetUniformBuffer(buf.Buffer, buf.Memory)
-	}
-}
-
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
@@ -560,20 +528,37 @@ func (app *Application) prepareUniformBuffers() {
 func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
-	data := types.Vertexp{}
-	for i := 0; i < 12*3; i++ {
-		data.Position[i] = types.GVertexData[i]
-		data.Attr[i][0] = types.GUVBufferData[2*i]
-		data.Attr[i][1] = types.GUVBufferData[2*i+1]
-		data.Attr[i][2] = 0
-		data.Attr[i][3] = 0
+	// Calculate the total size of the buffer
+	bufferSize := len(app.vertices) * types.VertexSize
+
+	// Create a slice to hold the raw byte data
+	dataRaw := make([]byte, bufferSize)
+
+	// Copy the data from app.vertices into dataRaw
+	for i, vertex := range app.vertices {
+		copy(dataRaw[i*types.VertexSize:], vertex.Data())
 	}
 
-	dataRaw := data.Data()
 	memProps := app.Context().Platform().MemoryProperties()
 	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
 	app.vertexBufferMemory = buf.Memory
 	app.vertexBuffer = buf.Buffer
+}
+
+func (app *Application) prepareIndexBuffer() {
+	dev := app.Context().Device()
+
+	bufferSize := len(app.indices) * types.IndexSize
+
+	dataRaw := make([]byte, bufferSize)
+	for i, index := range app.indices {
+		copy(dataRaw[i*types.IndexSize:], index.Data())
+	}
+
+	memProps := app.Context().Platform().MemoryProperties()
+	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit)
+	app.indexBufferMemory = buf.Memory
+	app.indexBuffer = buf.Buffer
 }
 
 // func (app *Application) prepareUniformBuffers() {
@@ -610,40 +595,6 @@ func (app *Application) prepareVertexBuffer() {
 // 		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
 // 		res.SetUniformBuffer(buf.Buffer, buf.Memory)
 // 	}
-// }
-
-// // TODO cpp uses a staging buffer during this for optimization -> copybuffer
-// // should be called after filling vertices: loadhm()
-// func (app *Application) prepareVertexBuffer() {
-// 	dev := app.Context().Device()
-
-// // possible error here - not correct initialization
-// 	data := &app.vertices[0] 	// vertices is an array of vertices
-//	data := types.GVertexBufferData
-//	datap := &data[0]
-
-// 	dataRaw := data.Data()
-// 	memProps := app.Context().Platform().MemoryProperties()
-//	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
-//	app.vertexBufferMemory = buf.Memory
-//	app.vertexBuffer = buf.Buffer
-// }
-
-// // TODO cpp uses a staging buffer during this for optimization -> copybuffer
-// // should be called after filling indices: loadhm()
-// // TODO free
-// func (app *Application) prepareIndexBuffer() {
-// 	dev := app.Context().Device()
-
-// 	data := &app.indices[0]
-//	data := types.GIndexBufferData
-//	datap := &data[0]
-
-// 	dataRaw := data.Data()
-// 	memProps := app.Context().Platform().MemoryProperties()
-// 	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit)
-// 	app.indexBufferMemory = buf.Memory
-// 	app.indexBuffer = buf.Buffer
 // }
 
 func (app *Application) prepareDescriptorLayout() {
@@ -752,35 +703,28 @@ func (app *Application) preparePipeline() {
 	utils.OrPanic(as.NewError(ret))
 	app.pipelineCache = pipelineCache
 
-	// bindingDescription := [1]vk.VertexInputBindingDescription{
-	// 	{
-	// 	Binding: 0,
-	// 	Stride: uint32(unsafe.Sizeof(types.Vertexp{})),
-	// 	InputRate: vk.VertexInputRateVertex,
-	// 	},
-	// }
+	bindingDescriptions := []vk.VertexInputBindingDescription{
+		{
+			Binding:   0,
+			Stride:    uint32(types.VertexSize),
+			InputRate: vk.VertexInputRateVertex,
+		},
+	}
 
-	// var v types.Vertexp
-	// posOffset := uintptr(unsafe.Pointer(&v.Position)) - uintptr(unsafe.Pointer(&v))
-	// attrOffset := uintptr(unsafe.Pointer(&v.Attr)) - uintptr(unsafe.Pointer(&v))
-
-	// attributeDescription := [2]vk.VertexInputAttributeDescription{
-	// 	{
-	// 		Binding: 0,
-	// 		Location: 0,
-	// 		Format: vk.FormatR32g32b32a32Sfloat,
-	// 		// Offset: offsetof(Vertex, pos),
-	// 		// Offset: reflect.Offset(types.Vertex.Pos),
-	// 		Offset: uint32(posOffset),
-	// 	},
-	// 	{
-	// 		Binding: 0,
-	// 		Location: 1,
-	// 		Format: vk.FormatR32g32b32a32Sfloat,
-	// 		Offset: uint32(attrOffset),
-	// 	},
-
-	// }
+	attributeDescriptions := []vk.VertexInputAttributeDescription{
+		{
+			Binding:  0,
+			Location: 0,
+			Format:   vk.FormatR32g32b32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(types.Vertex{}.Pos)),
+		},
+		{
+			Binding:  0,
+			Location: 1,
+			Format:   vk.FormatR32g32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(types.Vertex{}.TexCoord)),
+		},
+	}
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
@@ -796,11 +740,11 @@ func (app *Application) preparePipeline() {
 			},
 		},
 		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
-			SType: vk.StructureTypePipelineVertexInputStateCreateInfo,
-			// VertexBindingDescriptionCount: 1,
-			// VertexAttributeDescriptionCount: uint32(len(attributeDescription)),
-			// PVertexBindingDescriptions: bindingDescription[:],
-			// PVertexAttributeDescriptions: attributeDescription[:],
+			SType:                           vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount:   uint32(len(bindingDescriptions)),
+			PVertexBindingDescriptions:      bindingDescriptions,
+			VertexAttributeDescriptionCount: uint32(len(attributeDescriptions)),
+			PVertexAttributeDescriptions:    attributeDescriptions,
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
@@ -978,6 +922,29 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
+func (app *Application) initCubeDimensions() {
+	vertices := []types.Vertex{
+		{Pos: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 1}},
+		{Pos: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 1}},
+		{Pos: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 0}},
+		{Pos: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 0}},
+		{Pos: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{1, 1}},
+		{Pos: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{0, 1}},
+		{Pos: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{0, 0}},
+		{Pos: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{1, 0}},
+	}
+	app.vertices = vertices
+
+	app.indices = []types.Index{
+		0, 2, 1, 0, 3, 2, // Front face
+		1, 6, 5, 1, 2, 6, // Right face
+		5, 7, 4, 5, 6, 7, // Back face
+		4, 3, 0, 4, 7, 3, // Left face
+		3, 6, 2, 3, 7, 6, // Top face
+		4, 1, 5, 4, 0, 1, // Bottom face
+	}
+}
+
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
@@ -988,17 +955,18 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Timing function to test loading heightmap
 	start := time.Now()
-	vertices, _, err := mesh.LoadHM(HGT_PATH)
+	vertices, indices, err := mesh.LoadHM(HGT_PATH)
 	fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
-
 	utils.OrPanic(err)
 	app.vertices = vertices[:]
-	// app.indices = indices
+	app.indices = indices[:]
+
+	// app.initCubeDimensions() // Test function for vertices and indices
 
 	// app.prepareCubeDataBuffers()
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
-	// app.prepareIndexBuffer()
+	app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
@@ -1041,7 +1009,7 @@ func (app *Application) NextFrame() {
 
 	app.viewMatrix = app.camera.GetViewMatrix()
 
-	app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
+	// app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
 }
 
 // likely called every frame by asche

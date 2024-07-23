@@ -23,23 +23,20 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout(std140, binding = 0) uniform UBOp {
-        mat4 MVP;
+    mat4 MVP;
 } ubuf;
 
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec2 inTexCoord;
 
-layout(std140, binding = 1) uniform BufferObject {
-        vec4 position[12 * 3];
-        vec4 attr[12 * 3];
-} vertData;
-
-layout (location = 0) out vec4 texcoord;
+layout(location = 0) out vec2 texcoord;
 
 out gl_PerVertex {
-        vec4 gl_Position;
+    vec4 gl_Position;
 };
 
 void main() 
 {
-   texcoord = vertData.attr[gl_VertexIndex];
-   gl_Position = ubuf.MVP * vertData.position[gl_VertexIndex];
+    texcoord = inTexCoord;
+    gl_Position = ubuf.MVP * vec4(inPosition, 1.0);
 }

@@ -8,7 +8,7 @@ import (
 
 	"go-testing/internal/types"
 
-	lin "github.com/xlab/linmath"
+	// lin "github.com/xlab/linmath"
 )
 
 const (
@@ -56,8 +56,8 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 
 			vertices[y*length + x] = types.Vertex{
 				Pos:    [3]float32{normX, height * scale, normZ},
-				Color:  [3]float32{1.0, 1.0, 1.0},
-				Normal: [3]float32{0.0, 0.0, 0.0},
+				// Color:  [3]float32{1.0, 1.0, 1.0},
+				// Normal: [3]float32{0.0, 0.0, 0.0},
 				TexCoord: [2]float32{
 					normZ / float32(length-1),
 					normX / float32(length-1),
@@ -89,28 +89,28 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 		}
 	}
 
-	calculateNormals(&vertices)
+	// calculateNormals(&vertices)
 	return vertices, indices, nil
 }
 
-// Calculates the Normal Vector for each vertex in the given vertices
-func calculateNormals(vertices *[]types.Vertex) {
-	for y := 0; y < length-1; y++ {
-		for x := 0; x < length-1; x++ {
-			current := (*vertices)[y*length+x].Pos
-			right := (*vertices)[y*length+(x+1)].Pos
-			down := (*vertices)[(y+1)*length+x].Pos
+// // Calculates the Normal Vector for each vertex in the given vertices
+// func calculateNormals(vertices *[]types.Vertex) {
+// 	for y := 0; y < length-1; y++ {
+// 		for x := 0; x < length-1; x++ {
+// 			current := (*vertices)[y*length+x].Pos
+// 			right := (*vertices)[y*length+(x+1)].Pos
+// 			down := (*vertices)[(y+1)*length+x].Pos
 
-			// Funky way of doing math with linmath
-			var normal lin.Vec3
-			var a lin.Vec3
-			var b lin.Vec3
-			a.Sub(&down, &current)
-			b.Sub(&right, &current)
-			normal.MultCross(&a, &b)
-			normal.Norm(&normal)
+// 			// Funky way of doing math with linmath
+// 			var normal lin.Vec3
+// 			var a lin.Vec3
+// 			var b lin.Vec3
+// 			a.Sub(&down, &current)
+// 			b.Sub(&right, &current)
+// 			normal.MultCross(&a, &b)
+// 			normal.Norm(&normal)
 
-			(*vertices)[y*length+x].Normal = normal
-		}
-	}
-}
+// 			(*vertices)[y*length+x].Normal = normal
+// 		}
+// 	}
+// }
