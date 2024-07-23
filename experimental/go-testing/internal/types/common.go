@@ -51,12 +51,12 @@ func (u *Vertexp) Data() []byte {
 }
 
 type UniformBufferObject struct {
-	Model   *lin.Mat4x4 // object to world space
-	View    *lin.Mat4x4 // world to camera space
-	Proj    *lin.Mat4x4 // camera to clip and screen space
-	NormalM *lin.Mat4x4 // for lighting
+	Model      lin.Mat4x4 // object to world space
+	View       lin.Mat4x4 // world to camera space
+	Projection lin.Mat4x4 // camera to clip and screen space
 
-	LightDir lin.Vec3 // Need to initialize this as
+	NormalM  lin.Mat4x4 // for lighting
+	LightDir lin.Vec3   // Need to initialize this as
 }
 
 // creating a byte slice array of size UniformBufferObject
