@@ -5,9 +5,10 @@ import (
 	"runtime"
 	"time"
 
+	"go-testing/internal/renderer"
+
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
-	"go-testing/internal/renderer"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )

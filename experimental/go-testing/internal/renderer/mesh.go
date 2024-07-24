@@ -1,12 +1,10 @@
-package mesh
+package renderer
 
 import (
 	"fmt"
 	"image"
 	"image/png"
 	"os"
-
-	"go-testing/internal/types"
 
 	// lin "github.com/xlab/linmath"
 )
@@ -16,10 +14,10 @@ const (
 	scale  = 60.0 / 1852.0 // Meters to Arcminutes
 )
 
-func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
+func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 	// Preallocate slices
-	vertices := make([]types.Vertex, length*length)
-	indices := make([]types.Index, 6*(length-1)*(length-1))
+	vertices := make([]Vertex, length*length)
+	indices := make([]Index, 6*(length-1)*(length-1))
 
 	file, err := os.Open(hmPath)
 	if err != nil {
@@ -54,7 +52,7 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 			normX := float32(x)
 			normZ := float32(y)
 
-			vertices[y*length + x] = types.Vertex{
+			vertices[y*length + x] = Vertex{
 				Pos:    [3]float32{normX, height * scale, normZ},
 				// Color:  [3]float32{1.0, 1.0, 1.0},
 				// Normal: [3]float32{0.0, 0.0, 0.0},
@@ -70,9 +68,9 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 	indexPos := 0
 	for y := 0; y < length-1; y++ {
 		for x := 0; x < length-1; x++ {
-			topLeft := types.Index(y*length + x)
+			topLeft := Index(y*length + x)
 			topRight := topLeft + 1
-			botLeft := types.Index((y+1)*length + x)
+			botLeft := Index((y+1)*length + x)
 			botRight := botLeft + 1
 
 			// First triangle
@@ -94,7 +92,7 @@ func LoadHM(hmPath string) ([]types.Vertex, []types.Index, error) {
 }
 
 // // Calculates the Normal Vector for each vertex in the given vertices
-// func calculateNormals(vertices *[]types.Vertex) {
+// func calculateNormals(vertices *[]Vertex) {
 // 	for y := 0; y < length-1; y++ {
 // 		for x := 0; x < length-1; x++ {
 // 			current := (*vertices)[y*length+x].Pos
