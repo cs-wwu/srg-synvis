@@ -19,7 +19,7 @@ func (v *Vertex) Data() []byte {
 	return (*[VertexSize]byte)(unsafe.Pointer(v))[:]
 }
 
-type Index uint16
+type Index uint32 // Be wary of integer overflow with large mesh
 
 const IndexSize = int(unsafe.Sizeof(Index(0)))
 

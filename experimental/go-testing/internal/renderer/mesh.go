@@ -1,10 +1,10 @@
 package renderer
 
 import (
-	// "fmt"
-	// "image"
-	// "image/png"
-	// "os"
+	"fmt"
+	"image"
+	"image/png"
+	"os"
 
 	lin "github.com/xlab/linmath"
 )
@@ -12,7 +12,7 @@ import (
 const (
 	length = 3601 // Image Height and Width
 	// scale  = 60.0 / 1852.0 // Meters to Arcminutes
-	scale = 3.0
+	scale = 1.0
 )
 
 func LoadHM(hmPath string) ([]Vertex, []Index, error) {
@@ -20,21 +20,46 @@ func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 	vertices := make([]Vertex, length*length)
 	indices := make([]Index, 6*(length-1)*(length-1))
 
+	file, err := os.Open(hmPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open heightmap: %v", err)
+	}
+	defer file.Close()
+
+	// Decode image
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode heightmap: %v", err)
+	}
+
+	// Ensure the image is grayscale
+	grayImg, ok := rawImg.(*image.Gray16)
+	if !ok {
+		return nil, nil, fmt.Errorf("heightmap is not in 16-bit grayscale format")
+	}
+
+	// Verify image size
+	width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
+	if width != length || height != length {
+		return nil, nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
+	}
+
 	// Generate vertices
 	for z := 0; z < length; z++ {
 		for x := 0; x < length; x++ {
-			index := z*length + x
-			vertices[index] = Vertex{
-				Position: lin.Vec3{
-					float32(x) * scale, // X coordinate
-					0,                  // Y is 0 for a flat grid
-					float32(z) * scale, // Z coordinate
-				},
-				Color:  lin.Vec3{1.0, 1.0, 1.0}, // White color
-				Normal: lin.Vec3{0.0, 1.0, 0.0}, // Up-facing normal
+			// Might need to change for performance improvements (direct array arithmetic?)
+			pixelValue := grayImg.Gray16At(x, z).Y
+			height := float32(int(pixelValue) - 32768) // Y
+			normX := float32(x)
+			normZ := float32(z)
+
+			vertices[z*length+x] = Vertex{
+				Position: lin.Vec3{normX, height * scale, normZ},
+				Color:    lin.Vec3{1.0, 1.0, 1.0},
+				Normal:   lin.Vec3{0.0, 0.0, 0.0},
 				TexCoord: lin.Vec2{
-					float32(x) * scale,
-					float32(z) * scale,
+                    float32(x) / float32(length-1), // Normalize to [0, 1]
+                    float32(z) / float32(length-1), // Normalize to [0, 1]
 				},
 			}
 		}
@@ -46,98 +71,25 @@ func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 		for x := 0; x < length-1; x++ {
 			topLeft := Index(z*length + x)
 			topRight := topLeft + 1
-			bottomLeft := Index((z+1)*length + x)
-			bottomRight := bottomLeft + 1
+			botLeft := Index((z+1)*length + x)
+			botRight := botLeft + 1
 
 			// First triangle
 			indices[indexPos] = topLeft
-			indices[indexPos+1] = bottomLeft
+			indices[indexPos+1] = botLeft
 			indices[indexPos+2] = topRight
 			indexPos += 3
 
 			// Second triangle
 			indices[indexPos] = topRight
-			indices[indexPos+1] = bottomLeft
-			indices[indexPos+2] = bottomRight
+			indices[indexPos+1] = botLeft
+			indices[indexPos+2] = botRight
 			indexPos += 3
 		}
 	}
 
+	calculateNormals(&vertices)
 	return vertices, indices, nil
-	// // Preallocate slices
-	// vertices := make([]Vertex, length*length)
-	// indices := make([]Index, 6*(length-1)*(length-1))
-
-	// file, err := os.Open(hmPath)
-	// if err != nil {
-	// 	return nil, nil, fmt.Errorf("failed to open heightmap: %v", err)
-	// }
-	// defer file.Close()
-
-	// // Decode image
-	// rawImg, err := png.Decode(file)
-	// if err != nil {
-	// 	return nil, nil, fmt.Errorf("failed to decode heightmap: %v", err)
-	// }
-
-	// // Ensure the image is grayscale
-	// grayImg, ok := rawImg.(*image.Gray16)
-	// if !ok {
-	// 	return nil, nil, fmt.Errorf("heightmap is not in 16-bit grayscale format")
-	// }
-
-	// // Verify image size
-	// width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
-	// if width != length || height != length {
-	// 	return nil, nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
-	// }
-
-	// // Generate vertices
-	// for z := 0; z < length; z++ {
-	// 	for x := 0; x < length; x++ {
-	// 		// Might need to change for performance improvements (direct array arithmetic?)
-	// 		pixelValue := grayImg.Gray16At(x, z).Y
-	// 		height := float32(int(pixelValue) - 32768) // Y
-	// 		normX := float32(x)
-	// 		normZ := float32(z)
-
-	// 		vertices[z*length+x] = Vertex{
-	// 			Position: lin.Vec3{normX, height * scale, normZ},
-	// 			Color:    lin.Vec3{1.0, 1.0, 1.0},
-	// 			Normal:   lin.Vec3{0.0, 0.0, 0.0},
-	// 			TexCoord: lin.Vec2{
-	// 				normZ / float32(length-1),
-	// 				normX / float32(length-1),
-	// 			},
-	// 		}
-	// 	}
-	// }
-
-	// // Generate indices
-	// indexPos := 0
-	// for z := 0; z < length-1; z++ {
-	// 	for x := 0; x < length-1; x++ {
-	// 		topLeft := Index(z*length + x)
-	// 		topRight := topLeft + 1
-	// 		botLeft := Index((z+1)*length + x)
-	// 		botRight := botLeft + 1
-
-	// 		// First triangle
-	// 		indices[indexPos] = topLeft
-	// 		indices[indexPos+1] = botLeft
-	// 		indices[indexPos+2] = topRight
-	// 		indexPos += 3
-
-	// 		// Second triangle
-	// 		indices[indexPos] = topRight
-	// 		indices[indexPos+1] = botLeft
-	// 		indices[indexPos+2] = botRight
-	// 		indexPos += 3
-	// 	}
-	// }
-
-	// calculateNormals(&vertices)
-	// return vertices, indices, nil
 }
 
 // Calculates the Normal Vector for each vertex in the given vertices

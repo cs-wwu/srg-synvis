@@ -22,7 +22,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/checkers.png",
+	"assets/textures/gopher.png",
 }
 
 func NewApplication(spinAngle float32) *Application {
@@ -155,7 +155,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	tex := &Texture{
 		texWidth:    int32(width),
 		texHeight:   int32(height),
-		imageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
+		imageLayout: vk.ImageLayoutShaderReadOnlyOptimal, // FIXME: Possible mismatch with ImageLayout: vk.ImageLayoutGeneral
 	}
 
 	var image vk.Image
@@ -410,8 +410,9 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
 	clearValues[0].SetColor([]float32{
-		0.2, 0.2, 0.2, 0.2,
+		0.2, 0.2, 0.2, 0.2, // This is the background color of the scene
 	})
+	// This draws the background color
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
 		RenderPass:  app.renderPass,
@@ -453,7 +454,7 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 	// Bind vertex buffer
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
 
-	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
+	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint32)
 	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
 
 	// Note that ending the renderpass changes the image's layout from
@@ -519,10 +520,7 @@ func (app *Application) prepareUniformBuffers() {
 func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
-	// Calculate the total size of the buffer
 	bufferSize := len(app.vertices) * VertexSize
-
-	// Create a slice to hold the raw byte data
 	dataRaw := make([]byte, bufferSize)
 
 	// Copy the data from app.vertices into dataRaw
@@ -689,6 +687,7 @@ func (app *Application) preparePipeline() {
 	OrPanic(as.NewError(ret))
 	app.pipelineCache = pipelineCache
 
+	// Vertex Descriptions needed for glsl shader
 	bindingDescriptions := []vk.VertexInputBindingDescription{
 		{
 			Binding:   0,
@@ -697,29 +696,30 @@ func (app *Application) preparePipeline() {
 		},
 	}
 
+	// These are correct
 	attributeDescriptions := []vk.VertexInputAttributeDescription{
 		{
 			Binding:  0,
 			Location: 0,
-			Format:   vk.FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat, // vec3
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
-			Format:   vk.FormatR32g32Sfloat,
+			Format:   vk.FormatR32g32Sfloat, // vec2
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
 		},
 		{
 			Binding:  0,
 			Location: 2,
-			Format:   vk.FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat, // vec3
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
 		},
 		{
 			Binding:  0,
 			Location: 3,
-			Format:   vk.FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat, // vec3
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
 		},
 	}
@@ -843,7 +843,7 @@ func (app *Application) prepareDescriptorSet() {
 		texInfos = append(texInfos, vk.DescriptorImageInfo{
 			Sampler:     tex.sampler,
 			ImageView:   tex.view,
-			ImageLayout: vk.ImageLayoutGeneral,
+			ImageLayout: vk.ImageLayoutGeneral, // FIXME: Possible mismatch with tex.imageLayout = vk.ImageLayoutShaderReadOnlyOptimal
 		})
 	}
 
@@ -939,14 +939,14 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Timing function to test loading heightmap
-	// // start := time.Now()
-	// vertices, indices, err := LoadHM(HGT_PATH)
-	// OrPanic(err)
-	// app.vertices = vertices
-	// app.indices = indices
-	// // fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
+	// start := time.Now()
+	vertices, indices, err := LoadHM(HGT_PATH)
+	OrPanic(err)
+	app.vertices = vertices
+	app.indices = indices
+	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
 
-	app.initCubeDimensions() // Test function for vertices and indices
+	// app.initCubeDimensions() // Test function for vertices and indices
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
@@ -1102,7 +1102,7 @@ func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
 		// as we're using only optimal textures.
 		newImg.Stride = rowPitch
 	}
-	draw.Draw(newImg, newImg.Bounds(), img, image.ZP, draw.Src)
+	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
 	size := newImg.Bounds().Size()
 	return []byte(newImg.Pix), size.X, size.Y, nil
 }
