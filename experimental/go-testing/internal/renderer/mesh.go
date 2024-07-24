@@ -12,7 +12,7 @@ import (
 const (
 	length = 3601 // Image Height and Width
 	// scale  = 60.0 / 1852.0 // Meters to Arcminutes
-	scale = 1.0
+	scale = 0.5
 )
 
 func LoadHM(hmPath string) ([]Vertex, []Index, error) {

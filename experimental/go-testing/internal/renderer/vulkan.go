@@ -22,7 +22,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/gopher.png",
+	"assets/textures/checkers.png",
 }
 
 func NewApplication(spinAngle float32) *Application {
@@ -34,7 +34,7 @@ func NewApplication(spinAngle float32) *Application {
 	}
 
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 3600.0)
+	app.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
 	app.viewMatrix = app.camera.GetViewMatrix()
 	app.modelMatrix.Identity()
 	app.projectionMatrix[1][1] *= -1 // Flip projection matrix from GL to Vulkan orientation.
