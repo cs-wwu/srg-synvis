@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	// "go-testing/internal/mesh"
-	"go-testing/pkg/utils"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
@@ -107,7 +106,7 @@ func (app *Application) prepareDepth() {
 		Tiling:      vk.ImageTilingOptimal,
 		Usage:       vk.ImageUsageFlags(vk.ImageUsageDepthStencilAttachmentBit),
 	}, nil, &app.depth.image)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 
 	var memReqs vk.MemoryRequirements
 	vk.GetImageMemoryRequirements(dev, app.depth.image, &memReqs)
@@ -124,11 +123,11 @@ func (app *Application) prepareDepth() {
 
 	var mem vk.DeviceMemory
 	ret = vk.AllocateMemory(dev, app.depth.memAlloc, nil, &mem)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.depth.mem = mem
 
 	ret = vk.BindImageMemory(dev, app.depth.image, app.depth.mem, 0)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 
 	var view vk.ImageView
 	ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
@@ -142,7 +141,7 @@ func (app *Application) prepareDepth() {
 		ViewType: vk.ImageViewType2d,
 		Image:    app.depth.image,
 	}, nil, &view)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.depth.view = view
 }
 
@@ -153,7 +152,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	texFormat := vk.FormatR8g8b8a8Unorm
 	_, width, height, err := loadTextureData(path, 0)
 	if err != nil {
-		utils.OrPanic(err)
+		OrPanic(err)
 	}
 	tex := &Texture{
 		texWidth:    int32(width),
@@ -178,7 +177,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		Usage:         vk.ImageUsageFlags(usage),
 		InitialLayout: vk.ImageLayoutPreinitialized,
 	}, nil, &image)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	tex.image = image
 
 	var memReqs vk.MemoryRequirements
@@ -195,10 +194,10 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	}
 	var mem vk.DeviceMemory
 	ret = vk.AllocateMemory(dev, tex.memAlloc, nil, &mem)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	tex.mem = mem
 	ret = vk.BindImageMemory(dev, tex.image, tex.mem, 0)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 
 	hostVisible := memoryProps&vk.MemoryPropertyHostVisibleBit != 0
 	if hostVisible {
@@ -209,11 +208,11 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		layout.Deref()
 
 		data, _, _, err := loadTextureData(path, int(layout.RowPitch))
-		utils.OrPanic(err)
+		OrPanic(err)
 		if len(data) > 0 {
 			var pData unsafe.Pointer
 			ret = vk.MapMemory(dev, tex.mem, 0, vk.DeviceSize(len(data)), 0, &pData)
-			if utils.IsError(ret) {
+			if IsError(ret) {
 				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
 				return tex
 			}
@@ -234,7 +233,7 @@ func (app *Application) setImageLayout(image vk.Image, aspectMask vk.ImageAspect
 
 	cmd := app.Context().CommandBuffer()
 	if cmd == nil {
-		utils.OrPanic(errors.New("vulkan: command buffer not initialized"))
+		OrPanic(errors.New("vulkan: command buffer not initialized"))
 	}
 
 	imageMemoryBarrier := vk.ImageMemoryBarrier{
@@ -320,7 +319,7 @@ func (app *Application) prepareTextures() {
 
 			cmd := app.Context().CommandBuffer()
 			if cmd == nil {
-				utils.OrPanic(errors.New("vulkan: command buffer not initialized"))
+				OrPanic(errors.New("vulkan: command buffer not initialized"))
 			}
 			vk.CmdCopyImage(cmd, staging.image, vk.ImageLayoutTransferSrcOptimal,
 				tex.image, vk.ImageLayoutTransferDstOptimal,
@@ -352,7 +351,7 @@ func (app *Application) prepareTextures() {
 			// cannot destroy until cmd is submitted.. must keep a list somewhere
 			// staging.DestroyImage(dev)
 		} else {
-			utils.OrPanic(errors.New("vulkan: R8G8B8A8_UNORM not supported as texture image format"))
+			OrPanic(errors.New("vulkan: R8G8B8A8_UNORM not supported as texture image format"))
 		}
 
 		var sampler vk.Sampler
@@ -370,7 +369,7 @@ func (app *Application) prepareTextures() {
 			BorderColor:             vk.BorderColorFloatOpaqueWhite,
 			UnnormalizedCoordinates: vk.False,
 		}, nil, &sampler)
-		utils.OrPanic(as.NewError(ret))
+		OrPanic(as.NewError(ret))
 		tex.sampler = sampler
 
 		var view vk.ImageView
@@ -391,7 +390,7 @@ func (app *Application) prepareTextures() {
 				LayerCount: 1,
 			},
 		}, nil, &view)
-		utils.OrPanic(as.NewError(ret))
+		OrPanic(as.NewError(ret))
 		tex.view = view
 
 		return tex
@@ -408,7 +407,7 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
 	})
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
@@ -493,7 +492,7 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 			}})
 	}
 	ret = vk.EndCommandBuffer(cmd)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 }
 
 func (app *Application) prepareUniformBuffers() {
@@ -617,7 +616,7 @@ func (app *Application) prepareDescriptorLayout() {
 				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
 			}},
 	}, nil, &descLayout)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.descLayout = descLayout
 
 	var pipelineLayout vk.PipelineLayout
@@ -628,7 +627,7 @@ func (app *Application) prepareDescriptorLayout() {
 			app.descLayout,
 		},
 	}, nil, &pipelineLayout)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.pipelineLayout = pipelineLayout
 }
 
@@ -679,7 +678,7 @@ func (app *Application) prepareRenderPass() {
 			},
 		}},
 	}, nil, &renderPass)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.renderPass = renderPass
 }
 
@@ -687,16 +686,16 @@ func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
 	vs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/cube.vert.spv"))
-	utils.OrPanic(err)
+	OrPanic(err)
 	fs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/cube.frag.spv"))
-	utils.OrPanic(err)
+	OrPanic(err)
 
 	// note .cpp does not have a pipelinecache
 	var pipelineCache vk.PipelineCache
 	ret := vk.CreatePipelineCache(dev, &vk.PipelineCacheCreateInfo{
 		SType: vk.StructureTypePipelineCacheCreateInfo,
 	}, nil, &pipelineCache)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.pipelineCache = pipelineCache
 
 	bindingDescriptions := []vk.VertexInputBindingDescription{
@@ -805,7 +804,7 @@ func (app *Application) preparePipeline() {
 	}}
 	pipeline := make([]vk.Pipeline, 1)
 	ret = vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, pipelineCreateInfos, nil, pipeline)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.pipeline = pipeline[0]
 
 	vk.DestroyShaderModule(dev, vs, nil)
@@ -831,7 +830,7 @@ func (app *Application) prepareDescriptorPool() {
 			DescriptorCount: uint32(len(swapchainImageResources) * len(texEnabled)),
 		}},
 	}, nil, &descPool)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 	app.descPool = descPool
 }
 
@@ -856,7 +855,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorSetCount: 1,
 			PSetLayouts:        []vk.DescriptorSetLayout{app.descLayout},
 		}, &set)
-		utils.OrPanic(as.NewError(ret))
+		OrPanic(as.NewError(ret))
 
 		res.SetDescriptorSet(set)
 
@@ -869,7 +868,7 @@ func (app *Application) prepareDescriptorSet() {
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
 				Range:  vk.DeviceSize(UBOSizep),
-				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
+				// Range:  vk.DeviceSize(VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
 		}, {SType: vk.StructureTypeWriteDescriptorSet,
@@ -912,7 +911,7 @@ func (app *Application) prepareFramebuffers() {
 			Height: app.height,
 			Layers: 1,
 		}, nil, &fb)
-		utils.OrPanic(as.NewError(ret))
+		OrPanic(as.NewError(ret))
 
 		res.SetFramebuffer(fb)
 	}
@@ -953,7 +952,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// start := time.Now()
 	// vertices, indices, err := mesh.LoadHM(HGT_PATH)
 	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
-	// utils.OrPanic(err)
+	// OrPanic(err)
 	// app.vertices = vertices[:]
 	// app.indices = indices[:]
 
@@ -1021,7 +1020,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	data := MVP.Data()
 	var pData unsafe.Pointer
 	ret := vk.MapMemory(dev, res.UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &pData)
-	utils.OrPanic(as.NewError(ret))
+	OrPanic(as.NewError(ret))
 
 	n := vk.Memcopy(pData, data)
 	if n != len(data) {
@@ -1154,16 +1153,16 @@ func canPresentEarlier(earliest, actual, margin, rdur uint64) bool {
 // Converts the given file to a byte array to be used
 func fileToBytes(filename string) []byte {
 	file, err := os.Open(filename)
-	utils.OrPanic(err)
+	OrPanic(err)
 	defer file.Close()
 
 	// Read the file into data
 	fileInfo, err := file.Stat()
-	utils.OrPanic(err)
+	OrPanic(err)
 	fileSize := fileInfo.Size()
 	data := make([]byte, fileSize)
 	_, err = file.Read(data)
-	utils.OrPanic(err)
+	OrPanic(err)
 
 	return data
 }
