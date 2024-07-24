@@ -24,7 +24,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/gopher.png",
+	"assets/textures/checkers.png",
 }
 
 func NewApplication(spinAngle float32) *Application {
@@ -69,7 +69,7 @@ type Application struct {
 	projectionMatrix lin.Mat4x4
 	viewMatrix       lin.Mat4x4
 	modelMatrix      lin.Mat4x4
-	//
+
 	// uniformBuffersMapped []unsafe.Pointer
 	vertices           []Vertex
 	indices            []Index
@@ -878,7 +878,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(VertexpSize),
+				Range:  vk.DeviceSize(VertexSize),
 				Buffer: app.vertexBuffer,
 			}},
 		}, {

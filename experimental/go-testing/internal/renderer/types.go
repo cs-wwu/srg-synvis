@@ -26,12 +26,6 @@ func (u *Index) Data() []byte {
 	return (*[m]byte)(unsafe.Pointer(u))[:IndexSize]
 }
 
-type Vertexp struct {
-	Position [12 * 3]lin.Vec4
-	// _ 		 [12 * 3]float32				// alignas(16)
-	Attr [12 * 3][4]float32
-}
-
 type UBOp struct {
 	MVP lin.Mat4x4
 }
@@ -41,12 +35,6 @@ const UBOSizep = int(unsafe.Sizeof(UBOp{}))
 func (u *UBOp) Data() []byte {
 	const m = 0x7fffffff
 	return (*[m]byte)(unsafe.Pointer(u))[:UBOSizep]
-}
-
-const VertexpSize = int(unsafe.Sizeof(Vertexp{}))
-
-func (u *Vertexp) Data() []byte {
-	return (*[VertexpSize]byte)(unsafe.Pointer(u))[:]
 }
 
 type UniformBufferObject struct {

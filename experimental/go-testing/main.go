@@ -23,8 +23,8 @@ type Application struct {
 	debugEnabled bool
 }
 
-func (a *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
-	surfPtr, err := a.WindowHandle.CreateWindowSurface(instance, nil)
+func (app *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
+	surfPtr, err := app.WindowHandle.CreateWindowSurface(instance, nil)
 	if err != nil {
 		log.Println(err)
 		return vk.NullSurface
@@ -32,11 +32,11 @@ func (a *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
 	return vk.SurfaceFromPointer(surfPtr)
 }
 
-func (a *Application) VulkanAppName() string {
+func (app *Application) VulkanAppName() string {
 	return "Vulkan"
 }
 
-func (a *Application) VulkanLayers() []string {
+func (app *Application) VulkanLayers() []string {
 	return []string{
 		// "VK_LAYER_GOOGLE_threading",
 		// "VK_LAYER_LUNARG_parameter_validation",
@@ -48,25 +48,25 @@ func (a *Application) VulkanLayers() []string {
 	}
 }
 
-func (a *Application) VulkanDebug() bool {
+func (app *Application) VulkanDebug() bool {
 	return false // a.debugEnabled
 }
 
-func (a *Application) VulkanDeviceExtensions() []string {
+func (app *Application) VulkanDeviceExtensions() []string {
 	return []string{
 		"VK_KHR_swapchain",
 	}
 }
 
-func (a *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
+func (app *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
 	return &as.SwapchainDimensions{
 		Width: 500, Height: 500, Format: vk.FormatB8g8r8a8Unorm,
 	}
 }
 
-func (a *Application) VulkanInstanceExtensions() []string {
-	extensions := a.WindowHandle.GetRequiredInstanceExtensions()
-	if a.debugEnabled {
+func (app *Application) VulkanInstanceExtensions() []string {
+	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
+	if app.debugEnabled {
 		extensions = append(extensions, "VK_EXT_debug_report")
 	}
 	return extensions
