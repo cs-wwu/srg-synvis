@@ -1,5 +1,4 @@
-// Package types provides universal types used across packages
-package types
+package renderer
 
 import (
 	lin "github.com/xlab/linmath"

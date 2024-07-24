@@ -11,7 +11,6 @@ import (
 	"unsafe"
 
 	// "go-testing/internal/mesh"
-	"go-testing/internal/types"
 	"go-testing/pkg/utils"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -22,7 +21,6 @@ import (
 
 const (
 	MAXFRAMES = 4                               // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
-	LENGTH    = 3601                            // TODO change this to 3601 * 9
 	HGT_PATH  = "assets/heightmaps/n48w123.png" // TODO hardcoded
 )
 
@@ -74,13 +72,13 @@ type Application struct {
 	modelMatrix      lin.Mat4x4
 	//
 	// uniformBuffersMapped []unsafe.Pointer
-	vertices           []types.Vertex
-	indices            []types.Index
+	vertices           []Vertex
+	indices            []Index
 	vertexBuffer       vk.Buffer
 	vertexBufferMemory vk.DeviceMemory
 	indexBuffer        vk.Buffer
 	indexBufferMemory  vk.DeviceMemory
-	ubo                types.UniformBufferObject
+	ubo                UniformBufferObject
 
 	camera       *Camera
 	WindowHandle *glfw.Window
@@ -506,7 +504,7 @@ func (app *Application) prepareUniformBuffers() {
 	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
 	MVP.Mult(&VP, &app.modelMatrix)
 
-	data := types.UBOp{
+	data := UBOp{
 		MVP: MVP,
 	}
 
@@ -527,14 +525,14 @@ func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
 	// Calculate the total size of the buffer
-	bufferSize := len(app.vertices) * types.VertexSize
+	bufferSize := len(app.vertices) * VertexSize
 
 	// Create a slice to hold the raw byte data
 	dataRaw := make([]byte, bufferSize)
 
 	// Copy the data from app.vertices into dataRaw
 	for i, vertex := range app.vertices {
-		copy(dataRaw[i*types.VertexSize:], vertex.Data())
+		copy(dataRaw[i*VertexSize:], vertex.Data())
 	}
 
 	memProps := app.Context().Platform().MemoryProperties()
@@ -546,11 +544,11 @@ func (app *Application) prepareVertexBuffer() {
 func (app *Application) prepareIndexBuffer() {
 	dev := app.Context().Device()
 
-	bufferSize := len(app.indices) * types.IndexSize
+	bufferSize := len(app.indices) * IndexSize
 
 	dataRaw := make([]byte, bufferSize)
 	for i, index := range app.indices {
-		copy(dataRaw[i*types.IndexSize:], index.Data())
+		copy(dataRaw[i*IndexSize:], index.Data())
 	}
 
 	memProps := app.Context().Platform().MemoryProperties()
@@ -578,7 +576,7 @@ func (app *Application) prepareIndexBuffer() {
 // 	norm.Identity()
 // 	ld := lin.Vec3{0.0, 0.1, 0.1}
 
-// 	data := types.UniformBufferObject{
+// 	data := UniformBufferObject{
 // 		Model: model,
 // 		View: view,
 // 		Proj: proj,
@@ -704,7 +702,7 @@ func (app *Application) preparePipeline() {
 	bindingDescriptions := []vk.VertexInputBindingDescription{
 		{
 			Binding:   0,
-			Stride:    uint32(types.VertexSize),
+			Stride:    uint32(VertexSize),
 			InputRate: vk.VertexInputRateVertex,
 		},
 	}
@@ -714,13 +712,13 @@ func (app *Application) preparePipeline() {
 			Binding:  0,
 			Location: 0,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(types.Vertex{}.Pos)),
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.Pos)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
 			Format:   vk.FormatR32g32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(types.Vertex{}.TexCoord)),
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
 		},
 	}
 
@@ -870,7 +868,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(types.UBOSizep),
+				Range:  vk.DeviceSize(UBOSizep),
 				// Range:  vk.DeviceSize(utils.VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
@@ -881,7 +879,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(types.VertexpSize),
+				Range:  vk.DeviceSize(VertexpSize),
 				Buffer: app.vertexBuffer,
 			}},
 		}, {
@@ -921,7 +919,7 @@ func (app *Application) prepareFramebuffers() {
 }
 
 func (app *Application) initCubeDimensions() {
-	vertices := []types.Vertex{
+	vertices := []Vertex{
 		{Pos: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 1}},
 		{Pos: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 1}},
 		{Pos: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 0}},
@@ -933,7 +931,7 @@ func (app *Application) initCubeDimensions() {
 	}
 	app.vertices = vertices
 
-	app.indices = []types.Index{
+	app.indices = []Index{
 		0, 2, 1, 0, 3, 2, // Front face
 		1, 6, 5, 1, 2, 6, // Right face
 		5, 7, 4, 5, 6, 7, // Back face
@@ -961,7 +959,6 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.initCubeDimensions() // Test function for vertices and indices
 
-	// app.prepareCubeDataBuffers()
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
 	app.prepareIndexBuffer()
