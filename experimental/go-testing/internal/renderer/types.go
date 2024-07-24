@@ -1,14 +1,16 @@
 package renderer
 
 import (
-	lin "github.com/xlab/linmath"
 	"unsafe"
+
+	lin "github.com/xlab/linmath"
 )
 
 type Vertex struct {
-	// possible error here: define number of vertices
-	Pos      lin.Vec3
+	Position lin.Vec3
 	TexCoord lin.Vec2
+	Normal   lin.Vec3
+	Color    lin.Vec3
 }
 
 const VertexSize = int(unsafe.Sizeof(Vertex{}))
@@ -17,7 +19,7 @@ func (v *Vertex) Data() []byte {
 	return (*[VertexSize]byte)(unsafe.Pointer(v))[:]
 }
 
-type Index int16
+type Index uint16
 
 const IndexSize = int(unsafe.Sizeof(Index(0)))
 

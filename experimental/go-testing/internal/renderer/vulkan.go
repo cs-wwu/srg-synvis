@@ -10,8 +10,6 @@ import (
 	"os"
 	"unsafe"
 
-	// "go-testing/internal/mesh"
-
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -707,18 +705,30 @@ func (app *Application) preparePipeline() {
 	}
 
 	attributeDescriptions := []vk.VertexInputAttributeDescription{
-		{
-			Binding:  0,
-			Location: 0,
-			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Pos)),
-		},
-		{
-			Binding:  0,
-			Location: 1,
-			Format:   vk.FormatR32g32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
-		},
+        {
+            Binding:  0,
+            Location: 0,
+            Format:   vk.FormatR32g32b32Sfloat,
+            Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
+        },
+        {
+            Binding:  0,
+            Location: 1,
+            Format:   vk.FormatR32g32b32Sfloat,
+            Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
+        },
+        {
+            Binding:  0,
+            Location: 2,
+            Format:   vk.FormatR32g32b32Sfloat,
+            Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
+        },
+        {
+            Binding:  0,
+            Location: 3,
+            Format:   vk.FormatR32g32Sfloat,
+            Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
+        },
 	}
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
@@ -868,7 +878,6 @@ func (app *Application) prepareDescriptorSet() {
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
 				Range:  vk.DeviceSize(UBOSizep),
-				// Range:  vk.DeviceSize(VkTexCubeUniformSize),
 				Buffer: res.UniformBuffer(),
 			}},
 		}, {SType: vk.StructureTypeWriteDescriptorSet,
@@ -919,24 +928,24 @@ func (app *Application) prepareFramebuffers() {
 
 func (app *Application) initCubeDimensions() {
 	vertices := []Vertex{
-		{Pos: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 1}},
-		{Pos: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 1}},
-		{Pos: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 0}},
-		{Pos: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 0}},
-		{Pos: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{1, 1}},
-		{Pos: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{0, 1}},
-		{Pos: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{0, 0}},
-		{Pos: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{1, 0}},
 	}
 	app.vertices = vertices
 
 	app.indices = []Index{
-		0, 2, 1, 0, 3, 2, // Front face
-		1, 6, 5, 1, 2, 6, // Right face
-		5, 7, 4, 5, 6, 7, // Back face
-		4, 3, 0, 4, 7, 3, // Left face
-		3, 6, 2, 3, 7, 6, // Top face
-		4, 1, 5, 4, 0, 1, // Bottom face
+		0, 1, 2, 2, 3, 0, // Front face
+		1, 5, 6, 6, 2, 1, // Right face
+		5, 4, 7, 7, 6, 5, // Back face
+		4, 0, 3, 3, 7, 4, // Left face
+		3, 2, 6, 6, 7, 3, // Top face
+		4, 5, 1, 1, 0, 4, // Bottom face
 	}
 }
 
@@ -950,11 +959,11 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Timing function to test loading heightmap
 	// start := time.Now()
-	// vertices, indices, err := mesh.LoadHM(HGT_PATH)
+	// vertices, indices, err := LoadHM(HGT_PATH)
 	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
 	// OrPanic(err)
-	// app.vertices = vertices[:]
-	// app.indices = indices[:]
+	// app.vertices = vertices
+	// app.indices = indices
 
 	app.initCubeDimensions() // Test function for vertices and indices
 
