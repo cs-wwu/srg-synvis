@@ -9,17 +9,19 @@ import (
 )
 
 var (
-	// For Heightmap
-	// START_CAMERA_POS   = lin.Vec3{1740.0, 30.0, 957.0}
-	// START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	// START_CAMERA_FRONT = lin.Vec3{0.0, -1.0, 0.0}
-
-	// For Cube Model
-	START_CAMERA_POS   = lin.Vec3{0.0, 50.0, 0.0}
+	// For heightmap model
+	START_CAMERA_POS   = lin.Vec3{1740.0, 50.0, 957.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{1.0, 0.0, 0.5}
-	CAMERA_SPEED       = float32(0.2)
-	LOOK_SENSITIVITY   = float32(0.03)
+	CAMERA_SPEED       = float32(10.0)
+	LOOK_SENSITIVITY   = float32(0.1)
+
+	// For Cube Model
+	// START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
+	// START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
+	// START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}
+	// CAMERA_SPEED       = float32(0.2)
+	// LOOK_SENSITIVITY   = float32(0.03)
 )
 
 type Camera struct {
