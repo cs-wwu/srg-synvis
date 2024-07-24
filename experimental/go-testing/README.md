@@ -10,9 +10,9 @@ Experimental vulkan testing in `Go`.
 - [x] Render Based on UBO
 - [x] Load a Heightmap
 - [x] Render a Heightmap
-  - [ ] Put Normal, Color Vectors back into Vertex struct
+  - [x] Put Normal, Color Vectors back into Vertex struct
   - [ ] Use the new UBO, make it more modular/efficient
-  - [ ] Make Shader's work like `cpp` shaders
+  - [ ] Make Shader's work like `main.cpp` shaders
 - [ ] Optimizations (30fps on RPi?)
   - [ ] Frustum Culling
   - [ ] LODs
