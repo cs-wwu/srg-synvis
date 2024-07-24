@@ -595,7 +595,7 @@ func (app *Application) prepareDescriptorLayout() {
 	var descLayout vk.DescriptorSetLayout
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
-		BindingCount: 3,
+		BindingCount: 2,
 		PBindings: []vk.DescriptorSetLayoutBinding{
 			{
 				Binding:         0,
@@ -604,11 +604,6 @@ func (app *Application) prepareDescriptorLayout() {
 				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageVertexBit),
 			}, {
 				Binding:         1,
-				DescriptorType:  vk.DescriptorTypeUniformBuffer,
-				DescriptorCount: 1,
-				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageVertexBit),
-			}, {
-				Binding:         2,
 				DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 				DescriptorCount: uint32(len(texEnabled)),
 				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
@@ -828,11 +823,8 @@ func (app *Application) prepareDescriptorPool() {
 	ret := vk.CreateDescriptorPool(dev, &vk.DescriptorPoolCreateInfo{
 		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
 		MaxSets:       uint32(len(swapchainImageResources)),
-		PoolSizeCount: 3,
+		PoolSizeCount: 2,
 		PPoolSizes: []vk.DescriptorPoolSize{{
-			Type:            vk.DescriptorTypeUniformBuffer,
-			DescriptorCount: uint32(len(swapchainImageResources)),
-		}, {
 			Type:            vk.DescriptorTypeUniformBuffer,
 			DescriptorCount: uint32(len(swapchainImageResources)),
 		}, {
@@ -869,7 +861,7 @@ func (app *Application) prepareDescriptorSet() {
 
 		res.SetDescriptorSet(set)
 
-		vk.UpdateDescriptorSets(dev, 3, []vk.WriteDescriptorSet{{
+		vk.UpdateDescriptorSets(dev, 2, []vk.WriteDescriptorSet{{
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
@@ -880,19 +872,9 @@ func (app *Application) prepareDescriptorSet() {
 				Range:  vk.DeviceSize(UBOSizep),
 				Buffer: res.UniformBuffer(),
 			}},
-		}, {SType: vk.StructureTypeWriteDescriptorSet,
-			DstBinding:      1,
-			DstSet:          set,
-			DescriptorCount: 1,
-			DescriptorType:  vk.DescriptorTypeUniformBuffer,
-			PBufferInfo: []vk.DescriptorBufferInfo{{
-				Offset: 0,
-				Range:  vk.DeviceSize(VertexSize), // TODO might be the wrong size
-				Buffer: app.vertexBuffer,
-			}},
 		}, {
 			SType:           vk.StructureTypeWriteDescriptorSet,
-			DstBinding:      2,
+			DstBinding:      1,
 			DstSet:          set,
 			DescriptorCount: uint32(len(texEnabled)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
