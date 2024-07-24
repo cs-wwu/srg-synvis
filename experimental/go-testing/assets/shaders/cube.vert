@@ -38,7 +38,7 @@ const float AMBIENT = 0.04;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
-layout(location = 2) out vec3 worldPos; // New output for world position
+layout(location = 2) out vec3 worldPos;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -54,5 +54,5 @@ void main()
 
     fragColor = intense * inColor;
     fragTexCoord = inTexCoord;
-    worldPos = worldPosition.xyz; // Pass world position to fragment shader
+    worldPos = worldPosition.xyz;
 }

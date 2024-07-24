@@ -33,13 +33,7 @@ func NewApplication(spinAngle float32) *Application {
 		camera:    camera,
 	}
 
-	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
-	app.ubo.View = app.camera.GetViewMatrix()
-	app.ubo.Model.Identity()
-	app.ubo.Projection[1][1] *= -1
-	temp := lin.Vec3{0, 0.1, 0.1}
-	app.ubo.LightDir.Norm(&temp)
+	app.initUBO()
 	return app
 }
 
@@ -79,6 +73,16 @@ type Application struct {
 	WindowHandle *glfw.Window
 
 	spinAngle float32
+}
+
+func (app *Application) initUBO() {
+	// 45 FOV, Aspect 1.0, Near plane, Far Plane
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
+	app.ubo.View = app.camera.GetViewMatrix()
+	app.ubo.Model.Identity()
+	app.ubo.Projection[1][1] *= -1
+	temp := lin.Vec3{0, 0.1, 0.1}
+	app.ubo.LightDir.Norm(&temp)
 }
 
 func (app *Application) prepareDepth() {
