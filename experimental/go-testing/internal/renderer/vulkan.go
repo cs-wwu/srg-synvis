@@ -516,8 +516,6 @@ func (app *Application) prepareUniformBuffers() {
 
 // TODO cpp uses a staging buffer during this for optimization -> copybuffer
 // should be called after filling vertices: loadhm()
-// note this is implented as a buffer binded in descriptors sets
-// in cpp we instead individually bind each member of the vertex struct
 func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
@@ -922,12 +920,12 @@ func (app *Application) initCubeDimensions() {
 	app.vertices = vertices
 
 	indices := []Index{
-		0, 1, 2, 2, 3, 0, // Front face
-		1, 5, 6, 6, 2, 1, // Right face
-		5, 4, 7, 7, 6, 5, // Back face
-		4, 0, 3, 3, 7, 4, // Left face
-		3, 2, 6, 6, 7, 3, // Top face
-		4, 5, 1, 1, 0, 4, // Bottom face
+		0, 3, 2, 2, 1, 0, // Front face
+		1, 2, 6, 6, 5, 1, // Right face
+		5, 6, 7, 7, 4, 5, // Back face
+		4, 7, 3, 3, 0, 4, // Left face
+		3, 7, 6, 6, 2, 3, // Top face
+		4, 0, 1, 1, 5, 4, // Bottom face
 	}
 	app.indices = indices
 }
@@ -980,8 +978,12 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
+	// destroy vertex and index buffers
 	vk.DestroyBuffer(dev, app.vertexBuffer, nil)
 	vk.FreeMemory(dev, app.vertexBufferMemory, nil)
+
+	vk.DestroyBuffer(dev, app.indexBuffer, nil)
+	vk.FreeMemory(dev, app.indexBufferMemory, nil)
 
 	app.depth.Destroy(dev)
 	return nil
