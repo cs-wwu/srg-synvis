@@ -24,10 +24,18 @@ layout(binding = 1) uniform sampler2D texSampler;
 
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
+layout(location = 2) in vec3 worldPos;
 
 layout(location = 0) out vec4 outColor;
 
 void main() {
     vec4 texColor = texture(texSampler, fragTexCoord);
-    outColor = texColor * vec4(fragColor, 1.0);
+    vec4 baseColor = texColor * vec4(fragColor, 1.0);
+    
+    // Check if the height (y-coordinate) is 0 or less
+    if (worldPos.y <= 0.0) {
+        outColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue color
+    } else {
+        outColor = baseColor;
+    }
 }

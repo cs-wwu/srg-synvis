@@ -20,6 +20,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
+
 layout(std140, binding = 0) uniform UBO {
     mat4 model;
     mat4 view;
@@ -37,6 +38,7 @@ const float AMBIENT = 0.04;
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
+layout(location = 2) out vec3 worldPos; // New output for world position
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -44,11 +46,13 @@ out gl_PerVertex {
 
 void main() 
 {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    vec4 worldPosition = ubo.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * worldPosition;
 
     vec3 world = normalize(mat3(ubo.normalM) * inNormal);
     float intense = AMBIENT + max(dot(world, ubo.lightDir), 0);
 
     fragColor = intense * inColor;
     fragTexCoord = inTexCoord;
+    worldPos = worldPosition.xyz; // Pass world position to fragment shader
 }
