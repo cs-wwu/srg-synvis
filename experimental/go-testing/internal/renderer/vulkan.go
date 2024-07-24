@@ -959,12 +959,12 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Timing function to test loading heightmap
-	// start := time.Now()
+	// // start := time.Now()
 	// vertices, indices, err := LoadHM(HGT_PATH)
-	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
 	// OrPanic(err)
 	// app.vertices = vertices
 	// app.indices = indices
+	// // fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
 
 	app.initCubeDimensions() // Test function for vertices and indices
 
