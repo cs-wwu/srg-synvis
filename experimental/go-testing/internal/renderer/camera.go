@@ -15,9 +15,9 @@ var (
 	// START_CAMERA_FRONT = lin.Vec3{0.0, -1.0, 0.0}
 
 	// For Cube Model
-	START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
+	START_CAMERA_POS   = lin.Vec3{0.0, 50.0, 0.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}
+	START_CAMERA_FRONT = lin.Vec3{1.0, 0.0, 0.5}
 	CAMERA_SPEED       = float32(0.2)
 	LOOK_SENSITIVITY   = float32(0.03)
 )
@@ -127,9 +127,22 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 
 		front := calcFrontVector(pitch, yaw)
 		c.Front = &front
+
+		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
+			fmt.Printf("Pos: %v\n", c.GetPosition())
+			fmt.Printf("Vectors: %v\n", c.GetViewVectors())
+		}
 		// Update the camera's front, right, and up vectors for quaternions
 		// c.updateCameraVectors()
 	}
+}
+
+func (c *Camera) GetPosition() string {
+	return fmt.Sprintf("%v", c.Pos)
+}
+
+func (c *Camera) GetViewVectors() string {
+	return fmt.Sprintf("(Up: %v, Front: %v, Right: %v)", c.Up, c.Front, c.Right)
 }
 
 // Calculate the front vector without quaternions, from pitch and yaw
