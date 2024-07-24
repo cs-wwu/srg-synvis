@@ -705,30 +705,30 @@ func (app *Application) preparePipeline() {
 	}
 
 	attributeDescriptions := []vk.VertexInputAttributeDescription{
-        {
-            Binding:  0,
-            Location: 0,
-            Format:   vk.FormatR32g32b32Sfloat,
-            Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
-        },
-        {
-            Binding:  0,
-            Location: 1,
-            Format:   vk.FormatR32g32b32Sfloat,
-            Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
-        },
-        {
-            Binding:  0,
-            Location: 2,
-            Format:   vk.FormatR32g32b32Sfloat,
-            Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
-        },
-        {
-            Binding:  0,
-            Location: 3,
-            Format:   vk.FormatR32g32Sfloat,
-            Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
-        },
+		{
+			Binding:  0,
+			Location: 0,
+			Format:   vk.FormatR32g32b32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
+		},
+		{
+			Binding:  0,
+			Location: 1,
+			Format:   vk.FormatR32g32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
+		},
+		{
+			Binding:  0,
+			Location: 2,
+			Format:   vk.FormatR32g32b32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
+		},
+		{
+			Binding:  0,
+			Location: 3,
+			Format:   vk.FormatR32g32b32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
+		},
 	}
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
@@ -887,7 +887,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(VertexSize),
+				Range:  vk.DeviceSize(VertexSize), // TODO might be the wrong size
 				Buffer: app.vertexBuffer,
 			}},
 		}, {
@@ -928,18 +928,18 @@ func (app *Application) prepareFramebuffers() {
 
 func (app *Application) initCubeDimensions() {
 	vertices := []Vertex{
-		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 1}},
-		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{0, 1}},
-		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{0, 1}},
 	}
 	app.vertices = vertices
 
-	app.indices = []Index{
+	indices := []Index{
 		0, 1, 2, 2, 3, 0, // Front face
 		1, 5, 6, 6, 2, 1, // Right face
 		5, 4, 7, 7, 6, 5, // Back face
@@ -947,6 +947,7 @@ func (app *Application) initCubeDimensions() {
 		3, 2, 6, 6, 7, 3, // Top face
 		4, 5, 1, 1, 0, 4, // Bottom face
 	}
+	app.indices = indices
 }
 
 func (app *Application) VulkanContextPrepare() error {
