@@ -28,16 +28,6 @@ func (u *Index) Data() []byte {
 	return (*[m]byte)(unsafe.Pointer(u))[:IndexSize]
 }
 
-type UBOp struct {
-	MVP lin.Mat4x4
-}
-
-const UBOSizep = int(unsafe.Sizeof(UBOp{}))
-
-func (u *UBOp) Data() []byte {
-	const m = 0x7fffffff
-	return (*[m]byte)(unsafe.Pointer(u))[:UBOSizep]
-}
 
 type UniformBufferObject struct {
 	Model      lin.Mat4x4 // object to world space

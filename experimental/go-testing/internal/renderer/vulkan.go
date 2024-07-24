@@ -34,10 +34,12 @@ func NewApplication(spinAngle float32) *Application {
 	}
 
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.projectionMatrix.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
-	app.viewMatrix = app.camera.GetViewMatrix()
-	app.modelMatrix.Identity()
-	app.projectionMatrix[1][1] *= -1 // Flip projection matrix from GL to Vulkan orientation.
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
+	app.ubo.View = app.camera.GetViewMatrix()
+	app.ubo.Model.Identity()
+	app.ubo.Projection[1][1] *= -1
+	temp := lin.Vec3{0, 0.1, 0.1}
+	app.ubo.LightDir.Norm(&temp)
 	return app
 }
 
@@ -63,10 +65,6 @@ type Application struct {
 
 	frameIndex int
 
-	// these belong in ubo
-	projectionMatrix lin.Mat4x4
-	viewMatrix       lin.Mat4x4
-	modelMatrix      lin.Mat4x4
 
 	// uniformBuffersMapped []unsafe.Pointer
 	vertices           []Vertex
@@ -358,9 +356,9 @@ func (app *Application) prepareTextures() {
 			MagFilter:               vk.FilterNearest,
 			MinFilter:               vk.FilterNearest,
 			MipmapMode:              vk.SamplerMipmapModeNearest,
-			AddressModeU:            vk.SamplerAddressModeClampToEdge,
-			AddressModeV:            vk.SamplerAddressModeClampToEdge,
-			AddressModeW:            vk.SamplerAddressModeClampToEdge,
+			AddressModeU:            vk.SamplerAddressModeRepeat,
+			AddressModeV:            vk.SamplerAddressModeRepeat,
+			AddressModeW:            vk.SamplerAddressModeRepeat,
 			AnisotropyEnable:        vk.False,
 			MaxAnisotropy:           1,
 			CompareOp:               vk.CompareOpNever,
@@ -497,16 +495,8 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
-	var VP lin.Mat4x4
-	var MVP lin.Mat4x4
-	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
-	MVP.Mult(&VP, &app.modelMatrix)
+	dataRaw := app.ubo.Data()
 
-	data := UBOp{
-		MVP: MVP,
-	}
-
-	dataRaw := data.Data()
 	memProps := app.Context().Platform().MemoryProperties()
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
@@ -550,41 +540,6 @@ func (app *Application) prepareIndexBuffer() {
 	app.indexBuffer = buf.Buffer
 }
 
-// func (app *Application) prepareUniformBuffers() {
-// 	dev := app.Context().Device()
-
-// 	model := new(lin.Mat4x4)
-// 	model.Identity()
-
-// 	// view := new(lin.Mat4x4)
-// 	viewm := app.camera.GetViewMatrix()
-// 	view := &viewm
-
-// 	proj := new(lin.Mat4x4)
-// 	proj.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 100.0)
-// 	proj[1][1] *= -1
-
-// 	// TODO check if initializing to correct vals
-// 	norm := new(lin.Mat4x4)
-// 	norm.Identity()
-// 	ld := lin.Vec3{0.0, 0.1, 0.1}
-
-// 	data := UniformBufferObject{
-// 		Model: model,
-// 		View: view,
-// 		Proj: proj,
-// 		NormalM: norm,
-// 		LightDir: ld,
-// 	}
-
-// 	dataRaw := data.Data()
-// 	memProps := app.Context().Platform().MemoryProperties()
-// 	swapchainImageResources := app.Context().SwapchainImageResources()
-// 	for _, res := range swapchainImageResources {
-// 		buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageUniformBufferBit)
-// 		res.SetUniformBuffer(buf.Buffer, buf.Memory)
-// 	}
-// }
 
 func (app *Application) prepareDescriptorLayout() {
 	dev := app.Context().Device()
@@ -867,7 +822,7 @@ func (app *Application) prepareDescriptorSet() {
 			DescriptorType:  vk.DescriptorTypeUniformBuffer,
 			PBufferInfo: []vk.DescriptorBufferInfo{{
 				Offset: 0,
-				Range:  vk.DeviceSize(UBOSizep),
+				Range:  vk.DeviceSize(UBOSize),
 				Buffer: res.UniformBuffer(),
 			}},
 		}, {
@@ -995,7 +950,7 @@ func (app *Application) NextFrame() {
 	// Rotate around the Y axis
 	app.camera.ProcessInput(app.WindowHandle)
 
-	app.viewMatrix = app.camera.GetViewMatrix()
+	app.ubo.View = app.camera.GetViewMatrix()
 
 	// app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
 }
@@ -1007,11 +962,11 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	dev := app.Context().Device()
 	res := app.Context().SwapchainImageResources()[imageIdx]
 
-	var MVP, VP lin.Mat4x4
-	VP.Mult(&app.projectionMatrix, &app.viewMatrix)
-	MVP.Mult(&VP, &app.modelMatrix)
+	temp := new(lin.Mat4x4)
+	temp.Invert(&app.ubo.Model)
+	app.ubo.NormalM.Transpose(temp)
 
-	data := MVP.Data()
+	data := app.ubo.Data()
 	var pData unsafe.Pointer
 	ret := vk.MapMemory(dev, res.UniformMemory(), 0, vk.DeviceSize(len(data)), 0, &pData)
 	OrPanic(as.NewError(ret))
