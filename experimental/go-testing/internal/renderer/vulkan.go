@@ -706,9 +706,9 @@ func (app *Application) preparePipeline() {
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
-			// Topology: vk.PrimitiveTopologyTriangleList,
-			Topology: vk.PrimitiveTopologyTriangleStrip,
-			PrimitiveRestartEnable: vk.True,
+			Topology: vk.PrimitiveTopologyTriangleList,
+			// Topology: vk.PrimitiveTopologyTriangleStrip,
+			// PrimitiveRestartEnable: vk.True,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
 			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
