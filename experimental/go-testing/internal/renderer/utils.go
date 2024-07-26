@@ -62,3 +62,10 @@ type sliceHeader struct {
 	Len  int
 	Cap  int
 }
+
+func min(a, b int) int {
+    if a < b {
+        return a
+    }
+    return b
+}

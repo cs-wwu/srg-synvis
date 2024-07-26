@@ -13,6 +13,7 @@ Experimental vulkan testing in `Go`.
   - [x] Put Normal, Color Vectors back into Vertex struct
   - [x] Use the new UBO, make it more modular/efficient
   - [x] Make Shader's work like `main.cpp` shaders
+- [ ] Load based on chunks
 - [ ] Optimizations (30fps on RPi?)
   - [ ] Frustum Culling
   - [ ] LODs

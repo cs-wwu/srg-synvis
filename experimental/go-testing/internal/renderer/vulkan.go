@@ -61,6 +61,8 @@ type Application struct {
 	frameIndex int
 
 	// uniformBuffersMapped []unsafe.Pointer
+	chunks             map[lin.Vec2]*Chunk
+	loadedChunks       []*Chunk
 	vertices           []Vertex
 	indices            []Index
 	vertexBuffer       vk.Buffer
@@ -713,9 +715,9 @@ func (app *Application) preparePipeline() {
 			PVertexAttributeDescriptions:    attributeDescriptions,
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
-			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			SType: vk.StructureTypePipelineInputAssemblyStateCreateInfo,
 			// Topology: vk.PrimitiveTopologyTriangleList,
-			Topology: vk.PrimitiveTopologyTriangleStrip,
+			Topology:               vk.PrimitiveTopologyTriangleStrip,
 			PrimitiveRestartEnable: vk.True,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
