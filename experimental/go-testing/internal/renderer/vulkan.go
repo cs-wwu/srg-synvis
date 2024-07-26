@@ -3,6 +3,7 @@ package renderer
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
@@ -58,7 +59,6 @@ type Application struct {
 	pipeline       vk.Pipeline
 
 	frameIndex int
-
 
 	// uniformBuffersMapped []unsafe.Pointer
 	vertices           []Vertex
@@ -273,6 +273,14 @@ func (app *Application) setImageLayout(image vk.Image, aspectMask vk.ImageAspect
 		0, 0, nil, 0, nil, 1, []vk.ImageMemoryBarrier{imageMemoryBarrier})
 }
 
+func (app *Application) getGPUName(gpu vk.PhysicalDevice) string {
+	var devProperties vk.PhysicalDeviceProperties
+	vk.GetPhysicalDeviceProperties(gpu, &devProperties)
+	devProperties.Deref()
+
+	return vk.ToString(devProperties.DeviceName[:])
+}
+
 func (app *Application) prepareTextures() {
 	dev := app.Context().Device()
 	texFormat := vk.FormatR8g8b8a8Unorm
@@ -281,6 +289,7 @@ func (app *Application) prepareTextures() {
 	vk.GetPhysicalDeviceFormatProperties(gpu, texFormat, &props)
 	props.Deref()
 
+	fmt.Printf("GPU: %v\n", app.getGPUName(gpu))
 	prepareTex := func(path string) *Texture {
 		var tex *Texture
 
@@ -544,7 +553,6 @@ func (app *Application) prepareIndexBuffer() {
 	app.indexBufferMemory = buf.Memory
 	app.indexBuffer = buf.Buffer
 }
-
 
 func (app *Application) prepareDescriptorLayout() {
 	dev := app.Context().Device()
