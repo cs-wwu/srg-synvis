@@ -877,29 +877,30 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
-func (app *Application) initCubeDimensions() {
-	vertices := []Vertex{
-		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 1}},
-		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{0, 1}},
-	}
-	app.vertices = vertices
+// Obselete after heightmap has been loaded
+// func (app *Application) initCubeDimensions() {
+// 	vertices := []Vertex{
+// 		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 0}},
+// 		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 0}},
+// 		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 1}},
+// 		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 1}},
+// 		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{0, 0}},
+// 		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{1, 0}},
+// 		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{1, 1}},
+// 		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{0, 1}},
+// 	}
+// 	app.vertices = vertices
 
-	indices := []Index{
-		0, 3, 2, 2, 1, 0, // Front face
-		1, 2, 6, 6, 5, 1, // Right face
-		5, 6, 7, 7, 4, 5, // Back face
-		4, 7, 3, 3, 0, 4, // Left face
-		3, 7, 6, 6, 2, 3, // Top face
-		4, 0, 1, 1, 5, 4, // Bottom face
-	}
-	app.indices = indices
-}
+// 	indices := []Index{
+// 		0, 3, 2, 2, 1, 0, // Front face
+// 		1, 2, 6, 6, 5, 1, // Right face
+// 		5, 6, 7, 7, 4, 5, // Back face
+// 		4, 7, 3, 3, 0, 4, // Left face
+// 		3, 7, 6, 6, 2, 3, // Top face
+// 		4, 0, 1, 1, 5, 4, // Bottom face
+// 	}
+// 	app.indices = indices
+// }
 
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
@@ -916,8 +917,6 @@ func (app *Application) VulkanContextPrepare() error {
 	app.vertices = vertices
 	app.indices = indices
 	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
-
-	// app.initCubeDimensions() // Test function for vertices and indices
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareVertexBuffer()
