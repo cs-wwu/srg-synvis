@@ -18,7 +18,8 @@ const (
 func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 	// Preallocate slices
 	vertices := make([]Vertex, length*length)
-	indices := make([]Index, 6*(length-1)*(length-1))
+	// indices := make([]Index, 6*(length-1)*(length-1))
+	indices := make([]Index, 3*(length-1)*(length-1))
 
 	file, err := os.Open(hmPath)
 	if err != nil {
@@ -66,25 +67,57 @@ func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 	}
 
 	// Generate indices
+	// indexPos := 0
+	// for z := 0; z < length-1; z++ {
+	// 	for x := 0; x < length-1; x++ {
+	// 		topLeft := Index(z*length + x)
+	// 		topRight := topLeft + 1
+	// 		botLeft := Index((z+1)*length + x)
+	// 		botRight := botLeft + 1
+
+	// 		// First triangle
+	// 		indices[indexPos] = topLeft
+	// 		indices[indexPos+1] = botLeft
+	// 		indices[indexPos+2] = topRight
+	// 		indexPos += 3
+
+	// 		// Second triangle
+	// 		indices[indexPos] = topRight
+	// 		indices[indexPos+1] = botLeft
+	// 		indices[indexPos+2] = botRight
+	// 		indexPos += 3
+	// 	}
+	// }
+
 	indexPos := 0
 	for z := 0; z < length-1; z++ {
-		for x := 0; x < length-1; x++ {
-			topLeft := Index(z*length + x)
-			topRight := topLeft + 1
-			botLeft := Index((z+1)*length + x)
-			botRight := botLeft + 1
+		// Alternate the triangle strip direction to prevent degenerate triangles
+		if z%2 == 0 {
+			// Even rows: left to right
+			for x := 0; x < length; x++ {
+				topLeft := Index(z*length + x)
+				botLeft := Index((z+1)*length + x)
 
-			// First triangle
-			indices[indexPos] = topLeft
-			indices[indexPos+1] = botLeft
-			indices[indexPos+2] = topRight
-			indexPos += 3
+				// Add two vertices per iteration (triangle strip)
+				indices[indexPos] = topLeft
+				indices[indexPos+1] = botLeft
+				indexPos += 2
+			}
+		} else {
+			// Odd rows: right to left
+			for x := length - 1; x >= 0; x-- {
+				topRight := Index(z*length + x)
+				botRight := Index((z+1)*length + x)
 
-			// Second triangle
-			indices[indexPos] = topRight
-			indices[indexPos+1] = botLeft
-			indices[indexPos+2] = botRight
-			indexPos += 3
+				// Add two vertices per iteration (triangle strip)
+				indices[indexPos] = topRight
+				indices[indexPos+1] = botRight
+				indexPos += 2
+			}
+		}
+		if z < length-2 {
+			indices[indexPos] = Index(uint32(0xFFFF)) // Insert strip-cut index
+			indexPos++
 		}
 	}
 

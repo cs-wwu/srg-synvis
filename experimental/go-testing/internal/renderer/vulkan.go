@@ -509,8 +509,9 @@ func (app *Application) prepareUniformBuffers() {
 	}
 }
 
-// TODO cpp uses a staging buffer during this for optimization -> copybuffer
-// should be called after filling vertices: loadhm()
+// if using dynamic buffers, staging buffers not needed(?)
+// staging buffer more efficiently transfer data from CPU to GPU
+// so not as useful w/ an integrated GPU
 func (app *Application) prepareVertexBuffer() {
 	dev := app.Context().Device()
 
@@ -705,8 +706,9 @@ func (app *Application) preparePipeline() {
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
-			Topology: vk.PrimitiveTopologyTriangleList,
-			// PrimitiveRestartEnable: vk.False,
+			// Topology: vk.PrimitiveTopologyTriangleList,
+			Topology: vk.PrimitiveTopologyTriangleStrip,
+			PrimitiveRestartEnable: vk.True,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
 			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
@@ -959,7 +961,7 @@ func (app *Application) NextFrame() {
 	// app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
 }
 
-// likely called every frame by asche
+// called every frame by asche
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
