@@ -26,12 +26,12 @@ var texEnabled = []string{
 	"assets/textures/checkers.png",
 }
 
-func NewApplication(spinAngle float32) *Application {
+func NewApplication() *Application {
 	camera := NewCamera()
 
 	app := &Application{
-		spinAngle: spinAngle,
-		camera:    camera,
+		camera: camera,
+		chunks: make(map[string]*Chunk),
 	}
 
 	app.initUBO()
@@ -61,8 +61,10 @@ type Application struct {
 	frameIndex int
 
 	// uniformBuffersMapped []unsafe.Pointer
-	chunks             map[lin.Vec2]*Chunk
-	loadedChunks       []*Chunk
+	chunks       map[string]*Chunk
+	loadedChunks []*Chunk
+	heightmap    *image.Gray16
+
 	vertices           []Vertex
 	indices            []Index
 	vertexBuffer       vk.Buffer
@@ -422,28 +424,19 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
-	clearValues[0].SetColor([]float32{
-		0.2, 0.2, 0.2, 0.2, // This is the background color of the scene
-	})
-	// This draws the background color
+	clearValues[0].SetColor([]float32{0.2, 0.2, 0.2, 0.2})
+
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
 		RenderPass:  app.renderPass,
 		Framebuffer: res.Framebuffer(),
 		RenderArea: vk.Rect2D{
-			Offset: vk.Offset2D{
-				X: 0, Y: 0,
-			},
-			Extent: vk.Extent2D{
-				Width:  app.width,
-				Height: app.height,
-			},
+			Offset: vk.Offset2D{X: 0, Y: 0},
+			Extent: vk.Extent2D{Width: app.width, Height: app.height},
 		},
 		ClearValueCount: 2,
 		PClearValues:    clearValues,
 	}, vk.SubpassContentsInline)
-
-	// vk.CmdClearAttachments(cmd, 1, &clearAttachment, 1, &clearRect)
 
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
@@ -455,23 +448,16 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 		MaxDepth: 1.0,
 	}})
 	vk.CmdSetScissor(cmd, 0, 1, []vk.Rect2D{{
-		Offset: vk.Offset2D{
-			X: 0, Y: 0,
-		},
-		Extent: vk.Extent2D{
-			Width:  app.width,
-			Height: app.height,
-		},
+		Offset: vk.Offset2D{X: 0, Y: 0},
+		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	// Bind vertex buffer
-	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
+	for _, chunk := range app.loadedChunks {
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{chunk.vertexBuffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, chunk.indexBuffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, 0, 0, 0)
+	}
 
-	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint32)
-	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
-
-	// Note that ending the renderpass changes the image's layout from
-	// vk.ImageLayoutColorAttachmentOptimal to vk.ImageLayoutPresentSrc
 	vk.CmdEndRenderPass(cmd)
 
 	graphicsQueueIndex := app.Context().Platform().GraphicsQueueFamilyIndex()
@@ -902,25 +888,52 @@ func (app *Application) prepareFramebuffers() {
 // 	app.indices = indices
 // }
 
+func (app *Application) LoadAllChunks() {
+	if app.heightmap == nil {
+		panic("Heightmap not loaded")
+	}
+
+	totalChunks := (length / ChunkSize) * (length / ChunkSize)
+	fmt.Printf("Loading %d chunks...\n", totalChunks)
+
+	for z := 0; z < length/ChunkSize; z++ {
+		for x := 0; x < length/ChunkSize; x++ {
+			app.LoadChunk(x, z)
+			if (z*length/ChunkSize+x+1)%10 == 0 {
+				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
+			}
+		}
+	}
+
+	fmt.Printf("All %d chunks loaded.\n", totalChunks)
+}
+
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
 	app.width = dim.Width
 
+	heightmap, err := GetHM(HGT_PATH)
+	OrPanic(err)
+	app.heightmap = heightmap
+
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Timing function to test loading heightmap
-	// start := time.Now()
-	vertices, indices, err := LoadHM(HGT_PATH)
-	OrPanic(err)
-	app.vertices = vertices
-	app.indices = indices
-	// fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
+	// // Timing function to test loading heightmap
+	// // start := time.Now()
+	// vertices, indices, err := LoadHM(HGT_PATH)
+	// OrPanic(err)
+	// app.vertices = vertices
+	// app.indices = indices
+	// // fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
+
+	// Load all available chunks
+	app.LoadAllChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
-	app.prepareVertexBuffer()
-	app.prepareIndexBuffer()
+	// app.prepareVertexBuffer()
+	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
@@ -948,12 +961,19 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
-	// destroy vertex and index buffers
-	vk.DestroyBuffer(dev, app.vertexBuffer, nil)
-	vk.FreeMemory(dev, app.vertexBufferMemory, nil)
+	for _, chunk := range app.chunks {
+		vk.DestroyBuffer(dev, chunk.vertexBuffer, nil)
+		vk.FreeMemory(dev, chunk.vertexMemory, nil)
+		vk.DestroyBuffer(dev, chunk.indexBuffer, nil)
+		vk.FreeMemory(dev, chunk.indexMemory, nil)
+	}
 
-	vk.DestroyBuffer(dev, app.indexBuffer, nil)
-	vk.FreeMemory(dev, app.indexBufferMemory, nil)
+	// // destroy vertex and index buffers
+	// vk.DestroyBuffer(dev, app.vertexBuffer, nil)
+	// vk.FreeMemory(dev, app.vertexBufferMemory, nil)
+
+	// vk.DestroyBuffer(dev, app.indexBuffer, nil)
+	// vk.FreeMemory(dev, app.indexBufferMemory, nil)
 
 	app.depth.Destroy(dev)
 	return nil

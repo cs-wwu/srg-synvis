@@ -25,33 +25,42 @@ type Chunk struct {
 	vertexMemory vk.DeviceMemory
 	indexBuffer  vk.Buffer
 	indexMemory  vk.DeviceMemory
-	Position     lin.Vec2 // Chunk coordinates
+	X            int // Global X coordinate of the chunk's top-left corner
+	Z            int // Global Z coordinate of the chunk's top-left corner
 }
 
-func (app *Application) LoadChunk(heightmap *image.Gray16, chunkX, chunkZ int) {
-    position := lin.Vec2{float32(chunkX), float32(chunkZ)}
-    if _, exists := app.chunks[position]; exists {
+func (app *Application) LoadChunk(chunkX, chunkZ int) {
+    if app.heightmap == nil {
+        panic("Heightmap not loaded")
+    }
+
+    key := chunkKey(chunkX, chunkZ)
+    if _, exists := app.chunks[key]; exists {
         return // Chunk already loaded
     }
 
     chunk := &Chunk{
-        Position: position,
+        X: chunkX * ChunkSize,
+        Z: chunkZ * ChunkSize,
     }
 
     // Generate vertices and indices for this chunk
-    startX, startZ := chunkX*ChunkSize, chunkZ*ChunkSize
     chunk.vertices = make([]Vertex, ChunkSize*ChunkSize)
     chunk.indices = make([]Index, 2*ChunkSize*(ChunkSize-1)+2*((ChunkSize-1)-1))
 
-    // Fill vertices (similar to LoadHM, but for a single chunk)
+    // Fill vertices
     for z := 0; z < ChunkSize; z++ {
         for x := 0; x < ChunkSize; x++ {
-            globalX, globalZ := startX+x, startZ+z
-            pixelValue := heightmap.Gray16At(globalX, globalZ).Y
+            globalX, globalZ := chunk.X+x, chunk.Z+z
+            pixelValue := app.heightmap.Gray16At(globalX, globalZ).Y
             height := float32(int(pixelValue) - 32768)
 
             chunk.vertices[z*ChunkSize+x] = Vertex{
-                Position: lin.Vec3{float32(x), height * scale, float32(z)},
+                Position: lin.Vec3{
+                    float32(globalX), // Use global X coordinate
+                    height * scale,
+                    float32(globalZ), // Use global Z coordinate
+                },
                 Color:    lin.Vec3{1.0, 1.0, 1.0},
                 Normal:   lin.Vec3{0.0, 0.0, 0.0},
                 TexCoord: lin.Vec2{
@@ -62,11 +71,11 @@ func (app *Application) LoadChunk(heightmap *image.Gray16, chunkX, chunkZ int) {
         }
     }
 
-    // Generate indices for this chunk (using triangle strips)
+    // Generate indices (using triangle strips)
     indexPos := 0
     for z := 0; z < ChunkSize-1; z++ {
         if z > 0 {
-            chunk.indices[indexPos] = Index(z*ChunkSize)
+            chunk.indices[indexPos] = Index(z * ChunkSize)
             indexPos++
         }
 
@@ -77,7 +86,7 @@ func (app *Application) LoadChunk(heightmap *image.Gray16, chunkX, chunkZ int) {
         }
 
         if z < ChunkSize-2 {
-            chunk.indices[indexPos] = Index((z+1)*ChunkSize + (ChunkSize-1))
+            chunk.indices[indexPos] = Index((z+1)*ChunkSize + (ChunkSize - 1))
             indexPos++
         }
     }
@@ -87,74 +96,86 @@ func (app *Application) LoadChunk(heightmap *image.Gray16, chunkX, chunkZ int) {
     // Create Vulkan buffers for this chunk
     app.createChunkBuffers(chunk)
 
-    app.chunks[position] = chunk
+    app.chunks[key] = chunk
     app.loadedChunks = append(app.loadedChunks, chunk)
 }
 
 func (app *Application) createChunkBuffers(chunk *Chunk) {
-    dev := app.Context().Device()
-    memProps := app.Context().Platform().MemoryProperties()
+	dev := app.Context().Device()
+	memProps := app.Context().Platform().MemoryProperties()
 
-    // Create vertex buffer
-    vertexBufferSize := len(chunk.vertices) * VertexSize
-    vertexDataRaw := make([]byte, vertexBufferSize)
-    for i, vertex := range chunk.vertices {
-        copy(vertexDataRaw[i*VertexSize:], vertex.Data())
-    }
-    vertexBuf := as.CreateBuffer(dev, memProps, vertexDataRaw, vk.BufferUsageVertexBufferBit)
-    chunk.vertexBuffer = vertexBuf.Buffer
-    chunk.vertexMemory = vertexBuf.Memory
+	// Create vertex buffer
+	vertexBufferSize := len(chunk.vertices) * VertexSize
+	vertexDataRaw := make([]byte, vertexBufferSize)
+	for i, vertex := range chunk.vertices {
+		copy(vertexDataRaw[i*VertexSize:], vertex.Data())
+	}
+	vertexBuf := as.CreateBuffer(dev, memProps, vertexDataRaw, vk.BufferUsageVertexBufferBit)
+	chunk.vertexBuffer = vertexBuf.Buffer
+	chunk.vertexMemory = vertexBuf.Memory
 
-    // Create index buffer
-    indexBufferSize := len(chunk.indices) * IndexSize
-    indexDataRaw := make([]byte, indexBufferSize)
-    for i, index := range chunk.indices {
-        copy(indexDataRaw[i*IndexSize:], index.Data())
-    }
-    indexBuf := as.CreateBuffer(dev, memProps, indexDataRaw, vk.BufferUsageIndexBufferBit)
-    chunk.indexBuffer = indexBuf.Buffer
-    chunk.indexMemory = indexBuf.Memory
+	// Create index buffer
+	indexBufferSize := len(chunk.indices) * IndexSize
+	indexDataRaw := make([]byte, indexBufferSize)
+	for i, index := range chunk.indices {
+		copy(indexDataRaw[i*IndexSize:], index.Data())
+	}
+	indexBuf := as.CreateBuffer(dev, memProps, indexDataRaw, vk.BufferUsageIndexBufferBit)
+	chunk.indexBuffer = indexBuf.Buffer
+	chunk.indexMemory = indexBuf.Memory
 }
 
 func (app *Application) UnloadChunk(chunkX, chunkZ int) {
-    position := lin.Vec2{float32(chunkX), float32(chunkZ)}
-    chunk, exists := app.chunks[position]
-    if !exists {
-        return // Chunk not loaded
-    }
+	key := chunkKey(chunkX, chunkZ)
+	chunk, exists := app.chunks[key]
+	if !exists {
+		return // Chunk not loaded
+	}
 
-    dev := app.Context().Device()
-    vk.DestroyBuffer(dev, chunk.vertexBuffer, nil)
-    vk.FreeMemory(dev, chunk.vertexMemory, nil)
-    vk.DestroyBuffer(dev, chunk.indexBuffer, nil)
-    vk.FreeMemory(dev, chunk.indexMemory, nil)
+	dev := app.Context().Device()
+	vk.DestroyBuffer(dev, chunk.vertexBuffer, nil)
+	vk.FreeMemory(dev, chunk.vertexMemory, nil)
+	vk.DestroyBuffer(dev, chunk.indexBuffer, nil)
+	vk.FreeMemory(dev, chunk.indexMemory, nil)
 
-    delete(app.chunks, position)
-    for i, c := range app.loadedChunks {
-        if c == chunk {
-            app.loadedChunks = append(app.loadedChunks[:i], app.loadedChunks[i+1:]...)
-            break
-        }
-    }
+	delete(app.chunks, key)
+	for i, c := range app.loadedChunks {
+		if c == chunk {
+			app.loadedChunks = append(app.loadedChunks[:i], app.loadedChunks[i+1:]...)
+			break
+		}
+	}
+}
+
+// Helper function to create a unique key for each chunk
+func chunkKey(x, z int) string {
+	return fmt.Sprintf("%d,%d", x, z)
 }
 
 func calculateChunkNormals(c *Chunk) {
-	for z := 0; z < length-1; z++ {
-		for x := 0; x < length-1; x++ {
-			current := c.vertices[z*length+x].Position
-			right := c.vertices[z*length+(x+1)].Position
-			down := c.vertices[(z+1)*length+x].Position
+	for z := 0; z < ChunkSize; z++ {
+		for x := 0; x < ChunkSize; x++ {
+			if x < ChunkSize-1 && z < ChunkSize-1 {
+				current := &c.vertices[z*ChunkSize+x].Position
+				right := &c.vertices[z*ChunkSize+(x+1)].Position
+				down := &c.vertices[(z+1)*ChunkSize+x].Position
 
-			// Funky way of doing math with linmath
-			var normal lin.Vec3
-			var a lin.Vec3
-			var b lin.Vec3
-			a.Sub(&down, &current)
-			b.Sub(&right, &current)
-			normal.MultCross(&a, &b)
-			normal.Norm(&normal)
+				var normal lin.Vec3
+				var a, b lin.Vec3
+				a.Sub(down, current)
+				b.Sub(right, current)
+				normal.MultCross(&a, &b)
+				normal.Norm(&normal)
 
-			c.vertices[z*length+x].Normal = normal
+				c.vertices[z*ChunkSize+x].Normal = normal
+			} else {
+				// For edge vertices, just use the normal of the previous vertex
+				if x > 0 {
+					c.vertices[z*ChunkSize+x].Normal = c.vertices[z*ChunkSize+(x-1)].Normal
+				} else if z > 0 {
+					c.vertices[z*ChunkSize+x].Normal = c.vertices[(z-1)*ChunkSize+x].Normal
+				}
+			}
 		}
 	}
 }
@@ -187,6 +208,8 @@ func GetHM(hmPath string) (*image.Gray16, error) {
 	return grayImg, nil
 }
 
+// ------------------ Old Heightmap Loading for Reference ------------------
+
 func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 	// Preallocate slices
 	vertices := make([]Vertex, length*length)
@@ -218,29 +241,6 @@ func LoadHM(hmPath string) ([]Vertex, []Index, error) {
 			}
 		}
 	}
-
-	// Generate indices
-	// indexPos := 0
-	// for z := 0; z < length-1; z++ {
-	// 	for x := 0; x < length-1; x++ {
-	// 		topLeft := Index(z*length + x)
-	// 		topRight := topLeft + 1
-	// 		botLeft := Index((z+1)*length + x)
-	// 		botRight := botLeft + 1
-
-	// 		// First triangle
-	// 		indices[indexPos] = topLeft
-	// 		indices[indexPos+1] = botLeft
-	// 		indices[indexPos+2] = topRight
-	// 		indexPos += 3
-
-	// 		// Second triangle
-	// 		indices[indexPos] = topRight
-	// 		indices[indexPos+1] = botLeft
-	// 		indices[indexPos+2] = botRight
-	// 		indexPos += 3
-	// 	}
-	// }
 
 	indexPos := 0
 	for z := 0; z < length-1; z++ {

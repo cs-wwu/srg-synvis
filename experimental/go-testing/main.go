@@ -74,7 +74,7 @@ func (app *Application) VulkanInstanceExtensions() []string {
 
 func NewApplication(debugEnabled bool) *Application {
 	return &Application{
-		Application: renderer.NewApplication(1.0),
+		Application: renderer.NewApplication(),
 
 		debugEnabled: debugEnabled,
 	}
