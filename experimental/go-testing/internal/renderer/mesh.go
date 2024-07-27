@@ -44,14 +44,12 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 		Z: chunkZ * ChunkSize,
 	}
 
-	// We'll add one extra vertex on each side for the skirt
+	// Add one vertex on each side for a chunk skirt
 	extendedSize := ChunkSize + 2
 	chunk.vertices = make([]Vertex, extendedSize*extendedSize)
-
-	// Adjust index count for the new vertices
 	chunk.indices = make([]Index, 2*extendedSize*(extendedSize-1)+2*((extendedSize-1)-1))
-
-	skirtDropFactor := float32(0.1) // Adjust this value to change how far down the skirt goes
+	// This is for merging chunks together to stop chunk gaps
+	skirtDropFactor := float32(0.1) // This value can be adjusted
 
 	// Fill vertices
 	for z := -1; z <= ChunkSize; z++ {
@@ -110,6 +108,7 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 	app.loadedChunks = append(app.loadedChunks, chunk)
 }
 
+// Creates and implements the Vulkan Vertex and Index buffers for this chunk
 func (app *Application) createChunkBuffers(chunk *Chunk) {
 	dev := app.Context().Device()
 	memProps := app.Context().Platform().MemoryProperties()
@@ -135,6 +134,7 @@ func (app *Application) createChunkBuffers(chunk *Chunk) {
 	chunk.indexMemory = indexBuf.Memory
 }
 
+// Unloads the chunk at the given coordinates
 func (app *Application) UnloadChunk(chunkX, chunkZ int) {
 	key := chunkKey(chunkX, chunkZ)
 	chunk, exists := app.chunks[key]
@@ -162,6 +162,7 @@ func chunkKey(x, z int) string {
 	return fmt.Sprintf("%d,%d", x, z)
 }
 
+// Calculates the chunk's normal vectors (stored in the chunks vertices)
 func calculateChunkNormals(c *Chunk) {
 	extendedSize := ChunkSize + 2
 	for z := 0; z < extendedSize; z++ {
@@ -191,6 +192,7 @@ func calculateChunkNormals(c *Chunk) {
 	}
 }
 
+// Returns a pointer to the heightmap image
 func GetHM(hmPath string) (*image.Gray16, error) {
 	file, err := os.Open(hmPath)
 	if err != nil {

@@ -64,19 +64,10 @@ type Application struct {
 	chunks       map[string]*Chunk
 	loadedChunks []*Chunk
 	heightmap    *image.Gray16
-
-	vertices           []Vertex
-	indices            []Index
-	vertexBuffer       vk.Buffer
-	vertexBufferMemory vk.DeviceMemory
-	indexBuffer        vk.Buffer
-	indexBufferMemory  vk.DeviceMemory
-	ubo                UniformBufferObject
+	ubo          UniformBufferObject
 
 	camera       *Camera
 	WindowHandle *glfw.Window
-
-	spinAngle float32
 }
 
 func (app *Application) initUBO() {
@@ -506,42 +497,6 @@ func (app *Application) prepareUniformBuffers() {
 	}
 }
 
-// if using dynamic buffers, staging buffers not needed(?)
-// staging buffer more efficiently transfer data from CPU to GPU
-// so not as useful w/ an integrated GPU
-func (app *Application) prepareVertexBuffer() {
-	dev := app.Context().Device()
-
-	bufferSize := len(app.vertices) * VertexSize
-	dataRaw := make([]byte, bufferSize)
-
-	// Copy the data from app.vertices into dataRaw
-	for i, vertex := range app.vertices {
-		copy(dataRaw[i*VertexSize:], vertex.Data())
-	}
-
-	memProps := app.Context().Platform().MemoryProperties()
-	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
-	app.vertexBufferMemory = buf.Memory
-	app.vertexBuffer = buf.Buffer
-}
-
-func (app *Application) prepareIndexBuffer() {
-	dev := app.Context().Device()
-
-	bufferSize := len(app.indices) * IndexSize
-
-	dataRaw := make([]byte, bufferSize)
-	for i, index := range app.indices {
-		copy(dataRaw[i*IndexSize:], index.Data())
-	}
-
-	memProps := app.Context().Platform().MemoryProperties()
-	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageIndexBufferBit)
-	app.indexBufferMemory = buf.Memory
-	app.indexBuffer = buf.Buffer
-}
-
 func (app *Application) prepareDescriptorLayout() {
 	dev := app.Context().Device()
 	var descLayout vk.DescriptorSetLayout
@@ -863,31 +818,6 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
-// Obselete after heightmap has been loaded
-// func (app *Application) initCubeDimensions() {
-// 	vertices := []Vertex{
-// 		{Position: lin.Vec3{-1, -1, -1}, TexCoord: lin.Vec2{0, 0}},
-// 		{Position: lin.Vec3{1, -1, -1}, TexCoord: lin.Vec2{1, 0}},
-// 		{Position: lin.Vec3{1, 1, -1}, TexCoord: lin.Vec2{1, 1}},
-// 		{Position: lin.Vec3{-1, 1, -1}, TexCoord: lin.Vec2{0, 1}},
-// 		{Position: lin.Vec3{-1, -1, 1}, TexCoord: lin.Vec2{0, 0}},
-// 		{Position: lin.Vec3{1, -1, 1}, TexCoord: lin.Vec2{1, 0}},
-// 		{Position: lin.Vec3{1, 1, 1}, TexCoord: lin.Vec2{1, 1}},
-// 		{Position: lin.Vec3{-1, 1, 1}, TexCoord: lin.Vec2{0, 1}},
-// 	}
-// 	app.vertices = vertices
-
-// 	indices := []Index{
-// 		0, 3, 2, 2, 1, 0, // Front face
-// 		1, 2, 6, 6, 5, 1, // Right face
-// 		5, 6, 7, 7, 4, 5, // Back face
-// 		4, 7, 3, 3, 0, 4, // Left face
-// 		3, 7, 6, 6, 2, 3, // Top face
-// 		4, 0, 1, 1, 5, 4, // Bottom face
-// 	}
-// 	app.indices = indices
-// }
-
 func (app *Application) LoadAllChunks() {
 	if app.heightmap == nil {
 		panic("Heightmap not loaded")
@@ -920,20 +850,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// // Timing function to test loading heightmap
-	// // start := time.Now()
-	// vertices, indices, err := LoadHM(HGT_PATH)
-	// OrPanic(err)
-	// app.vertices = vertices
-	// app.indices = indices
-	// // fmt.Printf("Took %v seconds to load heightmap\n", time.Since(start))
-
 	// Load all available chunks
 	app.LoadAllChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
-	// app.prepareVertexBuffer()
-	// app.prepareIndexBuffer()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
