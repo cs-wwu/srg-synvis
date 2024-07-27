@@ -30,74 +30,84 @@ type Chunk struct {
 }
 
 func (app *Application) LoadChunk(chunkX, chunkZ int) {
-    if app.heightmap == nil {
-        panic("Heightmap not loaded")
-    }
+	if app.heightmap == nil {
+		panic("Heightmap not loaded")
+	}
 
-    key := chunkKey(chunkX, chunkZ)
-    if _, exists := app.chunks[key]; exists {
-        return // Chunk already loaded
-    }
+	key := chunkKey(chunkX, chunkZ)
+	if _, exists := app.chunks[key]; exists {
+		return // Chunk already loaded
+	}
 
-    chunk := &Chunk{
-        X: chunkX * ChunkSize,
-        Z: chunkZ * ChunkSize,
-    }
+	chunk := &Chunk{
+		X: chunkX * ChunkSize,
+		Z: chunkZ * ChunkSize,
+	}
 
-    // Generate vertices and indices for this chunk
-    chunk.vertices = make([]Vertex, ChunkSize*ChunkSize)
-    chunk.indices = make([]Index, 2*ChunkSize*(ChunkSize-1)+2*((ChunkSize-1)-1))
+	// We'll add one extra vertex on each side for the skirt
+	extendedSize := ChunkSize + 2
+	chunk.vertices = make([]Vertex, extendedSize*extendedSize)
 
-    // Fill vertices
-    for z := 0; z < ChunkSize; z++ {
-        for x := 0; x < ChunkSize; x++ {
-            globalX, globalZ := chunk.X+x, chunk.Z+z
-            pixelValue := app.heightmap.Gray16At(globalX, globalZ).Y
-            height := float32(int(pixelValue) - 32768)
+	// Adjust index count for the new vertices
+	chunk.indices = make([]Index, 2*extendedSize*(extendedSize-1)+2*((extendedSize-1)-1))
 
-            chunk.vertices[z*ChunkSize+x] = Vertex{
-                Position: lin.Vec3{
-                    float32(globalX), // Use global X coordinate
-                    height * scale,
-                    float32(globalZ), // Use global Z coordinate
-                },
-                Color:    lin.Vec3{1.0, 1.0, 1.0},
-                Normal:   lin.Vec3{0.0, 0.0, 0.0},
-                TexCoord: lin.Vec2{
-                    float32(globalX) / float32(length-1),
-                    float32(globalZ) / float32(length-1),
-                },
-            }
-        }
-    }
+	skirtDropFactor := float32(0.1) // Adjust this value to change how far down the skirt goes
 
-    // Generate indices (using triangle strips)
-    indexPos := 0
-    for z := 0; z < ChunkSize-1; z++ {
-        if z > 0 {
-            chunk.indices[indexPos] = Index(z * ChunkSize)
-            indexPos++
-        }
+	// Fill vertices
+	for z := -1; z <= ChunkSize; z++ {
+		for x := -1; x <= ChunkSize; x++ {
+			globalX, globalZ := chunk.X+x, chunk.Z+z
+			pixelValue := app.heightmap.Gray16At(clamp(globalX, 0, length-1), clamp(globalZ, 0, length-1)).Y
+			height := float32(int(pixelValue) - 32768)
 
-        for x := 0; x < ChunkSize; x++ {
-            chunk.indices[indexPos] = Index(z*ChunkSize + x)
-            chunk.indices[indexPos+1] = Index((z+1)*ChunkSize + x)
-            indexPos += 2
-        }
+			// Lower the height for skirt vertices
+			if x == -1 || x == ChunkSize || z == -1 || z == ChunkSize {
+				height -= skirtDropFactor
+			}
 
-        if z < ChunkSize-2 {
-            chunk.indices[indexPos] = Index((z+1)*ChunkSize + (ChunkSize - 1))
-            indexPos++
-        }
-    }
+			chunk.vertices[(z+1)*extendedSize+(x+1)] = Vertex{
+				Position: lin.Vec3{
+					float32(globalX),
+					height * scale,
+					float32(globalZ),
+				},
+				Color:  lin.Vec3{1.0, 1.0, 1.0},
+				Normal: lin.Vec3{0.0, 0.0, 0.0},
+				TexCoord: lin.Vec2{
+					float32(globalX) / float32(length-1),
+					float32(globalZ) / float32(length-1),
+				},
+			}
+		}
+	}
 
-    calculateChunkNormals(chunk)
+	// Generate indices (using triangle strips)
+	indexPos := 0
+	for z := 0; z < extendedSize-1; z++ {
+		if z > 0 {
+			chunk.indices[indexPos] = Index(z * extendedSize)
+			indexPos++
+		}
 
-    // Create Vulkan buffers for this chunk
-    app.createChunkBuffers(chunk)
+		for x := 0; x < extendedSize; x++ {
+			chunk.indices[indexPos] = Index(z*extendedSize + x)
+			chunk.indices[indexPos+1] = Index((z+1)*extendedSize + x)
+			indexPos += 2
+		}
 
-    app.chunks[key] = chunk
-    app.loadedChunks = append(app.loadedChunks, chunk)
+		if z < extendedSize-2 {
+			chunk.indices[indexPos] = Index((z+1)*extendedSize + (extendedSize - 1))
+			indexPos++
+		}
+	}
+
+	calculateChunkNormals(chunk)
+
+	// Create Vulkan buffers for this chunk
+	app.createChunkBuffers(chunk)
+
+	app.chunks[key] = chunk
+	app.loadedChunks = append(app.loadedChunks, chunk)
 }
 
 func (app *Application) createChunkBuffers(chunk *Chunk) {
@@ -153,12 +163,13 @@ func chunkKey(x, z int) string {
 }
 
 func calculateChunkNormals(c *Chunk) {
-	for z := 0; z < ChunkSize; z++ {
-		for x := 0; x < ChunkSize; x++ {
-			if x < ChunkSize-1 && z < ChunkSize-1 {
-				current := &c.vertices[z*ChunkSize+x].Position
-				right := &c.vertices[z*ChunkSize+(x+1)].Position
-				down := &c.vertices[(z+1)*ChunkSize+x].Position
+	extendedSize := ChunkSize + 2
+	for z := 0; z < extendedSize; z++ {
+		for x := 0; x < extendedSize; x++ {
+			if x < extendedSize-1 && z < extendedSize-1 {
+				current := &c.vertices[z*extendedSize+x].Position
+				right := &c.vertices[z*extendedSize+(x+1)].Position
+				down := &c.vertices[(z+1)*extendedSize+x].Position
 
 				var normal lin.Vec3
 				var a, b lin.Vec3
@@ -167,13 +178,13 @@ func calculateChunkNormals(c *Chunk) {
 				normal.MultCross(&a, &b)
 				normal.Norm(&normal)
 
-				c.vertices[z*ChunkSize+x].Normal = normal
+				c.vertices[z*extendedSize+x].Normal = normal
 			} else {
 				// For edge vertices, just use the normal of the previous vertex
 				if x > 0 {
-					c.vertices[z*ChunkSize+x].Normal = c.vertices[z*ChunkSize+(x-1)].Normal
+					c.vertices[z*extendedSize+x].Normal = c.vertices[z*extendedSize+(x-1)].Normal
 				} else if z > 0 {
-					c.vertices[z*ChunkSize+x].Normal = c.vertices[(z-1)*ChunkSize+x].Normal
+					c.vertices[z*extendedSize+x].Normal = c.vertices[(z-1)*extendedSize+x].Normal
 				}
 			}
 		}
@@ -206,6 +217,17 @@ func GetHM(hmPath string) (*image.Gray16, error) {
 	}
 
 	return grayImg, nil
+}
+
+// Helper function to clamp values
+func clamp(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 // ------------------ Old Heightmap Loading for Reference ------------------
