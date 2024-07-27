@@ -28,9 +28,12 @@ var texEnabled = []string{
 
 func NewApplication() *Application {
 	camera := NewCamera()
+	frustum := &Frustum{}
 
 	app := &Application{
 		camera: camera,
+		frustum: frustum,
+		visibleChunks: make([]*Chunk, 1000),
 		chunks: make(map[string]*Chunk),
 	}
 
@@ -66,8 +69,10 @@ type Application struct {
 	heightmap    *image.Gray16
 	ubo          UniformBufferObject
 
-	camera       *Camera
-	WindowHandle *glfw.Window
+	camera        *Camera
+	frustum       *Frustum
+	visibleChunks []*Chunk
+	WindowHandle  *glfw.Window
 }
 
 func (app *Application) initUBO() {
@@ -850,7 +855,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Load all available chunks
+	// Load all available chunks for now
 	app.LoadAllChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
@@ -900,14 +905,12 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
-	// var Model lin.Mat4x4
-	// Model.Dup(&app.modelMatrix)
-	// Rotate around the Y axis
+	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
-
 	app.ubo.View = app.camera.GetViewMatrix()
 
-	// app.modelMatrix.Rotate(&app.modelMatrix, 0.0, 1.0, 0.0, lin.DegreesToRadians(app.spinAngle))
+	// Update the view frustum
+	// TODO
 }
 
 // called every frame by asche
