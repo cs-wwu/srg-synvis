@@ -31,10 +31,10 @@ func NewApplication() *Application {
 	frustum := &Frustum{}
 
 	app := &Application{
-		camera: camera,
-		frustum: frustum,
+		camera:        camera,
+		frustum:       frustum,
 		visibleChunks: make([]*Chunk, 1000),
-		chunks: make(map[string]*Chunk),
+		chunks:        make(map[string]*Chunk),
 	}
 
 	app.initUBO()
@@ -448,7 +448,7 @@ func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, 
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	for _, chunk := range app.loadedChunks {
+	for _, chunk := range app.visibleChunks {
 		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{chunk.vertexBuffer}, []vk.DeviceSize{0})
 		vk.CmdBindIndexBuffer(cmd, chunk.indexBuffer, 0, vk.IndexTypeUint32)
 		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, 0, 0, 0)
@@ -858,6 +858,9 @@ func (app *Application) VulkanContextPrepare() error {
 	// Load all available chunks for now
 	app.LoadAllChunks()
 
+	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	app.determineVisibleChunks()
+
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
@@ -909,8 +912,9 @@ func (app *Application) NextFrame() {
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
-	// Update the view frustum
-	// TODO
+	// Update the view frustum and visibleChunks
+	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	app.determineVisibleChunks()
 }
 
 // called every frame by asche
