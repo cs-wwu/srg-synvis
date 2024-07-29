@@ -16,6 +16,9 @@ const (
 	scale         = 60.0 / 1852.0 // Meters to Arcminutes
 	ChunkSize     = 64            // Vertices per side of a chunk
 	ChunksPerSide = length / ChunkSize
+
+	LOD_LEVELS   = 6
+	LOD_DISTANCE = 250.0
 )
 
 type Chunk struct {
@@ -27,6 +30,7 @@ type Chunk struct {
 	indexMemory  vk.DeviceMemory
 	X            int // Global X coordinate of the chunk's top-left corner
 	Z            int // Global Z coordinate of the chunk's top-left corner
+	lodLevel     int
 }
 
 func (app *Application) LoadChunk(chunkX, chunkZ int) {
@@ -190,6 +194,17 @@ func calculateChunkNormals(c *Chunk) {
 			}
 		}
 	}
+}
+
+func distanceToChunk(chunk *Chunk, cameraPos *lin.Vec3) float32 {
+	chunkCenter := lin.Vec3{
+		float32(chunk.X) + float32(ChunkSize)/2,
+		0, // Assuming Y is up
+		float32(chunk.Z) + float32(ChunkSize)/2,
+	}
+	diff := lin.Vec3{}
+	diff.Sub(&chunkCenter, cameraPos)
+	return diff.Len()
 }
 
 // Returns a pointer to the heightmap image
