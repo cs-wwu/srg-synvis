@@ -13,6 +13,11 @@ import (
 	"github.com/xlab/closer"
 )
 
+const (
+	WINDOW_HEIGHT = 480
+	WINDOW_WIDTH  = 800
+)
+
 func init() {
 	runtime.LockOSThread()
 	log.SetFlags(log.Lshortfile)
@@ -60,7 +65,7 @@ func (app *Application) VulkanDeviceExtensions() []string {
 
 func (app *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
 	return &as.SwapchainDimensions{
-		Width: 800, Height: 480, Format: vk.FormatB8g8r8a8Unorm,
+		Width: WINDOW_WIDTH, Height: WINDOW_HEIGHT, Format: vk.FormatB8g8r8a8Unorm,
 	}
 }
 
@@ -171,4 +176,3 @@ func orPanic(err interface{}) {
 		}
 	}
 }
-

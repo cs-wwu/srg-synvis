@@ -38,7 +38,6 @@ func NewApplication() *Application {
 		chunks:        make(map[string]*Chunk),
 	}
 
-	app.initUBO()
 	return app
 }
 
@@ -78,8 +77,9 @@ type Application struct {
 }
 
 func (app *Application) initUBO() {
+	aspectRatio := float32(app.width) / float32(app.height)
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), 1.0, 0.1, 4000.0)
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), aspectRatio, 0.1, 4000.0)
 	app.ubo.View = app.camera.GetViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
@@ -758,7 +758,7 @@ func (app *Application) LoadAllChunks() {
 	for z := 0; z < length/ChunkSize; z++ {
 		for x := 0; x < length/ChunkSize; x++ {
 			app.LoadChunk(x, z)
-			if (z*length/ChunkSize+x+1)%10 == 0 {
+			if (z*length/ChunkSize+x+1) % 100 == 0 {
 				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
 			}
 		}
@@ -772,6 +772,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.height = dim.Height
 	app.width = dim.Width
 
+	app.initUBO()
 	heightmap, err := GetHM(HGT_PATH)
 	OrPanic(err)
 	app.heightmap = heightmap
@@ -839,7 +840,7 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	if app.frameCount%CULLING_INTERVAL == 0 {
+	if app.WindowHandle.GetKey(glfw.KeyR) == glfw.Press {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
