@@ -921,6 +921,7 @@ func (app *Application) NextFrame() {
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
+	// Current UBO update logic
 	dev := app.Context().Device()
 	res := app.Context().SwapchainImageResources()[imageIdx]
 
@@ -938,8 +939,70 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 		log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
 	}
 	vk.UnmapMemory(dev, res.UniformMemory())
-	return nil
 
+	// New command buffer update logic
+	cmd := res.CommandBuffer()
+	app.updateCommandBuffer(res, cmd)
+
+	return nil
+}
+
+func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+	// Begin command buffer
+	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
+		SType: vk.StructureTypeCommandBufferBeginInfo,
+		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
+	})
+	OrPanic(as.NewError(ret))
+
+	// Clear values for rendering
+	clearValues := make([]vk.ClearValue, 2)
+	clearValues[1].SetDepthStencil(1, 0)
+	clearValues[0].SetColor([]float32{0.2, 0.2, 0.2, 0.2})
+
+	// Begin render pass
+	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
+		SType:       vk.StructureTypeRenderPassBeginInfo,
+		RenderPass:  app.renderPass,
+		Framebuffer: res.Framebuffer(),
+		RenderArea: vk.Rect2D{
+			Offset: vk.Offset2D{X: 0, Y: 0},
+			Extent: vk.Extent2D{Width: app.width, Height: app.height},
+		},
+		ClearValueCount: 2,
+		PClearValues:    clearValues,
+	}, vk.SubpassContentsInline)
+
+	// Bind pipeline and descriptor sets
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	// Set viewport and scissor
+	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
+		Width:    float32(app.width),
+		Height:   float32(app.height),
+		MinDepth: 0.0,
+		MaxDepth: 1.0,
+	}})
+	vk.CmdSetScissor(cmd, 0, 1, []vk.Rect2D{{
+		Offset: vk.Offset2D{X: 0, Y: 0},
+		Extent: vk.Extent2D{Width: app.width, Height: app.height},
+	}})
+
+	// Draw visible chunks
+	for _, chunk := range app.visibleChunks {
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{chunk.vertexBuffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, chunk.indexBuffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, 0, 0, 0)
+	}
+
+	// End render pass
+	vk.CmdEndRenderPass(cmd)
+
+	// End command buffer
+	ret = vk.EndCommandBuffer(cmd)
+	OrPanic(as.NewError(ret))
 }
 
 func (app *Application) Destroy() {}
