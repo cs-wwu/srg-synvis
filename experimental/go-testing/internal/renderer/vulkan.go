@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	MAXFRAMES = 4                               // in context.prepareSwapchain, call to vk.GetSwapchainImages fills in imageCount to 4
-	HGT_PATH  = "assets/heightmaps/n48w123.png" // TODO hardcoded
+	HGT_PATH         = "assets/heightmaps/n48w123.png" // TODO hardcoded
+	FOV              = 60.0                            // Field Of View in Degrees
+	CULLING_INTERVAL = 3                               // Perform culling every x frames
 )
 
 var texEnabled = []string{
@@ -62,6 +63,7 @@ type Application struct {
 	pipeline       vk.Pipeline
 
 	frameIndex int
+	frameCount int
 
 	// uniformBuffersMapped []unsafe.Pointer
 	chunks       map[string]*Chunk
@@ -77,7 +79,7 @@ type Application struct {
 
 func (app *Application) initUBO() {
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(45.0), 1.0, 0.1, 4000.0)
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), 1.0, 0.1, 4000.0)
 	app.ubo.View = app.camera.GetViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
@@ -908,13 +910,17 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
+	app.frameCount++
+
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	if app.frameCount%CULLING_INTERVAL == 0 {
+		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+		app.determineVisibleChunks()
+	}
 }
 
 // called every frame by asche
