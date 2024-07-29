@@ -840,7 +840,7 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	if app.WindowHandle.GetKey(glfw.KeyR) == glfw.Press {
+	if app.frameCount % CULLING_INTERVAL == 0 {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
