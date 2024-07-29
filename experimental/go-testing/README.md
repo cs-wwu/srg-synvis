@@ -15,7 +15,7 @@ Experimental vulkan testing in `Go`.
   - [x] Make Shader's work like `main.cpp` shaders
 - [x] Load based on chunks
 - [ ] Optimizations (30fps on RPi?)
-  - [ ] Frustum Culling
+  - [X] Frustum Culling
   - [ ] LODs
 - [ ] Create a modular coordinate system
 - [ ] Splice Heightmaps together

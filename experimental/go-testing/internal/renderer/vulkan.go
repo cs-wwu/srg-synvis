@@ -20,7 +20,7 @@ import (
 const (
 	HGT_PATH         = "assets/heightmaps/n48w123.png" // TODO hardcoded
 	FOV              = 60.0                            // Field Of View in Degrees
-	CULLING_INTERVAL = 3                               // Perform culling every x frames
+	CULLING_INTERVAL = 2                               // Perform culling every x frames
 )
 
 var texEnabled = []string{
@@ -413,84 +413,6 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) drawBuildCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
-	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
-		SType: vk.StructureTypeCommandBufferBeginInfo,
-		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
-	})
-	OrPanic(as.NewError(ret))
-
-	clearValues := make([]vk.ClearValue, 2)
-	clearValues[1].SetDepthStencil(1, 0)
-	clearValues[0].SetColor([]float32{0.2, 0.2, 0.2, 0.2})
-
-	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
-		SType:       vk.StructureTypeRenderPassBeginInfo,
-		RenderPass:  app.renderPass,
-		Framebuffer: res.Framebuffer(),
-		RenderArea: vk.Rect2D{
-			Offset: vk.Offset2D{X: 0, Y: 0},
-			Extent: vk.Extent2D{Width: app.width, Height: app.height},
-		},
-		ClearValueCount: 2,
-		PClearValues:    clearValues,
-	}, vk.SubpassContentsInline)
-
-	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
-	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
-	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
-		Width:    float32(app.width),
-		Height:   float32(app.height),
-		MinDepth: 0.0,
-		MaxDepth: 1.0,
-	}})
-	vk.CmdSetScissor(cmd, 0, 1, []vk.Rect2D{{
-		Offset: vk.Offset2D{X: 0, Y: 0},
-		Extent: vk.Extent2D{Width: app.width, Height: app.height},
-	}})
-
-	for _, chunk := range app.visibleChunks {
-		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{chunk.vertexBuffer}, []vk.DeviceSize{0})
-		vk.CmdBindIndexBuffer(cmd, chunk.indexBuffer, 0, vk.IndexTypeUint32)
-		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, 0, 0, 0)
-	}
-
-	vk.CmdEndRenderPass(cmd)
-
-	graphicsQueueIndex := app.Context().Platform().GraphicsQueueFamilyIndex()
-	presentQueueIndex := app.Context().Platform().PresentQueueFamilyIndex()
-	if graphicsQueueIndex != presentQueueIndex {
-		// Separate Present Queue Case
-		//
-		// We have to transfer ownership from the graphics queue family to the
-		// present queue family to be able to present.  Note that we don't have
-		// to transfer from present queue family back to graphics queue family at
-		// the start of the next frame because we don't care about the image's
-		// contents at that point.
-		vk.CmdPipelineBarrier(cmd,
-			vk.PipelineStageFlags(vk.PipelineStageColorAttachmentOutputBit),
-			vk.PipelineStageFlags(vk.PipelineStageBottomOfPipeBit),
-			0, 0, nil, 0, nil, 1, []vk.ImageMemoryBarrier{{
-				SType:               vk.StructureTypeImageMemoryBarrier,
-				SrcAccessMask:       0,
-				DstAccessMask:       vk.AccessFlags(vk.AccessColorAttachmentWriteBit),
-				OldLayout:           vk.ImageLayoutPresentSrc,
-				NewLayout:           vk.ImageLayoutPresentSrc,
-				SrcQueueFamilyIndex: graphicsQueueIndex,
-				DstQueueFamilyIndex: presentQueueIndex,
-				SubresourceRange: vk.ImageSubresourceRange{
-					AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
-					LayerCount: 1,
-					LevelCount: 1,
-				},
-				Image: res.Image(),
-			}})
-	}
-	ret = vk.EndCommandBuffer(cmd)
-	OrPanic(as.NewError(ret))
-}
-
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
@@ -873,7 +795,7 @@ func (app *Application) VulkanContextPrepare() error {
 
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
-		app.drawBuildCommandBuffer(res, res.CommandBuffer())
+		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
 	return nil
 }
@@ -1093,42 +1015,6 @@ func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
 	return []byte(newImg.Pix), size.X, size.Y, nil
 }
 
-func actualTimeLate(desired, actual, rdur uint64) bool {
-	// The desired time was the earliest time that the present should have
-	// occured.  In almost every case, the actual time should be later than the
-	// desired time.  We should only consider the actual time "late" if it is
-	// after "desired + rdur".
-	if actual <= desired {
-		// The actual time was before or equal to the desired time.  This will
-		// probably never happen, but in case it does, return false since the
-		// present was obviously NOT late.
-		return false
-	}
-	deadline := actual + rdur
-	if actual > deadline {
-		return true
-	} else {
-		return false
-	}
-}
-
-const million = 1000 * 1000
-
-func canPresentEarlier(earliest, actual, margin, rdur uint64) bool {
-	if earliest < actual {
-		// Consider whether this present could have occured earlier.  Make sure
-		// that earliest time was at least 2msec earlier than actual time, and
-		// that the margin was at least 2msec:
-		diff := actual - earliest
-		if (diff >= (2 * million)) && (margin >= (2 * million)) {
-			// This present could have occured earlier because both: 1) the
-			// earliest time was at least 2 msec before actual time, and 2) the
-			// margin was at least 2msec.
-			return true
-		}
-	}
-	return false
-}
 
 // Converts the given file to a byte array to be used
 func fileToBytes(filename string) []byte {
