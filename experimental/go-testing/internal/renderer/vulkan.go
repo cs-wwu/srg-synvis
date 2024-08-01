@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	// "image/color"
 	"image/draw"
 	"image/png"
 	"log"
@@ -15,6 +16,12 @@ import (
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
+
+	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
+	// "github.com/golang/freetype/raster"
+	// "golang.org/x/image/font"
+	// "golang.org/x/image/math/fixed"
 )
 
 const (
@@ -69,6 +76,11 @@ type Application struct {
 	loadedChunks []*Chunk
 	heightmap    *image.Gray16
 	ubo          UniformBufferObject
+
+	uiBuffer 	vk.Buffer
+	uiBufferMem	vk.DeviceMemory
+	uiImage 	vk.Image
+	uiImageMem	vk.DeviceMemory
 
 	camera        *Camera
 	frustum       *Frustum
@@ -687,6 +699,11 @@ func (app *Application) prepareDescriptorSet() {
 			ImageLayout: vk.ImageLayoutGeneral, // FIXME: Possible mismatch with tex.imageLayout = vk.ImageLayoutShaderReadOnlyOptimal
 		})
 	}
+	// uiDesciptorImageInfo := vk.DescriptorImageInfo{
+	// 	ImageView: // todo,
+	// 	Sampler: ,// todo
+	// 	ImageLayout: vk.ImageLayoutShaderReadOnlyOptmimal,
+	// }
 
 	for _, res := range swapchainImageResources {
 		var set vk.DescriptorSet
@@ -767,6 +784,227 @@ func (app *Application) LoadAllChunks() {
 	fmt.Printf("All %d chunks loaded.\n", totalChunks)
 }
 
+func prepareFont(fontPath string) (*truetype.Font) {
+	fontBytes, err := os.ReadFile(fontPath)
+	if err != nil {
+		panic("Failed to read font file")
+	}
+
+	font, err := freetype.ParseFont(fontBytes)
+	if err != nil {
+		panic("Failed to parse font")
+	}
+	return font
+
+	// transition image layout
+	// transitionImageLayout(
+	// 	dev, commandBuffer, textImage,
+	// 	vk.FormatR8g8b8a8Unorm,
+	// 	vk.ImageLayoutTransferDstOptimal,
+	// 	vk.ImageLayoutShaderReadOnlyOptimal,
+	// )
+	
+	// modify shaders
+	// draw command
+}
+
+func renderTextToBitmap(font *truetype.Font, text string, size float64) (image.Image) {
+    c := freetype.NewContext()
+    c.SetFont(font)
+    c.SetFontSize(size)
+	dst := image.NewRGBA(image.Rect(0, 0, 800, 600))	// todo change dimensions
+    c.SetDst(dst) // Adjust size as needed
+    c.SetSrc(image.White)
+    c.SetClip(dst.Bounds())
+
+    pt := freetype.Pt(10, 10+int(c.PointToFixed(size)>>6))
+    _, err := c.DrawString(text, pt)
+    if err != nil {
+        panic("could not draw text");
+    }
+    return dst
+}
+
+func (app *Application) createTextImage() {
+	dev := app.Context().Device()
+	var image vk.Image
+	ret := vk.CreateImage(dev, &vk.ImageCreateInfo{
+		SType:     vk.StructureTypeImageCreateInfo,
+		ImageType: vk.ImageType2d,
+		Extent: vk.Extent3D{
+			Width:  app.width,	// todo change dimensions
+			Height: app.height,
+			Depth:  1,
+		},
+		MipLevels:   1,
+		ArrayLayers: 1,
+		Format: 	vk.FormatR8g8b8a8Unorm,	// review
+		Samples:     vk.SampleCount1Bit,
+		Tiling:      vk.ImageTilingOptimal,
+		Usage: vk.ImageUsageFlags(vk.ImageUsageTransferDstBit | vk.ImageUsageSampledBit),	// review
+		SharingMode: vk.SharingModeExclusive,
+		InitialLayout: vk.ImageLayoutUndefined,
+	}, nil, &image)
+	OrPanic(as.NewError(ret))
+	
+	// allocate mem for the image
+	var memReqs vk.MemoryRequirements
+	vk.GetImageMemoryRequirements(dev, image, &memReqs)
+	memReqs.Deref()
+
+	memProps := app.Context().Platform().MemoryProperties()
+	memTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
+		vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), vk.MemoryPropertyDeviceLocalBit)
+	var imgMem vk.DeviceMemory
+	ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
+		SType: vk.StructureTypeMemoryAllocateInfo,
+		AllocationSize: memReqs.Size,
+		MemoryTypeIndex: memTypeIndex,
+	}, nil, &imgMem)
+	OrPanic(as.NewError(ret))
+
+	ret = vk.BindImageMemory(dev, image, imgMem, 0)
+	OrPanic(as.NewError(ret))
+
+	app.uiImage = image
+	app.uiImageMem = imgMem
+}
+
+func (app *Application) createTextBuffer(text image.Image) {
+	dev := app.Context().Device()
+	length := int(unsafe.Sizeof(text))
+
+	var stagingBuffer vk.Buffer
+	var stagingBufferMemory vk.DeviceMemory
+	ret := vk.CreateBuffer(dev, &vk.BufferCreateInfo{
+		SType: vk.StructureTypeBufferCreateInfo,
+		Size: vk.DeviceSize(length),
+		Usage: vk.BufferUsageFlags(vk.BufferUsageTransferSrcBit),
+		SharingMode: vk.SharingModeExclusive,
+	}, nil, &stagingBuffer)
+	OrPanic(as.NewError(ret))
+
+	var bufMemReqs vk.MemoryRequirements
+	// todo memProps might be wrong
+	memProps := app.Context().Platform().MemoryProperties()
+	bufMemTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
+		vk.MemoryPropertyFlagBits(bufMemReqs.MemoryTypeBits), vk.MemoryPropertyHostVisibleBit | vk.MemoryPropertyHostCoherentBit)
+	vk.GetBufferMemoryRequirements(dev, stagingBuffer, &bufMemReqs)
+	ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
+		SType: vk.StructureTypeMemoryAllocateInfo,
+		AllocationSize: bufMemReqs.Size,
+		MemoryTypeIndex: bufMemTypeIndex,
+	}, nil, &stagingBufferMemory)
+	OrPanic(as.NewError(ret))
+
+	ret = vk.BindBufferMemory(dev, stagingBuffer, stagingBufferMemory, 0)
+	OrPanic(as.NewError(ret))
+	app.uiBuffer = stagingBuffer
+	app.uiBufferMem = stagingBufferMemory
+}
+
+func (app *Application) copyTextBuffer(text image.Image) {
+	// todo put in update command buffer?
+	// func copyBufferToImage(device vk.Device, queue vk.Queue, commandPool vk.CommandPool, buffer vk.Buffer, image vk.Image, width, height int32) {
+	// 	// Begin command buffer recording
+	// 	commandBuffer := beginSingleTimeCommands(device, commandPool)
+		
+	// 	// Image layout transition
+	// 	imageLayoutTransition(device, commandBuffer, image, width, height)
+	
+	// 	// Copy buffer to image
+	// 	copyRegion := vk.BufferImageCopy{
+	// 		BufferOffset: 0,
+	// 		BufferRowLength: 0,
+	// 		BufferImageHeight: 0,
+	// 		ImageSubresource: vk.ImageSubresourceLayers{
+	// 			MipLevel: 0,
+	// 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
+	// 			LayerCount: 1,
+	// 	},
+	// 	ImageOffset: vk.Offset3D{X: 0, Y: 0, Z: 0},
+	// 	ImageExtent: vk.Extent3D{Width: app.width, Height: app.height, Depth: 1},
+	// }
+	// 	vk.CmdCopyBufferToImage(commandBuffer, buffer, image, vk.ImageLayoutTransferDstOptimal, 1, []vk.BufferImageCopy{copyRegion})
+	
+	// 	// End command buffer recording and submit
+	// 	endSingleTimeCommands(device, queue, commandPool, commandBuffer)
+	// }
+}
+
+func (app *Application) createSampler() (vk.Sampler) {
+	dev := app.Context().Device()
+
+    var sampler vk.Sampler
+    err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
+		SType: vk.StructureTypeSamplerCreateInfo,
+        MagFilter: vk.FilterLinear,
+        MinFilter: vk.FilterLinear,
+        AddressModeU: vk.SamplerAddressModeRepeat,
+        AddressModeV: vk.SamplerAddressModeRepeat,
+        AddressModeW: vk.SamplerAddressModeRepeat,
+        AnisotropyEnable: vk.Bool32(1),
+        MaxAnisotropy: 16,
+        BorderColor: vk.BorderColorFloatOpaqueBlack,
+        UnnormalizedCoordinates: vk.Bool32(0),
+        CompareEnable: vk.Bool32(0),
+        CompareOp: vk.CompareOpAlways,
+        MipmapMode: vk.SamplerMipmapModeLinear,
+        MaxLod: 1,
+	}, nil, &sampler) 
+	if err != vk.Success {
+        panic("could not create text sampler")
+    }
+    return sampler
+}
+
+// func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
+//     imageInfo := vk.DescriptorImageInfo{
+//         ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
+//         ImageView:   imageView,
+//         Sampler:     sampler,
+//     }
+
+//     descriptorWrite := vk.DescriptorWrite{
+//         SType: vk.StructureTypeDescriptorWrite,
+//         DescriptorType: vk.DescriptorTypeCombinedImageSampler,
+//         DescriptorCount: 1,
+//         PImageInfo:       &imageInfo,
+//         DSTSet:           descriptorSet,
+//     }
+    
+//     vk.UpdateDescriptorSets(device, []vk.DescriptorWrite{descriptorWrite}, nil)
+// }
+
+// func createVertexBuffer(device vk.Device, physicalDevice vk.PhysicalDevice, commandPool vk.CommandPool, queue vk.Queue, vertices []float32) (vk.Buffer, vk.DeviceMemory, error) {
+//     bufferSize := vk.DeviceSize(len(vertices) * 4) // 4 bytes per float
+
+//     stagingBuffer, stagingBufferMemory, err := createBuffer(device, bufferSize, vk.BufferUsageTransferSrcBit, vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
+//     if err != nil {
+//         return 0, 0, err
+//     }
+
+//     // Map and copy vertex data
+//     data, err := vk.MapMemory(device, stagingBufferMemory, 0, bufferSize, 0)
+//     if err != nil {
+//         return 0, 0, err
+//     }
+//     copy(data, vertices)
+//     vk.UnmapMemory(device, stagingBufferMemory)
+
+//     vertexBuffer, vertexBufferMemory, err := createBuffer(device, bufferSize, vk.BufferUsageVertexBufferBit|vk.BufferUsageTransferDstBit, vk.MemoryPropertyDeviceLocalBit)
+//     if err != nil {
+//         return 0, 0, err
+//     }
+
+//     copyBuffer(device, commandPool, queue, stagingBuffer, vertexBuffer, bufferSize)
+
+//     vk.DestroyBuffer(device, stagingBuffer, nil)
+//     vk.FreeMemory(device, stagingBufferMemory, nil)
+
+//     return vertexBuffer, vertexBufferMemory, nil
+// }
+
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
@@ -779,6 +1017,22 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.prepareDepth()
 	app.prepareTextures()
+
+	// font := prepareFont("../../assets/SourceSansPro-Regular.tff")
+	// text := renderTextToBitmap(font, "Hello", 24)
+	// // upload bitmap to vulkan as a texture
+	// 	// create a vulkan image
+	// 	app.createTextImage()
+	// 	// copy bitmap data to vulkan image
+	// 	app.createTextBuffer(text)
+	// 	app.copyTextBuffer(text)
+	// 	// create vulkan sampler
+	// 	app.createSampler()
+		// update descriptor sets
+	// draw the text texture to screen
+		// create a vertex buffer
+		// create a shader for text rendering
+		// draw the quad with text texture
 
 	// Load all available chunks for now
 	app.LoadAllChunks()
@@ -883,6 +1137,29 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
 	})
 	OrPanic(as.NewError(ret))
+
+	// copyRegion := vk.BufferImageCopy{
+	// 	BufferOffset: 0,
+	// 	BufferRowLength: 0,
+	// 	BufferImageHeight: 0,
+	// 	ImageSubresource: vk.ImageSubresourceLayers{
+	// 		MipLevel: 0,
+	// 		AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
+	// 		LayerCount: 1,
+	// 	},
+	// 	ImageOffset: vk.Offset3D{X: 0, Y: 0, Z: 0},
+	// 	ImageExtent: vk.Extent3D{Width: app.width, Height: app.height, Depth: 1},
+	// }
+
+	// // record the copy command to transfer data from buffer to image
+	// vk.CmdCopyBufferToImage(
+    //     cmd,
+    //     app.uiBuffer, // Replace with your actual staging buffer
+    //     app.uiImage,         // Replace with your actual image
+    //     vk.ImageLayoutTransferDstOptimal,
+    //     1,
+    //     []vk.BufferImageCopy{copyRegion},
+    // )
 
 	// Clear values for rendering
 	clearValues := make([]vk.ClearValue, 2)
