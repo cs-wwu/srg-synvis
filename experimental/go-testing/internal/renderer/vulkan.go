@@ -66,7 +66,9 @@ type Application struct {
 	descLayout     vk.DescriptorSetLayout
 	pipelineCache  vk.PipelineCache
 	renderPass     vk.RenderPass
+	uiRenderPass   vk.RenderPass
 	pipeline       vk.Pipeline
+	uipipeline	   vk.Pipeline
 
 	frameIndex int
 	frameCount int
@@ -77,6 +79,14 @@ type Application struct {
 	heightmap    *image.Gray16
 	ubo          UniformBufferObject
 
+	vertices	 	[]types.uiVertex
+	indices		 	[]types.uiIndex
+	vertexBuffer 	vk.Buffer
+	vertexBufferMemory vk.DeviceMemory
+	indexBuffer     vk.Buffer
+	indexBufferMemory vk.DeviceMemory
+
+	uiFrameBuffers vk.Framebuffer[4]
 	uiBuffer 	vk.Buffer
 	uiBufferMem	vk.DeviceMemory
 	uiImage 	vk.Image
@@ -425,6 +435,30 @@ func (app *Application) prepareTextures() {
 	}
 }
 
+func (app *Application) prepareuiTextures() {
+	// what else do I need here...-> can I put this in preparetextures?
+	var sampler vk.Sampler
+    err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
+		SType: vk.StructureTypeSamplerCreateInfo,
+        MagFilter: vk.FilterLinear,
+        MinFilter: vk.FilterLinear,
+        AddressModeU: vk.SamplerAddressModeRepeat,
+        AddressModeV: vk.SamplerAddressModeRepeat,
+        AddressModeW: vk.SamplerAddressModeRepeat,
+        AnisotropyEnable: vk.Bool32(1),
+        MaxAnisotropy: 16,
+        BorderColor: vk.BorderColorFloatOpaqueBlack,
+        UnnormalizedCoordinates: vk.Bool32(0),
+        CompareEnable: vk.Bool32(0),
+        CompareOp: vk.CompareOpAlways,
+        MipmapMode: vk.SamplerMipmapModeLinear,
+        MaxLod: 1,
+	}, nil, &sampler) 
+	if err != vk.Success {
+        panic("could not create text sampler")
+    }
+}
+
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
@@ -472,6 +506,10 @@ func (app *Application) prepareDescriptorLayout() {
 	app.pipelineLayout = pipelineLayout
 }
 
+func (app *Application) prepareuiDescriptorLayout() {
+
+}
+
 func (app *Application) prepareRenderPass() {
 	dev := app.Context().Device()
 	// The initial layout for the color and depth attachments will be vk.LayoutUndefined
@@ -494,7 +532,7 @@ func (app *Application) prepareRenderPass() {
 			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
 			StencilStoreOp: vk.AttachmentStoreOpDontCare,
 			InitialLayout:  vk.ImageLayoutUndefined,
-			FinalLayout:    vk.ImageLayoutPresentSrc,
+			FinalLayout:    vk.ImageLayoutColorAttachmentOptimal,
 		}, {
 			Format:         app.depth.format,
 			Samples:        vk.SampleCount1Bit,
@@ -521,6 +559,44 @@ func (app *Application) prepareRenderPass() {
 	}, nil, &renderPass)
 	OrPanic(as.NewError(ret))
 	app.renderPass = renderPass
+}
+
+func (app *Application) prepareuiRenderPass() {
+	dev := app.Context().Device()
+	// The initial layout for the color and depth attachments will be vk.LayoutUndefined
+	// because at the start of the renderpass, we don't care about their contents.
+	// At the start of the subpass, the color attachment's layout will be transitioned
+	// to vk.LayoutColorAttachmentOptimal and the depth stencil attachment's layout
+	// will be transitioned to vk.LayoutDepthStencilAttachmentOptimal. At the end of
+	// the renderpass, the color attachment's layout will be transitioned to
+	// vk.LayoutPresentSrc to be ready to present. This is all done as part of
+	// the renderpass, no barriers are necessary.
+	var renderPass vk.RenderPass
+	ret := vk.CreateRenderPass(dev, &vk.RenderPassCreateInfo{
+		SType:           vk.StructureTypeRenderPassCreateInfo,
+		AttachmentCount: 1,
+		PAttachments: []vk.AttachmentDescription{{
+			Format:         app.Context().SwapchainDimensions().Format,
+			Samples:        vk.SampleCount1Bit,
+			LoadOp:         vk.AttachmentLoadOpLoad
+			StoreOp:        vk.AttachmentStoreOpStore,
+			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
+			StencilStoreOp: vk.AttachmentStoreOpDontCare,
+			InitialLayout:  vk.ImageLayoutColorAttachmentOptimal
+			FinalLayout:    vk.ImageLayoutPresentSrc
+		}},
+		SubpassCount: 1,
+		PSubpasses: []vk.SubpassDescription{{
+			PipelineBindPoint:    vk.PipelineBindPointGraphics,
+			ColorAttachmentCount: 1,
+			PColorAttachments: []vk.AttachmentReference{{
+				Attachment: 0,
+				Layout:     vk.ImageLayoutColorAttachmentOptimal,
+			}},
+		}},
+	}, nil, &renderPass)
+	OrPanic(as.NewError(ret))
+	app.uiRenderPass = renderPass
 }
 
 func (app *Application) preparePipeline() {
@@ -667,6 +743,118 @@ func (app *Application) preparePipeline() {
 	vk.DestroyShaderModule(dev, fs, nil)
 }
 
+func (app *Application) prepareuiPipeline() {
+	dev := app.Context().Device()
+
+	vs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/ui.vert.spv"))
+	OrPanic(err)
+	fs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/ui.frag.spv"))
+	OrPanic(err)
+
+	// note .cpp does not have a pipelinecache
+	var pipelineCache vk.PipelineCache
+	ret := vk.CreatePipelineCache(dev, &vk.PipelineCacheCreateInfo{
+		SType: vk.StructureTypePipelineCacheCreateInfo,
+	}, nil, &pipelineCache)
+	OrPanic(as.NewError(ret))
+	app.pipelineCache = pipelineCache	// todo ok?
+
+	// Vertex Descriptions needed for glsl shader
+	bindingDescriptions := []vk.VertexInputBindingDescription{
+		{
+			Binding:   0,
+			Stride:    uint32(uiVertexSize),
+			InputRate: vk.VertexInputRateVertex,
+		},
+	}
+
+	attributeDescriptions := []vk.VertexInputAttributeDescription{
+		{
+			Binding:  0,
+			Location: 0,
+			Format:   vk.FormatR32g32Sfloat,, // vec3
+			Offset:   uint32(unsafe.Offsetof(uiVertex{}.Position)),
+		},
+		{
+			Binding:  0,
+			Location: 1,
+			Format:   vk.FormatR32g32Sfloat, // vec2
+			Offset:   uint32(unsafe.Offsetof(uiVertex{}.TexCoord)),
+		},
+	}
+
+	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                           vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount:   uint32(len(bindingDescriptions)),
+			PVertexBindingDescriptions:      bindingDescriptions,
+			VertexAttributeDescriptionCount: uint32(len(attributeDescriptions)),
+			PVertexAttributeDescriptions:    attributeDescriptions,
+		},
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType: vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+			PrimitiveRestartEnable: vk.True,
+		},
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+		},
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask: 0xF,
+				BlendEnable:    vk.False,
+			}},
+		},
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType: vk.StructureTypePipelineMultisampleStateCreateInfo,
+			// SampleShadingEnable: vk.False,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "uimain\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "uimain\x00",
+		}},
+	}}
+	pipeline := make([]vk.Pipeline, 1)
+	ret = vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, pipelineCreateInfos, nil, pipeline)
+	OrPanic(as.NewError(ret))
+	app.uipipeline = pipeline[0]
+
+	vk.DestroyShaderModule(dev, vs, nil)
+	vk.DestroyShaderModule(dev, fs, nil)
+}
+
 func (app *Application) prepareDescriptorPool() {
 	dev := app.Context().Device()
 	swapchainImageResources := app.Context().SwapchainImageResources()
@@ -699,11 +887,54 @@ func (app *Application) prepareDescriptorSet() {
 			ImageLayout: vk.ImageLayoutGeneral, // FIXME: Possible mismatch with tex.imageLayout = vk.ImageLayoutShaderReadOnlyOptimal
 		})
 	}
-	// uiDesciptorImageInfo := vk.DescriptorImageInfo{
-	// 	ImageView: // todo,
-	// 	Sampler: ,// todo
-	// 	ImageLayout: vk.ImageLayoutShaderReadOnlyOptmimal,
-	// }
+
+	for _, res := range swapchainImageResources {
+		var set vk.DescriptorSet
+		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
+			SType:              vk.StructureTypeDescriptorSetAllocateInfo,
+			DescriptorPool:     app.descPool,
+			DescriptorSetCount: 1,
+			PSetLayouts:        []vk.DescriptorSetLayout{app.descLayout},
+		}, &set)
+		OrPanic(as.NewError(ret))
+
+		res.SetDescriptorSet(set)
+
+		vk.UpdateDescriptorSets(dev, 2, []vk.WriteDescriptorSet{{
+			SType:           vk.StructureTypeWriteDescriptorSet,
+			DstBinding:      0,
+			DstSet:          set,
+			DescriptorCount: 1,
+			DescriptorType:  vk.DescriptorTypeUniformBuffer,
+			PBufferInfo: []vk.DescriptorBufferInfo{{
+				Offset: 0,
+				Range:  vk.DeviceSize(UBOSize),
+				Buffer: res.UniformBuffer(),
+			}},
+		}, {
+			SType:           vk.StructureTypeWriteDescriptorSet,
+			DstBinding:      1,
+			DstSet:          set,
+			DescriptorCount: uint32(len(texEnabled)),
+			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
+			PImageInfo:      texInfos,
+		}}, 0, nil)
+	}
+}
+
+func (app *Application) prepareuiDescriptorSet() {
+	// todo change for ui
+	dev := app.Context().Device()
+	swapchainImageResources := app.Context().SwapchainImageResources()
+
+	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.textures))
+	for _, tex := range app.textures {
+		texInfos = append(texInfos, vk.DescriptorImageInfo{
+			Sampler:     tex.sampler,
+			ImageView:   tex.view,
+			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal
+		})
+	}
 
 	for _, res := range swapchainImageResources {
 		var set vk.DescriptorSet
@@ -745,7 +976,6 @@ func (app *Application) prepareFramebuffers() {
 
 	for _, res := range swapchainImageResources {
 		var fb vk.Framebuffer
-
 		ret := vk.CreateFramebuffer(dev, &vk.FramebufferCreateInfo{
 			SType:           vk.StructureTypeFramebufferCreateInfo,
 			RenderPass:      app.renderPass,
@@ -759,8 +989,22 @@ func (app *Application) prepareFramebuffers() {
 			Layers: 1,
 		}, nil, &fb)
 		OrPanic(as.NewError(ret))
-
 		res.SetFramebuffer(fb)
+
+		var uifb vk.Framebuffer
+		ret := vk.CreateFramebuffer(dev, &vk.FramebufferCreateInfo{
+			SType:           vk.StructureTypeFramebufferCreateInfo,
+			RenderPass:      app.uiRenderPass,
+			AttachmentCount: 1,
+			PAttachments: []vk.ImageView{
+				res.View(),
+			},
+			Width:  app.width,
+			Height: app.height,
+			Layers: 1,
+		}, nil, &uifb)
+		OrPanic(as.NewError(ret))
+		app.uiFrameBuffers[i] = uifb
 	}
 }
 
@@ -870,6 +1114,7 @@ func (app *Application) createTextImage() {
 	app.uiImageMem = imgMem
 }
 
+// not necessary for initial text attempt
 func (app *Application) createTextBuffer(text image.Image) {
 	dev := app.Context().Device()
 	length := int(unsafe.Sizeof(text))
@@ -932,31 +1177,6 @@ func (app *Application) copyTextBuffer(text image.Image) {
 	// }
 }
 
-func (app *Application) createSampler() (vk.Sampler) {
-	dev := app.Context().Device()
-
-    var sampler vk.Sampler
-    err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
-		SType: vk.StructureTypeSamplerCreateInfo,
-        MagFilter: vk.FilterLinear,
-        MinFilter: vk.FilterLinear,
-        AddressModeU: vk.SamplerAddressModeRepeat,
-        AddressModeV: vk.SamplerAddressModeRepeat,
-        AddressModeW: vk.SamplerAddressModeRepeat,
-        AnisotropyEnable: vk.Bool32(1),
-        MaxAnisotropy: 16,
-        BorderColor: vk.BorderColorFloatOpaqueBlack,
-        UnnormalizedCoordinates: vk.Bool32(0),
-        CompareEnable: vk.Bool32(0),
-        CompareOp: vk.CompareOpAlways,
-        MipmapMode: vk.SamplerMipmapModeLinear,
-        MaxLod: 1,
-	}, nil, &sampler) 
-	if err != vk.Success {
-        panic("could not create text sampler")
-    }
-    return sampler
-}
 
 // func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
 //     imageInfo := vk.DescriptorImageInfo{
@@ -1005,6 +1225,33 @@ func (app *Application) createSampler() (vk.Sampler) {
 //     return vertexBuffer, vertexBufferMemory, nil
 // }
 
+func (app *Application) prepareuiQuad() {
+	dev := app.Context().Device()
+
+    // Prepare raw data slice
+    var dataRaw []byte
+    for _, vertex := range app.vertices {
+        dataRaw = append(dataRaw, vertex.Data()...)
+    }
+
+    memProps := app.Context().Platform().MemoryProperties()
+    buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
+    app.vertexBufferMemory = buf.Memory
+    app.vertexBuffer = buf.Buffer
+
+    // Prepare raw data slice
+    var dataRaw2 []byte
+    for _, index := range app.indices {
+        idx := types.Index(index)
+        dataRaw2 = append(dataRaw, idx.Data()...)
+    }
+
+    memProps2 := app.Context().Platform().MemoryProperties()
+    buf2 := as.CreateBuffer(dev, memProps2, dataRaw, vk.BufferUsageIndexBufferBit)
+    app.indexBufferMemory = buf2.Memory
+    app.indexBuffer = buf2.Buffer
+}
+
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
@@ -1018,6 +1265,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
+
 	// font := prepareFont("../../assets/SourceSansPro-Regular.tff")
 	// text := renderTextToBitmap(font, "Hello", 24)
 	// // upload bitmap to vulkan as a texture
@@ -1027,7 +1275,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// 	app.createTextBuffer(text)
 	// 	app.copyTextBuffer(text)
 	// 	// create vulkan sampler
-	// 	app.createSampler()
+	//  app.prepareuiTextures
 		// update descriptor sets
 	// draw the text texture to screen
 		// create a vertex buffer
@@ -1044,8 +1292,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
+	app.prepareuiPipeline()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
+	app.prepareuiDescriptorSet()
 	app.prepareFramebuffers()
 
 	swapchainImageResources := app.Context().SwapchainImageResources()
@@ -1061,8 +1311,14 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
+	vk.DestroyRenderPass(dev, app.uiRenderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+	// todo more to destroy here
+	
+	for i := 0; i < 4; i++ {
+		vk.DestroyFrameBuffers(dev, app.uiFrameBuffers[i], nil)
+	}
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
@@ -1122,6 +1378,8 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 		log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
 	}
 	vk.UnmapMemory(dev, res.UniformMemory())
+
+	// update ui state 
 
 	// New command buffer update logic
 	cmd := res.CommandBuffer()
@@ -1205,6 +1463,14 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	// End render pass
 	vk.CmdEndRenderPass(cmd)
+
+	// todo begin second render pass
+	// using ui shader
+	// draw ui geometry
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
+
+	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
+	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
 
 	// End command buffer
 	ret = vk.EndCommandBuffer(cmd)
