@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"bufio"
 	"image"
 	// "image/color"
 	"image/draw"
@@ -33,6 +34,9 @@ const (
 var texEnabled = []string{
 	"assets/textures/checkers.png",
 }
+var uitexEnabled = []string{
+	"out.png",
+}
 
 func NewApplication() *Application {
 	camera := NewCamera()
@@ -48,6 +52,19 @@ func NewApplication() *Application {
 	return app
 }
 
+type uiSwapchainImageResources struct {
+	image                vk.Image
+	cmd                  vk.CommandBuffer
+	graphicsToPresentCmd vk.CommandBuffer
+
+	view          vk.ImageView
+	framebuffer   vk.Framebuffer
+	descriptorSet vk.DescriptorSet
+
+	uniformBuffer vk.Buffer
+	uniformMemory vk.DeviceMemory
+}
+
 type Application struct {
 	as.BaseVulkanApp
 
@@ -60,13 +77,17 @@ type Application struct {
 	depth             *Depth
 	useStagingBuffers bool
 
-	descPool vk.DescriptorPool
+	descPool 	vk.DescriptorPool
+	uidescPool	vk.DescriptorPool
+	uiSwapResources [len(Application.Context().swapchainImageResources())]*uiSwapchainImageResources
 
 	pipelineLayout vk.PipelineLayout
+	uipipelineLayout vk.PipelineLayout
 	descLayout     vk.DescriptorSetLayout
+	uidescLayout   vk.DescriptorSetLayout
 	pipelineCache  vk.PipelineCache
 	renderPass     vk.RenderPass
-	uiRenderPass   vk.RenderPass
+	uirenderPass   vk.RenderPass
 	pipeline       vk.Pipeline
 	uipipeline	   vk.Pipeline
 
@@ -79,18 +100,14 @@ type Application struct {
 	heightmap    *image.Gray16
 	ubo          UniformBufferObject
 
-	vertices	 	[]types.uiVertex
-	indices		 	[]types.uiIndex
-	vertexBuffer 	vk.Buffer
-	vertexBufferMemory vk.DeviceMemory
-	indexBuffer     vk.Buffer
-	indexBufferMemory vk.DeviceMemory
-
-	uiFrameBuffers vk.Framebuffer[4]
-	uiBuffer 	vk.Buffer
-	uiBufferMem	vk.DeviceMemory
-	uiImage 	vk.Image
-	uiImageMem	vk.DeviceMemory
+	// ui stuff: todo reduce...
+	vertices	 		[]uiVertex
+	indices		 		[]Index
+	vertexBuffer 		vk.Buffer
+	vertexBufferMemory 	vk.DeviceMemory
+	indexBuffer     	vk.Buffer
+	indexBufferMemory 	vk.DeviceMemory
+	uiTextures			[]*Texture
 
 	camera        *Camera
 	frustum       *Frustum
@@ -433,10 +450,16 @@ func (app *Application) prepareTextures() {
 	for _, texFile := range texEnabled {
 		app.textures = append(app.textures, prepareTex(texFile))
 	}
+
+	app.uiTextures = make([]*Texture, 0, len(uitexEnabled))
+	for _, texFile := range uitexEnabled {
+		app.uiTextures = append(app.uiTextures, prepareTex(texFile))
+	}
 }
 
 func (app *Application) prepareuiTextures() {
 	// what else do I need here...-> can I put this in preparetextures?
+	dev := app.Context().Device()
 	var sampler vk.Sampler
     err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
 		SType: vk.StructureTypeSamplerCreateInfo,
@@ -445,11 +468,11 @@ func (app *Application) prepareuiTextures() {
         AddressModeU: vk.SamplerAddressModeRepeat,
         AddressModeV: vk.SamplerAddressModeRepeat,
         AddressModeW: vk.SamplerAddressModeRepeat,
-        AnisotropyEnable: vk.Bool32(1),
+        AnisotropyEnable: vk.True,
         MaxAnisotropy: 16,
         BorderColor: vk.BorderColorFloatOpaqueBlack,
-        UnnormalizedCoordinates: vk.Bool32(0),
-        CompareEnable: vk.Bool32(0),
+        UnnormalizedCoordinates: vk.False,
+        CompareEnable: vk.False,
         CompareOp: vk.CompareOpAlways,
         MipmapMode: vk.SamplerMipmapModeLinear,
         MaxLod: 1,
@@ -561,16 +584,9 @@ func (app *Application) prepareRenderPass() {
 	app.renderPass = renderPass
 }
 
+// second 2d render pass - after worldRenderPass
 func (app *Application) prepareuiRenderPass() {
 	dev := app.Context().Device()
-	// The initial layout for the color and depth attachments will be vk.LayoutUndefined
-	// because at the start of the renderpass, we don't care about their contents.
-	// At the start of the subpass, the color attachment's layout will be transitioned
-	// to vk.LayoutColorAttachmentOptimal and the depth stencil attachment's layout
-	// will be transitioned to vk.LayoutDepthStencilAttachmentOptimal. At the end of
-	// the renderpass, the color attachment's layout will be transitioned to
-	// vk.LayoutPresentSrc to be ready to present. This is all done as part of
-	// the renderpass, no barriers are necessary.
 	var renderPass vk.RenderPass
 	ret := vk.CreateRenderPass(dev, &vk.RenderPassCreateInfo{
 		SType:           vk.StructureTypeRenderPassCreateInfo,
@@ -578,12 +594,12 @@ func (app *Application) prepareuiRenderPass() {
 		PAttachments: []vk.AttachmentDescription{{
 			Format:         app.Context().SwapchainDimensions().Format,
 			Samples:        vk.SampleCount1Bit,
-			LoadOp:         vk.AttachmentLoadOpLoad
+			LoadOp:         vk.AttachmentLoadOpLoad,
 			StoreOp:        vk.AttachmentStoreOpStore,
 			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
 			StencilStoreOp: vk.AttachmentStoreOpDontCare,
-			InitialLayout:  vk.ImageLayoutColorAttachmentOptimal
-			FinalLayout:    vk.ImageLayoutPresentSrc
+			InitialLayout:  vk.ImageLayoutColorAttachmentOptimal,
+			FinalLayout:    vk.ImageLayoutPresentSrc,
 		}},
 		SubpassCount: 1,
 		PSubpasses: []vk.SubpassDescription{{
@@ -596,7 +612,7 @@ func (app *Application) prepareuiRenderPass() {
 		}},
 	}, nil, &renderPass)
 	OrPanic(as.NewError(ret))
-	app.uiRenderPass = renderPass
+	app.uirenderPass = renderPass
 }
 
 func (app *Application) preparePipeline() {
@@ -772,7 +788,7 @@ func (app *Application) prepareuiPipeline() {
 		{
 			Binding:  0,
 			Location: 0,
-			Format:   vk.FormatR32g32Sfloat,, // vec3
+			Format:   vk.FormatR32g32Sfloat, // vec2
 			Offset:   uint32(unsafe.Offsetof(uiVertex{}.Position)),
 		},
 		{
@@ -786,7 +802,7 @@ func (app *Application) prepareuiPipeline() {
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
 		Layout:     app.pipelineLayout,
-		RenderPass: app.renderPass,
+		RenderPass: app.uirenderPass,
 
 		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
 			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
@@ -925,41 +941,31 @@ func (app *Application) prepareDescriptorSet() {
 func (app *Application) prepareuiDescriptorSet() {
 	// todo change for ui
 	dev := app.Context().Device()
-	swapchainImageResources := app.Context().SwapchainImageResources()
+	uiswapchainImageResources := app.uiSwapResources
 
-	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.textures))
-	for _, tex := range app.textures {
+	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
+	for _, tex := range app.uiTextures {
 		texInfos = append(texInfos, vk.DescriptorImageInfo{
 			Sampler:     tex.sampler,
 			ImageView:   tex.view,
-			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal
+			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
 	}
 
-	for _, res := range swapchainImageResources {
+	// hmmm
+	for _, res:= range uiswapchainImageResources {
 		var set vk.DescriptorSet
 		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
 			SType:              vk.StructureTypeDescriptorSetAllocateInfo,
-			DescriptorPool:     app.descPool,
+			DescriptorPool:     app.uidescPool,
 			DescriptorSetCount: 1,
-			PSetLayouts:        []vk.DescriptorSetLayout{app.descLayout},
+			PSetLayouts:        []vk.DescriptorSetLayout{app.uidescLayout},
 		}, &set)
 		OrPanic(as.NewError(ret))
 
-		res.SetDescriptorSet(set)
+		res.descriptorSet = set
 
-		vk.UpdateDescriptorSets(dev, 2, []vk.WriteDescriptorSet{{
-			SType:           vk.StructureTypeWriteDescriptorSet,
-			DstBinding:      0,
-			DstSet:          set,
-			DescriptorCount: 1,
-			DescriptorType:  vk.DescriptorTypeUniformBuffer,
-			PBufferInfo: []vk.DescriptorBufferInfo{{
-				Offset: 0,
-				Range:  vk.DeviceSize(UBOSize),
-				Buffer: res.UniformBuffer(),
-			}},
-		}, {
+		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      1,
 			DstSet:          set,
@@ -973,7 +979,6 @@ func (app *Application) prepareuiDescriptorSet() {
 func (app *Application) prepareFramebuffers() {
 	dev := app.Context().Device()
 	swapchainImageResources := app.Context().SwapchainImageResources()
-
 	for _, res := range swapchainImageResources {
 		var fb vk.Framebuffer
 		ret := vk.CreateFramebuffer(dev, &vk.FramebufferCreateInfo{
@@ -990,21 +995,24 @@ func (app *Application) prepareFramebuffers() {
 		}, nil, &fb)
 		OrPanic(as.NewError(ret))
 		res.SetFramebuffer(fb)
+	}
 
+	uiswapchainImageResources := app.uiSwapResources
+	for _, res := range uiswapchainImageResources {
 		var uifb vk.Framebuffer
 		ret := vk.CreateFramebuffer(dev, &vk.FramebufferCreateInfo{
 			SType:           vk.StructureTypeFramebufferCreateInfo,
-			RenderPass:      app.uiRenderPass,
+			RenderPass:      app.uirenderPass,
 			AttachmentCount: 1,
 			PAttachments: []vk.ImageView{
-				res.View(),
+				res.view,
 			},
 			Width:  app.width,
 			Height: app.height,
 			Layers: 1,
 		}, nil, &uifb)
 		OrPanic(as.NewError(ret))
-		app.uiFrameBuffers[i] = uifb
+		res.framebuffer = uifb
 	}
 }
 
@@ -1039,19 +1047,16 @@ func prepareFont(fontPath string) (*truetype.Font) {
 		panic("Failed to parse font")
 	}
 	return font
-
-	// transition image layout
 	// transitionImageLayout(
 	// 	dev, commandBuffer, textImage,
 	// 	vk.FormatR8g8b8a8Unorm,
 	// 	vk.ImageLayoutTransferDstOptimal,
 	// 	vk.ImageLayoutShaderReadOnlyOptimal,
 	// )
-	
-	// modify shaders
-	// draw command
 }
 
+// todo: currently writing out a png so that I can call prepare texture
+// this will be too heavyweight in the future
 func renderTextToBitmap(font *truetype.Font, text string, size float64) (image.Image) {
     c := freetype.NewContext()
     c.SetFont(font)
@@ -1064,88 +1069,105 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) (image.I
     pt := freetype.Pt(10, 10+int(c.PointToFixed(size)>>6))
     _, err := c.DrawString(text, pt)
     if err != nil {
-        panic("could not draw text");
+        panic("could not draw text")
     }
-    return dst
+	outFile, err := os.Create("out.png")
+	if err != nil {
+		panic("could not save png")
+	}
+	defer outFile.Close()
+	b := bufio.NewWriter(outFile)
+	err = png.Encode(b, dst)
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	err = b.Flush()
+	if err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("Wrote out.png OK.")	
+	return dst
 }
 
 func (app *Application) createTextImage() {
-	dev := app.Context().Device()
-	var image vk.Image
-	ret := vk.CreateImage(dev, &vk.ImageCreateInfo{
-		SType:     vk.StructureTypeImageCreateInfo,
-		ImageType: vk.ImageType2d,
-		Extent: vk.Extent3D{
-			Width:  app.width,	// todo change dimensions
-			Height: app.height,
-			Depth:  1,
-		},
-		MipLevels:   1,
-		ArrayLayers: 1,
-		Format: 	vk.FormatR8g8b8a8Unorm,	// review
-		Samples:     vk.SampleCount1Bit,
-		Tiling:      vk.ImageTilingOptimal,
-		Usage: vk.ImageUsageFlags(vk.ImageUsageTransferDstBit | vk.ImageUsageSampledBit),	// review
-		SharingMode: vk.SharingModeExclusive,
-		InitialLayout: vk.ImageLayoutUndefined,
-	}, nil, &image)
-	OrPanic(as.NewError(ret))
+	// dev := app.Context().Device()
+	// var image vk.Image
+	// ret := vk.CreateImage(dev, &vk.ImageCreateInfo{
+	// 	SType:     vk.StructureTypeImageCreateInfo,
+	// 	ImageType: vk.ImageType2d,
+	// 	Extent: vk.Extent3D{
+	// 		Width:  app.width,	// todo change dimensions
+	// 		Height: app.height,
+	// 		Depth:  1,
+	// 	},
+	// 	MipLevels:   1,
+	// 	ArrayLayers: 1,
+	// 	Format: 	vk.FormatR8g8b8a8Unorm,	// review
+	// 	Samples:     vk.SampleCount1Bit,
+	// 	Tiling:      vk.ImageTilingOptimal,
+	// 	Usage: vk.ImageUsageFlags(vk.ImageUsageTransferDstBit | vk.ImageUsageSampledBit),	// review
+	// 	SharingMode: vk.SharingModeExclusive,
+	// 	InitialLayout: vk.ImageLayoutUndefined,
+	// }, nil, &image)
+	// OrPanic(as.NewError(ret))
 	
-	// allocate mem for the image
-	var memReqs vk.MemoryRequirements
-	vk.GetImageMemoryRequirements(dev, image, &memReqs)
-	memReqs.Deref()
+	// // allocate mem for the image
+	// var memReqs vk.MemoryRequirements
+	// vk.GetImageMemoryRequirements(dev, image, &memReqs)
+	// memReqs.Deref()
 
-	memProps := app.Context().Platform().MemoryProperties()
-	memTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
-		vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), vk.MemoryPropertyDeviceLocalBit)
-	var imgMem vk.DeviceMemory
-	ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
-		SType: vk.StructureTypeMemoryAllocateInfo,
-		AllocationSize: memReqs.Size,
-		MemoryTypeIndex: memTypeIndex,
-	}, nil, &imgMem)
-	OrPanic(as.NewError(ret))
+	// memProps := app.Context().Platform().MemoryProperties()
+	// memTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
+	// 	vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), vk.MemoryPropertyDeviceLocalBit)
+	// var imgMem vk.DeviceMemory
+	// ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
+	// 	SType: vk.StructureTypeMemoryAllocateInfo,
+	// 	AllocationSize: memReqs.Size,
+	// 	MemoryTypeIndex: memTypeIndex,
+	// }, nil, &imgMem)
+	// OrPanic(as.NewError(ret))
 
-	ret = vk.BindImageMemory(dev, image, imgMem, 0)
-	OrPanic(as.NewError(ret))
+	// ret = vk.BindImageMemory(dev, image, imgMem, 0)
+	// OrPanic(as.NewError(ret))
 
-	app.uiImage = image
-	app.uiImageMem = imgMem
+	// app.uiImage = image
+	// app.uiImageMem = imgMem
 }
 
 // not necessary for initial text attempt
 func (app *Application) createTextBuffer(text image.Image) {
-	dev := app.Context().Device()
-	length := int(unsafe.Sizeof(text))
+	// dev := app.Context().Device()
+	// length := int(unsafe.Sizeof(text))
 
-	var stagingBuffer vk.Buffer
-	var stagingBufferMemory vk.DeviceMemory
-	ret := vk.CreateBuffer(dev, &vk.BufferCreateInfo{
-		SType: vk.StructureTypeBufferCreateInfo,
-		Size: vk.DeviceSize(length),
-		Usage: vk.BufferUsageFlags(vk.BufferUsageTransferSrcBit),
-		SharingMode: vk.SharingModeExclusive,
-	}, nil, &stagingBuffer)
-	OrPanic(as.NewError(ret))
+	// var stagingBuffer vk.Buffer
+	// var stagingBufferMemory vk.DeviceMemory
+	// ret := vk.CreateBuffer(dev, &vk.BufferCreateInfo{
+	// 	SType: vk.StructureTypeBufferCreateInfo,
+	// 	Size: vk.DeviceSize(length),
+	// 	Usage: vk.BufferUsageFlags(vk.BufferUsageTransferSrcBit),
+	// 	SharingMode: vk.SharingModeExclusive,
+	// }, nil, &stagingBuffer)
+	// OrPanic(as.NewError(ret))
 
-	var bufMemReqs vk.MemoryRequirements
-	// todo memProps might be wrong
-	memProps := app.Context().Platform().MemoryProperties()
-	bufMemTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
-		vk.MemoryPropertyFlagBits(bufMemReqs.MemoryTypeBits), vk.MemoryPropertyHostVisibleBit | vk.MemoryPropertyHostCoherentBit)
-	vk.GetBufferMemoryRequirements(dev, stagingBuffer, &bufMemReqs)
-	ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
-		SType: vk.StructureTypeMemoryAllocateInfo,
-		AllocationSize: bufMemReqs.Size,
-		MemoryTypeIndex: bufMemTypeIndex,
-	}, nil, &stagingBufferMemory)
-	OrPanic(as.NewError(ret))
+	// var bufMemReqs vk.MemoryRequirements
+	// // todo memProps might be wrong
+	// memProps := app.Context().Platform().MemoryProperties()
+	// bufMemTypeIndex, _ := as.FindRequiredMemoryTypeFallback(memProps,
+	// 	vk.MemoryPropertyFlagBits(bufMemReqs.MemoryTypeBits), vk.MemoryPropertyHostVisibleBit | vk.MemoryPropertyHostCoherentBit)
+	// vk.GetBufferMemoryRequirements(dev, stagingBuffer, &bufMemReqs)
+	// ret = vk.AllocateMemory(dev, &vk.MemoryAllocateInfo{
+	// 	SType: vk.StructureTypeMemoryAllocateInfo,
+	// 	AllocationSize: bufMemReqs.Size,
+	// 	MemoryTypeIndex: bufMemTypeIndex,
+	// }, nil, &stagingBufferMemory)
+	// OrPanic(as.NewError(ret))
 
-	ret = vk.BindBufferMemory(dev, stagingBuffer, stagingBufferMemory, 0)
-	OrPanic(as.NewError(ret))
-	app.uiBuffer = stagingBuffer
-	app.uiBufferMem = stagingBufferMemory
+	// ret = vk.BindBufferMemory(dev, stagingBuffer, stagingBufferMemory, 0)
+	// OrPanic(as.NewError(ret))
+	// app.uiBuffer = stagingBuffer
+	// app.uiBufferMem = stagingBufferMemory
 }
 
 func (app *Application) copyTextBuffer(text image.Image) {
@@ -1242,12 +1264,12 @@ func (app *Application) prepareuiQuad() {
     // Prepare raw data slice
     var dataRaw2 []byte
     for _, index := range app.indices {
-        idx := types.Index(index)
+        idx := Index(index)
         dataRaw2 = append(dataRaw, idx.Data()...)
     }
 
     memProps2 := app.Context().Platform().MemoryProperties()
-    buf2 := as.CreateBuffer(dev, memProps2, dataRaw, vk.BufferUsageIndexBufferBit)
+    buf2 := as.CreateBuffer(dev, memProps2, dataRaw2, vk.BufferUsageIndexBufferBit)
     app.indexBufferMemory = buf2.Memory
     app.indexBuffer = buf2.Buffer
 }
@@ -1311,14 +1333,14 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
-	vk.DestroyRenderPass(dev, app.uiRenderPass, nil)
+	vk.DestroyRenderPass(dev, app.uirenderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
 	// todo more to destroy here
 	
-	for i := 0; i < 4; i++ {
-		vk.DestroyFrameBuffers(dev, app.uiFrameBuffers[i], nil)
-	}
+	// for i := 0; i < 4; i++ {
+	// 	vk.DestroyFrameBuffer(dev, app.uiFrameBuffers[i], nil)
+	// }
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
