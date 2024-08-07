@@ -61,8 +61,8 @@ type uiSwapchainImageResources struct {
 	framebuffer   vk.Framebuffer
 	descriptorSet vk.DescriptorSet
 
-	uniformBuffer vk.Buffer
-	uniformMemory vk.DeviceMemory
+	// uniformBuffer vk.Buffer
+	// uniformMemory vk.DeviceMemory
 }
 
 type Application struct {
@@ -79,7 +79,7 @@ type Application struct {
 
 	descPool 	vk.DescriptorPool
 	uidescPool	vk.DescriptorPool
-	uiSwapResources [len(Application.Context().swapchainImageResources())]*uiSwapchainImageResources
+	uiSwapResources [4]*uiSwapchainImageResources
 
 	pipelineLayout vk.PipelineLayout
 	uipipelineLayout vk.PipelineLayout
@@ -530,7 +530,31 @@ func (app *Application) prepareDescriptorLayout() {
 }
 
 func (app *Application) prepareuiDescriptorLayout() {
+	dev := app.Context().Device()
+	var descLayout vk.DescriptorSetLayout
+	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
+		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
+		BindingCount: 1,
+		PBindings: []vk.DescriptorSetLayoutBinding{{
+				Binding:         0,
+				DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
+				DescriptorCount: uint32(len(texEnabled)),
+				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
+			}},
+	}, nil, &descLayout)
+	OrPanic(as.NewError(ret))
+	app.uidescLayout = descLayout
 
+	var pipelineLayout vk.PipelineLayout
+	ret = vk.CreatePipelineLayout(dev, &vk.PipelineLayoutCreateInfo{
+		SType:          vk.StructureTypePipelineLayoutCreateInfo,
+		SetLayoutCount: 1,
+		PSetLayouts: []vk.DescriptorSetLayout{
+			app.uidescLayout,
+		},
+	}, nil, &pipelineLayout)
+	OrPanic(as.NewError(ret))
+	app.uipipelineLayout = pipelineLayout
 }
 
 func (app *Application) prepareRenderPass() {
@@ -889,12 +913,25 @@ func (app *Application) prepareDescriptorPool() {
 	}, nil, &descPool)
 	OrPanic(as.NewError(ret))
 	app.descPool = descPool
+
+	uiswapchainImageResources := app.uiSwapResources
+	var uidescPool vk.DescriptorPool
+	ret = vk.CreateDescriptorPool(dev, &vk.DescriptorPoolCreateInfo{
+		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
+		MaxSets:       uint32(len(uiswapchainImageResources)),
+		PoolSizeCount: 1,
+		PPoolSizes: []vk.DescriptorPoolSize{{
+			Type:            vk.DescriptorTypeCombinedImageSampler,
+			DescriptorCount: uint32(len(uiswapchainImageResources) * len(uitexEnabled)),
+		}},
+	}, nil, &uidescPool)
+	OrPanic(as.NewError(ret))
+	app.uidescPool = uidescPool
 }
 
 func (app *Application) prepareDescriptorSet() {
 	dev := app.Context().Device()
 	swapchainImageResources := app.Context().SwapchainImageResources()
-
 	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.textures))
 	for _, tex := range app.textures {
 		texInfos = append(texInfos, vk.DescriptorImageInfo{
@@ -903,7 +940,6 @@ func (app *Application) prepareDescriptorSet() {
 			ImageLayout: vk.ImageLayoutGeneral, // FIXME: Possible mismatch with tex.imageLayout = vk.ImageLayoutShaderReadOnlyOptimal
 		})
 	}
-
 	for _, res := range swapchainImageResources {
 		var set vk.DescriptorSet
 		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
@@ -936,23 +972,17 @@ func (app *Application) prepareDescriptorSet() {
 			PImageInfo:      texInfos,
 		}}, 0, nil)
 	}
-}
 
-func (app *Application) prepareuiDescriptorSet() {
-	// todo change for ui
-	dev := app.Context().Device()
+	// and for ui
 	uiswapchainImageResources := app.uiSwapResources
-
-	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
+	texInfos2 := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
 	for _, tex := range app.uiTextures {
-		texInfos = append(texInfos, vk.DescriptorImageInfo{
+		texInfos2 = append(texInfos2, vk.DescriptorImageInfo{
 			Sampler:     tex.sampler,
 			ImageView:   tex.view,
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
 	}
-
-	// hmmm
 	for _, res:= range uiswapchainImageResources {
 		var set vk.DescriptorSet
 		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
@@ -967,11 +997,11 @@ func (app *Application) prepareuiDescriptorSet() {
 
 		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{
 			SType:           vk.StructureTypeWriteDescriptorSet,
-			DstBinding:      1,
+			DstBinding:      0,
 			DstSet:          set,
 			DescriptorCount: uint32(len(texEnabled)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-			PImageInfo:      texInfos,
+			PImageInfo:      texInfos2,
 		}}, 0, nil)
 	}
 }
@@ -1247,6 +1277,20 @@ func (app *Application) copyTextBuffer(text image.Image) {
 //     return vertexBuffer, vertexBufferMemory, nil
 // }
 
+func (app *Application) initUIDimensions() {
+	vertices := []uiVertex{
+		{Position: lin.Vec2{-1, -1}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec2{1, -1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{1, 1}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-1, 1}, TexCoord: lin.Vec2{0, 1}},
+	}
+	app.vertices = vertices
+
+	app.indices = []Index{
+		0, 1, 2, 2, 3, 0, // Front face
+	}
+}
+
 func (app *Application) prepareuiQuad() {
 	dev := app.Context().Device()
 
@@ -1287,7 +1331,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-
+	app.initUIDimensions()
+	app.prepareuiQuad()
 	// font := prepareFont("../../assets/SourceSansPro-Regular.tff")
 	// text := renderTextToBitmap(font, "Hello", 24)
 	// // upload bitmap to vulkan as a texture
@@ -1312,14 +1357,16 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
+	app.prepareuiDescriptorLayout()
 	app.prepareRenderPass()
+	app.prepareuiRenderPass()
 	app.preparePipeline()
 	app.prepareuiPipeline()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
-	app.prepareuiDescriptorSet()
 	app.prepareFramebuffers()
 
+	// hmmm
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
@@ -1330,12 +1377,15 @@ func (app *Application) VulkanContextPrepare() error {
 func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
+	vk.DestroyDescriptorPool(dev, app.uidescPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyRenderPass(dev, app.uirenderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
+	vk.DestroyPipelineLayout(dev, app.uipipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+	vk.DestroyDescriptorSetLayout(dev, app.uidescLayout, nil)
 	// todo more to destroy here
 	
 	// for i := 0; i < 4; i++ {
