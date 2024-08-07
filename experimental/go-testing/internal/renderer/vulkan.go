@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"unsafe"
+	"reflect"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
@@ -53,11 +54,8 @@ func NewApplication() *Application {
 }
 
 type uiSwapchainImageResources struct {
-	// todo initialize these -> context.prepare(), context.swapchainprepare()
 	image 	vk.Image
-	// The image field should be initialized with the swapchain image retrieved from the existing swapchain
 	cmd		vk.CommandBuffer
-	// Command buffers need to be allocated and initialized for rendering operations. You can allocate these command buffers as needed without creating a new swapchain.
 
 	// graphicsToPresentCmd vk.CommandBuffer
 	// only necessary to transition image from rendering to presentation or handle sync
@@ -65,9 +63,6 @@ type uiSwapchainImageResources struct {
 	view          vk.ImageView
 	framebuffer   vk.Framebuffer
 	descriptorSet vk.DescriptorSet
-
-	// uniformBuffer vk.Buffer
-	// uniformMemory vk.DeviceMemory
 }
 
 type Application struct {
@@ -796,13 +791,13 @@ func (app *Application) prepareuiPipeline() {
 	fs, err := as.LoadShaderModule(dev, fileToBytes("assets/shaders/ui.frag.spv"))
 	OrPanic(err)
 
-	// note .cpp does not have a pipelinecache
+	// note this can be shared
 	var pipelineCache vk.PipelineCache
 	ret := vk.CreatePipelineCache(dev, &vk.PipelineCacheCreateInfo{
 		SType: vk.StructureTypePipelineCacheCreateInfo,
 	}, nil, &pipelineCache)
 	OrPanic(as.NewError(ret))
-	app.pipelineCache = pipelineCache	// todo ok?
+	app.pipelineCache = pipelineCache
 
 	// Vertex Descriptions needed for glsl shader
 	bindingDescriptions := []vk.VertexInputBindingDescription{
@@ -1032,6 +1027,7 @@ func (app *Application) prepareFramebuffers() {
 		res.SetFramebuffer(fb)
 	}
 
+	// and for ui
 	uiswapchainImageResources := app.uiSwapResources
 	for _, res := range uiswapchainImageResources {
 		var uifb vk.Framebuffer
@@ -1049,6 +1045,86 @@ func (app *Application) prepareFramebuffers() {
 		OrPanic(as.NewError(ret))
 		res.framebuffer = uifb
 	}
+}
+
+// todo carefully review
+func (app *Application) prepareuiCmd() {
+	c := app.Context()
+	dev := app.Context().Device()
+
+	// prepare images needs to be called after creating the swapchain
+	swapchainField := reflect.ValueOf(&c).Elem().FieldByName("swapchain")
+	if swapchainField.IsValid() {
+		if swapchain, ok := swapchainField.Interface().(vk.Swapchain); ok {
+			var imageCount uint32
+			vk.GetSwapchainImages(dev, swapchain, &imageCount, nil)
+			swapchainImages := make([]vk.Image, imageCount)
+			vk.GetSwapchainImages(dev, swapchain, &imageCount, swapchainImages)
+
+			for i := 0; i < int(imageCount); i++ {
+				app.uiSwapResources[i].image = swapchainImages[i]
+			}
+		} else {
+			panic("could not get swapchain")
+		}
+	} else {
+		panic("could not get swapchain")
+	}
+
+	ret := vk.BeginCommandBuffer(c.CommandBuffer(), &vk.CommandBufferBeginInfo{
+		SType: vk.StructureTypeCommandBufferBeginInfo,
+	})
+	OrPanic(as.NewError(ret))
+
+	// this entire ugly block is just for getting the commandpool XD
+	cmdPoolField := reflect.ValueOf(&c).Elem().FieldByName("cmdPool")
+	if cmdPoolField.IsValid() {
+		if cmdPool, ok := cmdPoolField.Interface().(vk.CommandPool); ok {
+			for i := 0; i < len(app.uiSwapResources); i++ {
+				var cmd = make([]vk.CommandBuffer, 1)
+				vk.AllocateCommandBuffers(dev, &vk.CommandBufferAllocateInfo{
+					SType:              vk.StructureTypeCommandBufferAllocateInfo,
+					CommandPool:        cmdPool,
+					Level:              vk.CommandBufferLevelPrimary,
+					CommandBufferCount: 1,
+				}, cmd)
+				OrPanic(as.NewError(ret))
+				app.uiSwapResources[i].cmd = cmd[0]
+			}
+		} else {
+			panic("error getting command pool")
+		}
+	} else {
+		panic("error getting command pool")
+	}
+
+	// note i skip graphicsToPresentCmd
+
+	for i := 0; i < len(app.uiSwapResources); i++ {
+		var view vk.ImageView
+		ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
+			SType:  vk.StructureTypeImageViewCreateInfo,
+			Format: c.SwapchainDimensions().Format,
+			Components: vk.ComponentMapping{
+				R: vk.ComponentSwizzleR,
+				G: vk.ComponentSwizzleG,
+				B: vk.ComponentSwizzleB,
+				A: vk.ComponentSwizzleA,
+			},
+			SubresourceRange: vk.ImageSubresourceRange{
+				AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
+				LevelCount: 1,
+				LayerCount: 1,
+			},
+			ViewType: vk.ImageViewType2d,
+			Image:    app.uiSwapResources[i].image,
+		}, nil, &view)
+		OrPanic(as.NewError(ret))
+		app.uiSwapResources[i].view = view
+	}
+
+	ret = vk.EndCommandBuffer(c.CommandBuffer())
+	// todo c.flushInitCmd()?
 }
 
 func (app *Application) LoadAllChunks() {
@@ -1371,10 +1447,12 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
+	app.prepareuiCmd()
 	// hmmm
 	swapchainImageResources := app.Context().SwapchainImageResources()
-	for _, res := range swapchainImageResources {
+	for i, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
+		app.updateuiCommandBuffer(app.uiSwapResources[i], app.uiSwapResources[i].cmd)
 	}
 	return nil
 }
@@ -1436,6 +1514,7 @@ func (app *Application) NextFrame() {
 // called every frame by asche
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
+// todo: might be screwed for AcquireNextImage -> or not if it just return imageIdx(???)
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	// Current UBO update logic
 	dev := app.Context().Device()
@@ -1462,15 +1541,60 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
 
+	res2 := app.uiSwapResources[imageIdx]
+	cmd2 := res2.cmd
+	app.updateuiCommandBuffer(res2, cmd2)
+
 	return nil
 }
 
-func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+
+func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cmd vk.CommandBuffer) {
 	// Begin command buffer
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
 	})
+	OrPanic(as.NewError(ret))
+
+	// Begin render pass
+	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
+		SType:       vk.StructureTypeRenderPassBeginInfo,
+		RenderPass:  app.uirenderPass,
+		Framebuffer: res.framebuffer,
+		RenderArea: vk.Rect2D{
+			Offset: vk.Offset2D{X: 0, Y: 0},
+			Extent: vk.Extent2D{Width: app.width, Height: app.height},
+		},
+		ClearValueCount: 0,
+	}, vk.SubpassContentsInline)
+
+	// Bind pipeline and descriptor sets
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.uipipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.uipipelineLayout,
+		0, 1, []vk.DescriptorSet{res.descriptorSet}, 0, nil)
+
+	// Set viewport and scissor
+	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
+		Width:    float32(app.width),
+		Height:   float32(app.height),
+		MinDepth: 0.0,
+		MaxDepth: 1.0,
+	}})
+	vk.CmdSetScissor(cmd, 0, 1, []vk.Rect2D{{
+		Offset: vk.Offset2D{X: 0, Y: 0},
+		Extent: vk.Extent2D{Width: app.width, Height: app.height},
+	}})
+
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
+	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
+
+	// End render pass
+	vk.CmdEndRenderPass(cmd)
+
+	// End command buffer
+	ret = vk.EndCommandBuffer(cmd)
 	OrPanic(as.NewError(ret))
 
 	// copyRegion := vk.BufferImageCopy{
@@ -1495,6 +1619,15 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
     //     1,
     //     []vk.BufferImageCopy{copyRegion},
     // )
+}
+
+func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+	// Begin command buffer
+	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
+		SType: vk.StructureTypeCommandBufferBeginInfo,
+		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
+	})
+	OrPanic(as.NewError(ret))
 
 	// Clear values for rendering
 	clearValues := make([]vk.ClearValue, 2)
@@ -1540,14 +1673,6 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	// End render pass
 	vk.CmdEndRenderPass(cmd)
-
-	// todo begin second render pass
-	// using ui shader
-	// draw ui geometry
-	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
-
-	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
-	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
 
 	// End command buffer
 	ret = vk.EndCommandBuffer(cmd)
