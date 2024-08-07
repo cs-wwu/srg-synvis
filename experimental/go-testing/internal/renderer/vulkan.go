@@ -53,9 +53,14 @@ func NewApplication() *Application {
 }
 
 type uiSwapchainImageResources struct {
-	image                vk.Image
-	cmd                  vk.CommandBuffer
-	graphicsToPresentCmd vk.CommandBuffer
+	// todo initialize these -> context.prepare(), context.swapchainprepare()
+	image 	vk.Image
+	// The image field should be initialized with the swapchain image retrieved from the existing swapchain
+	cmd		vk.CommandBuffer
+	// Command buffers need to be allocated and initialized for rendering operations. You can allocate these command buffers as needed without creating a new swapchain.
+
+	// graphicsToPresentCmd vk.CommandBuffer
+	// only necessary to transition image from rendering to presentation or handle sync
 
 	view          vk.ImageView
 	framebuffer   vk.Framebuffer
