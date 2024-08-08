@@ -1,18 +1,18 @@
 package renderer
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
-	"bufio"
 	"image"
 	// "image/color"
 	"image/draw"
 	"image/png"
 	"log"
 	"os"
-	"unsafe"
 	"reflect"
+	"unsafe"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
@@ -36,7 +36,7 @@ var texEnabled = []string{
 	"assets/textures/checkers.png",
 }
 var uitexEnabled = []string{
-	"out.png",
+	"assets/textures/gopher.png",
 }
 
 func NewApplication() *Application {
@@ -54,8 +54,8 @@ func NewApplication() *Application {
 }
 
 type uiSwapchainImageResources struct {
-	image 	vk.Image
-	cmd		vk.CommandBuffer
+	image vk.Image
+	cmd   vk.CommandBuffer
 
 	// graphicsToPresentCmd vk.CommandBuffer
 	// only necessary to transition image from rendering to presentation or handle sync
@@ -77,19 +77,19 @@ type Application struct {
 	depth             *Depth
 	useStagingBuffers bool
 
-	descPool 	vk.DescriptorPool
-	uidescPool	vk.DescriptorPool
-	uiSwapResources [4]*uiSwapchainImageResources
+	descPool        vk.DescriptorPool
+	uidescPool      vk.DescriptorPool
+	uiSwapResources [4]*uiSwapchainImageResources	// todo change from hardcoded
 
-	pipelineLayout vk.PipelineLayout
+	pipelineLayout   vk.PipelineLayout
 	uipipelineLayout vk.PipelineLayout
-	descLayout     vk.DescriptorSetLayout
-	uidescLayout   vk.DescriptorSetLayout
-	pipelineCache  vk.PipelineCache
-	renderPass     vk.RenderPass
-	uirenderPass   vk.RenderPass
-	pipeline       vk.Pipeline
-	uipipeline	   vk.Pipeline
+	descLayout       vk.DescriptorSetLayout
+	uidescLayout     vk.DescriptorSetLayout
+	pipelineCache    vk.PipelineCache
+	renderPass       vk.RenderPass
+	uirenderPass     vk.RenderPass
+	pipeline         vk.Pipeline
+	uipipeline       vk.Pipeline
 
 	frameIndex int
 	frameCount int
@@ -101,13 +101,13 @@ type Application struct {
 	ubo          UniformBufferObject
 
 	// ui stuff: todo reduce...
-	vertices	 		[]uiVertex
-	indices		 		[]Index
-	vertexBuffer 		vk.Buffer
-	vertexBufferMemory 	vk.DeviceMemory
-	indexBuffer     	vk.Buffer
-	indexBufferMemory 	vk.DeviceMemory
-	uiTextures			[]*Texture
+	vertices           []uiVertex
+	indices            []Index
+	vertexBuffer       vk.Buffer
+	vertexBufferMemory vk.DeviceMemory
+	indexBuffer        vk.Buffer
+	indexBufferMemory  vk.DeviceMemory
+	uiTextures         []*Texture
 
 	camera        *Camera
 	frustum       *Frustum
@@ -124,6 +124,12 @@ func (app *Application) initUBO() {
 	app.ubo.Projection[1][1] *= -1
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
+}
+
+func (app *Application) initializeSwapResources() {
+	for i := range app.uiSwapResources {
+		app.uiSwapResources[i] = &uiSwapchainImageResources{}
+	}
 }
 
 func (app *Application) prepareDepth() {
@@ -461,25 +467,25 @@ func (app *Application) prepareuiTextures() {
 	// what else do I need here...-> can I put this in preparetextures?
 	dev := app.Context().Device()
 	var sampler vk.Sampler
-    err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
-		SType: vk.StructureTypeSamplerCreateInfo,
-        MagFilter: vk.FilterLinear,
-        MinFilter: vk.FilterLinear,
-        AddressModeU: vk.SamplerAddressModeRepeat,
-        AddressModeV: vk.SamplerAddressModeRepeat,
-        AddressModeW: vk.SamplerAddressModeRepeat,
-        AnisotropyEnable: vk.True,
-        MaxAnisotropy: 16,
-        BorderColor: vk.BorderColorFloatOpaqueBlack,
-        UnnormalizedCoordinates: vk.False,
-        CompareEnable: vk.False,
-        CompareOp: vk.CompareOpAlways,
-        MipmapMode: vk.SamplerMipmapModeLinear,
-        MaxLod: 1,
-	}, nil, &sampler) 
+	err := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
+		SType:                   vk.StructureTypeSamplerCreateInfo,
+		MagFilter:               vk.FilterLinear,
+		MinFilter:               vk.FilterLinear,
+		AddressModeU:            vk.SamplerAddressModeRepeat,
+		AddressModeV:            vk.SamplerAddressModeRepeat,
+		AddressModeW:            vk.SamplerAddressModeRepeat,
+		AnisotropyEnable:        vk.True,
+		MaxAnisotropy:           16,
+		BorderColor:             vk.BorderColorFloatOpaqueBlack,
+		UnnormalizedCoordinates: vk.False,
+		CompareEnable:           vk.False,
+		CompareOp:               vk.CompareOpAlways,
+		MipmapMode:              vk.SamplerMipmapModeLinear,
+		MaxLod:                  1,
+	}, nil, &sampler)
 	if err != vk.Success {
-        panic("could not create text sampler")
-    }
+		panic("could not create text sampler")
+	}
 }
 
 func (app *Application) prepareUniformBuffers() {
@@ -536,11 +542,11 @@ func (app *Application) prepareuiDescriptorLayout() {
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
 		BindingCount: 1,
 		PBindings: []vk.DescriptorSetLayoutBinding{{
-				Binding:         0,
-				DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-				DescriptorCount: uint32(len(texEnabled)),
-				StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
-			}},
+			Binding:         0,
+			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
+			DescriptorCount: uint32(len(texEnabled)),
+			StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
+		}},
 	}, nil, &descLayout)
 	OrPanic(as.NewError(ret))
 	app.uidescLayout = descLayout
@@ -844,8 +850,8 @@ func (app *Application) prepareuiPipeline() {
 			PVertexAttributeDescriptions:    attributeDescriptions,
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
-			SType: vk.StructureTypePipelineInputAssemblyStateCreateInfo,
-			Topology: vk.PrimitiveTopologyTriangleList,
+			SType:                  vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology:               vk.PrimitiveTopologyTriangleList,
 			PrimitiveRestartEnable: vk.True,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
@@ -878,12 +884,12 @@ func (app *Application) prepareuiPipeline() {
 			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
 			Stage:  vk.ShaderStageVertexBit,
 			Module: vs,
-			PName:  "uimain\x00",
+			PName:  "main\x00",
 		}, {
 			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
 			Stage:  vk.ShaderStageFragmentBit,
 			Module: fs,
-			PName:  "uimain\x00",
+			PName:  "main\x00",
 		}},
 	}}
 	pipeline := make([]vk.Pipeline, 1)
@@ -974,7 +980,6 @@ func (app *Application) prepareDescriptorSet() {
 	}
 
 	// and for ui
-	uiswapchainImageResources := app.uiSwapResources
 	texInfos2 := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
 	for _, tex := range app.uiTextures {
 		texInfos2 = append(texInfos2, vk.DescriptorImageInfo{
@@ -983,7 +988,8 @@ func (app *Application) prepareDescriptorSet() {
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
 	}
-	for _, res:= range uiswapchainImageResources {
+	uiswapchainImageResources := app.uiSwapResources
+	for _, res := range uiswapchainImageResources {
 		var set vk.DescriptorSet
 		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
 			SType:              vk.StructureTypeDescriptorSetAllocateInfo,
@@ -999,7 +1005,7 @@ func (app *Application) prepareDescriptorSet() {
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
-			DescriptorCount: uint32(len(texEnabled)),
+			DescriptorCount: uint32(len(uitexEnabled)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 			PImageInfo:      texInfos2,
 		}}, 0, nil)
@@ -1053,7 +1059,15 @@ func (app *Application) prepareuiCmd() {
 	dev := app.Context().Device()
 
 	// prepare images needs to be called after creating the swapchain
-	swapchainField := reflect.ValueOf(&c).Elem().FieldByName("swapchain")
+	value := reflect.ValueOf(c)
+    value = value.Elem()
+    if value.Kind() != reflect.Struct {
+        panic("Expected a struct type")
+    }
+
+    // Access the field by name
+    swapchainField := value.FieldByName("swapchain")
+	swapchainField = reflect.NewAt(swapchainField.Type(), unsafe.Pointer(swapchainField.UnsafeAddr())).Elem()
 	if swapchainField.IsValid() {
 		if swapchain, ok := swapchainField.Interface().(vk.Swapchain); ok {
 			var imageCount uint32
@@ -1071,13 +1085,14 @@ func (app *Application) prepareuiCmd() {
 		panic("could not get swapchain")
 	}
 
+
 	ret := vk.BeginCommandBuffer(c.CommandBuffer(), &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 	})
 	OrPanic(as.NewError(ret))
 
-	// this entire ugly block is just for getting the commandpool XD
-	cmdPoolField := reflect.ValueOf(&c).Elem().FieldByName("cmdPool")
+	cmdPoolField := value.FieldByName("cmdPool")
+	cmdPoolField = reflect.NewAt(cmdPoolField.Type(), unsafe.Pointer(cmdPoolField.UnsafeAddr())).Elem()
 	if cmdPoolField.IsValid() {
 		if cmdPool, ok := cmdPoolField.Interface().(vk.CommandPool); ok {
 			for i := 0; i < len(app.uiSwapResources); i++ {
@@ -1124,6 +1139,7 @@ func (app *Application) prepareuiCmd() {
 	}
 
 	ret = vk.EndCommandBuffer(c.CommandBuffer())
+	OrPanic(as.NewError(ret))
 	// todo c.flushInitCmd()?
 }
 
@@ -1138,7 +1154,7 @@ func (app *Application) LoadAllChunks() {
 	for z := 0; z < length/ChunkSize; z++ {
 		for x := 0; x < length/ChunkSize; x++ {
 			app.LoadChunk(x, z)
-			if (z*length/ChunkSize+x+1) % 100 == 0 {
+			if (z*length/ChunkSize+x+1)%100 == 0 {
 				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
 			}
 		}
@@ -1147,7 +1163,7 @@ func (app *Application) LoadAllChunks() {
 	fmt.Printf("All %d chunks loaded.\n", totalChunks)
 }
 
-func prepareFont(fontPath string) (*truetype.Font) {
+func prepareFont(fontPath string) *truetype.Font {
 	fontBytes, err := os.ReadFile(fontPath)
 	if err != nil {
 		panic("Failed to read font file")
@@ -1168,20 +1184,20 @@ func prepareFont(fontPath string) (*truetype.Font) {
 
 // todo: currently writing out a png so that I can call prepare texture
 // this will be too heavyweight in the future
-func renderTextToBitmap(font *truetype.Font, text string, size float64) (image.Image) {
-    c := freetype.NewContext()
-    c.SetFont(font)
-    c.SetFontSize(size)
-	dst := image.NewRGBA(image.Rect(0, 0, 800, 600))	// todo change dimensions
-    c.SetDst(dst) // Adjust size as needed
-    c.SetSrc(image.White)
-    c.SetClip(dst.Bounds())
+func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Image {
+	c := freetype.NewContext()
+	c.SetFont(font)
+	c.SetFontSize(size)
+	dst := image.NewRGBA(image.Rect(0, 0, 800, 600)) // todo change dimensions
+	c.SetDst(dst)                                    // Adjust size as needed
+	c.SetSrc(image.White)
+	c.SetClip(dst.Bounds())
 
-    pt := freetype.Pt(10, 10+int(c.PointToFixed(size)>>6))
-    _, err := c.DrawString(text, pt)
-    if err != nil {
-        panic("could not draw text")
-    }
+	pt := freetype.Pt(10, 10+int(c.PointToFixed(size)>>6))
+	_, err := c.DrawString(text, pt)
+	if err != nil {
+		panic("could not draw text")
+	}
 	outFile, err := os.Create("out.png")
 	if err != nil {
 		panic("could not save png")
@@ -1198,7 +1214,7 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) (image.I
 		log.Println(err)
 		os.Exit(1)
 	}
-	fmt.Println("Wrote out.png OK.")	
+	fmt.Println("Wrote out.png OK.")
 	return dst
 }
 
@@ -1223,7 +1239,7 @@ func (app *Application) createTextImage() {
 	// 	InitialLayout: vk.ImageLayoutUndefined,
 	// }, nil, &image)
 	// OrPanic(as.NewError(ret))
-	
+
 	// // allocate mem for the image
 	// var memReqs vk.MemoryRequirements
 	// vk.GetImageMemoryRequirements(dev, image, &memReqs)
@@ -1286,10 +1302,10 @@ func (app *Application) copyTextBuffer(text image.Image) {
 	// func copyBufferToImage(device vk.Device, queue vk.Queue, commandPool vk.CommandPool, buffer vk.Buffer, image vk.Image, width, height int32) {
 	// 	// Begin command buffer recording
 	// 	commandBuffer := beginSingleTimeCommands(device, commandPool)
-		
+
 	// 	// Image layout transition
 	// 	imageLayoutTransition(device, commandBuffer, image, width, height)
-	
+
 	// 	// Copy buffer to image
 	// 	copyRegion := vk.BufferImageCopy{
 	// 		BufferOffset: 0,
@@ -1304,12 +1320,11 @@ func (app *Application) copyTextBuffer(text image.Image) {
 	// 	ImageExtent: vk.Extent3D{Width: app.width, Height: app.height, Depth: 1},
 	// }
 	// 	vk.CmdCopyBufferToImage(commandBuffer, buffer, image, vk.ImageLayoutTransferDstOptimal, 1, []vk.BufferImageCopy{copyRegion})
-	
+
 	// 	// End command buffer recording and submit
 	// 	endSingleTimeCommands(device, queue, commandPool, commandBuffer)
 	// }
 }
-
 
 // func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
 //     imageInfo := vk.DescriptorImageInfo{
@@ -1325,7 +1340,7 @@ func (app *Application) copyTextBuffer(text image.Image) {
 //         PImageInfo:       &imageInfo,
 //         DSTSet:           descriptorSet,
 //     }
-    
+
 //     vk.UpdateDescriptorSets(device, []vk.DescriptorWrite{descriptorWrite}, nil)
 // }
 
@@ -1375,31 +1390,32 @@ func (app *Application) initUIDimensions() {
 func (app *Application) prepareuiQuad() {
 	dev := app.Context().Device()
 
-    // Prepare raw data slice
-    var dataRaw []byte
-    for _, vertex := range app.vertices {
-        dataRaw = append(dataRaw, vertex.Data()...)
-    }
+	// Prepare raw data slice
+	var dataRaw []byte
+	for _, vertex := range app.vertices {
+		dataRaw = append(dataRaw, vertex.Data()...)
+	}
 
-    memProps := app.Context().Platform().MemoryProperties()
-    buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
-    app.vertexBufferMemory = buf.Memory
-    app.vertexBuffer = buf.Buffer
+	memProps := app.Context().Platform().MemoryProperties()
+	buf := as.CreateBuffer(dev, memProps, dataRaw, vk.BufferUsageVertexBufferBit)
+	app.vertexBufferMemory = buf.Memory
+	app.vertexBuffer = buf.Buffer
 
-    // Prepare raw data slice
-    var dataRaw2 []byte
-    for _, index := range app.indices {
-        idx := Index(index)
-        dataRaw2 = append(dataRaw, idx.Data()...)
-    }
+	// Prepare raw data slice
+	var dataRaw2 []byte
+	for _, index := range app.indices {
+		idx := Index(index)
+		dataRaw2 = append(dataRaw, idx.Data()...)
+	}
 
-    memProps2 := app.Context().Platform().MemoryProperties()
-    buf2 := as.CreateBuffer(dev, memProps2, dataRaw2, vk.BufferUsageIndexBufferBit)
-    app.indexBufferMemory = buf2.Memory
-    app.indexBuffer = buf2.Buffer
+	memProps2 := app.Context().Platform().MemoryProperties()
+	buf2 := as.CreateBuffer(dev, memProps2, dataRaw2, vk.BufferUsageIndexBufferBit)
+	app.indexBufferMemory = buf2.Memory
+	app.indexBuffer = buf2.Buffer
 }
 
 func (app *Application) VulkanContextPrepare() error {
+	app.initializeSwapResources()
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
 	app.width = dim.Width
@@ -1424,17 +1440,19 @@ func (app *Application) VulkanContextPrepare() error {
 	// 	app.copyTextBuffer(text)
 	// 	// create vulkan sampler
 	//  app.prepareuiTextures
-		// update descriptor sets
+	// update descriptor sets
 	// draw the text texture to screen
-		// create a vertex buffer
-		// create a shader for text rendering
-		// draw the quad with text texture
+	// create a vertex buffer
+	// create a shader for text rendering
+	// draw the quad with text texture
 
 	// Load all available chunks for now
 	app.LoadAllChunks()
 
 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 	app.determineVisibleChunks()
+
+	app.prepareuiCmd()	// not sure where I should place this
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
@@ -1447,13 +1465,13 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
-	app.prepareuiCmd()
 	// hmmm
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for i, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 		app.updateuiCommandBuffer(app.uiSwapResources[i], app.uiSwapResources[i].cmd)
 	}
+	fmt.Printf("done preparing\n")
 	return nil
 }
 
@@ -1469,14 +1487,33 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DestroyPipelineLayout(dev, app.uipipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.uidescLayout, nil)
-	// todo more to destroy here
-	
-	// for i := 0; i < 4; i++ {
-	// 	vk.DestroyFrameBuffer(dev, app.uiFrameBuffers[i], nil)
-	// }
+
+	// TODO more to destroy here?
+
+	value := reflect.ValueOf(app.Context())
+    value = value.Elem()
+    if value.Kind() != reflect.Struct {
+        panic("Expected a struct type")
+    }
+
+	cmdPoolField := value.FieldByName("cmdPool")
+	cmdPoolField = reflect.NewAt(cmdPoolField.Type(), unsafe.Pointer(cmdPoolField.UnsafeAddr())).Elem()
+	cmdPool, _ := cmdPoolField.Interface().(vk.CommandPool)
+
+
+	for _, res := range app.uiSwapResources {
+		vk.DestroyFramebuffer(dev, res.framebuffer, nil)
+		vk.DestroyImageView(dev, res.view, nil)
+		vk.FreeCommandBuffers(dev, cmdPool, 1, []vk.CommandBuffer{
+			res.cmd,
+		})		
+	}
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
+	}
+	for i := 0; i < len(app.uiTextures); i++ {
+		app.uiTextures[i].Destroy(dev)
 	}
 
 	for _, chunk := range app.chunks {
@@ -1486,12 +1523,12 @@ func (app *Application) VulkanContextCleanup() error {
 		vk.FreeMemory(dev, chunk.indexMemory, nil)
 	}
 
-	// // destroy vertex and index buffers
-	// vk.DestroyBuffer(dev, app.vertexBuffer, nil)
-	// vk.FreeMemory(dev, app.vertexBufferMemory, nil)
+	// destroy vertex and index buffers
+	vk.DestroyBuffer(dev, app.vertexBuffer, nil)
+	vk.FreeMemory(dev, app.vertexBufferMemory, nil)
 
-	// vk.DestroyBuffer(dev, app.indexBuffer, nil)
-	// vk.FreeMemory(dev, app.indexBufferMemory, nil)
+	vk.DestroyBuffer(dev, app.indexBuffer, nil)
+	vk.FreeMemory(dev, app.indexBufferMemory, nil)
 
 	app.depth.Destroy(dev)
 	return nil
@@ -1505,7 +1542,7 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	if app.frameCount % CULLING_INTERVAL == 0 {
+	if app.frameCount%CULLING_INTERVAL == 0 {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
@@ -1535,7 +1572,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	}
 	vk.UnmapMemory(dev, res.UniformMemory())
 
-	// update ui state 
+	// update ui state
 
 	// New command buffer update logic
 	cmd := res.CommandBuffer()
@@ -1547,7 +1584,6 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 
 	return nil
 }
-
 
 func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cmd vk.CommandBuffer) {
 	// Begin command buffer
@@ -1612,13 +1648,13 @@ func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cm
 
 	// // record the copy command to transfer data from buffer to image
 	// vk.CmdCopyBufferToImage(
-    //     cmd,
-    //     app.uiBuffer, // Replace with your actual staging buffer
-    //     app.uiImage,         // Replace with your actual image
-    //     vk.ImageLayoutTransferDstOptimal,
-    //     1,
-    //     []vk.BufferImageCopy{copyRegion},
-    // )
+	//     cmd,
+	//     app.uiBuffer, // Replace with your actual staging buffer
+	//     app.uiImage,         // Replace with your actual image
+	//     vk.ImageLayoutTransferDstOptimal,
+	//     1,
+	//     []vk.BufferImageCopy{copyRegion},
+	// )
 }
 
 func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
@@ -1760,7 +1796,6 @@ func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
 	size := newImg.Bounds().Size()
 	return []byte(newImg.Pix), size.X, size.Y, nil
 }
-
 
 // Converts the given file to a byte array to be used
 func fileToBytes(filename string) []byte {
