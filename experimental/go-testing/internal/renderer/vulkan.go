@@ -11,7 +11,6 @@ import (
 	"image/png"
 	"log"
 	"os"
-	"reflect"
 	"unsafe"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -53,18 +52,6 @@ func NewApplication() *Application {
 	return app
 }
 
-type uiSwapchainImageResources struct {
-	image vk.Image
-	cmd   vk.CommandBuffer
-
-	// graphicsToPresentCmd vk.CommandBuffer
-	// only necessary to transition image from rendering to presentation or handle sync
-
-	view          vk.ImageView
-	framebuffer   vk.Framebuffer
-	descriptorSet vk.DescriptorSet
-}
-
 type Application struct {
 	as.BaseVulkanApp
 
@@ -79,7 +66,6 @@ type Application struct {
 
 	descPool        vk.DescriptorPool
 	uidescPool      vk.DescriptorPool
-	uiSwapResources [4]*uiSwapchainImageResources	// todo change from hardcoded
 
 	pipelineLayout   vk.PipelineLayout
 	uipipelineLayout vk.PipelineLayout
@@ -126,11 +112,6 @@ func (app *Application) initUBO() {
 	app.ubo.LightDir.Norm(&temp)
 }
 
-func (app *Application) initializeSwapResources() {
-	for i := range app.uiSwapResources {
-		app.uiSwapResources[i] = &uiSwapchainImageResources{}
-	}
-}
 
 func (app *Application) prepareDepth() {
 	dev := app.Context().Device()
@@ -920,7 +901,7 @@ func (app *Application) prepareDescriptorPool() {
 	OrPanic(as.NewError(ret))
 	app.descPool = descPool
 
-	uiswapchainImageResources := app.uiSwapResources
+	uiswapchainImageResources := app.Context().UISwapchainImageResources()
 	var uidescPool vk.DescriptorPool
 	ret = vk.CreateDescriptorPool(dev, &vk.DescriptorPoolCreateInfo{
 		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
@@ -988,7 +969,7 @@ func (app *Application) prepareDescriptorSet() {
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
 	}
-	uiswapchainImageResources := app.uiSwapResources
+	uiswapchainImageResources := app.Context().UISwapchainImageResources()
 	for _, res := range uiswapchainImageResources {
 		var set vk.DescriptorSet
 		ret := vk.AllocateDescriptorSets(dev, &vk.DescriptorSetAllocateInfo{
@@ -999,7 +980,7 @@ func (app *Application) prepareDescriptorSet() {
 		}, &set)
 		OrPanic(as.NewError(ret))
 
-		res.descriptorSet = set
+		res.SetDescriptorSet(set)
 
 		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{
 			SType:           vk.StructureTypeWriteDescriptorSet,
@@ -1034,7 +1015,7 @@ func (app *Application) prepareFramebuffers() {
 	}
 
 	// and for ui
-	uiswapchainImageResources := app.uiSwapResources
+	uiswapchainImageResources := app.Context().UISwapchainImageResources()
 	for _, res := range uiswapchainImageResources {
 		var uifb vk.Framebuffer
 		ret := vk.CreateFramebuffer(dev, &vk.FramebufferCreateInfo{
@@ -1042,105 +1023,15 @@ func (app *Application) prepareFramebuffers() {
 			RenderPass:      app.uirenderPass,
 			AttachmentCount: 1,
 			PAttachments: []vk.ImageView{
-				res.view,
+				res.View(),
 			},
 			Width:  app.width,
 			Height: app.height,
 			Layers: 1,
 		}, nil, &uifb)
 		OrPanic(as.NewError(ret))
-		res.framebuffer = uifb
+		res.SetFramebuffer(uifb)
 	}
-}
-
-// todo carefully review
-func (app *Application) prepareuiCmd() {
-	c := app.Context()
-	dev := app.Context().Device()
-
-	// prepare images needs to be called after creating the swapchain
-	value := reflect.ValueOf(c)
-    value = value.Elem()
-    if value.Kind() != reflect.Struct {
-        panic("Expected a struct type")
-    }
-
-    // Access the field by name
-    swapchainField := value.FieldByName("swapchain")
-	swapchainField = reflect.NewAt(swapchainField.Type(), unsafe.Pointer(swapchainField.UnsafeAddr())).Elem()
-	if swapchainField.IsValid() {
-		if swapchain, ok := swapchainField.Interface().(vk.Swapchain); ok {
-			var imageCount uint32
-			vk.GetSwapchainImages(dev, swapchain, &imageCount, nil)
-			swapchainImages := make([]vk.Image, imageCount)
-			vk.GetSwapchainImages(dev, swapchain, &imageCount, swapchainImages)
-
-			for i := 0; i < int(imageCount); i++ {
-				app.uiSwapResources[i].image = swapchainImages[i]
-			}
-		} else {
-			panic("could not get swapchain")
-		}
-	} else {
-		panic("could not get swapchain")
-	}
-
-
-	ret := vk.BeginCommandBuffer(c.CommandBuffer(), &vk.CommandBufferBeginInfo{
-		SType: vk.StructureTypeCommandBufferBeginInfo,
-	})
-	OrPanic(as.NewError(ret))
-
-	cmdPoolField := value.FieldByName("cmdPool")
-	cmdPoolField = reflect.NewAt(cmdPoolField.Type(), unsafe.Pointer(cmdPoolField.UnsafeAddr())).Elem()
-	if cmdPoolField.IsValid() {
-		if cmdPool, ok := cmdPoolField.Interface().(vk.CommandPool); ok {
-			for i := 0; i < len(app.uiSwapResources); i++ {
-				var cmd = make([]vk.CommandBuffer, 1)
-				vk.AllocateCommandBuffers(dev, &vk.CommandBufferAllocateInfo{
-					SType:              vk.StructureTypeCommandBufferAllocateInfo,
-					CommandPool:        cmdPool,
-					Level:              vk.CommandBufferLevelPrimary,
-					CommandBufferCount: 1,
-				}, cmd)
-				OrPanic(as.NewError(ret))
-				app.uiSwapResources[i].cmd = cmd[0]
-			}
-		} else {
-			panic("error getting command pool")
-		}
-	} else {
-		panic("error getting command pool")
-	}
-
-	// note i skip graphicsToPresentCmd
-
-	for i := 0; i < len(app.uiSwapResources); i++ {
-		var view vk.ImageView
-		ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
-			SType:  vk.StructureTypeImageViewCreateInfo,
-			Format: c.SwapchainDimensions().Format,
-			Components: vk.ComponentMapping{
-				R: vk.ComponentSwizzleR,
-				G: vk.ComponentSwizzleG,
-				B: vk.ComponentSwizzleB,
-				A: vk.ComponentSwizzleA,
-			},
-			SubresourceRange: vk.ImageSubresourceRange{
-				AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
-				LevelCount: 1,
-				LayerCount: 1,
-			},
-			ViewType: vk.ImageViewType2d,
-			Image:    app.uiSwapResources[i].image,
-		}, nil, &view)
-		OrPanic(as.NewError(ret))
-		app.uiSwapResources[i].view = view
-	}
-
-	ret = vk.EndCommandBuffer(c.CommandBuffer())
-	OrPanic(as.NewError(ret))
-	// todo c.flushInitCmd()?
 }
 
 func (app *Application) LoadAllChunks() {
@@ -1415,7 +1306,6 @@ func (app *Application) prepareuiQuad() {
 }
 
 func (app *Application) VulkanContextPrepare() error {
-	app.initializeSwapResources()
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
 	app.width = dim.Width
@@ -1452,8 +1342,6 @@ func (app *Application) VulkanContextPrepare() error {
 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 	app.determineVisibleChunks()
 
-	app.prepareuiCmd()	// not sure where I should place this
-
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
 	app.prepareuiDescriptorLayout()
@@ -1467,16 +1355,18 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// hmmm
 	swapchainImageResources := app.Context().SwapchainImageResources()
+	uiSwapResources := app.Context().UISwapchainImageResources()
 	for i, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
-		app.updateuiCommandBuffer(app.uiSwapResources[i], app.uiSwapResources[i].cmd)
+		app.updateuiCommandBuffer(uiSwapResources[i], uiSwapResources[i].CommandBuffer())
 	}
 	fmt.Printf("done preparing\n")
 	return nil
 }
 
 func (app *Application) VulkanContextCleanup() error {
-	dev := app.Context().Device()
+	c := app.Context()
+	dev := c.Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyDescriptorPool(dev, app.uidescPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
@@ -1490,24 +1380,13 @@ func (app *Application) VulkanContextCleanup() error {
 
 	// TODO more to destroy here?
 
-	value := reflect.ValueOf(app.Context())
-    value = value.Elem()
-    if value.Kind() != reflect.Struct {
-        panic("Expected a struct type")
-    }
-
-	cmdPoolField := value.FieldByName("cmdPool")
-	cmdPoolField = reflect.NewAt(cmdPoolField.Type(), unsafe.Pointer(cmdPoolField.UnsafeAddr())).Elem()
-	cmdPool, _ := cmdPoolField.Interface().(vk.CommandPool)
-
-
-	for _, res := range app.uiSwapResources {
-		vk.DestroyFramebuffer(dev, res.framebuffer, nil)
-		vk.DestroyImageView(dev, res.view, nil)
-		vk.FreeCommandBuffers(dev, cmdPool, 1, []vk.CommandBuffer{
-			res.cmd,
-		})		
-	}
+	// for _, res := range app.uiSwapResources {
+	// 	vk.DestroyFramebuffer(dev, res.framebuffer, nil)
+	// 	vk.DestroyImageView(dev, res.view, nil)
+	// 	vk.FreeCommandBuffers(dev, c.CmdPool(), 1, []vk.CommandBuffer{
+	// 		res.cmd,
+	// 	})		
+	// }
 
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
@@ -1578,14 +1457,14 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
 
-	res2 := app.uiSwapResources[imageIdx]
-	cmd2 := res2.cmd
+	res2 := app.Context().UISwapchainImageResources()[imageIdx]
+	cmd2 := res2.CommandBuffer()
 	app.updateuiCommandBuffer(res2, cmd2)
 
 	return nil
 }
 
-func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cmd vk.CommandBuffer) {
+func (app *Application) updateuiCommandBuffer(res *as.UISwapchainImageResources, cmd vk.CommandBuffer) {
 	// Begin command buffer
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
@@ -1597,7 +1476,7 @@ func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cm
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
 		RenderPass:  app.uirenderPass,
-		Framebuffer: res.framebuffer,
+		Framebuffer: res.Framebuffer(),
 		RenderArea: vk.Rect2D{
 			Offset: vk.Offset2D{X: 0, Y: 0},
 			Extent: vk.Extent2D{Width: app.width, Height: app.height},
@@ -1608,7 +1487,7 @@ func (app *Application) updateuiCommandBuffer(res *uiSwapchainImageResources, cm
 	// Bind pipeline and descriptor sets
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.uipipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.uipipelineLayout,
-		0, 1, []vk.DescriptorSet{res.descriptorSet}, 0, nil)
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
 	// Set viewport and scissor
 	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
