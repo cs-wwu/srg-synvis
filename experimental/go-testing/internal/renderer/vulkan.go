@@ -13,7 +13,8 @@ import (
 	"unsafe"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	as "github.com/vulkan-go/asche"
+	// as "github.com/vulkan-go/asche"
+	as "go-testing/asche2"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 
@@ -1219,7 +1220,7 @@ func (app *Application) copyTextBuffer(text image.Image) {
 	// }
 }
 
-func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
+func updateuiDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
 //     imageInfo := vk.DescriptorImageInfo{
 //         ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 //         ImageView:   imageView,
@@ -1292,6 +1293,7 @@ func (app *Application) VulkanContextPrepare() error {
 	font := prepareFont("assets/SourceSansPro-Regular.ttf")
 	text := renderTextToBitmap(font, "Hello", 72)
 	app.fontImages = append(app.fontImages, text)
+	// todo update texture dynamically
 	// // upload bitmap to vulkan as a texture
 	// 	// create a vulkan image
 	// 	app.createTextImage()
@@ -1300,6 +1302,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// 	app.copyTextBuffer(text)
 	// 	// create vulkan sampler
 	//  app.prepareuiTextures
+	// app.udpateuiDescriptorSet
 
 	app.prepareDepth()
 	app.prepareTextures()

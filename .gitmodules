@@ -1,3 +1,0 @@
-[submodule "experimental/go-testing/asche"]
-	path = experimental/go-testing/asche
-	url = git@github.com:vulkan-go/asche.git

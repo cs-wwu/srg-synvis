@@ -6,7 +6,8 @@ import (
 	"image/png"
 	"os"
 
-	as "github.com/vulkan-go/asche"
+	// as "github.com/vulkan-go/asche"
+	as "go-testing/asche2"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
