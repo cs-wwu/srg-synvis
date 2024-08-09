@@ -1267,8 +1267,8 @@ func (app *Application) copyTextBuffer(text image.Image) {
 
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
-		{Position: lin.Vec2{-.5, -.5}, TexCoord: lin.Vec2{0, 1}},
-		{Position: lin.Vec2{.5, -.5}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-.5, -.5}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{.5, -.5}, TexCoord: lin.Vec2{1, 0}},
 		{Position: lin.Vec2{.5, .5}, TexCoord: lin.Vec2{1, 1}},
 		{Position: lin.Vec2{-.5, .5}, TexCoord: lin.Vec2{0, 1}},
 	}
