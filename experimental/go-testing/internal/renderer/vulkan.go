@@ -388,6 +388,7 @@ func (app *Application) prepareTextures() {
 				vk.PipelineStageTransferBit, vk.PipelineStageFragmentShaderBit)
 			// cannot destroy until cmd is submitted.. must keep a list somewhere
 			// staging.DestroyImage(dev)
+			// todo fix this???
 		} else {
 			OrPanic(errors.New("vulkan: R8G8B8A8_UNORM not supported as texture image format"))
 		}
@@ -1097,6 +1098,7 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Im
 	if err != nil {
 		panic("could not draw text")
 	}
+	// take out
 	outFile, err := os.Create("out.png")
 	if err != nil {
 		panic("could not save png")
@@ -1114,6 +1116,7 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Im
 		os.Exit(1)
 	}
 	fmt.Println("Wrote out.png OK.")
+	// end take out
 	return dst
 }
 
@@ -1162,7 +1165,6 @@ func (app *Application) createTextImage() {
 	// app.uiImageMem = imgMem
 }
 
-// not necessary for initial text attempt
 func (app *Application) createTextBuffer(text image.Image) {
 	// dev := app.Context().Device()
 	// length := int(unsafe.Sizeof(text))
@@ -1243,35 +1245,6 @@ func (app *Application) copyTextBuffer(text image.Image) {
 //     vk.UpdateDescriptorSets(device, []vk.DescriptorWrite{descriptorWrite}, nil)
 // }
 
-// func createVertexBuffer(device vk.Device, physicalDevice vk.PhysicalDevice, commandPool vk.CommandPool, queue vk.Queue, vertices []float32) (vk.Buffer, vk.DeviceMemory, error) {
-//     bufferSize := vk.DeviceSize(len(vertices) * 4) // 4 bytes per float
-
-//     stagingBuffer, stagingBufferMemory, err := createBuffer(device, bufferSize, vk.BufferUsageTransferSrcBit, vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
-//     if err != nil {
-//         return 0, 0, err
-//     }
-
-//     // Map and copy vertex data
-//     data, err := vk.MapMemory(device, stagingBufferMemory, 0, bufferSize, 0)
-//     if err != nil {
-//         return 0, 0, err
-//     }
-//     copy(data, vertices)
-//     vk.UnmapMemory(device, stagingBufferMemory)
-
-//     vertexBuffer, vertexBufferMemory, err := createBuffer(device, bufferSize, vk.BufferUsageVertexBufferBit|vk.BufferUsageTransferDstBit, vk.MemoryPropertyDeviceLocalBit)
-//     if err != nil {
-//         return 0, 0, err
-//     }
-
-//     copyBuffer(device, commandPool, queue, stagingBuffer, vertexBuffer, bufferSize)
-
-//     vk.DestroyBuffer(device, stagingBuffer, nil)
-//     vk.FreeMemory(device, stagingBufferMemory, nil)
-
-//     return vertexBuffer, vertexBufferMemory, nil
-// }
-
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
 		{Position: lin.Vec2{-.5, -.5}, TexCoord: lin.Vec2{0, 0}},
@@ -1282,8 +1255,7 @@ func (app *Application) initUIDimensions() {
 	app.vertices = vertices
 
 	app.indices = []Index{
-		// 0, 1, 2, 2, 3, 0, // Front face
-		0, 1, 2, 2, 3, 0, // Front face
+		0, 1, 2, 2, 3, 0, // Front face (CLOCKWISE)
 	}
 }
 
@@ -1343,9 +1315,6 @@ func (app *Application) VulkanContextPrepare() error {
 	//  app.prepareuiTextures
 	// update descriptor sets
 	// draw the text texture to screen
-	// create a vertex buffer
-	// create a shader for text rendering
-	// draw the quad with text texture
 
 	// Load all available chunks for now
 	app.LoadAllChunks()
@@ -1364,7 +1333,6 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
-	// hmmm
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	uiSwapResources := app.Context().UISwapchainImageResources()
 	for i, res := range swapchainImageResources {
@@ -1680,6 +1648,7 @@ func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
 	if rowPitch <= 4*img.Bounds().Dy() {
 		// apply the proposed row pitch only if supported,
 		// as we're using only optimal textures.
+		// todo???
 		newImg.Stride = rowPitch
 	}
 	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
