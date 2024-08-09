@@ -87,7 +87,7 @@ type Application struct {
 	ubo          UniformBufferObject
 
 	// ui stuff: todo reduce...
-	vertices           []uiVertex
+	vertices           []UIVertex
 	indices            []Index
 	vertexBuffer       vk.Buffer
 	vertexBufferMemory vk.DeviceMemory
@@ -525,7 +525,7 @@ func (app *Application) prepareuiDescriptorLayout() {
 		PBindings: []vk.DescriptorSetLayoutBinding{{
 			Binding:         0,
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-			DescriptorCount: uint32(len(texEnabled)),
+			DescriptorCount: uint32(len(uitexEnabled)),
 			StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
 		}},
 	}, nil, &descLayout)
@@ -622,6 +622,7 @@ func (app *Application) prepareuiRenderPass() {
 			}},
 		}},
 	}, nil, &renderPass)
+	// subpass dependency?
 	OrPanic(as.NewError(ret))
 	app.uirenderPass = renderPass
 }
@@ -790,7 +791,7 @@ func (app *Application) prepareuiPipeline() {
 	bindingDescriptions := []vk.VertexInputBindingDescription{
 		{
 			Binding:   0,
-			Stride:    uint32(uiVertexSize),
+			Stride:    uint32(UIVertexSize),
 			InputRate: vk.VertexInputRateVertex,
 		},
 	}
@@ -800,19 +801,19 @@ func (app *Application) prepareuiPipeline() {
 			Binding:  0,
 			Location: 0,
 			Format:   vk.FormatR32g32Sfloat, // vec2
-			Offset:   uint32(unsafe.Offsetof(uiVertex{}.Position)),
+			Offset:   uint32(unsafe.Offsetof(UIVertex{}.Position)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
 			Format:   vk.FormatR32g32Sfloat, // vec2
-			Offset:   uint32(unsafe.Offsetof(uiVertex{}.TexCoord)),
+			Offset:   uint32(unsafe.Offsetof(UIVertex{}.TexCoord)),
 		},
 	}
 
 	pipelineCreateInfos := []vk.GraphicsPipelineCreateInfo{{
 		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
-		Layout:     app.pipelineLayout,
+		Layout:     app.uipipelineLayout,
 		RenderPass: app.uirenderPass,
 
 		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
@@ -839,7 +840,7 @@ func (app *Application) prepareuiPipeline() {
 			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
 			PolygonMode: vk.PolygonModeFill,
 			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
-			FrontFace:   vk.FrontFaceCounterClockwise,
+			FrontFace:   vk.FrontFaceClockwise,
 			LineWidth:   1.0,
 		},
 		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
@@ -1265,15 +1266,16 @@ func (app *Application) copyTextBuffer(text image.Image) {
 // }
 
 func (app *Application) initUIDimensions() {
-	vertices := []uiVertex{
-		{Position: lin.Vec2{-1, -1}, TexCoord: lin.Vec2{0, 1}},
-		{Position: lin.Vec2{1, -1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{1, 1}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{-1, 1}, TexCoord: lin.Vec2{0, 1}},
+	vertices := []UIVertex{
+		{Position: lin.Vec2{-.5, -.5}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec2{.5, -.5}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{.5, .5}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-.5, .5}, TexCoord: lin.Vec2{0, 1}},
 	}
 	app.vertices = vertices
 
 	app.indices = []Index{
+		// 0, 1, 2, 2, 3, 0, // Front face
 		0, 1, 2, 2, 3, 0, // Front face
 	}
 }
@@ -1281,10 +1283,11 @@ func (app *Application) initUIDimensions() {
 func (app *Application) prepareuiQuad() {
 	dev := app.Context().Device()
 
-	// Prepare raw data slice
-	var dataRaw []byte
-	for _, vertex := range app.vertices {
-		dataRaw = append(dataRaw, vertex.Data()...)
+	vertBufSize := len(app.vertices) * UIVertexSize
+	dataRaw := make([]byte, vertBufSize)
+
+	for i, vertex := range app.vertices {
+		copy(dataRaw[i*UIVertexSize:], vertex.Data())
 	}
 
 	memProps := app.Context().Platform().MemoryProperties()
@@ -1293,10 +1296,10 @@ func (app *Application) prepareuiQuad() {
 	app.vertexBuffer = buf.Buffer
 
 	// Prepare raw data slice
-	var dataRaw2 []byte
-	for _, index := range app.indices {
-		idx := Index(index)
-		dataRaw2 = append(dataRaw, idx.Data()...)
+	indBufSize := len(app.indices) * IndexSize
+	dataRaw2 := make([]byte, indBufSize)
+	for i, index := range app.indices {
+		copy(dataRaw2[i*IndexSize:], index.Data())
 	}
 
 	memProps2 := app.Context().Platform().MemoryProperties()
@@ -1502,7 +1505,7 @@ func (app *Application) updateuiCommandBuffer(res *as.UISwapchainImageResources,
 	}})
 
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.vertexBuffer}, []vk.DeviceSize{0})
-	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint16)
+	vk.CmdBindIndexBuffer(cmd, app.indexBuffer, 0, vk.IndexTypeUint32)
 	vk.CmdDrawIndexed(cmd, uint32(len(app.indices)), 1, 0, 0, 0)
 
 	// End render pass
