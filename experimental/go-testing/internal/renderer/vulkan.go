@@ -35,7 +35,8 @@ var texEnabled = []string{
 	"assets/textures/checkers.png",
 }
 var uitexEnabled = []string{
-	"assets/textures/gopher.png",
+	// "assets/textures/gopher.png",
+	"out.png",
 }
 
 func NewApplication() *Application {
@@ -847,8 +848,14 @@ func (app *Application) prepareuiPipeline() {
 			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
 			AttachmentCount: 1,
 			PAttachments: []vk.PipelineColorBlendAttachmentState{{
-				ColorWriteMask: 0xF,
-				BlendEnable:    vk.False,
+				BlendEnable:        vk.True,
+				ColorWriteMask:     vk.ColorComponentFlags(vk.ColorComponentRBit) | vk.ColorComponentFlags(vk.ColorComponentGBit) | vk.ColorComponentFlags(vk.ColorComponentBBit) | vk.ColorComponentFlags(vk.ColorComponentABit),
+				ColorBlendOp:            vk.BlendOpAdd,
+				AlphaBlendOp:       vk.BlendOpAdd,
+				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
+				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
+				SrcAlphaBlendFactor: vk.BlendFactorOne,
+				DstAlphaBlendFactor: vk.BlendFactorZero,
 			}},
 		},
 		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
@@ -1323,8 +1330,9 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.initUIDimensions()
 	app.prepareuiQuad()
-	// font := prepareFont("../../assets/SourceSansPro-Regular.tff")
+	font := prepareFont("assets/SourceSansPro-Regular.ttf")
 	// text := renderTextToBitmap(font, "Hello", 24)
+	renderTextToBitmap(font, "Hello", 24)
 	// // upload bitmap to vulkan as a texture
 	// 	// create a vulkan image
 	// 	app.createTextImage()
