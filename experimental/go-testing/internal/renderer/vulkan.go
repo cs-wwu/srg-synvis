@@ -1,7 +1,6 @@
 package renderer
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -34,10 +33,7 @@ const (
 var texEnabled = []string{
 	"assets/textures/checkers.png",
 }
-var uitexEnabled = []string{
-	// "assets/textures/gopher.png",
-	"out.png",
-}
+
 
 func NewApplication() *Application {
 	camera := NewCamera()
@@ -62,6 +58,7 @@ type Application struct {
 	colorSpace vk.ColorSpace
 
 	textures          []*Texture
+	uiTextures         []*Texture
 	depth             *Depth
 	useStagingBuffers bool
 
@@ -94,7 +91,7 @@ type Application struct {
 	vertexBufferMemory vk.DeviceMemory
 	indexBuffer        vk.Buffer
 	indexBufferMemory  vk.DeviceMemory
-	uiTextures         []*Texture
+	fontImages		   []image.Image
 
 	camera        *Camera
 	frustum       *Frustum
@@ -174,12 +171,18 @@ func (app *Application) prepareDepth() {
 	app.depth.view = view
 }
 
-func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
+func (app *Application) prepareTextureImage(path string, img image.Image, tiling vk.ImageTiling,
 	usage vk.ImageUsageFlagBits, memoryProps vk.MemoryPropertyFlagBits) *Texture {
 
 	dev := app.Context().Device()
 	texFormat := vk.FormatR8g8b8a8Unorm
-	_, width, height, err := loadTextureData(path, 0)
+	var width, height int
+	var err error
+	if path != "" {
+		_, width, height, err = loadTextureData(path, 0)
+	} else {
+		_, width, height, err = loaduiTextureData(img, 0)
+	}
 	if err != nil {
 		OrPanic(err)
 	}
@@ -236,7 +239,13 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		}, &layout)
 		layout.Deref()
 
-		data, _, _, err := loadTextureData(path, int(layout.RowPitch))
+		var data []byte
+		var err error
+		if path != "" {
+			data, _, _, err = loadTextureData(path, int(layout.RowPitch))
+		} else {
+			data, _, _, err = loaduiTextureData(img, int(layout.RowPitch))
+		}
 		OrPanic(err)
 		if len(data) > 0 {
 			var pData unsafe.Pointer
@@ -319,14 +328,14 @@ func (app *Application) prepareTextures() {
 	props.Deref()
 
 	fmt.Printf("GPU: %v\n", app.getGPUName(gpu))
-	prepareTex := func(path string) *Texture {
+	prepareTex := func(path string, img image.Image) *Texture {
 		var tex *Texture
 
 		if (props.LinearTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureSampledImageBit) != 0) &&
 			!app.useStagingBuffers {
 			// -> device can texture using linear textures
 
-			tex = app.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageSampledBit,
+			tex = app.prepareTextureImage(path, img, vk.ImageTilingLinear, vk.ImageUsageSampledBit,
 				vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
 
 			// Nothing in the pipeline needs to be complete to start, and don't allow fragment
@@ -340,9 +349,9 @@ func (app *Application) prepareTextures() {
 			//  Must use staging buffer to copy linear texture to optimized
 			log.Println("vulkan warn: using staging buffers")
 
-			staging := app.prepareTextureImage(path, vk.ImageTilingLinear, vk.ImageUsageTransferSrcBit,
+			staging := app.prepareTextureImage(path, img, vk.ImageTilingLinear, vk.ImageUsageTransferSrcBit,
 				vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
-			tex = app.prepareTextureImage(path, vk.ImageTilingOptimal,
+			tex = app.prepareTextureImage(path, img, vk.ImageTilingOptimal,
 				vk.ImageUsageTransferDstBit|vk.ImageUsageSampledBit, vk.MemoryPropertyDeviceLocalBit)
 
 			app.setImageLayout(staging.image, vk.ImageAspectColorBit,
@@ -437,12 +446,16 @@ func (app *Application) prepareTextures() {
 
 	app.textures = make([]*Texture, 0, len(texEnabled))
 	for _, texFile := range texEnabled {
-		app.textures = append(app.textures, prepareTex(texFile))
+		app.textures = append(app.textures, prepareTex(texFile, nil))
 	}
 
-	app.uiTextures = make([]*Texture, 0, len(uitexEnabled))
-	for _, texFile := range uitexEnabled {
-		app.uiTextures = append(app.uiTextures, prepareTex(texFile))
+	// app.uiTextures = make([]*Texture, 0, len(uitexEnabled))
+	// for _, texFile := range uitexEnabled {
+	// 	app.uiTextures = append(app.uiTextures, prepareTex(texFile, nil))
+	// }
+	app.uiTextures = make([]*Texture, 0, len(app.fontImages))
+	for _, img := range app.fontImages {
+		app.uiTextures = append(app.uiTextures, prepareTex("", img))
 	}
 }
 
@@ -527,7 +540,7 @@ func (app *Application) prepareuiDescriptorLayout() {
 		PBindings: []vk.DescriptorSetLayoutBinding{{
 			Binding:         0,
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-			DescriptorCount: uint32(len(uitexEnabled)),
+			DescriptorCount: uint32(len(app.fontImages)),
 			StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
 		}},
 	}, nil, &descLayout)
@@ -918,7 +931,7 @@ func (app *Application) prepareDescriptorPool() {
 		PoolSizeCount: 1,
 		PPoolSizes: []vk.DescriptorPoolSize{{
 			Type:            vk.DescriptorTypeCombinedImageSampler,
-			DescriptorCount: uint32(len(uiswapchainImageResources) * len(uitexEnabled)),
+			DescriptorCount: uint32(len(uiswapchainImageResources) * len(app.fontImages)),
 		}},
 	}, nil, &uidescPool)
 	OrPanic(as.NewError(ret))
@@ -995,7 +1008,7 @@ func (app *Application) prepareDescriptorSet() {
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
-			DescriptorCount: uint32(len(uitexEnabled)),
+			DescriptorCount: uint32(len(app.fontImages)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 			PImageInfo:      texInfos2,
 		}}, 0, nil)
@@ -1082,8 +1095,6 @@ func prepareFont(fontPath string) *truetype.Font {
 	// )
 }
 
-// todo: currently writing out a png so that I can call prepare texture
-// this will be too heavyweight in the future
 func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Image {
 	c := freetype.NewContext()
 	c.SetFont(font)
@@ -1098,25 +1109,6 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Im
 	if err != nil {
 		panic("could not draw text")
 	}
-	// take out
-	outFile, err := os.Create("out.png")
-	if err != nil {
-		panic("could not save png")
-	}
-	defer outFile.Close()
-	b := bufio.NewWriter(outFile)
-	err = png.Encode(b, dst)
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
-	err = b.Flush()
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
-	fmt.Println("Wrote out.png OK.")
-	// end take out
 	return dst
 }
 
@@ -1227,7 +1219,7 @@ func (app *Application) copyTextBuffer(text image.Image) {
 	// }
 }
 
-// func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
+func updateDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, imageView vk.ImageView, sampler vk.Sampler) {
 //     imageInfo := vk.DescriptorImageInfo{
 //         ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 //         ImageView:   imageView,
@@ -1243,7 +1235,7 @@ func (app *Application) copyTextBuffer(text image.Image) {
 //     }
 
 //     vk.UpdateDescriptorSets(device, []vk.DescriptorWrite{descriptorWrite}, nil)
-// }
+}
 
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
@@ -1297,14 +1289,9 @@ func (app *Application) VulkanContextPrepare() error {
 	OrPanic(err)
 	app.heightmap = heightmap
 
-	app.prepareDepth()
-	app.prepareTextures()
-
-	app.initUIDimensions()
-	app.prepareuiQuad()
 	font := prepareFont("assets/SourceSansPro-Regular.ttf")
-	// text := renderTextToBitmap(font, "Hello", 24)
-	renderTextToBitmap(font, "Hello", 24)
+	text := renderTextToBitmap(font, "Hello", 72)
+	app.fontImages = append(app.fontImages, text)
 	// // upload bitmap to vulkan as a texture
 	// 	// create a vulkan image
 	// 	app.createTextImage()
@@ -1313,8 +1300,12 @@ func (app *Application) VulkanContextPrepare() error {
 	// 	app.copyTextBuffer(text)
 	// 	// create vulkan sampler
 	//  app.prepareuiTextures
-	// update descriptor sets
-	// draw the text texture to screen
+
+	app.prepareDepth()
+	app.prepareTextures()
+
+	app.initUIDimensions()
+	app.prepareuiQuad()
 
 	// Load all available chunks for now
 	app.LoadAllChunks()
@@ -1409,7 +1400,6 @@ func (app *Application) NextFrame() {
 // called every frame by asche
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
-// todo: might be screwed for AcquireNextImage -> or not if it just return imageIdx(???)
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	// Current UBO update logic
 	dev := app.Context().Device()
@@ -1507,8 +1497,8 @@ func (app *Application) updateuiCommandBuffer(res *as.UISwapchainImageResources,
 	// // record the copy command to transfer data from buffer to image
 	// vk.CmdCopyBufferToImage(
 	//     cmd,
-	//     app.uiBuffer, // Replace with your actual staging buffer
-	//     app.uiImage,         // Replace with your actual image
+	//     app.uiBuffer,
+	//     app.uiImage,
 	//     vk.ImageLayoutTransferDstOptimal,
 	//     1,
 	//     []vk.BufferImageCopy{copyRegion},
@@ -1648,12 +1638,34 @@ func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
 	if rowPitch <= 4*img.Bounds().Dy() {
 		// apply the proposed row pitch only if supported,
 		// as we're using only optimal textures.
-		// todo???
 		newImg.Stride = rowPitch
 	}
 	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
 	size := newImg.Bounds().Size()
 	return []byte(newImg.Pix), size.X, size.Y, nil
+}
+
+func loaduiTextureData(img image.Image, rowPitch int) ([]byte, int, int, error) {
+	// Ensure the image is in RGBA format
+	rgbaImg, ok := img.(*image.RGBA)
+	if !ok {
+		// Convert image to RGBA if it's not already in that format
+		bounds := img.Bounds()
+		rgbaImg = image.NewRGBA(bounds)
+		draw.Draw(rgbaImg, bounds, img, image.Point{}, draw.Src)
+	}
+
+	// Adjust stride if necessary
+	if rowPitch <= 4*rgbaImg.Bounds().Dy() {
+		rgbaImg.Stride = rowPitch
+	}
+
+	// Extract pixel data
+	data := rgbaImg.Pix
+	width := rgbaImg.Bounds().Dx()
+	height := rgbaImg.Bounds().Dy()
+
+	return data, width, height, nil
 }
 
 // Converts the given file to a byte array to be used
