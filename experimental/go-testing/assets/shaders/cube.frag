@@ -33,7 +33,7 @@ void main() {
     vec4 baseColor = texColor * vec4(fragColor, 1.0);
     
     // Check if the height (y-coordinate) is 0 or less
-    if (fragTexCoord.z > 0.0) {
+    if (fragTexCoord.z > 1.0) {
         outColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue color
     } else {
         outColor = baseColor;
