@@ -71,9 +71,9 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 
 Download latest version of RenderDoc
 ```bash
-tar -xvzf rederdoc_*.tar.gz
+tar -xvzf rederdoc_<your_version>.tar.gz
 sudo mkdir /opt/renderdoc
-sudo cp -r Downloads/renderdoc_*/* /opt/renderdoc
+sudo cp -r Downloads/renderdoc_<your_version>/* /opt/renderdoc
 sudo ln -s /opt/renderdoc/bin/rederdoccmd /usr/local/bin/renderdoccmd
 sudo ln -s /opt/renderdoc/bin/qrenderdoc /usr/local/bin/qrenderdoc
 ```

@@ -1294,15 +1294,16 @@ func (app *Application) VulkanContextPrepare() error {
 	text := renderTextToBitmap(font, "Hello", 72)
 	app.fontImages = append(app.fontImages, text)
 	// todo update texture dynamically
-	// // upload bitmap to vulkan as a texture
-	// 	// create a vulkan image
-	// 	app.createTextImage()
-	// 	// copy bitmap data to vulkan image
-	// 	app.createTextBuffer(text)
-	// 	app.copyTextBuffer(text)
-	// 	// create vulkan sampler
-	//  app.prepareuiTextures
-	// app.udpateuiDescriptorSet
+	// /copy data to a stagin buffer
+	// map staging buffer and copy mem to it
+	// transition texture to transfer dest layout
+	// cpy staging buffer to texture
+	// transition texture back to og layout
+	// update descriptor sets- use dynamic uniformbuffers created with vk.DescriptorTypeUniformBufferDynamic
+	// instead of creating a new texture for each tezt, use a texture atlas
+	// use pipeline layout that supports dynamic descriptor sets
+	// use render pass that can handle dynamic content
+	// synchronization..
 
 	app.prepareDepth()
 	app.prepareTextures()
