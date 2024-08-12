@@ -56,33 +56,44 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 	// This is for merging chunks together to stop chunk gaps
 	skirtDropFactor := float32(0.1) // This value can be adjusted
 
-	// Fill vertices
-	for z := -1; z <= ChunkSize; z++ {
-		for x := -1; x <= ChunkSize; x++ {
-			globalX, globalZ := chunk.X+x, chunk.Z+z
-			pixelValue := app.heightmap.Gray16At(clamp(globalX, 0, length-1), clamp(globalZ, 0, length-1)).Y
-			height := float32(int(pixelValue) - 32768)
+    // Fill vertices
+    for z := -1; z <= ChunkSize; z++ {
+        for x := -1; x <= ChunkSize; x++ {
+            globalX, globalZ := chunk.X+x, chunk.Z+z
+            pixelValue := app.heightmap.Gray16At(clamp(globalX, 0, length-1), clamp(globalZ, 0, length-1)).Y
+            height := float32(int(pixelValue) - 32768)
 
-			// Lower the height for skirt vertices
-			if x == -1 || x == ChunkSize || z == -1 || z == ChunkSize {
-				height -= skirtDropFactor
-			}
+            // Lower the height for skirt vertices
+            if x == -1 || x == ChunkSize || z == -1 || z == ChunkSize {
+                height -= skirtDropFactor
+            }
 
-			chunk.vertices[(z+1)*extendedSize+(x+1)] = Vertex{
-				Position: lin.Vec3{
-					float32(globalX),
-					height * scale,
-					float32(globalZ),
-				},
-				Normal: lin.Vec3{0.0, 0.0, 0.0},
-				TexCoord: lin.Vec3{
-					float32(globalX) / float32(length-1),
-					float32(globalZ) / float32(length-1),
-					float32(app.watermap.GrayAt(x, z).Y), // TODO, this is Water
-				},
-			}
-		}
-	}
+            // Correct water value calculation
+            var waterValue float32
+            if x >= 0 && x < ChunkSize && z >= 0 && z < ChunkSize {
+                waterValue = float32(app.watermap.GrayAt(globalX, globalZ).Y) / 255.0
+            } else {
+                // For skirt vertices, use the nearest in-bounds water value
+                nearestX := clamp(globalX, chunk.X, chunk.X+ChunkSize-1)
+                nearestZ := clamp(globalZ, chunk.Z, chunk.Z+ChunkSize-1)
+                waterValue = float32(app.watermap.GrayAt(nearestX, nearestZ).Y) / 255.0
+            }
+
+            chunk.vertices[(z+1)*extendedSize+(x+1)] = Vertex{
+                Position: lin.Vec3{
+                    float32(globalX),
+                    height * scale,
+                    float32(globalZ),
+                },
+                Normal: lin.Vec3{0.0, 0.0, 0.0},
+                TexCoord: lin.Vec3{
+                    float32(globalX) / float32(length-1),
+                    float32(globalZ) / float32(length-1),
+                    waterValue, // Corrected water value
+                },
+            }
+        }
+    }
 
 	// Generate indices (using triangle strips)
 	indexPos := 0

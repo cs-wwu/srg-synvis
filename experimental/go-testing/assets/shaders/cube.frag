@@ -32,8 +32,8 @@ void main() {
     vec4 texColor = texture(texSampler, vec2(fragTexCoord.x, fragTexCoord.y));
     vec4 baseColor = texColor * vec4(fragColor, 1.0);
     
-    // Check if the height (y-coordinate) is 0 or less
-    if (abs(fragTexCoord.z - 255.0) < 0.1) {
+    // Check if the height (y-coordinate) is greater than 0 (then it's water)
+    if (fragTexCoord.z > 0.5) {
         outColor = vec4(0.0, 0.0, 1.0, 1.0); // Blue color
     } else {
         outColor = baseColor;
