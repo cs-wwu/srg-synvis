@@ -45,3 +45,15 @@ func (u *UniformBufferObject) Data() []byte {
 	const m = 0x7fffffff
 	return (*[m]byte)(unsafe.Pointer(u))[:UBOSize]
 }
+
+type UIVertex struct {
+	Position lin.Vec2
+	TexCoord lin.Vec2
+}
+
+const UIVertexSize = int(unsafe.Sizeof(UIVertex{}))
+
+func (v *UIVertex) Data() []byte {
+	const m = 0x7fffffff
+	return (*[m]byte)(unsafe.Pointer(v))[:UIVertexSize]
+}

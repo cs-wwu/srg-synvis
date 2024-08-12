@@ -19,7 +19,7 @@ Experimental vulkan testing in `Go`.
   - [ ] LODs
 - [ ] Create a modular coordinate system
 - [ ] Splice Heightmaps together
-- [ ] (opt) Render Text on-screen
+- [X] (opt) Render Text on-screen
 - [ ] Pull Data from RPi Sensors
 - [ ] Render Live Location from RPi Sensors
 - [ ] Render View Vectors based on RPi Sensors
@@ -65,3 +65,15 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 4. Run `vkcube` to test Vulkan Libraries
 
 5. Run `go run cmd/syvis/main.go` to run the application from project root
+
+6. Install glslc libraries(?)
+7. Install RenderDoc
+
+Download latest version of RenderDoc
+```bash
+tar -xvzf rederdoc_<your_version>.tar.gz
+sudo mkdir /opt/renderdoc
+sudo cp -r Downloads/renderdoc_<your_version>/* /opt/renderdoc
+sudo ln -s /opt/renderdoc/bin/rederdoccmd /usr/local/bin/renderdoccmd
+sudo ln -s /opt/renderdoc/bin/qrenderdoc /usr/local/bin/qrenderdoc
+```

@@ -1,3 +1,5 @@
+// Package heightmap provides utilities for downloading heightmaps and
+// converting them into PNGs
 package main
 
 import (
@@ -17,6 +19,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 )
@@ -34,7 +37,8 @@ type Credentials struct {
 }
 
 type Elevations [length][length]int16
-type Pixels [length][length]uint16
+type ElevationPixels [length][length]uint16
+type Water [length][length]uint8
 
 func promptCredentials() (Credentials, error) {
 	var creds Credentials
@@ -258,6 +262,38 @@ func heightmapToBytes(HGTFilepath string) ([]byte, error) {
 	return data, nil
 }
 
+// Turns a water (.swb) file to a byte array
+func waterToBytes(waterFilepath string) ([]byte, error) {
+	// Open the water file
+	hgtFile, err := os.Open(waterFilepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %v", waterFilepath, err)
+	}
+	defer hgtFile.Close()
+
+	// Check the heightmap file and size
+	hgtFileInfo, err := hgtFile.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("error getting file info: %v", err)
+	}
+	fileSize := hgtFileInfo.Size()
+
+	// expected file size is 3601 * 3601 (size of uint8 is 1 byte)
+	var expectedFileSize int64 = length * length
+	if fileSize != expectedFileSize {
+		return nil, fmt.Errorf("wrong file size, expected %d, received %d", expectedFileSize, fileSize)
+	}
+
+	// Create binary array and read it into data
+	data := make([]byte, fileSize)
+	_, err = hgtFile.Read(data)
+	if err != nil {
+		return nil, fmt.Errorf("error reading data from %s: %v", waterFilepath, err)
+	}
+
+	return data, nil
+}
+
 // Populate the elevations matrix with a data byte array
 func (elevations *Elevations) populate(data []byte) error {
 	reader := bytes.NewReader(data)
@@ -278,7 +314,7 @@ func (elevations *Elevations) populate(data []byte) error {
 // This will convert every elevation number from -32768 to 32767 to 0 - 65535
 //
 //	e.g. -12345 will become 20424 since it is 20424 from -32768
-func (pixels *Pixels) populate(elevations Elevations) error {
+func (pixels *ElevationPixels) populate(elevations Elevations) error {
 	var minInt16 uint16 = uint16(math.Abs(math.MinInt16))
 	for i := 0; i < length; i++ {
 		for j := 0; j < length; j++ {
@@ -314,7 +350,7 @@ func heightmapToPng(heightmapFilepath, pngFilepath string) error {
 	}
 
 	// Normalize the elevations to uint16 (no negatives in png)
-	var pixels Pixels
+	var pixels ElevationPixels
 	err = pixels.populate(elevations)
 	if err != nil {
 		return fmt.Errorf("failed to normalize matrix to pixels: %v", err)
@@ -390,32 +426,233 @@ func unzip(zipFile, targetDir string) error {
 	return nil
 }
 
-// Processes an array of heightmaps into pngs into the targetDir
-func ProcessHeightmaps(heightmaps []string, targetDir string) error {
-	err := downloadHeightmaps(heightmaps, targetDir)
-	if err != nil {
-		return fmt.Errorf("failed to download heightmaps: %v", err)
+// Fill the water array
+func (w *Water) populate(data []byte) error {
+	reader := bytes.NewReader(data)
+	for i := 0; i < length; i++ {
+		for j := 0; j < length; j++ {
+			var value uint8
+			err := binary.Read(reader, binary.BigEndian, &value)
+			if err != nil {
+				return fmt.Errorf("error reading uint8: %v", err)
+			}
+			w[i][j] = value
+		}
 	}
+	return nil
+}
+
+// Function to turn a water (.swb) file to a png
+func waterToPng(waterFilepath, pngFilepath string) error {
+	fmt.Printf("Creating %s\n", pngFilepath)
+	// Create a binary slice from the heightmap
+	data, err := waterToBytes(waterFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to convert water to byte array: %v", err)
+	}
+
+	// Pull the water map from the water data
+	var water Water
+	err = water.populate(data)
+	if err != nil {
+		return fmt.Errorf("failed to populate water matrix: %v", err)
+	}
+
+	// Fill the grayImage with the normalized array (Pixels)
+	grayImage := image.NewGray(image.Rect(0, 0, length, length))
+	for y := 0; y < length; y++ {
+		for x := 0; x < length; x++ {
+			grayValue := water[y][x]
+			grayImage.SetGray(x, y, color.Gray{Y: grayValue})
+		}
+	}
+
+	// Write elevations to png
+	pngFile, err := os.Create(pngFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %v", pngFilepath, err)
+	}
+	defer pngFile.Close()
+
+	if err := encodePNG(pngFile, grayImage); err != nil {
+		return fmt.Errorf("failed to encode %s: %v", pngFilepath, err)
+	}
+
+	return nil
+}
+
+// Function to turn a water (.swb) file to an rle compressed file
+// The rle is stored as the following:
+// All uint32:
+// 	First uint32: n Number of rle switches
+// 	Second uint32: 0 if starting with land, 1 if starting with water
+// 	Third to nth uint32: Number of land/water until next switch
+// 	e.g. All water would be [1 1 12967201]
+//      Half water then land would be [2 1 6483600 6483601]
+func waterToRle(waterFilepath, rleFilepath string) error {
+	fmt.Printf("Creating %s\n", rleFilepath)
+	// Create a binary slice from the heightmap
+	data, err := waterToBytes(waterFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to convert heightmap to byte array: %v", err)
+	}
+
+	// Pull the water map from the water data
+	var water Water
+	err = water.populate(data)
+	if err != nil {
+		return fmt.Errorf("failed to populate water matrix: %v", err)
+	}
+	
+	// We now have water in a byte array
+	processedData := make([]uint32, 0)
+	processedData = append(processedData, 1) // Initialize with 1 switch
+
+	currentState := uint32(0) // 0 for land, 1 for water
+	count := uint32(0)
+
+	for _, row := range water {
+		for _, isWater := range row {
+			state := uint32(0)
+			if isWater == 255 {
+				state = 1
+			}
+
+			if state == currentState {
+				count++
+			} else {
+				processedData[0]++ // Increment number of switches
+				processedData = append(processedData, count)
+				currentState = state
+				count = 1
+			}
+		}
+	}
+
+	// Append the final count
+	processedData = append(processedData, count)
+
+	// Set the second uint32 to indicate starting state
+	processedData = append([]uint32{processedData[0], processedData[1]}, processedData[2:]...)
+
+	// Convert []uint32 to []byte
+	byteData := make([]byte, len(processedData)*4)
+	for i, v := range processedData {
+		binary.LittleEndian.PutUint32(byteData[i*4:], v)
+	}
+
+	// Write RLE data to file
+	rleFile, err := os.Create(rleFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %v", rleFilepath, err)
+	}
+	defer rleFile.Close()
+
+	_, err = rleFile.Write(byteData)
+	if err != nil {
+		return fmt.Errorf("failed to write processed water data to file: %w", err)
+	}
+
+	return nil
+}
+
+// Function to reverse RLE compression
+func rleToWater(rleFilepath, waterFilepath string) error {
+	fmt.Printf("Creating %s\n", waterFilepath)
+
+	// Read RLE data from file
+	rleData, err := os.ReadFile(rleFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to read RLE file: %v", err)
+	}
+
+	// Convert []byte to []uint32
+	rleUint32 := make([]uint32, len(rleData)/4)
+	for i := 0; i < len(rleData); i += 4 {
+		rleUint32[i/4] = binary.LittleEndian.Uint32(rleData[i : i+4])
+	}
+
+	// Process RLE data
+	// numSwitches := rleUint32[0]
+	startState := rleUint32[1]
+	waterData := make([]byte, 0)
+
+	currentState := startState
+	for _, count := range rleUint32[2:] {
+		value := byte(0)
+		if currentState == 1 {
+			value = 255
+		}
+		waterData = append(waterData, make([]byte, count)...)
+		for i := len(waterData) - int(count); i < len(waterData); i++ {
+			waterData[i] = value
+		}
+		currentState = 1 - currentState // Switch state
+	}
+
+	// Write water data to file
+	waterFile, err := os.Create(waterFilepath)
+	if err != nil {
+		return fmt.Errorf("failed to create %s: %v", waterFilepath, err)
+	}
+	defer waterFile.Close()
+
+	_, err = waterFile.Write(waterData)
+	if err != nil {
+		return fmt.Errorf("failed to write water data to file: %w", err)
+	}
+
+	return nil
+}
+
+// Processes an array of heightmaps into pngs into the targetDir
+// See bottom of heightmap.go for example usage
+func ProcessHeightmaps(heightmaps []string, targetDir string) error {
+	if !strings.HasSuffix(targetDir, "/") { // append a "/" if necessary
+		targetDir += "/"
+	}
+
+	// err := downloadHeightmaps(heightmaps, targetDir)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to download heightmaps: %v", err)
+	// }
 
 	// Unzip each heightmap and remove the old zipped folders
 	for _, heightmap := range heightmaps {
-		zipFilePath := targetDir + heightmap + ".zip"
+		// zipFilePath := targetDir + heightmap + ".zip"
 		outputDir := targetDir + heightmap + "/"
-		err = unzip(zipFilePath, outputDir)
+		// err := unzip(zipFilePath, outputDir)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to unzip %s: %v", heightmap, err)
+		// }
+
+		// os.Remove(zipFilePath) // remove zip file
+
+		startTime := time.Now()
+		waterFile := outputDir + heightmap + ".swb"
+		waterPng := targetDir + heightmap + ".swb" + ".png"
+		err := waterToPng(waterFile, waterPng)
 		if err != nil {
-			return fmt.Errorf("failed to unzip %s: %v", heightmap, err)
+			return fmt.Errorf("failed to convert water to png: %w", err)
 		}
+		fmt.Printf("png conversion took %v\n", time.Since(startTime))
 
-		os.Remove(zipFilePath)
-
-		heightmapFile := outputDir + heightmap + ".hgt"
-		pngFile := targetDir + heightmap + ".png"
-		err = heightmapToPng(heightmapFile, pngFile)
+		startTime = time.Now()
+		waterRle := targetDir + heightmap + ".swb" + ".rle"
+		err = waterToRle(waterFile, waterRle)
 		if err != nil {
-			return fmt.Errorf("failed to convert %s to png: %v", heightmap, err)
+			return fmt.Errorf("failed to convert water to rle: %w", err)
 		}
+		fmt.Printf("rle conversion took %v\n", time.Since(startTime))
 
-		os.RemoveAll(outputDir)
+		// heightmapFile := outputDir + heightmap + ".hgt"
+		// pngFile := targetDir + heightmap + ".png"
+		// err = heightmapToPng(heightmapFile, pngFile)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to convert %s to png: %v", heightmap, err)
+		// }
+
+		// os.RemoveAll(outputDir) // Remove leftovers
 	}
 
 	return nil
@@ -424,10 +661,10 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 // Example Usage
 func main() {
 	targetDir := "heightmaps/"
-	heightmaps := []string{"n48w123"}
+	heightmaps := []string{"n48w123", "n48w122"}
 	err := ProcessHeightmaps(heightmaps, targetDir)
 	if err != nil {
-		fmt.Printf("failed to process heightmaps: %v", err)
+		fmt.Printf("failed to process heightmaps: %v\n", err)
 		os.Exit(1)
 	}
 }
