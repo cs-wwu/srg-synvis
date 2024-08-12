@@ -14,6 +14,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/golang/freetype"
 	"github.com/golang/freetype/truetype"
+
 	// as "github.com/vulkan-go/asche"
 	as "go-testing/asche2"
 
@@ -22,9 +23,10 @@ import (
 )
 
 const (
-	HGT_PATH         = "assets/heightmaps/n48w123.png" // TODO hardcoded
-	FOV              = 60.0                            // Field Of View in Degrees
-	CULLING_INTERVAL = 2                               // Perform culling every x frames
+	HGT_PATH         = "assets/heightmaps/n48w123.png"     // TODO hardcoded
+	WATER_PATH       = "assets/heightmaps/n48w123.swb.png" // TODO hardoced
+	FOV              = 60.0                                // Field Of View in Degrees
+	CULLING_INTERVAL = 2                                   // Perform culling every x frames
 )
 
 var texEnabled = []string{
@@ -77,6 +79,7 @@ type Application struct {
 	chunks       map[string]*Chunk
 	loadedChunks []*Chunk
 	heightmap    *image.Gray16
+	watermap     *image.Gray
 	ubo          UniformBufferObject
 
 	// ui stuff: todo reduce...
@@ -672,7 +675,7 @@ func (app *Application) preparePipeline() {
 		{
 			Binding:  0,
 			Location: 1,
-			Format:   vk.FormatR32g32Sfloat, // vec2
+			Format:   vk.FormatR32g32b32Sfloat, // vec3
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
 		},
 		{
@@ -680,12 +683,6 @@ func (app *Application) preparePipeline() {
 			Location: 2,
 			Format:   vk.FormatR32g32b32Sfloat, // vec3
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
-		},
-		{
-			Binding:  0,
-			Location: 3,
-			Format:   vk.FormatR32g32b32Sfloat, // vec3
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
 		},
 	}
 
@@ -1282,6 +1279,9 @@ func (app *Application) VulkanContextPrepare() error {
 	heightmap, err := GetHM(HGT_PATH)
 	OrPanic(err)
 	app.heightmap = heightmap
+	watermap, err := GetWatermap(WATER_PATH)
+	OrPanic(err)
+	app.watermap = watermap
 
 	font := prepareFont("assets/SourceSansPro-Regular.ttf")
 	text := renderTextToBitmap(font, "Hello", 72)

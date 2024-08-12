@@ -1,8 +1,6 @@
 package renderer
 
 import (
-	"fmt"
-
 	lin "github.com/xlab/linmath"
 )
 
@@ -94,6 +92,4 @@ func (app *Application) determineVisibleChunks() {
 			app.visibleChunks = append(app.visibleChunks, chunk)
 		}
 	}
-
-	fmt.Printf("Visible chunks: %d\n", len(app.visibleChunks))
 }

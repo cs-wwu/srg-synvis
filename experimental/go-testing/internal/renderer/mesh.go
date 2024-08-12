@@ -74,11 +74,11 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 					height * scale,
 					float32(globalZ),
 				},
-				Color:  lin.Vec3{1.0, 1.0, 1.0},
 				Normal: lin.Vec3{0.0, 0.0, 0.0},
-				TexCoord: lin.Vec2{
+				TexCoord: lin.Vec3{
 					float32(globalX) / float32(length-1),
 					float32(globalZ) / float32(length-1),
+					float32(app.watermap.GrayAt(x, z).Y), // TODO, this is Water
 				},
 			}
 		}
@@ -226,6 +226,34 @@ func GetHM(hmPath string) (*image.Gray16, error) {
 	grayImg, ok := rawImg.(*image.Gray16)
 	if !ok {
 		return nil, fmt.Errorf("heightmap is not in 16-bit grayscale format")
+	}
+
+	// Verify image size
+	width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
+	if width != length || height != length {
+		return nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
+	}
+
+	return grayImg, nil
+}
+
+func GetWatermap(waterPath string) (*image.Gray, error) {
+	file, err := os.Open(waterPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open watermap: %v", err)
+	}
+	defer file.Close()
+
+	// Decode image
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode watermap: %v", err)
+	}
+
+	// Ensure the image is grayscale
+	grayImg, ok := rawImg.(*image.Gray)
+	if !ok {
+		return nil, fmt.Errorf("watermap is not in 8-bit grayscale format")
 	}
 
 	// Verify image size

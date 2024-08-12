@@ -8,9 +8,8 @@ import (
 
 type Vertex struct {
 	Position lin.Vec3
-	TexCoord lin.Vec2
+	TexCoord lin.Vec3
 	Normal   lin.Vec3
-	Color    lin.Vec3
 }
 
 const VertexSize = int(unsafe.Sizeof(Vertex{}))
