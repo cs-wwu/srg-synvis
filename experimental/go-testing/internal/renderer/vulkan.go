@@ -30,7 +30,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/checkers.png",
+	"assets/textures/test.png",
 }
 
 func NewApplication() *Application {
