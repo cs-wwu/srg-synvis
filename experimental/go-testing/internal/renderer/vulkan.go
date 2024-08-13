@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/png"
 	"log"
@@ -1091,7 +1092,10 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Im
 	c.SetFont(font)
 	c.SetFontSize(size)
 	dst := image.NewRGBA(image.Rect(0, 0, 800, 600)) // todo change dimensions
-	c.SetDst(dst)                                    // Adjust size as needed
+	bgc := color.RGBA{0, 0, 0, 128}
+	bg := image.NewUniform(bgc)
+	draw.Draw(dst, dst.Bounds(), bg, image.Point{0, 0}, draw.Src)
+	c.SetDst(dst) // Adjust size as needed
 	c.SetSrc(image.White)
 	c.SetClip(dst.Bounds())
 
@@ -1230,10 +1234,10 @@ func updateuiDescriptorSets(device vk.Device, descriptorSet vk.DescriptorSet, im
 
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
-		{Position: lin.Vec2{-.5, -.5}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec2{.5, -.5}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec2{.5, .5}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{-.5, .5}, TexCoord: lin.Vec2{0, 1}},
+		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
 	}
 	app.vertices = vertices
 
