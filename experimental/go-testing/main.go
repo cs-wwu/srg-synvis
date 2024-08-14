@@ -122,6 +122,7 @@ func main() {
 	// Additional ticker for printing FPS
 	fpsPrintTicker := time.NewTicker(time.Second)
 	var frameCount int
+	display := 0
 
 	for {
 		select {
@@ -140,7 +141,7 @@ func main() {
 				continue
 			}
 			glfw.PollEvents()
-			app.NextFrame()
+			app.NextFrame(display)
 
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			orPanic(err)
@@ -156,6 +157,7 @@ func main() {
 		case <-fpsPrintTicker.C:
 			// Print the FPS and reset the frame count
 			log.Printf("FPS: %d", frameCount)
+			display = frameCount
 			frameCount = 0
 		}
 	}

@@ -35,6 +35,8 @@ type Context interface {
 	AcquireNextImage() (imageIndex int, outdated bool, err error)
 	// PresentImage
 	PresentImage(imageIdx int) (outdated bool, err error)
+	// gets the command pool
+	CommandPool() vk.CommandPool
 }
 
 type context struct {
@@ -52,7 +54,7 @@ type context struct {
 	swapchain               vk.Swapchain
 	swapchainDimensions     *SwapchainDimensions
 	swapchainImageResources []*SwapchainImageResources
-	uiSwapResources 		[]*UISwapchainImageResources
+	uiSwapResources         []*UISwapchainImageResources
 	frameLag                int
 
 	imageAcquiredSemaphores  []vk.Semaphore
@@ -125,6 +127,10 @@ func (c *context) Platform() Platform {
 
 func (c *context) CommandBuffer() vk.CommandBuffer {
 	return c.cmd
+}
+
+func (c *context) CommandPool() vk.CommandPool {
+	return c.cmdPool
 }
 
 func (c *context) SwapchainDimensions() *SwapchainDimensions {
