@@ -1122,7 +1122,7 @@ func (app *Application) updateText(str string, size float64) {
 		NewLayout:           vk.ImageLayoutTransferDstOptimal,
 		SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
 		DstQueueFamilyIndex: vk.QueueFamilyIgnored,
-		Image:               app.uiTextures[0].image, // todo
+		Image:               app.uiTextures[0].image,
 		SubresourceRange: vk.ImageSubresourceRange{
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
 			LayerCount: 1,
@@ -1146,7 +1146,7 @@ func (app *Application) updateText(str string, size float64) {
 		NewLayout:           vk.ImageLayoutShaderReadOnlyOptimal,
 		SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
 		DstQueueFamilyIndex: vk.QueueFamilyIgnored,
-		Image:               app.uiTextures[0].image, // todo
+		Image:               app.uiTextures[0].image,
 		SubresourceRange: vk.ImageSubresourceRange{
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
 			LayerCount: 1,
@@ -1270,18 +1270,11 @@ func (app *Application) VulkanContextCleanup() error {
 
 	// TODO more to destroy here?
 
-	// for _, res := range app.uiSwapResources {
-	// 	vk.DestroyFramebuffer(dev, res.framebuffer, nil)
-	// 	vk.DestroyImageView(dev, res.view, nil)
-	// 	vk.FreeCommandBuffers(dev, c.CmdPool(), 1, []vk.CommandBuffer{
-	// 		res.cmd,
-	// 	})
-	// }
-
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
 	}
 	for i := 0; i < len(app.uiTextures); i++ {
+		app.uiTextures[i].stagingbuf.Destroy()
 		app.uiTextures[i].Destroy(dev)
 	}
 
@@ -1354,6 +1347,8 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	return nil
 }
 
+// returns a cmd buffer that has begun recording
+// intended for use only once
 func (app *Application) beginSingleTimeCommands() []vk.CommandBuffer {
 	cmdBufferAllocateInfo := vk.CommandBufferAllocateInfo{
 		SType:              vk.StructureTypeCommandBufferAllocateInfo,
@@ -1376,6 +1371,7 @@ func (app *Application) beginSingleTimeCommands() []vk.CommandBuffer {
 	return cmdBuffer
 }
 
+// ends an active cmd buffer
 func (app *Application) endSingleTimeCommands(cmdBuffer []vk.CommandBuffer) {
 	ret := vk.EndCommandBuffer(cmdBuffer[0])
 	OrPanic(as.NewError(ret))
