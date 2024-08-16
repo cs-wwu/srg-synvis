@@ -9,4 +9,9 @@ require (
 	github.com/xlab/closer v1.1.0
 )
 
-require github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
+require (
+	github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
+	golang.org/x/term v0.23.0
+)
+
+require golang.org/x/sys v0.23.0 // indirect

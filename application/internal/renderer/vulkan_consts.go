@@ -44,9 +44,9 @@ type Application struct {
 }
 
 const (
-	HGT_PATH         = "assets/heightmaps/n48w123.png" // TODO hardcoded
-	FOV              = 60.0                            // Field Of View in Degrees
-	CULLING_INTERVAL = 2                               // Perform culling every x frames
+	HGT_PATH         = "assets/maps/n48w123.hgt.png" // TODO hardcoded
+	FOV              = 60.0                          // Field Of View in Degrees
+	CULLING_INTERVAL = 1                             // Perform culling every x frames
 
 	WINDOW_HEIGHT = 480
 	WINDOW_WIDTH  = 800
@@ -215,8 +215,8 @@ const (
 
 // Descriptor Pool constants
 const (
-	DescriptorPoolCreateInfoSType      = vk.StructureTypeDescriptorPoolCreateInfo
-	DescriptorPoolSizeCount            = 2
+	DescriptorPoolCreateInfoSType = vk.StructureTypeDescriptorPoolCreateInfo
+	DescriptorPoolSizeCount       = 2
 	// DescriptorTypeUniformBuffer        = vk.DescriptorTypeUniformBuffer
 	// DescriptorTypeCombinedImageSampler = vk.DescriptorTypeCombinedImageSampler
 )
