@@ -518,7 +518,7 @@ func (app *Application) preparePipeline() {
 		{
 			Binding:  0,
 			Location: 1,
-			Format:   FormatR32g32Sfloat,
+			Format:   FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
 		},
 		{
@@ -526,12 +526,6 @@ func (app *Application) preparePipeline() {
 			Location: 2,
 			Format:   FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
-		},
-		{
-			Binding:  0,
-			Location: 3,
-			Format:   FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Color)),
 		},
 	}
 

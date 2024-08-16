@@ -73,11 +73,11 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 					height * scale,
 					float32(globalZ),
 				},
-				Color:  lin.Vec3{1.0, 1.0, 1.0},
 				Normal: lin.Vec3{0.0, 0.0, 0.0},
-				TexCoord: lin.Vec2{
+				TexCoord: lin.Vec3{
 					float32(globalX) / float32(length-1),
 					float32(globalZ) / float32(length-1),
+					0.0, // TODO: Add water processing
 				},
 			}
 		}
