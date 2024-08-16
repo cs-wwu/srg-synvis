@@ -1,7 +1,11 @@
 package renderer
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"os"
 	"runtime"
 
@@ -86,4 +90,21 @@ func FileToBytes(filename string) []byte {
 	OrPanic(err)
 
 	return data
+}
+
+func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
+	data := FileToBytes(name)
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	newImg := image.NewRGBA(img.Bounds())
+	if rowPitch <= 4*img.Bounds().Dy() {
+		// apply the proposed row pitch only if supported,
+		// as we're using only optimal textures.
+		newImg.Stride = rowPitch
+	}
+	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
+	size := newImg.Bounds().Size()
+	return []byte(newImg.Pix), size.X, size.Y, nil
 }
