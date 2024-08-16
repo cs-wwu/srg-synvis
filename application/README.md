@@ -8,6 +8,9 @@ go run cmd/svs/main.go
 
 - [x] Messily Move old stuff into Main System
 - [x] Refactor Vulkan initializing data types into vulkan_consts.go
+- [x] Refactor Heightmap loading
+  - [x] Refactor Downloading into cmd/download/main.go
+  - [x] Refactor API Usage into api/nasa.go
 - [ ] Rework Chunk Management
   - [ ] Create a Chunk Manager
     - [ ] Frustum Culling
@@ -20,11 +23,8 @@ go run cmd/svs/main.go
   - [ ] Fix Last Triangle Not Rendering
   - [ ] Redo Indices Management
 - [ ] Rework Main method to not use ticker-based system
-- [x] Refactor Heightmap loading
-  - [x] Refactor Downloading into cmd/download/main.go
-  - [x] Refactor API Usage into api/nasa.go
 - [ ] Change heightmap loading and position to be modular based on arcminutes
   - [ ] Attempt Rendering of more than one heightmap
 - [ ] Change Camera to use Quaternions
-- [ ] Begin Implementation Unit and Integration Testing
 - [ ] Re-implement UI (try to use original `asche`?)
+- [ ] Begin Implementation Unit and Integration Testing
