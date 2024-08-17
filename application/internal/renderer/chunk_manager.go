@@ -6,6 +6,8 @@ import (
 	"image/png"
 	"os"
 
+	as "github.com/vulkan-go/asche"
+	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
@@ -21,25 +23,56 @@ const (
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
 	NUM_MAPS        = 4
+	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
+
+	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
+	INDICES_PER_CHUNK  = 6 * CHUNK_SIZE * CHUNK_SIZE
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcminutes
 )
 
 // A single ChunkManager to manage load/unloading images and chunks
 type ChunkManager struct {
-	Heightmaps    map[string]*image.Gray16
-	Watermaps     map[string]*image.Gray
-	Chunks        map[string]Chunk
-	VisibleChunks []*Chunk
+	device   *vk.Device
+	memProps *vk.PhysicalDeviceMemoryProperties
+
+	vertexBuffer vk.Buffer
+	vertexMemory vk.DeviceMemory
+	indexBuffer  vk.Buffer
+	indexMemory  vk.DeviceMemory
+
+	chunkMap      map[string]Chunk
+	visibleChunks []*Chunk
+
+	heightmaps map[string]*image.Gray16
+	watermaps  map[string]*image.Gray
 }
 
-func NewChunkManager() *ChunkManager {
-	return &ChunkManager{
-		Heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
-		Watermaps:     make(map[string]*image.Gray, NUM_MAPS),
-		Chunks:        make(map[string]Chunk, NUM_MAPS*CHUNKS_PER_MAP),
-		VisibleChunks: make([]*Chunk, 0),
+func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *ChunkManager {
+	cm := &ChunkManager{
+		device:        device,
+		memProps:      memProps,
+		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
+		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
+		chunkMap:      make(map[string]Chunk, NUM_MAPS*CHUNKS_PER_MAP),
+		visibleChunks: make([]*Chunk, 0),
 	}
+
+	cm.InitBuffers()
+
+	return cm
+}
+
+func (cm *ChunkManager) InitBuffers() {
+	// Create vertex buffer
+	vertexBuf := as.CreateBuffer(*cm.device, *cm.memProps, nil, BufferUsageVertexBufferBit)
+	cm.vertexBuffer = vertexBuf.Buffer
+	cm.vertexMemory = vertexBuf.Memory
+
+	// Create index buffer
+	indexBuf := as.CreateBuffer(*cm.device, *cm.memProps, nil, BufferUsageIndexBufferBit)
+	cm.indexBuffer = indexBuf.Buffer
+	cm.indexMemory = indexBuf.Memory
 }
 
 func ChunkKey(chunkX, chunkZ int) string {
@@ -67,7 +100,7 @@ func (cm *ChunkManager) LoadWatermap(coord string) error {
 		return fmt.Errorf("watermap is not in 8-bit grayscale format")
 	}
 
-	cm.Watermaps[coord] = grayImg
+	cm.watermaps[coord] = grayImg
 
 	return nil
 }
@@ -86,7 +119,7 @@ func (cm *ChunkManager) LoadHeightmap(coord string) error {
 		return fmt.Errorf("heightmap is not in 16-bit grayscale format")
 	}
 
-	cm.Heightmaps[coord] = grayImg
+	cm.heightmaps[coord] = grayImg
 
 	return nil
 }
@@ -99,12 +132,12 @@ func (cm *ChunkManager) UnloadMaps(coord string) {
 
 // Unloads a watermap (coord) from the ChunkManager
 func (cm *ChunkManager) unloadWatermap(coord string) {
-	delete(cm.Watermaps, coord)
+	delete(cm.watermaps, coord)
 }
 
 // Unloads a heightmap (coord) from the ChunkManager
 func (cm *ChunkManager) unloadHeightmap(coord string) {
-	delete(cm.Heightmaps, coord)
+	delete(cm.heightmaps, coord)
 }
 
 // Loads a map and returns a png
@@ -131,16 +164,18 @@ func loadMap(filepath string) (image.Image, error) {
 
 // Loads a specific chunk into memory, x and z are the upper-left corner of
 // the chunk (world is in arcsecond coordinates)
-//      <-  3600 * 180 * 2 ->
-//		|-------------------| ▲
-//	   	|	    World 		| 3600 * 90 * 2
-//		|-------------------| ▼
-
+// Note that the world is Latitude by Longitude times 3600 (arcseconds):
+//
+//	<-    3600 * 360   ->
+//	--------------------- ▲
+//	|      World        | 3600 * 180
+//	--------------------- ▼
 func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	// TODO move the map coord logic out of this function, user must use and verify
+	// Let the user pass in the relavant heightmap/watermap
 	mapCoords := CoordinateFloatToMap(chunkX, chunkZ)
-	heightmap := cm.Heightmaps[mapCoords]
-	watermap := cm.Watermaps[mapCoords]
+	heightmap := cm.heightmaps[mapCoords]
+	watermap := cm.watermaps[mapCoords]
 
 	// Load the chunk based on heightmap and watermap
 	if heightmap == nil || watermap == nil {
@@ -149,7 +184,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	}
 
 	chunkKey := ChunkKey(chunkX, chunkZ)
-	if _, exists := cm.Chunks[chunkKey]; exists {
+	if _, exists := cm.chunkMap[chunkKey]; exists {
 		return // Chunk already exists
 	}
 
@@ -164,7 +199,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	calculateChunkIndices(chunk)
 	calculateChunkNormals(chunk)
 
-	cm.Chunks[chunkKey] = *chunk
+	cm.chunkMap[chunkKey] = *chunk
 }
 
 // Generate vertices and texcoords

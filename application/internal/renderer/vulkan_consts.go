@@ -235,3 +235,9 @@ const (
 	FramebufferAttachmentCount = 2
 	FramebufferLayers          = 1
 )
+
+// Chunkmanager constnts
+const (
+	BufferUsageVertexBufferBit = vk.BufferUsageVertexBufferBit
+	BufferUsageIndexBufferBit  = vk.BufferUsageIndexBufferBit
+)
