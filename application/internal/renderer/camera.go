@@ -4,6 +4,7 @@ package renderer
 
 import (
 	"fmt"
+	"log"
 	"math"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -12,18 +13,13 @@ import (
 
 var (
 	// For heightmap model
-	START_CAMERA_POS   = lin.Vec3{1740.0, 50.0, 957.0}
+	// startX, startZ = CoordinateMapToFloat("n48w123")
+
+	START_CAMERA_POS   = lin.Vec3{-28193280.0, 50.0, 11070720.0}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{1.0, 0.0, 0.5}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
-
-	// For Cube Model
-	// START_CAMERA_POS   = lin.Vec3{0.0, 2.5, 5.0}
-	// START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	// START_CAMERA_FRONT = lin.Vec3{0.0, -0.5, -0.86}
-	// CAMERA_SPEED       = float32(0.2)
-	// LOOK_SENSITIVITY   = float32(0.03)
 )
 
 type Camera struct {
@@ -51,6 +47,8 @@ func NewCamera() *Camera {
 	right := lin.Vec3{}
 	right.MultCross(&front, &worldUp)
 	right.Norm(&right)
+
+	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
 	return &Camera{
 		Pos:         &pos,

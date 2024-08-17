@@ -710,44 +710,67 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
-func (app *Application) LoadAllChunks() {
-	if app.heightmap == nil {
-		panic("Heightmap not loaded")
-	}
+// func (app *Application) LoadAllChunks() {
+// 	if app.heightmap == nil {
+// 		panic("Heightmap not loaded")
+// 	}
 
-	totalChunks := (length / ChunkSize) * (length / ChunkSize)
-	fmt.Printf("Loading %d chunks...\n", totalChunks)
+// 	totalChunks := (length / ChunkSize) * (length / ChunkSize)
+// 	fmt.Printf("Loading %d chunks...\n", totalChunks)
 
-	for z := 0; z < length/ChunkSize; z++ {
-		for x := 0; x < length/ChunkSize; x++ {
-			app.OldLoadChunk(x, z)
-			if (z*length/ChunkSize+x+1)%100 == 0 {
-				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
-			}
-		}
-	}
+// 	for z := 0; z < length/ChunkSize; z++ {
+// 		for x := 0; x < length/ChunkSize; x++ {
+// 			app.OldLoadChunk(x, z)
+// 			if (z*length/ChunkSize+x+1)%100 == 0 {
+// 				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
+// 			}
+// 		}
+// 	}
 
-	fmt.Printf("All %d chunks loaded.\n", totalChunks)
-}
+// 	fmt.Printf("All %d chunks loaded.\n", totalChunks)
+// }
 
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
+	dev := app.Context().Device()
+	memProps := app.Context().Platform().MemoryProperties()
 	app.height = dim.Height
 	app.width = dim.Width
 
+	app.ChunkManager = NewChunkManager(&dev, &memProps)
 	app.initUBO()
-	heightmap, err := GetHM(HGT_PATH)
-	OrPanic(err)
-	app.heightmap = heightmap
-
 	app.prepareDepth()
 	app.prepareTextures()
 
 	// Load all available chunks for now
-	app.LoadAllChunks()
+	// app.LoadAllChunks()
 
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	// Testing for loading all maps and chunks
+	mapCoord := "n48w123"
+	err := app.ChunkManager.LoadMaps(mapCoord)
+	OrPanic(err)
+
+	// Get the world coordinates for this map
+	worldX, worldZ := CoordinateMapToFloat(mapCoord)
+
+	// Calculate how many chunks are in this map
+	chunksPerSide := MAP_LENGTH / CHUNK_SIZE
+
+	// Load all chunks for this map
+	for z := 0; z < chunksPerSide; z++ {
+		for x := 0; x < chunksPerSide; x++ {
+			chunkX := worldX + x*CHUNK_SIZE
+			chunkZ := worldZ + z*CHUNK_SIZE
+
+			app.ChunkManager.LoadChunk(chunkX, chunkZ)
+		}
+	}
+
+	// Load all of the chunks associated with n48w123
+	app.ChunkManager.FillBuffers()
+
+	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// app.determineVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()

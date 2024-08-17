@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	"fmt"
+	// "fmt"
 
 	lin "github.com/xlab/linmath"
 )
@@ -85,15 +85,15 @@ func (f *Frustum) IsChunkVisible(chunk *OldChunk) bool {
 	return true
 }
 
-func (app *Application) determineVisibleChunks() {
-	// Clear the slice while keeping the underlying array for size
-	app.visibleChunks = app.visibleChunks[:0] // Clear the slice while keeping the underlying array
+// func (app *Application) determineVisibleChunks() {
+// 	// Clear the slice while keeping the underlying array for size
+// 	app.visibleChunks = app.visibleChunks[:0] // Clear the slice while keeping the underlying array
 
-	for _, chunk := range app.loadedChunks {
-		if app.frustum.IsChunkVisible(chunk) {
-			app.visibleChunks = append(app.visibleChunks, chunk)
-		}
-	}
+// 	for _, chunk := range app.loadedChunks {
+// 		if app.frustum.IsChunkVisible(chunk) {
+// 			app.visibleChunks = append(app.visibleChunks, chunk)
+// 		}
+// 	}
 
-	fmt.Printf("Visible chunks: %d\n", len(app.visibleChunks))
-}
+// 	fmt.Printf("Visible chunks: %d\n", len(app.visibleChunks))
+// }

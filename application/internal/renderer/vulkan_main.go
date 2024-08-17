@@ -2,6 +2,7 @@
 package renderer
 
 import (
+	"fmt"
 	"log"
 	"unsafe"
 
@@ -14,13 +15,10 @@ import (
 
 func NewApplication() *Application {
 	camera := NewCamera()
-	frustum := &Frustum{}
-
+	// frustum := &Frustum{}
 	app := &Application{
-		camera:        camera,
-		frustum:       frustum,
-		visibleChunks: make([]*OldChunk, 1000),
-		chunks:        make(map[string]*OldChunk),
+		camera: camera,
+		// frustum:       frustum,
 	}
 
 	return app
@@ -39,12 +37,10 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
-	for _, chunk := range app.chunks {
-		vk.DestroyBuffer(dev, chunk.vertexBuffer, nil)
-		vk.FreeMemory(dev, chunk.vertexMemory, nil)
-		vk.DestroyBuffer(dev, chunk.indexBuffer, nil)
-		vk.FreeMemory(dev, chunk.indexMemory, nil)
-	}
+	vk.DestroyBuffer(dev, app.ChunkManager.vertexBuffer, nil)
+	vk.FreeMemory(dev, app.ChunkManager.vertexMemory, nil)
+	vk.DestroyBuffer(dev, app.ChunkManager.indexBuffer, nil)
+	vk.FreeMemory(dev, app.ChunkManager.indexMemory, nil)
 
 	app.depth.Destroy(dev)
 	return nil
@@ -52,16 +48,20 @@ func (app *Application) VulkanContextCleanup() error {
 
 func (app *Application) NextFrame() {
 	app.frameCount++
+	fmt.Printf("%d ", app.frameCount)
+	if app.frameCount%60 == 0 {
+		fmt.Printf("\n")
+	}
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	if app.frameCount%CULLING_INTERVAL == 0 {
-		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-		app.determineVisibleChunks()
-	}
+	// if app.frameCount%CULLING_INTERVAL == 0 {
+	// 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// 	app.determineVisibleChunks()
+	// }
 }
 
 // called every frame by asche
@@ -138,10 +138,20 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	}})
 
 	// Draw visible chunks
-	for _, chunk := range app.visibleChunks {
-		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{chunk.vertexBuffer}, []vk.DeviceSize{0})
-		vk.CmdBindIndexBuffer(cmd, chunk.indexBuffer, 0, vk.IndexTypeUint32)
-		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, 0, 0, 0)
+	// Bind vertex and index buffers
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.ChunkManager.vertexBuffer}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, app.ChunkManager.indexBuffer, 0, vk.IndexTypeUint32)
+
+	vertexOffset := uint32(0)
+	indexOffset := uint32(0)
+
+	for _, chunk := range app.ChunkManager.visibleChunks {
+		// Draw the chunk
+		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, indexOffset, int32(vertexOffset), 0)
+
+		// Update offsets for the next chunk
+		vertexOffset += uint32(len(chunk.vertices))
+		indexOffset += uint32(len(chunk.indices))
 	}
 
 	// End render pass

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"log"
 	"os"
+	"unsafe"
 
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -19,11 +21,16 @@ const (
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 
 	MAP_LENGTH      = 3601
-	CHUNKS_PER_SIDE = 64
+	CHUNKS_PER_SIDE = 60
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
 	NUM_MAPS        = 4
 	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
+
+	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
+	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
+	CHUNKS_X     = WORLD_WIDTH / CHUNK_SIZE
+	CHUNKS_Z     = WORLD_HEIGHT / CHUNK_SIZE
 
 	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
 	INDICES_PER_CHUNK  = 6 * CHUNK_SIZE * CHUNK_SIZE
@@ -41,7 +48,7 @@ type ChunkManager struct {
 	indexBuffer  vk.Buffer
 	indexMemory  vk.DeviceMemory
 
-	chunkMap      map[string]Chunk
+	chunks        map[string]*Chunk
 	visibleChunks []*Chunk
 
 	heightmaps map[string]*image.Gray16
@@ -52,10 +59,10 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 	cm := &ChunkManager{
 		device:        device,
 		memProps:      memProps,
+		visibleChunks: make([]*Chunk, 0),
+		chunks:        make(map[string]*Chunk),
 		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
 		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
-		chunkMap:      make(map[string]Chunk, NUM_MAPS*CHUNKS_PER_MAP),
-		visibleChunks: make([]*Chunk, 0),
 	}
 
 	cm.InitBuffers()
@@ -63,14 +70,21 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 	return cm
 }
 
+// Intializes the ChunkManager buffers
 func (cm *ChunkManager) InitBuffers() {
+	maxVertices := MAX_CHUNKS * VERTICES_PER_CHUNK
+	vertexData := make([]byte, maxVertices*VertexSize)
+
 	// Create vertex buffer
-	vertexBuf := as.CreateBuffer(*cm.device, *cm.memProps, nil, BufferUsageVertexBufferBit)
+	vertexBuf := as.CreateBuffer(*cm.device, *cm.memProps, vertexData, BufferUsageVertexBufferBit)
 	cm.vertexBuffer = vertexBuf.Buffer
 	cm.vertexMemory = vertexBuf.Memory
 
+	maxIndices := MAX_CHUNKS * INDICES_PER_CHUNK
+	indexData := make([]byte, maxIndices*IndexSize)
+
 	// Create index buffer
-	indexBuf := as.CreateBuffer(*cm.device, *cm.memProps, nil, BufferUsageIndexBufferBit)
+	indexBuf := as.CreateBuffer(*cm.device, *cm.memProps, indexData, BufferUsageIndexBufferBit)
 	cm.indexBuffer = indexBuf.Buffer
 	cm.indexMemory = indexBuf.Memory
 }
@@ -86,9 +100,103 @@ type Chunk struct {
 	Z        int // Global Z Position of the top-left chunk corner
 }
 
+// Function for filling all of the buffers with all current initialized chunks
+func (cm *ChunkManager) FillBuffers() {
+	dev := *cm.device
+
+	// Calculate total number of vertices and indices
+	totalVertices := 0
+	totalIndices := 0
+	for _, chunk := range cm.chunks {
+		totalVertices += len(chunk.vertices)
+		totalIndices += len(chunk.indices)
+	}
+
+	// Map vertex buffer
+	var vertexData unsafe.Pointer
+	vk.MapMemory(dev, cm.vertexMemory, 0, vk.DeviceSize(totalVertices*VertexSize), 0, &vertexData)
+
+	// Map index buffer
+	var indexData unsafe.Pointer
+	vk.MapMemory(dev, cm.indexMemory, 0, vk.DeviceSize(totalIndices*IndexSize), 0, &indexData)
+
+	var vertexOffset uintptr = 0
+	var indexOffset uintptr = 0
+	cm.visibleChunks = make([]*Chunk, 0, len(cm.chunks))
+
+	i := 0 // TODO test
+	for _, chunk := range cm.chunks {
+		if i%50 == 0 { // TODO test
+			log.Printf("Loading Chunks (%d / %d) at (%d, %d)\n", i, len(cm.chunks), chunk.X, chunk.Z)
+		}
+		// Copy vertex data
+		for _, vertex := range chunk.vertices {
+			dst := unsafe.Pointer(uintptr(vertexData) + uintptr(vertexOffset))
+			src := unsafe.Pointer(&vertex)
+			for i := 0; i < VertexSize; i++ {
+				*(*byte)(unsafe.Pointer(uintptr(dst) + uintptr(i))) = *(*byte)(unsafe.Pointer(uintptr(src) + uintptr(i)))
+			}
+			vertexOffset += uintptr(VertexSize)
+		}
+
+		// Copy index data
+		for _, index := range chunk.indices {
+			dst := unsafe.Pointer(uintptr(indexData) + uintptr(indexOffset))
+			src := unsafe.Pointer(&index)
+			for i := 0; i < IndexSize; i++ {
+				*(*byte)(unsafe.Pointer(uintptr(dst) + uintptr(i))) = *(*byte)(unsafe.Pointer(uintptr(src) + uintptr(i)))
+			}
+			indexOffset += uintptr(IndexSize)
+		}
+
+		// Add chunk to visible chunks
+		cm.visibleChunks = append(cm.visibleChunks, chunk)
+		i++ // TODO test
+	}
+
+	// Unmap memory
+	vk.UnmapMemory(dev, cm.vertexMemory)
+	vk.UnmapMemory(dev, cm.indexMemory)
+
+	// Flush the memory if it's not coherent
+	if (vk.MemoryPropertyFlagBits(cm.memProps.MemoryTypes[0].PropertyFlags) &
+		vk.MemoryPropertyHostCoherentBit) == 0 {
+		vertexMemRange := []vk.MappedMemoryRange{{
+			SType:  vk.StructureTypeMappedMemoryRange,
+			Memory: cm.vertexMemory,
+			Offset: 0,
+			Size:   vk.DeviceSize(totalVertices * VertexSize),
+		}}
+		vk.FlushMappedMemoryRanges(dev, 1, vertexMemRange)
+
+		indexMemRange := []vk.MappedMemoryRange{{
+			SType:  vk.StructureTypeMappedMemoryRange,
+			Memory: cm.indexMemory,
+			Offset: 0,
+			Size:   vk.DeviceSize(totalIndices * IndexSize),
+		}}
+		vk.FlushMappedMemoryRanges(dev, 1, indexMemRange)
+	}
+}
+
+// Loads both maps associated with the coordinate
+func (cm *ChunkManager) LoadMaps(coord string) error {
+	err := cm.LoadHeightmap(coord)
+	if err != nil {
+		return err
+	}
+
+	err = cm.LoadWatermap(coord)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Loads a watermap (coord.swb.png) into the ChunkManager
 func (cm *ChunkManager) LoadWatermap(coord string) error {
-	filepath := coord + WATERMAP_EXTENSION
+	filepath := MAPS_PATH + coord + WATERMAP_EXTENSION
 	rawImg, err := loadMap(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to load file: %w", err)
@@ -107,7 +215,7 @@ func (cm *ChunkManager) LoadWatermap(coord string) error {
 
 // Loads a heightmap (coord.hgt.png) into the ChunkManager
 func (cm *ChunkManager) LoadHeightmap(coord string) error {
-	filepath := coord + HEIGHTMAP_EXTENSION
+	filepath := MAPS_PATH + coord + HEIGHTMAP_EXTENSION
 	rawImg, err := loadMap(filepath)
 	if err != nil {
 		return fmt.Errorf("failed to load file: %w", err)
@@ -184,7 +292,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	}
 
 	chunkKey := ChunkKey(chunkX, chunkZ)
-	if _, exists := cm.chunkMap[chunkKey]; exists {
+	if _, exists := cm.chunks[chunkKey]; exists {
 		return // Chunk already exists
 	}
 
@@ -199,7 +307,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	calculateChunkIndices(chunk)
 	calculateChunkNormals(chunk)
 
-	cm.chunkMap[chunkKey] = *chunk
+	cm.chunks[chunkKey] = chunk
 }
 
 // Generate vertices and texcoords

@@ -1,8 +1,6 @@
 package renderer
 
 import (
-	"image"
-
 	"github.com/go-gl/glfw/v3.3/glfw"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -32,21 +30,19 @@ type Application struct {
 	frameCount int
 
 	// uniformBuffersMapped []unsafe.Pointer
-	chunks       map[string]*OldChunk
-	loadedChunks []*OldChunk
-	heightmap    *image.Gray16
-	ubo          UniformBufferObject
+	ubo UniformBufferObject
 
-	camera        *Camera
-	frustum       *Frustum
-	visibleChunks []*OldChunk
-	WindowHandle  *glfw.Window
+	camera       *Camera
+	ChunkManager *ChunkManager
+	frustum      *Frustum
+	WindowHandle *glfw.Window
 }
 
 const (
 	HGT_PATH         = "assets/maps/n48w123.hgt.png" // TODO hardcoded
 	FOV              = 60.0                          // Field Of View in Degrees
 	CULLING_INTERVAL = 1                             // Perform culling every x frames
+	MAPS_PATH        = "assets/maps/"
 
 	WINDOW_HEIGHT = 480
 	WINDOW_WIDTH  = 800

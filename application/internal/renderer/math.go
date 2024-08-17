@@ -16,8 +16,9 @@ const (
 )
 
 // Takes X, Z float coordinates and returns the corresponding map coords e.g.
-// 	0.0, 0.0 -> "n00e000"
-// 	3600.0, -3600.0 -> "n01w001"
+//
+//	0.0, 0.0 -> "n00e000"
+//	3600.0, -3600.0 -> "n01w001"
 func CoordinateFloatToMap(x, z int) string {
 	lat := int(z / ARC_DEGREES_TO_SECONDS)
 	lon := int(x / ARC_DEGREES_TO_SECONDS)
@@ -25,13 +26,13 @@ func CoordinateFloatToMap(x, z int) string {
 	latDir := 'n'
 	if lat < 0 {
 		latDir = 's'
-		lat = -lat
+		lat = -(lat - 1)
 	}
 
 	lonDir := 'e'
 	if lon < 0 {
 		lonDir = 'w'
-		lon = -lon
+		lon = -(lon - 1)
 	}
 
 	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
