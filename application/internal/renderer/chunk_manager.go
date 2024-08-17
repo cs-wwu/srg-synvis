@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-// This file should be used for chunk management, rendering, etc.
+// This file should be used for chunk management, chunk rendering, etc.
 
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
