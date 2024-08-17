@@ -19,8 +19,8 @@ func NewApplication() *Application {
 	app := &Application{
 		camera:        camera,
 		frustum:       frustum,
-		visibleChunks: make([]*Chunk, 1000),
-		chunks:        make(map[string]*Chunk),
+		visibleChunks: make([]*OldChunk, 1000),
+		chunks:        make(map[string]*OldChunk),
 	}
 
 	return app

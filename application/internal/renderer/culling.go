@@ -58,7 +58,7 @@ func (p *Plane) normalize() {
 	p.Distance /= length
 }
 
-func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
+func (f *Frustum) IsChunkVisible(chunk *OldChunk) bool {
 	corners := [8]lin.Vec3{
 		{float32(chunk.X), 0, float32(chunk.Z)},
 		{float32(chunk.X + ChunkSize), 0, float32(chunk.Z)},

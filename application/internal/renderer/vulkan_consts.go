@@ -32,14 +32,14 @@ type Application struct {
 	frameCount int
 
 	// uniformBuffersMapped []unsafe.Pointer
-	chunks       map[string]*Chunk
-	loadedChunks []*Chunk
+	chunks       map[string]*OldChunk
+	loadedChunks []*OldChunk
 	heightmap    *image.Gray16
 	ubo          UniformBufferObject
 
 	camera        *Camera
 	frustum       *Frustum
-	visibleChunks []*Chunk
+	visibleChunks []*OldChunk
 	WindowHandle  *glfw.Window
 }
 

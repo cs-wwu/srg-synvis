@@ -720,7 +720,7 @@ func (app *Application) LoadAllChunks() {
 
 	for z := 0; z < length/ChunkSize; z++ {
 		for x := 0; x < length/ChunkSize; x++ {
-			app.LoadChunk(x, z)
+			app.OldLoadChunk(x, z)
 			if (z*length/ChunkSize+x+1)%100 == 0 {
 				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
 			}
@@ -763,5 +763,3 @@ func (app *Application) VulkanContextPrepare() error {
 	}
 	return nil
 }
-
-

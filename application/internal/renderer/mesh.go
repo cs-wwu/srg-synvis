@@ -21,7 +21,7 @@ const (
 	LOD_DISTANCE = 250.0
 )
 
-type Chunk struct {
+type OldChunk struct {
 	vertices     []Vertex
 	indices      []Index
 	vertexBuffer vk.Buffer
@@ -33,17 +33,17 @@ type Chunk struct {
 	lodLevel     int
 }
 
-func (app *Application) LoadChunk(chunkX, chunkZ int) {
+func (app *Application) OldLoadChunk(chunkX, chunkZ int) {
 	if app.heightmap == nil {
 		panic("Heightmap not loaded")
 	}
 
-	key := chunkKey(chunkX, chunkZ)
+	key := OldchunkKey(chunkX, chunkZ)
 	if _, exists := app.chunks[key]; exists {
 		return // Chunk already loaded
 	}
 
-	chunk := &Chunk{
+	chunk := &OldChunk{
 		X: chunkX * ChunkSize,
 		Z: chunkZ * ChunkSize,
 	}
@@ -103,17 +103,17 @@ func (app *Application) LoadChunk(chunkX, chunkZ int) {
 		}
 	}
 
-	calculateChunkNormals(chunk)
+	OldcalculateChunkNormals(chunk)
 
 	// Create Vulkan buffers for this chunk
-	app.createChunkBuffers(chunk)
+	app.OldcreateChunkBuffers(chunk)
 
 	app.chunks[key] = chunk
 	app.loadedChunks = append(app.loadedChunks, chunk)
 }
 
 // Creates and implements the Vulkan Vertex and Index buffers for this chunk
-func (app *Application) createChunkBuffers(chunk *Chunk) {
+func (app *Application) OldcreateChunkBuffers(chunk *OldChunk) {
 	dev := app.Context().Device()
 	memProps := app.Context().Platform().MemoryProperties()
 
@@ -139,8 +139,8 @@ func (app *Application) createChunkBuffers(chunk *Chunk) {
 }
 
 // Unloads the chunk at the given coordinates
-func (app *Application) UnloadChunk(chunkX, chunkZ int) {
-	key := chunkKey(chunkX, chunkZ)
+func (app *Application) OldUnloadChunk(chunkX, chunkZ int) {
+	key := OldchunkKey(chunkX, chunkZ)
 	chunk, exists := app.chunks[key]
 	if !exists {
 		return // Chunk not loaded
@@ -162,12 +162,12 @@ func (app *Application) UnloadChunk(chunkX, chunkZ int) {
 }
 
 // Helper function to create a unique key for each chunk
-func chunkKey(x, z int) string {
+func OldchunkKey(x, z int) string {
 	return fmt.Sprintf("%d,%d", x, z)
 }
 
 // Calculates the chunk's normal vectors (stored in the chunks vertices)
-func calculateChunkNormals(c *Chunk) {
+func OldcalculateChunkNormals(c *OldChunk) {
 	extendedSize := ChunkSize + 2
 	for z := 0; z < extendedSize; z++ {
 		for x := 0; x < extendedSize; x++ {
@@ -196,7 +196,7 @@ func calculateChunkNormals(c *Chunk) {
 	}
 }
 
-func distanceToChunk(chunk *Chunk, cameraPos *lin.Vec3) float32 {
+func OlddistanceToChunk(chunk *OldChunk, cameraPos *lin.Vec3) float32 {
 	chunkCenter := lin.Vec3{
 		float32(chunk.X) + float32(ChunkSize)/2,
 		0, // Assuming Y is up
