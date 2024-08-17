@@ -18,7 +18,7 @@ const (
 // Takes X, Z float coordinates and returns the corresponding map coords e.g.
 // 	0.0, 0.0 -> "n00e000"
 // 	3600.0, -3600.0 -> "n01w001"
-func CoordinateFloatToMap(x, z float32) string {
+func CoordinateFloatToMap(x, z int) string {
 	lat := int(z / ARC_DEGREES_TO_SECONDS)
 	lon := int(x / ARC_DEGREES_TO_SECONDS)
 
@@ -42,7 +42,7 @@ func CoordinateFloatToMap(x, z float32) string {
 //	"n48w123" -> 172800.0, -460800.0
 //	"n00e000" -> 0.0, 0.0
 //	"s01e001" -> 3600.0, -3600.0
-func CoordinateMapToFloat(coord string) (x, z float32) {
+func CoordinateMapToFloat(coord string) (x, z int) {
 	if len(coord) != 7 {
 		return 0, 0 // Invalid coordinate format
 	}
@@ -52,12 +52,12 @@ func CoordinateMapToFloat(coord string) (x, z float32) {
 	lat, _ := strconv.Atoi(coord[1:3])
 	lon, _ := strconv.Atoi(coord[4:7])
 
-	x = float32(lon) * ARC_DEGREES_TO_SECONDS
+	x = lon * ARC_DEGREES_TO_SECONDS
 	if lonDir == 'w' {
 		x = -x
 	}
 
-	z = float32(lat) * ARC_DEGREES_TO_SECONDS
+	z = lat * ARC_DEGREES_TO_SECONDS
 	if latDir == 's' {
 		z = -z
 	}

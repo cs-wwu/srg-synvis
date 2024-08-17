@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	length        = 3601          // Image Height and Width
-	scale         = 60.0 / 1852.0 // Meters to Arcminutes
-	ChunkSize     = 64            // Vertices per side of a chunk
+	length        = 3601 // Image Height and Width
+	ChunkSize     = 64   // Vertices per side of a chunk
 	ChunksPerSide = length / ChunkSize
 
 	LOD_LEVELS   = 6
@@ -70,7 +69,7 @@ func (app *Application) OldLoadChunk(chunkX, chunkZ int) {
 			chunk.vertices[(z+1)*extendedSize+(x+1)] = Vertex{
 				Position: lin.Vec3{
 					float32(globalX),
-					height * scale,
+					height * HEIGHT_SCALE,
 					float32(globalZ),
 				},
 				Normal: lin.Vec3{0.0, 0.0, 0.0},
