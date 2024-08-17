@@ -12,6 +12,9 @@ import (
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
+
+	CHUNKS_PER_MAP = 64 * 64
+	NUM_MAPS       = 4
 )
 
 // A single ChunkManager to manage load/unloading images and chunks
@@ -22,11 +25,15 @@ type ChunkManager struct {
 	VisibleChunks []*Chunk
 }
 
+func ChunkKey(chunkX, chunkZ int) string {
+	return fmt.Sprintf("%d,%d", chunkX, chunkZ)
+}
+
 type Chunk struct {
 	vertices []Vertex
 	indices  []Index
-	X        int // Global X Position of the top-left chunsk Corner
-	Z        int
+	X        int // Global X Position of the top-left chunk corner
+	Z        int // Global Z Position of the top-left chunk corner
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
@@ -44,10 +51,9 @@ func (cm *ChunkManager) LoadWatermap(coord string) error {
 	}
 
 	cm.Watermaps[coord] = grayImg
-	
+
 	return nil
 }
-
 
 // Loads a heightmap (coord.hgt.png) into the ChunkManager
 func (cm *ChunkManager) LoadHeightmap(coord string) error {
@@ -56,15 +62,15 @@ func (cm *ChunkManager) LoadHeightmap(coord string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load file: %w", err)
 	}
-	
+
 	// Ensure the image is grayscale
 	grayImg, ok := rawImg.(*image.Gray16)
 	if !ok {
 		return fmt.Errorf("heightmap is not in 16-bit grayscale format")
 	}
-	
+
 	cm.Heightmaps[coord] = grayImg
-	
+
 	return nil
 }
 
@@ -107,10 +113,16 @@ func loadMap(filepath string) (image.Image, error) {
 }
 
 // Loads a specific chunk into memory
-func (cm *ChunkManager) LoadChunk(chunkX, chunkY float32) {
+func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
+
 	// TODO: Load the chunk pointed to by this, verify that it's file exists
 }
 
 func NewChunkManager() *ChunkManager {
-	return &ChunkManager{}
+	return &ChunkManager{
+		Heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
+		Watermaps:     make(map[string]*image.Gray, NUM_MAPS),
+		Chunks:        make(map[string]Chunk, NUM_MAPS*CHUNKS_PER_MAP),
+		VisibleChunks: make([]*Chunk, 0),
+	}
 }
