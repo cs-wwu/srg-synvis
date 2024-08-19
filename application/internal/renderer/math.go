@@ -54,7 +54,7 @@ const (
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
 func CoordinateFloatToMap(x, z int) string {
-	lat := int(z/ARC_DEGREES_TO_SECONDS) - 1
+	lat := int(z/ARC_DEGREES_TO_SECONDS) - 1 // for top-left coord
 	lon := int(x / ARC_DEGREES_TO_SECONDS)
 
 	latDir := 'n'
@@ -98,7 +98,7 @@ func CoordinateMapToFloat(coord string) (x, z int) {
 	if latDir == 's' {
 		z = -z
 	}
-	z += ARC_DEGREES_TO_SECONDS
+	z += ARC_DEGREES_TO_SECONDS // for top-left coord
 
 	return x, z
 }
