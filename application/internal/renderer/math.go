@@ -7,6 +7,39 @@ import (
 
 // This file should be used for coordinate math and rendering math
 
+// Each maps coordinates start in the bottom left of the square. They also
+// overlap by a single point for easy matching to the next map.
+
+// World map looks as follows for a single coordinate around (0, 0):
+// Each square represents a coordinate degree map
+// -3600      0        3599
+//  |---------|---------| 3600
+//  |         |         |
+//  | n00w001 | n00e000 |
+//  |         |         |
+//  |---------|---------| 0
+//  |         |         |
+//  | s01w001 | s01e000 |
+//  |         |         |
+//  |---------|---------| -3599
+
+// There is overlap between coordinates as follows:
+// Each square represents a single POINT
+//     3599      3600/0      1
+//  |---------|---------|---------|
+//  |         | n00w001 |         |
+//  | n00w001 | n00e000 | n00e000 |   3599
+//  |         |         |         |
+//  |---------|---------|---------|
+//  | n00w001 |         | n00e000 |
+//  | s01w001 |  All 4  | s01e000 |  3600/0
+//  |         |         |         |
+//  |---------|---------|---------|
+//  |         | s01w001 |         |
+//  | s01w001 | s01e000 | s01e000 |    1
+//  |         |         |         |
+//  |---------|---------|---------|
+
 const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
@@ -17,8 +50,9 @@ const (
 
 // Takes X, Z float coordinates and returns the corresponding map coords e.g.
 //
-//	0.0, 0.0 -> "n00e000"
-//	3600.0, -3600.0 -> "n01w001"
+//	0, 3600 -> "n00e000"
+//	0, 0 -> "s01e000"
+//	-3600, 0 -> "s01w001"
 func CoordinateFloatToMap(x, z int) string {
 	lat := int(z / ARC_DEGREES_TO_SECONDS)
 	lon := int(x / ARC_DEGREES_TO_SECONDS)
@@ -38,11 +72,13 @@ func CoordinateFloatToMap(x, z int) string {
 	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
 }
 
-// Takes a map coordinate and returns the corresponding float x, z coords e.g.
+// Takes a map coordinate and returns the corresponding float x, z coords.
+// Specifically the top-left coord of the map. e.g.
 //
-//	"n48w123" -> 172800.0, -460800.0
-//	"n00e000" -> 0.0, 0.0
-//	"s01e001" -> 3600.0, -3600.0
+//	"n48w123" -> 176400, -442800
+//  "n00w001" -> -3600, 3600
+//	"n00e000" -> 0, 3600
+//	"s01e001" -> 3600, 0
 func CoordinateMapToFloat(coord string) (x, z int) {
 	if len(coord) != 7 {
 		return 0, 0 // Invalid coordinate format
@@ -62,6 +98,7 @@ func CoordinateMapToFloat(coord string) (x, z int) {
 	if latDir == 's' {
 		z = -z
 	}
+	z += ARC_DEGREES_TO_SECONDS
 
 	return x, z
 }

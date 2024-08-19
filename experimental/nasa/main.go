@@ -484,11 +484,12 @@ func waterToPng(waterFilepath, pngFilepath string) error {
 // Function to turn a water (.swb) file to an rle compressed file
 // The rle is stored as the following:
 // All uint32:
-// 	First uint32: n Number of rle switches
-// 	Second uint32: 0 if starting with land, 1 if starting with water
-// 	Third to nth uint32: Number of land/water until next switch
-// 	e.g. All water would be [1 1 12967201]
-//      Half water then land would be [2 1 6483600 6483601]
+//
+//		First uint32: n Number of rle switches
+//		Second uint32: 0 if starting with land, 1 if starting with water
+//		Third to nth uint32: Number of land/water until next switch
+//		e.g. All water would be [1 1 12967201]
+//	     Half water then land would be [2 1 6483600 6483601]
 func waterToRle(waterFilepath, rleFilepath string) error {
 	fmt.Printf("Creating %s\n", rleFilepath)
 	// Create a binary slice from the heightmap
@@ -503,7 +504,7 @@ func waterToRle(waterFilepath, rleFilepath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to populate water matrix: %v", err)
 	}
-	
+
 	// We now have water in a byte array
 	processedData := make([]uint32, 0)
 	processedData = append(processedData, 1) // Initialize with 1 switch
@@ -612,59 +613,146 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 		targetDir += "/"
 	}
 
-	// err := downloadHeightmaps(heightmaps, targetDir)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to download heightmaps: %v", err)
-	// }
+	err := downloadHeightmaps(heightmaps, targetDir)
+	if err != nil {
+		return fmt.Errorf("failed to download heightmaps: %v", err)
+	}
 
 	// Unzip each heightmap and remove the old zipped folders
 	for _, heightmap := range heightmaps {
-		// zipFilePath := targetDir + heightmap + ".zip"
+		zipFilePath := targetDir + heightmap + ".zip"
 		outputDir := targetDir + heightmap + "/"
-		// err := unzip(zipFilePath, outputDir)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to unzip %s: %v", heightmap, err)
-		// }
+		err := unzip(zipFilePath, outputDir)
+		if err != nil {
+			return fmt.Errorf("failed to unzip %s: %v", heightmap, err)
+		}
 
-		// os.Remove(zipFilePath) // remove zip file
+		os.Remove(zipFilePath) // remove zip file
 
 		startTime := time.Now()
 		waterFile := outputDir + heightmap + ".swb"
-		waterPng := targetDir + heightmap + ".swb" + ".png"
-		err := waterToPng(waterFile, waterPng)
+		waterPng := targetDir + heightmap + ".swb.png"
+		err = waterToPng(waterFile, waterPng)
 		if err != nil {
 			return fmt.Errorf("failed to convert water to png: %w", err)
 		}
 		fmt.Printf("png conversion took %v\n", time.Since(startTime))
 
-		startTime = time.Now()
-		waterRle := targetDir + heightmap + ".swb" + ".rle"
-		err = waterToRle(waterFile, waterRle)
+		heightmapFile := outputDir + heightmap + ".hgt"
+		pngFile := targetDir + heightmap + ".hgt.png"
+		err = heightmapToPng(heightmapFile, pngFile)
 		if err != nil {
-			return fmt.Errorf("failed to convert water to rle: %w", err)
+			return fmt.Errorf("failed to convert %s to png: %v", heightmap, err)
 		}
-		fmt.Printf("rle conversion took %v\n", time.Since(startTime))
 
-		// heightmapFile := outputDir + heightmap + ".hgt"
-		// pngFile := targetDir + heightmap + ".png"
-		// err = heightmapToPng(heightmapFile, pngFile)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to convert %s to png: %v", heightmap, err)
-		// }
-
-		// os.RemoveAll(outputDir) // Remove leftovers
+		os.RemoveAll(outputDir) // Remove leftovers
 	}
 
 	return nil
 }
 
+// Loads a map and returns a png
+func loadMap(filepath string) (image.Image, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load map %v: %w", filepath, err)
+	}
+	defer file.Close()
+
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode map %v: %w", filepath, err)
+	}
+
+	// Verify image size
+	width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
+	if width != length || height != length {
+		return nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
+	}
+
+	return rawImg, nil
+}
+
+// Loads a watermap (coord.swb.png) into the ChunkManager
+func LoadWatermap(coord string) (*image.Gray, error) {
+	filepath := "heightmaps/" + coord + ".swb.png"
+	rawImg, err := loadMap(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load file: %w", err)
+	}
+
+	// Ensure the image is grayscale
+	grayImg, ok := rawImg.(*image.Gray)
+	if !ok {
+		return nil, fmt.Errorf("watermap is not in 8-bit grayscale format")
+	}
+
+	return grayImg, nil
+}
+
+// Loads a heightmap (coord.hgt.png) into the ChunkManager
+func LoadHeightmap(coord string) (*image.Gray16, error) {
+	filepath := "heightmaps/" + coord + ".hgt.png"
+	rawImg, err := loadMap(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load file: %w", err)
+	}
+
+	// Ensure the image is grayscale
+	grayImg, ok := rawImg.(*image.Gray16)
+	if !ok {
+		return nil, fmt.Errorf("heightmap is not in 16-bit grayscale format")
+	}
+
+	return grayImg, nil
+}
+
 // Example Usage
 func main() {
-	targetDir := "heightmaps/"
-	heightmaps := []string{"n48w123", "n48w122"}
-	err := ProcessHeightmaps(heightmaps, targetDir)
+	// targetDir := "heightmaps/"
+	// heightmaps := []string{"n48w123", "n48w122", "n47w123"}
+	// err := ProcessHeightmaps(heightmaps, targetDir)
+	// if err != nil {
+	// 	fmt.Printf("failed to process heightmaps: %v\n", err)
+	// 	os.Exit(1)
+	// }
+
+	n48w123_HGT, err := LoadHeightmap("n48w123")
 	if err != nil {
-		fmt.Printf("failed to process heightmaps: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
+	// n48w123_SWB, err := LoadWatermap("n48w123")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// n48w122_HGT, err := LoadHeightmap("n48w122")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// n48w122_SWB, err := LoadWatermap("n48w122")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	n47w123_HGT, err := LoadHeightmap("n47w123")
+	if err != nil {
+		panic(err)
+	}
+	// n47w123_SWB, err := LoadWatermap("n47w123")
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	last_row := make([]uint16, 3601)
+	for x := 0; x < 3601; x++ {
+		last_row[x] = n48w123_HGT.Gray16At(x, 3600).Y
+	}
+	fmt.Printf("%v\n", last_row[:15])
+
+	first_row := make([]uint16, 3601)
+	for x := 0; x < 3601; x++ {
+		first_row[x] = n47w123_HGT.Gray16At(x, 0).Y
+	}
+	fmt.Printf("%v\n", first_row[:15])
+
+
 }
