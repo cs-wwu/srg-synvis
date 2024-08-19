@@ -234,6 +234,7 @@ const (
 
 // Chunkmanager constnts
 const (
-	BufferUsageVertexBufferBit = vk.BufferUsageVertexBufferBit
-	BufferUsageIndexBufferBit  = vk.BufferUsageIndexBufferBit
+	BufferUsageVertexBufferBit   = vk.BufferUsageVertexBufferBit
+	BufferUsageIndexBufferBit    = vk.BufferUsageIndexBufferBit
+	BufferUsageIndirectBufferBit = vk.BufferUsageIndirectBufferBit
 )

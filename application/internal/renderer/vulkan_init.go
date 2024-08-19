@@ -742,31 +742,11 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Load all available chunks for now
-	// app.LoadAllChunks()
-
 	// Testing for loading all maps and chunks
-	mapCoord := "n48w123"
-	err := app.ChunkManager.LoadMaps(mapCoord)
-	OrPanic(err)
+	// Update the last position so that we load the map
+	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
 
-	// Get the world coordinates for this map
-	worldX, worldZ := CoordinateMapToFloat(mapCoord)
-
-	// Calculate how many chunks are in this map
-	chunksPerSide := MAP_LENGTH / CHUNK_SIZE
-
-	// Load all chunks for this map
-	for z := 0; z < chunksPerSide; z++ {
-		for x := 0; x < chunksPerSide; x++ {
-			chunkX := worldX + x*CHUNK_SIZE
-			chunkZ := worldZ + z*CHUNK_SIZE
-
-			app.ChunkManager.LoadChunk(chunkX, chunkZ)
-		}
-	}
-
-	// Load all of the chunks associated with n48w123
+	// Load all of the chunks associated
 	app.ChunkManager.FillBuffers()
 
 	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
