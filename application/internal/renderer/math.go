@@ -58,7 +58,7 @@ func CoordinateFloatToMap(x, z int) string {
 	lon := int(x / ARC_DEGREES_TO_SECONDS)
 
 	latDir := 'n'
-	if lat <= 0 {
+	if lat < 0 {
 		latDir = 's'
 		lat = -lat // Make positive number
 	}
