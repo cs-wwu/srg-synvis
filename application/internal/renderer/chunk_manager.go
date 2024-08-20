@@ -107,8 +107,8 @@ func (cm *ChunkManager) LoadChunks() {
 		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
-		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
-			for z := mapZ; z > mapZ-MAP_LENGTH; z -= CHUNK_SIZE {
+		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE*2 {
+			for z := mapZ; z > mapZ-MAP_LENGTH; z -= CHUNK_SIZE*2 {
 				cm.LoadChunk(x, z)
 				counter++
 			}
@@ -408,9 +408,9 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
 			worldZ := chunk.Z + z
-			pixelValue := heightmap.Gray16At(worldX, worldZ).Y
+			pixelValue := heightmap.Gray16At(CoordinateIntToPixel(worldX, worldZ)).Y
 			height := float32(int(pixelValue) - 32768)
-			isWater := watermap.GrayAt(worldX, worldZ).Y
+			isWater := watermap.GrayAt(CoordinateIntToPixel(worldX, worldZ)).Y
 
 			chunk.vertices[z*CHUNK_SIZE+x] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
