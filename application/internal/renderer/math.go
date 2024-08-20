@@ -109,3 +109,17 @@ func CoordinateMapToInt(coord string) (x, z int) {
 
 	return x, z
 }
+
+// Takes an x, z coordinate and returns the coorepsonding image pixel coord
+func CoordinateIntToPixel(x, z int) (int, int) {
+	x %= int(ARC_DEGREES_TO_SECONDS)
+	z %= int(ARC_DEGREES_TO_SECONDS)
+	if x < 0 {
+		x = x + int(ARC_DEGREES_TO_SECONDS)
+	}
+	if z < 0 {
+		z = z + int(ARC_DEGREES_TO_SECONDS)
+	}
+	return x, z
+}
+
