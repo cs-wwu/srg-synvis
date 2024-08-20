@@ -108,7 +108,7 @@ func (cm *ChunkManager) LoadChunks() {
 
 		counter := 0
 		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE*2 {
-			for z := mapZ; z > mapZ-MAP_LENGTH; z -= CHUNK_SIZE*2 {
+			for z := mapZ; z > mapZ-MAP_LENGTH; z -= CHUNK_SIZE {
 				cm.LoadChunk(x, z)
 				counter++
 			}
