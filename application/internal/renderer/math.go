@@ -57,10 +57,10 @@ func CoordinateIntToMap(x, z int) string {
 	// Adjust coordinates to handle the overlap
 	lat := z / int(ARC_DEGREES_TO_SECONDS)
 	lon := x / int(ARC_DEGREES_TO_SECONDS)
-	if z%int(ARC_DEGREES_TO_SECONDS) == 0 {
+	if z%int(ARC_DEGREES_TO_SECONDS) == 0 || z < 0 {
 		lat -= 1
 	}
-	if x%int(ARC_DEGREES_TO_SECONDS) != 0 {
+	if x%int(ARC_DEGREES_TO_SECONDS) != 0 && x < 0 {
 		lon -= 1
 	}
 
