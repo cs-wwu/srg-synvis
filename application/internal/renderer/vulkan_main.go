@@ -137,22 +137,12 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	// Draw visible chunks
 	// Bind vertex and index buffers
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.ChunkManager.vertexBuffer}, []vk.DeviceSize{0})
 	vk.CmdBindIndexBuffer(cmd, app.ChunkManager.indexBuffer, 0, vk.IndexTypeUint32)
 
-	vertexOffset := uint32(0)
-	indexOffset := uint32(0)
-
-	for _, chunk := range app.ChunkManager.visibleChunks {
-		// Draw the chunk
-		vk.CmdDrawIndexed(cmd, uint32(len(chunk.indices)), 1, indexOffset, int32(vertexOffset), 0)
-
-		// Update offsets for the next chunk
-		vertexOffset += uint32(len(chunk.vertices))
-		indexOffset += uint32(len(chunk.indices))
-	}
+	// Draw all chunks using indirect drawing
+	vk.CmdDrawIndexedIndirect(cmd, app.ChunkManager.drawCommandBuffer, 0, uint32(len(app.ChunkManager.visibleChunks)), uint32(unsafe.Sizeof(DrawCommand{})))
 
 	// End render pass
 	vk.CmdEndRenderPass(cmd)

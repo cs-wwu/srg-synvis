@@ -737,17 +737,18 @@ func (app *Application) VulkanContextPrepare() error {
 	app.height = dim.Height
 	app.width = dim.Width
 
-	app.ChunkManager = NewChunkManager(&dev, &memProps)
 	app.initUBO()
 	app.prepareDepth()
 	app.prepareTextures()
-
+	
 	// Testing for loading all maps and chunks
 	// Update the last position so that we load the map
+	app.ChunkManager = NewChunkManager(&dev, &memProps)
 	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
+	app.ChunkManager.LoadChunks()
+	app.ChunkManager.FillBuffers()
 
 	// Load all of the chunks associated
-	app.ChunkManager.FillBuffers()
 
 	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 	// app.determineVisibleChunks()

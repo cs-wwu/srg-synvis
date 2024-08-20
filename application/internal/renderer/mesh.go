@@ -235,8 +235,8 @@ func GetHM(hmPath string) (*image.Gray16, error) {
 	return grayImg, nil
 }
 
-// Helper function to clamp values
-func clamp(value, min, max int) int {
+// Helper function to oldclamp values
+func oldclamp(value, min, max int) int {
 	if value < min {
 		return min
 	}

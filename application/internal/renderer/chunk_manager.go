@@ -1,11 +1,13 @@
 package renderer
 
 import (
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/png"
 	"log"
 	"os"
+	"unsafe"
 
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -20,7 +22,7 @@ const (
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 
 	MAP_LENGTH      = 3600
-	CHUNKS_PER_SIDE = 60
+	CHUNKS_PER_SIDE = 20
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
 	NUM_MAPS        = 4 // TODO change to 9 in final version
@@ -67,7 +69,7 @@ type DrawCommand struct {
 }
 
 func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
-	if cm.lastPosition == (lin.Vec3{0.0, 0.0, 0.0}) { // TODO Test if statement
+	if cm.lastPosition[0] == 0.0 { // TODO Test if statement
 		cm.LoadMaps("n48w123")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
@@ -90,15 +92,146 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 	return cm
 }
 
+// Loads all chunks referenced by the current map(s)
+func (cm *ChunkManager) LoadChunks() {
+	if len(cm.heightmaps) == 0 || len(cm.watermaps) == 0 {
+		log.Println("No maps loaded. Load maps before calling LoadChunks.")
+		return
+	}
+
+	for mapCoord := range cm.heightmaps {
+		log.Printf("Loading map %s\n", mapCoord)
+
+		// Convert map coordinate to world coordinates
+		mapX, mapZ := CoordinateMapToFloat(mapCoord)
+		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
+
+		counter := 0
+		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
+			for z := mapZ; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
+				cm.LoadChunk(x, z)
+				counter++
+			}
+			log.Printf("Loading chunks... (%d / %d)\n", counter, CHUNK_SIZE*CHUNK_SIZE)
+		}
+	}
+
+	log.Printf("Loaded %d chunks from %d maps", len(cm.chunks), len(cm.heightmaps))
+}
+
 // Test function to fill the buffers with all current chunks and render them all
 func (cm *ChunkManager) FillBuffers() {
+	if cm.vertexBuffer == vk.NullBuffer || cm.indexBuffer == vk.NullBuffer || cm.drawCommandBuffer == vk.NullBuffer {
+		log.Println("Buffers not initialized. Call InitBuffers first.")
+		return
+	}
 
+	if len(cm.chunks) == 0 {
+		log.Println("No data loaded, failed to add chunks to buffers.")
+		return
+	}
+
+	var totalVertices, totalIndices uint32
+	drawCommands := make([]DrawCommand, 0, len(cm.chunks))
+
+	// First pass: calculate total sizes and prepare draw commands
+	for _, chunk := range cm.chunks {
+		vertexCount := uint32(len(chunk.vertices))
+		indexCount := uint32(len(chunk.indices))
+
+		drawCommands = append(drawCommands, DrawCommand{
+			IndexCount:    indexCount,
+			InstanceCount: 1,
+			FirstIndex:    totalIndices,
+			VertexOffset:  int32(totalVertices),
+			FirstInstance: 0,
+		})
+
+		totalVertices += vertexCount
+		totalIndices += indexCount
+	}
+
+	// Prepare vertex data
+	vertexData := make([]byte, totalVertices*uint32(VertexSize))
+	log.Printf("Vertex Data size: %d\n", totalVertices*uint32(VertexSize))
+	var vertexOffset uint32
+	for _, chunk := range cm.chunks {
+		for _, vertex := range chunk.vertices {
+			copy(vertexData[vertexOffset:], vertex.Data())
+			vertexOffset += uint32(VertexSize)
+		}
+	}
+
+	// Update vertex buffer
+	var pVertexData unsafe.Pointer
+	ret := vk.MapMemory(*cm.device, cm.vertexMemory, 0, vk.DeviceSize(len(vertexData)), 0, &pVertexData)
+	if ret != vk.Success {
+		log.Printf("Failed to map vertex memory: %v", ret)
+		panic(as.NewError(ret))
+	}
+	n := vk.Memcopy(pVertexData, vertexData)
+	if n != len(vertexData) {
+		log.Printf("Failed to copy vertex data: %d != %d", n, len(vertexData))
+	}
+	vk.UnmapMemory(*cm.device, cm.vertexMemory)
+
+	// Prepare index data
+	indexData := make([]byte, totalIndices*uint32(IndexSize))
+	var indexOffset uint32
+	for _, chunk := range cm.chunks {
+		for _, index := range chunk.indices {
+			copy(indexData[indexOffset:], index.Data())
+			indexOffset += uint32(IndexSize)
+		}
+	}
+
+	// Update index buffer
+	var pIndexData unsafe.Pointer
+	ret = vk.MapMemory(*cm.device, cm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
+	if ret != vk.Success {
+		log.Printf("Failed to map index memory: %v", ret)
+		return
+	}
+	n = vk.Memcopy(pIndexData, indexData)
+	if n != len(indexData) {
+		log.Printf("Failed to copy index data: %d != %d", n, len(indexData))
+	}
+	vk.UnmapMemory(*cm.device, cm.indexMemory)
+
+	// Prepare draw command data
+	drawCommandData := make([]byte, len(drawCommands)*int(unsafe.Sizeof(DrawCommand{})))
+	for i, cmd := range drawCommands {
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+0:], cmd.IndexCount)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+4:], cmd.InstanceCount)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+8:], cmd.FirstIndex)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+12:], uint32(cmd.VertexOffset))
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+16:], cmd.FirstInstance)
+	}
+
+	// Update draw command buffer
+	var pDrawCommandData unsafe.Pointer
+	ret = vk.MapMemory(*cm.device, cm.drawCommandMemory, 0, vk.DeviceSize(len(drawCommandData)), 0, &pDrawCommandData)
+	if ret != vk.Success {
+		log.Printf("Failed to map draw command memory: %v", ret)
+		return
+	}
+	n = vk.Memcopy(pDrawCommandData, drawCommandData)
+	if n != len(drawCommandData) {
+		log.Printf("Failed to copy draw command data: %d != %d", n, len(drawCommandData))
+	}
+	vk.UnmapMemory(*cm.device, cm.drawCommandMemory)
+
+	cm.visibleChunks = make([]*Chunk, 0, len(cm.chunks))
+	for _, chunk := range cm.chunks {
+		cm.visibleChunks = append(cm.visibleChunks, chunk)
+	}
 }
 
 // Intializes the ChunkManager buffers
 func (cm *ChunkManager) InitBuffers() {
 	// Create vertex buffer
 	maxVertices := MAX_CHUNKS * VERTICES_PER_CHUNK
+	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for vertices\n", MAX_CHUNKS, VERTICES_PER_CHUNK, VertexSize, maxVertices)
 	vertexData := make([]byte, maxVertices*VertexSize)
 
 	vertexBuf := as.CreateBuffer(*cm.device, *cm.memProps, vertexData, BufferUsageVertexBufferBit)
@@ -108,13 +241,16 @@ func (cm *ChunkManager) InitBuffers() {
 	// Create index buffer
 	maxIndices := MAX_CHUNKS * INDICES_PER_CHUNK
 	indexData := make([]byte, maxIndices*IndexSize)
+	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for indices\n", MAX_CHUNKS, INDICES_PER_CHUNK, IndexSize, maxIndices)
 
 	indexBuf := as.CreateBuffer(*cm.device, *cm.memProps, indexData, BufferUsageIndexBufferBit)
 	cm.indexBuffer = indexBuf.Buffer
 	cm.indexMemory = indexBuf.Memory
 
 	// Create the draw command buffer
-	drawCommandData := make([]byte, MAX_CHUNKS)
+	maxDrawComamnds := MAX_CHUNKS * int(unsafe.Sizeof(DrawCommand{}))
+	drawCommandData := make([]byte, maxDrawComamnds)
+	log.Printf("Allocating %d * %dB = %d Bytes for Draw commands\n", MAX_CHUNKS, int(unsafe.Sizeof(DrawCommand{})), maxDrawComamnds)
 	drawCommandBuffer := as.CreateBuffer(*cm.device, *cm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
 	cm.drawCommandBuffer = drawCommandBuffer.Buffer
 	cm.drawCommandMemory = drawCommandBuffer.Memory
@@ -240,7 +376,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	// Load the chunk based on heightmap and watermap
 	// TODO load water if missing heightmap and watermap
 	if heightmap == nil || watermap == nil {
-		log.Printf("Warning: Heightmap or Watermap not loaded for coordinates %s\n", mapCoords)
+		log.Printf("Warning: Map(s) not loaded for coords %s (%d, %d)\n", mapCoords, chunkX, chunkZ)
 		return
 	}
 
@@ -250,10 +386,10 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	}
 
 	chunk := &Chunk{
-		X:        chunkX * ChunkSize,
-		Z:        chunkZ * ChunkSize,
-		vertices: make([]Vertex, ChunkSize*ChunkSize),
-		indices:  make([]Index, 2*ChunkSize*(ChunkSize-1)+2*((ChunkSize-1)-1)),
+		X:        chunkX,
+		Z:        chunkZ,
+		vertices: make([]Vertex, CHUNK_SIZE*CHUNK_SIZE),
+		indices:  make([]Index, 2*CHUNK_SIZE*(CHUNK_SIZE-1)+2*((CHUNK_SIZE-1)-1)),
 	}
 
 	calculateChunkVertices(heightmap, watermap, chunk)
@@ -266,19 +402,23 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 // Generate vertices and texcoords
 func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Fill the vertices
-	for z := 0; z < ChunkSize; z++ {
-		for x := 0; x < ChunkSize; x++ {
+	for z := 0; z < CHUNK_SIZE; z++ {
+		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
 			worldZ := chunk.Z + z
+
 			if (x == 0) && (z == 0) { // TODO remove
 				log.Printf("Loading chunk at coord: (%d, %d)\n", worldX, worldZ)
+				pixelValue := heightmap.Gray16At(worldX, worldZ).Y
+				height := float32(int(pixelValue) - 32768)
+				log.Printf("(%d, %d) = %d -> %f\n", worldX, worldZ, pixelValue, height)
 			}
-			
+
 			pixelValue := heightmap.Gray16At(worldX, worldZ).Y
 			height := float32(int(pixelValue) - 32768)
 			isWater := watermap.GrayAt(worldX, worldZ).Y
 
-			chunk.vertices[z*ChunkSize+x] = Vertex{
+			chunk.vertices[z*CHUNK_SIZE+x] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
 				TexCoord: lin.Vec3{
 					float32(worldX) / float32(length-1),
@@ -293,22 +433,22 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 // Generate indices (triangle strip)
 func calculateChunkIndices(chunk *Chunk) {
 	indexPos := 0
-	for z := 0; z < ChunkSize-1; z++ {
+	for z := 0; z < CHUNK_SIZE-1; z++ {
 		if z > 0 {
 			// Degenerate triangle to connect strips
-			chunk.indices[indexPos] = Index(z * ChunkSize)
+			chunk.indices[indexPos] = Index(z * CHUNK_SIZE)
 			indexPos++
 		}
 
-		for x := 0; x < ChunkSize; x++ {
-			chunk.indices[indexPos] = Index(z*ChunkSize + x)
-			chunk.indices[indexPos+1] = Index((z+1)*ChunkSize + x)
+		for x := 0; x < CHUNK_SIZE; x++ {
+			chunk.indices[indexPos] = Index(z*CHUNK_SIZE + x)
+			chunk.indices[indexPos+1] = Index((z+1)*CHUNK_SIZE + x)
 			indexPos += 2
 		}
 
-		if z < ChunkSize-2 {
+		if z < CHUNK_SIZE-2 {
 			// Degenerate triangle to connect strips
-			chunk.indices[indexPos] = Index((z+1)*ChunkSize + (ChunkSize - 1))
+			chunk.indices[indexPos] = Index((z+1)*CHUNK_SIZE + (CHUNK_SIZE - 1))
 			indexPos++
 		}
 	}
@@ -316,11 +456,11 @@ func calculateChunkIndices(chunk *Chunk) {
 
 // Calculate Chunk Normals
 func calculateChunkNormals(chunk *Chunk) {
-	for z := 0; z < ChunkSize-1; z++ {
-		for x := 0; x < ChunkSize-1; x++ {
-			current := chunk.vertices[z*ChunkSize+x].Position
-			right := chunk.vertices[z*ChunkSize+(x+1)].Position
-			down := chunk.vertices[(z+1)*ChunkSize+x].Position
+	for z := 0; z < CHUNK_SIZE-1; z++ {
+		for x := 0; x < CHUNK_SIZE-1; x++ {
+			current := chunk.vertices[z*CHUNK_SIZE+x].Position
+			right := chunk.vertices[z*CHUNK_SIZE+(x+1)].Position
+			down := chunk.vertices[(z+1)*CHUNK_SIZE+x].Position
 
 			var normal, a, b lin.Vec3
 			a.Sub(&down, &current)
@@ -328,7 +468,7 @@ func calculateChunkNormals(chunk *Chunk) {
 			normal.MultCross(&a, &b)
 			normal.Norm(&normal)
 
-			chunk.vertices[z*ChunkSize+x].Normal = normal
+			chunk.vertices[z*CHUNK_SIZE+x].Normal = normal
 		}
 	}
 }
