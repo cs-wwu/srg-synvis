@@ -20,7 +20,9 @@ go run cmd/svs/main.go
   - [x] Undo Chunk Skirts
   - [x] Fix Last Triangle Not Rendering
   - [x] Redo Indices Management
-  - [ ] Re-implement ChunkManager as new rendering system
+  - [x] Re-implement ChunkManager as new rendering system
+- [ ] Fix `math.go` and/or iteration to load only necessary heightmap
+- [ ] Fix height rendering via Y coordinate (`heightmap.Gray16At(x, z)`)
 - [ ] Re-Work Frustum Culling with ChunkManager
 - [ ] Add LODs with ChunkManager
 - [ ] Rework Main method to not use ticker-based system
