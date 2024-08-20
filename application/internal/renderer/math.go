@@ -54,19 +54,26 @@ const (
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
 func CoordinateIntToMap(x, z int) string {
-	lat := int(z/ARC_DEGREES_TO_SECONDS) - 1 // for top-left coord
-	lon := int(x / ARC_DEGREES_TO_SECONDS)
+	// Adjust coordinates to handle the overlap
+	lat := z / int(ARC_DEGREES_TO_SECONDS)
+	lon := x / int(ARC_DEGREES_TO_SECONDS)
+	if z%int(ARC_DEGREES_TO_SECONDS) == 0 {
+		lat -= 1
+	}
+	if x%int(ARC_DEGREES_TO_SECONDS) != 0 {
+		lon -= 1
+	}
 
 	latDir := 'n'
 	if lat < 0 {
 		latDir = 's'
-		lat = -lat // Make positive number
+		lat = -lat
 	}
 
 	lonDir := 'e'
 	if lon < 0 {
 		lonDir = 'w'
-		lon = -lon // Make positive number
+		lon = -lon
 	}
 
 	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
@@ -75,7 +82,7 @@ func CoordinateIntToMap(x, z int) string {
 // Takes a map coordinate and returns the corresponding float x, z coords.
 // Specifically the top-left coord of the map. e.g.
 //
-//	"n48w123" -> 176400, -442800
+//	"n48w123" -> -442800, 176400
 //	"n00w001" -> -3600, 3600
 //	"n00e000" -> 0, 3600
 //	"s01e001" -> 3600, 0
@@ -98,7 +105,7 @@ func CoordinateMapToInt(coord string) (x, z int) {
 	if latDir == 's' {
 		z = -z
 	}
-	z += ARC_DEGREES_TO_SECONDS // for top-left coord
+	z += ARC_DEGREES_TO_SECONDS
 
 	return x, z
 }

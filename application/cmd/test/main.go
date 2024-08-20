@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
@@ -16,16 +17,21 @@ func testCoords(coord string, xValues, yValues []int) {
 
 	if resultCoord != coord {
 		log.Printf("Failed test (%s != %s): %s -> (%d, %d) -> %s\n", coord, resultCoord, coord, resultX, resultY, resultCoord)
+	} else {
+		log.Printf("Passed test: %s\n", coord)
 	}
 
 	for _, x := range xValues {
 		for _, y := range yValues {
 			resultCoord = renderer.CoordinateIntToMap(x, y)
 			if resultCoord != coord {
-				log.Printf("Failed test CoordinateIntToMap(%d, %d) -> %s, should be %s\n", x, y, resultCoord, coord)
+				log.Printf("Failed test CoordinateIntToMap(%-7d, %-7d) -> %s, should be %s\n", x, y, resultCoord, coord)
+			} else {
+				log.Printf("Passed test CoordinateIntToMap(%-7d, %-7d) -> %s\n", x, y, resultCoord)
 			}
 		}
 	}
+	fmt.Println()
 }
 
 func VulkanMathTest() {
