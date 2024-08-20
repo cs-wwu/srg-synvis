@@ -1312,6 +1312,7 @@ func (app *Application) NextFrame(fps int) {
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
+	app.CheckMouse(app.WindowHandle)
 
 	// Update the view frustum and visibleChunks
 	if app.frameCount%CULLING_INTERVAL == 0 {
