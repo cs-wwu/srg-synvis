@@ -139,7 +139,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 }
 
 func (c *Camera) GetPosition() string {
-	return fmt.Sprintf("%v", c.Pos)
+	return fmt.Sprintf("%v, %f %f", c.Pos, c.Pos[2]/ARC_DEGREES_TO_SECONDS, c.Pos[0]/ARC_DEGREES_TO_SECONDS)
 }
 
 func (c *Camera) GetViewVectors() string {

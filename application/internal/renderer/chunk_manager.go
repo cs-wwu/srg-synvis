@@ -34,7 +34,7 @@ const (
 	CHUNKS_Z     = WORLD_HEIGHT / CHUNK_SIZE
 
 	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
-	INDICES_PER_CHUNK  = 6 * CHUNK_SIZE * CHUNK_SIZE
+	INDICES_PER_CHUNK  = 2*CHUNK_SIZE*(CHUNK_SIZE-1) + 2*((CHUNK_SIZE-1)-1)
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcminutes
 )
@@ -107,12 +107,12 @@ func (cm *ChunkManager) LoadChunks() {
 		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
-		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE*2 {
-			for z := mapZ; z > mapZ-MAP_LENGTH; z -= CHUNK_SIZE {
+		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
+			for z := mapZ-MAP_LENGTH+CHUNK_SIZE; z < mapZ; z += CHUNK_SIZE {
 				cm.LoadChunk(x, z)
 				counter++
 			}
-			log.Printf("Loading chunks... (%d / %d)\n", counter, CHUNK_SIZE*CHUNK_SIZE)
+			log.Printf("Loading chunks... (%d / %d)\n", counter, CHUNKS_PER_MAP)
 		}
 	}
 
@@ -233,8 +233,8 @@ func (cm *ChunkManager) FillBuffers() {
 func (cm *ChunkManager) InitBuffers() {
 	// Create vertex buffer
 	maxVertices := MAX_CHUNKS * VERTICES_PER_CHUNK
-	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for vertices\n", MAX_CHUNKS, VERTICES_PER_CHUNK, VertexSize, maxVertices)
 	vertexData := make([]byte, maxVertices*VertexSize)
+	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for vertices\n", MAX_CHUNKS, VERTICES_PER_CHUNK, VertexSize, len(vertexData))
 
 	vertexBuf := as.CreateBuffer(*cm.device, *cm.memProps, vertexData, BufferUsageVertexBufferBit)
 	cm.vertexBuffer = vertexBuf.Buffer
@@ -243,7 +243,7 @@ func (cm *ChunkManager) InitBuffers() {
 	// Create index buffer
 	maxIndices := MAX_CHUNKS * INDICES_PER_CHUNK
 	indexData := make([]byte, maxIndices*IndexSize)
-	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for indices\n", MAX_CHUNKS, INDICES_PER_CHUNK, IndexSize, maxIndices)
+	log.Printf("Allocating (%d * %d) * %dB = %d Bytes for indices\n", MAX_CHUNKS, INDICES_PER_CHUNK, IndexSize, len(indexData))
 
 	indexBuf := as.CreateBuffer(*cm.device, *cm.memProps, indexData, BufferUsageIndexBufferBit)
 	cm.indexBuffer = indexBuf.Buffer
