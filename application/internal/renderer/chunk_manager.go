@@ -103,7 +103,7 @@ func (cm *ChunkManager) LoadChunks() {
 		log.Printf("Loading map %s\n", mapCoord)
 
 		// Convert map coordinate to world coordinates
-		mapX, mapZ := CoordinateMapToFloat(mapCoord)
+		mapX, mapZ := CoordinateMapToInt(mapCoord)
 		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
@@ -153,7 +153,7 @@ func (cm *ChunkManager) FillBuffers() {
 
 	// Prepare vertex data
 	vertexData := make([]byte, totalVertices*uint32(VertexSize))
-	log.Printf("Vertex Data size: %d\n", totalVertices*uint32(VertexSize))
+	log.Printf("Vertex Data size: %d\n", len(vertexData))
 	var vertexOffset uint32
 	for _, chunk := range cm.chunks {
 		for _, vertex := range chunk.vertices {
@@ -186,6 +186,7 @@ func (cm *ChunkManager) FillBuffers() {
 	}
 
 	// Update index buffer
+	log.Printf("Index Data size: %d\n", len(indexData))
 	var pIndexData unsafe.Pointer
 	ret = vk.MapMemory(*cm.device, cm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
 	if ret != vk.Success {
@@ -209,6 +210,7 @@ func (cm *ChunkManager) FillBuffers() {
 	}
 
 	// Update draw command buffer
+	log.Printf("DrawCommand Data size: %d\n", len(drawCommandData))
 	var pDrawCommandData unsafe.Pointer
 	ret = vk.MapMemory(*cm.device, cm.drawCommandMemory, 0, vk.DeviceSize(len(drawCommandData)), 0, &pDrawCommandData)
 	if ret != vk.Success {
@@ -369,7 +371,7 @@ func loadMap(filepath string) (image.Image, error) {
 func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	// TODO: stitch surrounding chunks together
 	// This should be done by asking if the chunkX, chunkZ exists in the chunk map
-	mapCoords := CoordinateFloatToMap(chunkX, chunkZ)
+	mapCoords := CoordinateIntToMap(chunkX, chunkZ)
 	heightmap := cm.heightmaps[mapCoords]
 	watermap := cm.watermaps[mapCoords]
 
@@ -406,14 +408,6 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
 			worldZ := chunk.Z + z
-
-			if (x == 0) && (z == 0) { // TODO remove
-				log.Printf("Loading chunk at coord: (%d, %d)\n", worldX, worldZ)
-				pixelValue := heightmap.Gray16At(worldX, worldZ).Y
-				height := float32(int(pixelValue) - 32768)
-				log.Printf("(%d, %d) = %d -> %f\n", worldX, worldZ, pixelValue, height)
-			}
-
 			pixelValue := heightmap.Gray16At(worldX, worldZ).Y
 			height := float32(int(pixelValue) - 32768)
 			isWater := watermap.GrayAt(worldX, worldZ).Y

@@ -53,15 +53,9 @@ const (
 //	0, 3600  -> "n00e000"
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
-func CoordinateFloatToMap(x, z int) string {
-	if z % int(ARC_DEGREES_TO_SECONDS) == 0 {
-		z -= 1
-	}
-	lat := int(z / ARC_DEGREES_TO_SECONDS) - 1
-	if x % int(ARC_DEGREES_TO_SECONDS) == 0 {
-		x -= 1
-	}
-	lon := int(x/ARC_DEGREES_TO_SECONDS) - 1 // for top-left coord
+func CoordinateIntToMap(x, z int) string {
+	lat := int(z/ARC_DEGREES_TO_SECONDS) - 1 // for top-left coord
+	lon := int(x / ARC_DEGREES_TO_SECONDS)
 
 	latDir := 'n'
 	if lat < 0 {
@@ -85,7 +79,7 @@ func CoordinateFloatToMap(x, z int) string {
 //	"n00w001" -> -3600, 3600
 //	"n00e000" -> 0, 3600
 //	"s01e001" -> 3600, 0
-func CoordinateMapToFloat(coord string) (x, z int) {
+func CoordinateMapToInt(coord string) (x, z int) {
 	if len(coord) != 7 {
 		return 0, 0 // Invalid coordinate format
 	}
