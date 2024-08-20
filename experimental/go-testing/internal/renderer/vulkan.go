@@ -516,7 +516,7 @@ func (app *Application) prepareuiDescriptorLayout() {
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
 		BindingCount: 1,
-		PBindings: []vk.DescriptorSetLayoutBinding{{
+		PBindings: []vk.DescriptorSetLayoutBinding{{	// diff
 			Binding:         0,
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 			DescriptorCount: uint32(len(app.fontImages)),
@@ -959,7 +959,7 @@ func (app *Application) prepareDescriptorSet() {
 	texInfos2 := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
 	for _, tex := range app.uiTextures {
 		texInfos2 = append(texInfos2, vk.DescriptorImageInfo{
-			Sampler:     tex.sampler,
+			Sampler:     tex.sampler,	// diff
 			ImageView:   tex.view,
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
@@ -977,7 +977,7 @@ func (app *Application) prepareDescriptorSet() {
 
 		res.SetDescriptorSet(set)
 
-		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{
+		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{	// diff
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
@@ -1062,11 +1062,11 @@ func prepareFont(fontPath string) *truetype.Font {
 	return font
 }
 
-func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Image {
+func renderTextToBitmap(font *truetype.Font, text string, size float64, width int, height int) image.Image {
 	c := freetype.NewContext()
 	c.SetFont(font)
 	c.SetFontSize(size)
-	dst := image.NewRGBA(image.Rect(0, 0, 800, 600)) // todo change dimensions
+	dst := image.NewRGBA(image.Rect(0, 0, width, height))
 	bgc := color.RGBA{0, 0, 0, 128}
 	bg := image.NewUniform(bgc)
 	draw.Draw(dst, dst.Bounds(), bg, image.Point{0, 0}, draw.Src)
@@ -1082,9 +1082,9 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64) image.Im
 	return dst
 }
 
-func (app *Application) updateText(str string, size float64) {
+func (app *Application) updateText(str string, size float64, width int, height int) {
 	dev := app.Context().Device()
-	text := renderTextToBitmap(app.font, str, size)
+	text := renderTextToBitmap(app.font, str, size, width, height)
 
 	// upload to buffer
 	var layout vk.SubresourceLayout
@@ -1159,15 +1159,23 @@ func (app *Application) updateText(str string, size float64) {
 
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
+		// don't need to pass texcoord?
 		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
 		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
 		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
 		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
+
+		{Position: lin.Vec2{0.5, -0.75}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{0.75, -0.75}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec2{0.75, -0.5}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{0.5, -0.5}, TexCoord: lin.Vec2{0, 1}},
+
 	}
 	app.vertices = vertices
 
 	app.indices = []Index{
 		0, 1, 2, 2, 3, 0, // Front face (CLOCKWISE)
+		4, 5, 6, 6, 7, 4,
 	}
 }
 
@@ -1213,8 +1221,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.watermap = watermap
 
 	app.font = prepareFont("assets/SourceSansPro-Regular.ttf")
-	text := renderTextToBitmap(app.font, "Hello", 72)
+	text := renderTextToBitmap(app.font, "X", 72, 800, 600)
 	app.fontImages = append(app.fontImages, text)
+	text2:= renderTextToBitmap(app.font, "\\O.o/", 72, 200, 125);
+	app.fontImages = append(app.fontImages, text2)
 	// look at
 	//	descriptorTypeStorageBufferDynamic
 	//	descriptorTypeUniformBufferDynamic
@@ -1308,7 +1318,7 @@ func (app *Application) NextFrame(fps int) {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
-	app.updateText("fps: " + strconv.Itoa(fps), 72)
+	app.updateText("fps: " + strconv.Itoa(fps), 72, 800, 600)
 }
 
 // called every frame by asche
