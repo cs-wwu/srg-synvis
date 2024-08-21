@@ -46,6 +46,8 @@ const (
 
 	WINDOW_HEIGHT = 480
 	WINDOW_WIDTH  = 800
+
+	VIEW_DISTANCE = 6000
 )
 
 var texEnabled = []string{

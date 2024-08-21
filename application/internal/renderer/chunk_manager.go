@@ -74,6 +74,7 @@ func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 	if cm.lastPosition[0] == 0.0 { // TODO Test if statement
 		cm.LoadMaps("n48w123")
 		cm.LoadMaps("n48w122")
+		cm.LoadMaps("n47w123")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	cm.lastPosition = pos
@@ -103,9 +104,11 @@ func (cm *ChunkManager) updateDrawCommands() {
 	var baseVertex int32 = 0
 	var baseIndex uint32 = 0
 
-	for _, chunk := range cm.visibleChunks {
-		cmd := ChunkToDrawCommand(chunk, baseVertex, baseIndex)
-		cm.drawCommands = append(cm.drawCommands, cmd)
+	for _, chunk := range cm.orderedChunks {
+		if containsChunk(chunk, cm.visibleChunks) {
+			cmd := ChunkToDrawCommand(chunk, baseVertex, baseIndex)
+			cm.drawCommands = append(cm.drawCommands, cmd)
+		}
 
 		baseVertex += int32(len(chunk.vertices))
 		baseIndex += uint32(len(chunk.indices))
@@ -143,6 +146,15 @@ func (cm *ChunkManager) updateDrawCommands() {
 	// fmt.Printf("       %7d\n", maxZ)
 	// fmt.Printf("%7d       %7d\n", minX, maxX)
 	// fmt.Printf("       %7d\n", minZ)
+}
+
+func containsChunk(chunk *Chunk, chunkArray []*Chunk) bool {
+	for _, otherChunk := range chunkArray {
+		if chunk == otherChunk {
+			return true
+		}
+	}
+	return false
 }
 
 // To be called after updating the drawcommand array

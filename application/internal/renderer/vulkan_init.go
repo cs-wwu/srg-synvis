@@ -64,7 +64,7 @@ func (app *Application) VulkanInstanceExtensions() []string {
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
 	// 45 FOV, Aspect 1.0, Near plane, Far Plane
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), aspectRatio, 0.1, 4000.0)
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), aspectRatio, 0.1, VIEW_DISTANCE)
 	app.ubo.View = app.camera.GetViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1

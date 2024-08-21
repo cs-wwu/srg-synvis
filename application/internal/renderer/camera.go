@@ -13,7 +13,7 @@ import (
 
 var (
 	// For heightmap model
-	startX, startZ = CoordinateGPSToFloat("48.733677, -122.482704")
+	startX, startZ = CoordinateGPSToFloat("48.0, -122.0")
 
 	START_CAMERA_POS   = lin.Vec3{startX, 100.0, startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
