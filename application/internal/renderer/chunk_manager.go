@@ -54,7 +54,7 @@ type ChunkManager struct {
 	drawCommandMemory vk.DeviceMemory
 	drawCommands      []DrawCommand
 
-	chunks        map[string]*Chunk
+	chunks map[string]*Chunk
 
 	heightmaps map[string]*image.Gray16
 	watermaps  map[string]*image.Gray
@@ -79,13 +79,13 @@ func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 
 func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *ChunkManager {
 	cm := &ChunkManager{
-		device:        device,
-		memProps:      memProps,
-		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
-		drawCommands:  make([]DrawCommand, 0),
-		chunks:        make(map[string]*Chunk),
-		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
-		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
+		device:       device,
+		memProps:     memProps,
+		lastPosition: lin.Vec3{0.0, 0.0, 0.0},
+		drawCommands: make([]DrawCommand, 0),
+		chunks:       make(map[string]*Chunk),
+		heightmaps:   make(map[string]*image.Gray16, NUM_MAPS),
+		watermaps:    make(map[string]*image.Gray, NUM_MAPS),
 	}
 
 	cm.InitBuffers()
@@ -176,7 +176,7 @@ func (cm *ChunkManager) FillBuffers() {
 		totalIndices += indexCount
 	}
 	cm.drawCommands = drawCommands
-	
+
 	// Prepare vertex data
 	vertexData := make([]byte, totalVertices*uint32(VertexSize))
 	log.Printf("Vertex Data size: %d\n", len(vertexData))

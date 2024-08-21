@@ -727,8 +727,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
 	app.ChunkManager.LoadChunks()
 	app.ChunkManager.FillBuffers()
-	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	// app.determineVisibleChunks()
+	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	app.determineVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
