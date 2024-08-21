@@ -13,9 +13,9 @@ import (
 
 var (
 	// For heightmap model
-	startX, startZ = CoordinateMapToInt("n48w123")
+	startX, startZ = CoordinateGPSToFloat("48.733677, -122.482704")
 
-	START_CAMERA_POS   = lin.Vec3{float32(startX), 50.0, float32(startZ)}
+	START_CAMERA_POS   = lin.Vec3{startX, 50.0, startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{1.0, 0.0, 0.5}
 	CAMERA_SPEED       = float32(10.0)
@@ -130,7 +130,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		c.Front = &front
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
-			fmt.Printf("Pos: %v\n", c.GetPosition())
+			fmt.Printf("Pos: %v\n", c.GetPositionString())
 			fmt.Printf("Vectors: %v\n", c.GetViewVectors())
 		}
 		// Update the camera's front, right, and up vectors for quaternions
@@ -138,8 +138,8 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 	}
 }
 
-func (c *Camera) GetPosition() string {
-	return fmt.Sprintf("%v, %f %f", c.Pos, c.Pos[2]/ARC_DEGREES_TO_SECONDS, c.Pos[0]/ARC_DEGREES_TO_SECONDS)
+func (c *Camera) GetPositionString() string {
+	return fmt.Sprintf("%v, %s", c.Pos, CoordinateFloatToGPS(c.Pos[0], c.Pos[2]))
 }
 
 func (c *Camera) GetViewVectors() string {

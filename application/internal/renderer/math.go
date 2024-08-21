@@ -3,6 +3,7 @@ package renderer
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // This file should be used for coordinate math and rendering math
@@ -127,5 +128,32 @@ func CoordinateIntToPixel(x, z int) (int, int) {
 	if z < 0 {
 		z = z + int(ARC_DEGREES_TO_SECONDS)
 	}
+	return x, z
+}
+
+// Returns the x, z float as a gps readable value
+func CoordinateFloatToGPS(x, z float32) string {
+	return fmt.Sprintf("%f, %f", -z/3600, x/3600)
+}
+
+// CoordinateGPSToFloat converts a GPS coordinate string to x, z float coordinates
+func CoordinateGPSToFloat(coord string) (float32, float32) {
+	// Split the coordinate string into latitude and longitude
+	parts := strings.Split(coord, ",")
+	if len(parts) != 2 {
+		fmt.Printf("invalid GPS coordinate format")
+		return 0.0, 0.0
+	}
+
+	// Parse latitude
+	lat, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 32)
+
+	// Parse longitude
+	lon, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 32)
+
+	// Convert to x, z float coordinates
+	x := float32(lon * 3600)
+	z := float32(-lat * 3600)
+
 	return x, z
 }

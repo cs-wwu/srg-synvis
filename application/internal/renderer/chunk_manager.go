@@ -109,8 +109,7 @@ func (cm *ChunkManager) LoadChunks() {
 		counter := 0
 		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
 			// Iterate from top right
-			for z := mapZ + CHUNK_SIZE; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
-				fmt.Printf("Loading chunk at (%d, %d)\n", mapX, mapZ)
+			for z := mapZ; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
 				cm.LoadChunk(x, z)
 				counter++
 			}
