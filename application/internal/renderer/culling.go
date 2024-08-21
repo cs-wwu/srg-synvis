@@ -63,13 +63,13 @@ func (p *Plane) normalize() {
 func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 	corners := [8]lin.Vec3{
 		{float32(chunk.X), 0, float32(chunk.Z)},
-		{float32(chunk.X + ChunkSize), 0, float32(chunk.Z)},
-		{float32(chunk.X), 0, float32(chunk.Z + ChunkSize)},
-		{float32(chunk.X + ChunkSize), 0, float32(chunk.Z + ChunkSize)},
+		{float32(chunk.X + CHUNK_SIZE), 0, float32(chunk.Z)},
+		{float32(chunk.X), 0, float32(chunk.Z + CHUNK_SIZE)},
+		{float32(chunk.X + CHUNK_SIZE), 0, float32(chunk.Z + CHUNK_SIZE)},
 		{float32(chunk.X), MAX_HEIGHT, float32(chunk.Z)},
-		{float32(chunk.X + ChunkSize), MAX_HEIGHT, float32(chunk.Z)},
-		{float32(chunk.X), MAX_HEIGHT, float32(chunk.Z + ChunkSize)},
-		{float32(chunk.X + ChunkSize), MAX_HEIGHT, float32(chunk.Z + ChunkSize)},
+		{float32(chunk.X + CHUNK_SIZE), MAX_HEIGHT, float32(chunk.Z)},
+		{float32(chunk.X), MAX_HEIGHT, float32(chunk.Z + CHUNK_SIZE)},
+		{float32(chunk.X + CHUNK_SIZE), MAX_HEIGHT, float32(chunk.Z + CHUNK_SIZE)},
 	}
 
 	for _, plane := range f.Planes {

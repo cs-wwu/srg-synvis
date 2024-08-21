@@ -710,26 +710,6 @@ func (app *Application) prepareFramebuffers() {
 	}
 }
 
-// func (app *Application) LoadAllChunks() {
-// 	if app.heightmap == nil {
-// 		panic("Heightmap not loaded")
-// 	}
-
-// 	totalChunks := (length / ChunkSize) * (length / ChunkSize)
-// 	fmt.Printf("Loading %d chunks...\n", totalChunks)
-
-// 	for z := 0; z < length/ChunkSize; z++ {
-// 		for x := 0; x < length/ChunkSize; x++ {
-// 			app.OldLoadChunk(x, z)
-// 			if (z*length/ChunkSize+x+1)%100 == 0 {
-// 				fmt.Printf("Loaded %d/%d chunks\n", z*length/ChunkSize+x+1, totalChunks)
-// 			}
-// 		}
-// 	}
-
-// 	fmt.Printf("All %d chunks loaded.\n", totalChunks)
-// }
-
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	dev := app.Context().Device()
@@ -747,10 +727,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
 	app.ChunkManager.LoadChunks()
 	app.ChunkManager.FillBuffers()
-
-	// Load all of the chunks associated
-
 	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// app.determineVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
