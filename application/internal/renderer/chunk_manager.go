@@ -55,6 +55,7 @@ type ChunkManager struct {
 	drawCommands      []DrawCommand
 
 	chunks        map[string]*Chunk
+	orderedChunks []*Chunk
 	visibleChunks []*Chunk
 
 	heightmaps map[string]*image.Gray16
@@ -85,6 +86,7 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		drawCommands:  make([]DrawCommand, 0),
 		chunks:        make(map[string]*Chunk),
+		orderedChunks: make([]*Chunk, 0),
 		visibleChunks: make([]*Chunk, 0),
 		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
 		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
@@ -110,37 +112,37 @@ func (cm *ChunkManager) updateDrawCommands() {
 	}
 
 	// TODO find the visible chunks
-	var minX int
-	var maxX int
-	var minZ int
-	var maxZ int
+	// var minX int
+	// var maxX int
+	// var minZ int
+	// var maxZ int
 
-	for i, chunk := range cm.visibleChunks {
-		if i == 0 {
-			minX = chunk.X
-			maxX = chunk.X
-			minZ = chunk.Z
-			maxZ = chunk.Z
-			continue
-		}
+	// for i, chunk := range cm.visibleChunks {
+	// 	if i == 0 {
+	// 		minX = chunk.X
+	// 		maxX = chunk.X
+	// 		minZ = chunk.Z
+	// 		maxZ = chunk.Z
+	// 		continue
+	// 	}
 
-		if chunk.X < minX {
-			minX = chunk.X
-		}
-		if chunk.X > maxX {
-			maxX = chunk.X
-		}
-		if chunk.Z < minZ {
-			minZ = chunk.Z
-		}
-		if chunk.Z > maxZ {
-			maxZ = chunk.Z
-		}
-	}
+	// 	if chunk.X < minX {
+	// 		minX = chunk.X
+	// 	}
+	// 	if chunk.X > maxX {
+	// 		maxX = chunk.X
+	// 	}
+	// 	if chunk.Z < minZ {
+	// 		minZ = chunk.Z
+	// 	}
+	// 	if chunk.Z > maxZ {
+	// 		maxZ = chunk.Z
+	// 	}
+	// }
 
-	fmt.Printf("       %7d\n", maxZ)
-	fmt.Printf("%7d       %7d\n", minX, maxX)
-	fmt.Printf("       %7d\n", minZ)
+	// fmt.Printf("       %7d\n", maxZ)
+	// fmt.Printf("%7d       %7d\n", minX, maxX)
+	// fmt.Printf("       %7d\n", minZ)
 }
 
 // To be called after updating the drawcommand array
@@ -211,7 +213,7 @@ func (cm *ChunkManager) FillBuffers() {
 	drawCommands := make([]DrawCommand, 0, len(cm.chunks))
 
 	// First pass: calculate total sizes and prepare draw commands
-	for _, chunk := range cm.chunks {
+	for _, chunk := range cm.orderedChunks {
 		vertexCount := uint32(len(chunk.vertices))
 		indexCount := uint32(len(chunk.indices))
 
@@ -232,7 +234,7 @@ func (cm *ChunkManager) FillBuffers() {
 	vertexData := make([]byte, totalVertices*uint32(VertexSize))
 	log.Printf("Vertex Data size: %d\n", len(vertexData))
 	var vertexOffset uint32
-	for _, chunk := range cm.chunks {
+	for _, chunk := range cm.orderedChunks {
 		for _, vertex := range chunk.vertices {
 			copy(vertexData[vertexOffset:], vertex.Data())
 			vertexOffset += uint32(VertexSize)
@@ -255,7 +257,7 @@ func (cm *ChunkManager) FillBuffers() {
 	// Prepare index data
 	indexData := make([]byte, totalIndices*uint32(IndexSize))
 	var indexOffset uint32
-	for _, chunk := range cm.chunks {
+	for _, chunk := range cm.orderedChunks {
 		for _, index := range chunk.indices {
 			copy(indexData[indexOffset:], index.Data())
 			indexOffset += uint32(IndexSize)
@@ -480,6 +482,7 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 	calculateChunkNormals(chunk)
 
 	cm.chunks[chunkKey] = chunk
+	cm.orderedChunks = append(cm.orderedChunks, chunk)
 }
 
 // Generate vertices and texcoords

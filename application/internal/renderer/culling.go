@@ -85,7 +85,6 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 		}
 	}
 
-	log.Printf("Chunk is visible: (%d, %d)", chunk.X, chunk.Z)
 	return true
 }
 
@@ -93,7 +92,7 @@ func (app *Application) determineVisibleChunks() {
 	cm := app.ChunkManager
 	cm.visibleChunks = cm.visibleChunks[:0]
 
-	for _, chunk := range cm.chunks {
+	for _, chunk := range cm.orderedChunks {
 		if app.frustum.IsChunkVisible(chunk) {
 			cm.visibleChunks = append(cm.visibleChunks, chunk)
 		}
