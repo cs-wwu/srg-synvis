@@ -3,6 +3,8 @@ package renderer
 import (
 	// "fmt"
 
+	"log"
+
 	lin "github.com/xlab/linmath"
 )
 
@@ -58,7 +60,7 @@ func (p *Plane) normalize() {
 	p.Distance /= length
 }
 
-func (f *Frustum) IsChunkVisible(chunk *OldChunk) bool {
+func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 	corners := [8]lin.Vec3{
 		{float32(chunk.X), 0, float32(chunk.Z)},
 		{float32(chunk.X + ChunkSize), 0, float32(chunk.Z)},
@@ -85,15 +87,15 @@ func (f *Frustum) IsChunkVisible(chunk *OldChunk) bool {
 	return true
 }
 
-// func (app *Application) determineVisibleChunks() {
-// 	// Clear the slice while keeping the underlying array for size
-// 	app.visibleChunks = app.visibleChunks[:0] // Clear the slice while keeping the underlying array
+func (app *Application) determineVisibleChunks() {
+	// Clear the slice while keeping the underlying array for size
+	app.ChunkManager.visibleChunks = app.ChunkManager.visibleChunks[:0] // Clear the slice while keeping the underlying array
 
-// 	for _, chunk := range app.loadedChunks {
-// 		if app.frustum.IsChunkVisible(chunk) {
-// 			app.visibleChunks = append(app.visibleChunks, chunk)
-// 		}
-// 	}
+	for _, chunk := range app.ChunkManager.chunks {
+		if app.frustum.IsChunkVisible(chunk) {
+			app.ChunkManager.visibleChunks = append(app.ChunkManager.visibleChunks, chunk)
+		}
+	}
 
-// 	fmt.Printf("Visible chunks: %d\n", len(app.visibleChunks))
-// }
+	log.Printf("Visible chunks: %d\n", len(app.ChunkManager.visibleChunks))
+}

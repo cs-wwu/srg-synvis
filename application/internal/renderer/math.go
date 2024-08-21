@@ -111,7 +111,7 @@ func CoordinateMapToInt(coord string) (x, z int) {
 }
 
 // Takes an x, z coordinate and returns the coorepsonding image pixel coord
-// Images start in the top-right, need to flip z coordinate
+// Images start in the top-left, due to vulkan, need to flip z coordinate
 func CoordinateIntToPixel(x, z int) (int, int) {
 	// Handle longitude (x)
 	x %= int(ARC_DEGREES_TO_SECONDS)
@@ -121,8 +121,10 @@ func CoordinateIntToPixel(x, z int) (int, int) {
 
 	// Handle latitude (z)
 	z %= int(ARC_DEGREES_TO_SECONDS)
-	if z < 0 {
-		z = z + int(ARC_DEGREES_TO_SECONDS)
+	if z >= 0 {
+		z = int(ARC_DEGREES_TO_SECONDS) - z
+	} else {
+		z = -z
 	}
 	return x, z
 }
