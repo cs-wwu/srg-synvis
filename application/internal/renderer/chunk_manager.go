@@ -54,7 +54,8 @@ type ChunkManager struct {
 	drawCommandMemory vk.DeviceMemory
 	drawCommands      []DrawCommand
 
-	chunks map[string]*Chunk
+	chunks        map[string]*Chunk
+	visibleChunks []*Chunk
 
 	heightmaps map[string]*image.Gray16
 	watermaps  map[string]*image.Gray
@@ -79,13 +80,14 @@ func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 
 func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *ChunkManager {
 	cm := &ChunkManager{
-		device:       device,
-		memProps:     memProps,
-		lastPosition: lin.Vec3{0.0, 0.0, 0.0},
-		drawCommands: make([]DrawCommand, 0),
-		chunks:       make(map[string]*Chunk),
-		heightmaps:   make(map[string]*image.Gray16, NUM_MAPS),
-		watermaps:    make(map[string]*image.Gray, NUM_MAPS),
+		device:        device,
+		memProps:      memProps,
+		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
+		drawCommands:  make([]DrawCommand, 0),
+		chunks:        make(map[string]*Chunk),
+		visibleChunks: make([]*Chunk, 0),
+		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
+		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
 	}
 
 	cm.InitBuffers()
@@ -93,6 +95,55 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 	return cm
 }
 
+// updates the draw commands based on the current visible chunks
+func (cm *ChunkManager) updateDrawCommands() {
+	cm.drawCommands = make([]DrawCommand, 0, len(cm.visibleChunks))
+	var baseVertex int32 = 0
+	var baseIndex uint32 = 0
+
+	for _, chunk := range cm.visibleChunks {
+		cmd := ChunkToDrawCommand(chunk, baseVertex, baseIndex)
+		cm.drawCommands = append(cm.drawCommands, cmd)
+
+		baseVertex += int32(len(chunk.vertices))
+		baseIndex += uint32(len(chunk.indices))
+	}
+
+	// TODO find the visible chunks
+	var minX int
+	var maxX int
+	var minZ int
+	var maxZ int
+
+	for i, chunk := range cm.visibleChunks {
+		if i == 0 {
+			minX = chunk.X
+			maxX = chunk.X
+			minZ = chunk.Z
+			maxZ = chunk.Z
+			continue
+		}
+
+		if chunk.X < minX {
+			minX = chunk.X
+		}
+		if chunk.X > maxX {
+			maxX = chunk.X
+		}
+		if chunk.Z < minZ {
+			minZ = chunk.Z
+		}
+		if chunk.Z > maxZ {
+			maxZ = chunk.Z
+		}
+	}
+
+	fmt.Printf("       %7d\n", maxZ)
+	fmt.Printf("%7d       %7d\n", minX, maxX)
+	fmt.Printf("       %7d\n", minZ)
+}
+
+// To be called after updating the drawcommand array
 func (cm *ChunkManager) updateDrawCommandBuffer() {
 	drawCommandData := make([]byte, len(cm.drawCommands)*int(unsafe.Sizeof(DrawCommand{})))
 	for i, cmd := range cm.drawCommands {
@@ -247,6 +298,16 @@ func (cm *ChunkManager) FillBuffers() {
 	vk.UnmapMemory(*cm.device, cm.drawCommandMemory)
 
 	cm.updateDrawCommandBuffer()
+}
+
+func ChunkToDrawCommand(chunk *Chunk, baseVertex int32, baseIndex uint32) DrawCommand {
+	return DrawCommand{
+		IndexCount:    uint32(len(chunk.indices)),
+		InstanceCount: 1,
+		FirstIndex:    baseIndex,
+		VertexOffset:  baseVertex,
+		FirstInstance: 0,
+	}
 }
 
 // Intializes the ChunkManager buffers

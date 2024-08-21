@@ -91,33 +91,16 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 
 func (app *Application) determineVisibleChunks() {
 	cm := app.ChunkManager
-	cm.drawCommands = cm.drawCommands[:0] // Clear the slice while keeping the underlying array
-
-	vertexOffset := 0
-	indexOffset := 0
+	cm.visibleChunks = cm.visibleChunks[:0]
 
 	for _, chunk := range cm.chunks {
-		// TODO: ischunkvisible is correct, not correctly updating drawcommands
 		if app.frustum.IsChunkVisible(chunk) {
-			// Calculate the index count for this chunk
-			indexCount := uint32(len(chunk.indices))
-
-			// Update Draw Commands
-			cm.drawCommands = append(cm.drawCommands, DrawCommand{
-				IndexCount:    indexCount,
-				InstanceCount: 1,
-				FirstIndex:    uint32(indexOffset),
-				VertexOffset:  int32(vertexOffset),
-				FirstInstance: 0,
-			})
+			cm.visibleChunks = append(cm.visibleChunks, chunk)
 		}
-
-		// Update offsets for the next chunk, regardless of visibility
-		vertexOffset += len(chunk.vertices)
-		indexOffset += len(chunk.indices)
 	}
 
 	// Update the draw command buffer
+	cm.updateDrawCommands()
 	cm.updateDrawCommandBuffer()
 
 	log.Printf("Visible chunks: %d\n", len(cm.drawCommands))
