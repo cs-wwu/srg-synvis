@@ -58,10 +58,10 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	if app.frameCount%CULLING_INTERVAL == 0 {
-		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-		app.determineVisibleChunks()
-	}
+	// if app.frameCount%CULLING_INTERVAL == 0 {
+	// 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// 	app.determineVisibleChunks()
+	// }
 }
 
 // called every frame by asche

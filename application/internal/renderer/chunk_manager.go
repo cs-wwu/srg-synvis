@@ -55,7 +55,6 @@ type ChunkManager struct {
 	drawCommands      []DrawCommand
 
 	chunks        map[string]*Chunk
-	visibleChunks []*Chunk
 
 	heightmaps map[string]*image.Gray16
 	watermaps  map[string]*image.Gray
@@ -84,7 +83,6 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 		memProps:      memProps,
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		drawCommands:  make([]DrawCommand, 0),
-		visibleChunks: make([]*Chunk, 0),
 		chunks:        make(map[string]*Chunk),
 		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
 		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
@@ -158,10 +156,6 @@ func (cm *ChunkManager) FillBuffers() {
 		return
 	}
 
-	for _, chunk := range cm.chunks {
-		cm.visibleChunks = append(cm.visibleChunks, chunk)
-	}
-
 	var totalVertices, totalIndices uint32
 	drawCommands := make([]DrawCommand, 0, len(cm.chunks))
 
@@ -181,7 +175,8 @@ func (cm *ChunkManager) FillBuffers() {
 		totalVertices += vertexCount
 		totalIndices += indexCount
 	}
-
+	cm.drawCommands = drawCommands
+	
 	// Prepare vertex data
 	vertexData := make([]byte, totalVertices*uint32(VertexSize))
 	log.Printf("Vertex Data size: %d\n", len(vertexData))
@@ -251,10 +246,7 @@ func (cm *ChunkManager) FillBuffers() {
 	}
 	vk.UnmapMemory(*cm.device, cm.drawCommandMemory)
 
-	cm.visibleChunks = make([]*Chunk, 0, len(cm.chunks))
-	for _, chunk := range cm.chunks {
-		cm.visibleChunks = append(cm.visibleChunks, chunk)
-	}
+	cm.updateDrawCommandBuffer()
 }
 
 // Intializes the ChunkManager buffers
