@@ -70,7 +70,7 @@ type DrawCommand struct {
 
 func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 	if cm.lastPosition[0] == 0.0 { // TODO Test if statement
-		cm.LoadMaps("n47w123")
+		cm.LoadMaps("n48w123")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	cm.lastPosition = pos
@@ -109,6 +109,7 @@ func (cm *ChunkManager) LoadChunks() {
 
 		counter := 0
 		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
+			// Iterate from top right
 			for z := mapZ + CHUNK_SIZE; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
 				fmt.Printf("Loading chunk at (%d, %d)\n", x-mapX, z-mapZ)
 				cm.LoadChunk(x, z)
@@ -410,11 +411,10 @@ func (cm *ChunkManager) LoadChunk(chunkX, chunkZ int) {
 // Generate vertices and texcoords
 func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Fill the vertices
-	for z := 0; z < CHUNK_SIZE; z++ {
+	for z := CHUNK_SIZE - 1; z >= 0; z-- {
+		worldZ := chunk.Z + z
 		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
-			worldZ := chunk.Z + z
-
 			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
