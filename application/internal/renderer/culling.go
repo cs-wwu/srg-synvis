@@ -97,6 +97,7 @@ func (app *Application) determineVisibleChunks() {
 	indexOffset := 0
 
 	for _, chunk := range cm.chunks {
+		// TODO: ischunkvisible is correct, not correctly updating drawcommands
 		if app.frustum.IsChunkVisible(chunk) {
 			// Calculate the index count for this chunk
 			indexCount := uint32(len(chunk.indices))
