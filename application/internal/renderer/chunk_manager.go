@@ -523,3 +523,11 @@ func calculateChunkNormals(chunk *Chunk) {
 		}
 	}
 }
+
+func (cm *ChunkManager) Destroy() {
+	vk.DestroyBuffer(*cm.device, cm.vertexBuffer, nil)
+	vk.FreeMemory(*cm.device, cm.vertexMemory, nil)
+
+	vk.DestroyBuffer(*cm.device, cm.indexBuffer, nil)
+	vk.FreeMemory(*cm.device, cm.indexMemory, nil)
+}

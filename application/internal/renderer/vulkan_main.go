@@ -37,10 +37,7 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
-	vk.DestroyBuffer(dev, app.ChunkManager.vertexBuffer, nil)
-	vk.FreeMemory(dev, app.ChunkManager.vertexMemory, nil)
-	vk.DestroyBuffer(dev, app.ChunkManager.indexBuffer, nil)
-	vk.FreeMemory(dev, app.ChunkManager.indexMemory, nil)
+	app.ChunkManager.Destroy()
 
 	app.depth.Destroy(dev)
 	return nil

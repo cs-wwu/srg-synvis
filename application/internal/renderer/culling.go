@@ -90,12 +90,12 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 
 func (app *Application) determineVisibleChunks() {
 	cm := app.ChunkManager
-	
+
 	// Clear the previous visible chunk map
 	for k := range cm.visibleChunks {
 		delete(cm.visibleChunks, k)
 	}
-	
+
 	for _, chunk := range cm.orderedChunks {
 		if app.frustum.IsChunkVisible(chunk) {
 			chunkKey := ChunkKey(chunk.X, chunk.Z)
@@ -109,3 +109,4 @@ func (app *Application) determineVisibleChunks() {
 
 	log.Printf("Visible chunks: %d\n", len(cm.visibleChunks))
 }
+
