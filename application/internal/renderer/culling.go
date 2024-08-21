@@ -21,6 +21,7 @@ type Frustum struct {
 	Planes [6]Plane // Left, Right, Top, Bottom, Near, Far
 }
 
+// Update the new camera view with the frustum
 func (f *Frustum) Update(view, proj *lin.Mat4x4) {
 	// Combine view and projection matrices
 	var clipMatrix lin.Mat4x4
@@ -88,6 +89,7 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 	return true
 }
 
+// determines visible chunks and updates the ChunkManager buffers accordingly
 func (app *Application) determineVisibleChunks() {
 	cm := app.ChunkManager
 

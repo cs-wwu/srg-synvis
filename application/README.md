@@ -26,8 +26,9 @@ go run cmd/svs/main.go
 - [x] Change heightmap loading and position to be modular based on arcseconds
   - [x] Attempt Rendering of more than one heightmap
 - [x] Begin Implementation Unit and Integration Testing
-- [ ] Re-Work Frustum Culling with ChunkManager
+- [x] Re-Work Frustum Culling with ChunkManager
 - [ ] Add LODs with ChunkManager
+- [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
 - [ ] Change Camera to use Quaternions
 - [ ] Re-implement UI (try to use original `asche`?)
