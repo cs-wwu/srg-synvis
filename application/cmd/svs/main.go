@@ -14,7 +14,7 @@ import (
 	"github.com/xlab/closer"
 )
 
-const FRAME_RATE = 60
+const FRAME_RATE = 20
 
 func init() {
 	runtime.LockOSThread()

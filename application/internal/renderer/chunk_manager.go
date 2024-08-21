@@ -107,8 +107,8 @@ func (cm *ChunkManager) LoadChunks() {
 		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
-		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
-			for z := mapZ-MAP_LENGTH+CHUNK_SIZE; z < mapZ; z += CHUNK_SIZE {
+		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE * 2 {
+			for z := mapZ - MAP_LENGTH + CHUNK_SIZE; z < mapZ; z += CHUNK_SIZE {
 				cm.LoadChunk(x, z)
 				counter++
 			}
@@ -129,6 +129,10 @@ func (cm *ChunkManager) FillBuffers() {
 	if len(cm.chunks) == 0 {
 		log.Println("No data loaded, failed to add chunks to buffers.")
 		return
+	}
+
+	for _, chunk := range cm.chunks {
+		cm.visibleChunks = append(cm.visibleChunks, chunk)
 	}
 
 	var totalVertices, totalIndices uint32

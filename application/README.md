@@ -21,8 +21,9 @@ go run cmd/svs/main.go
   - [x] Fix Last Triangle Not Rendering
   - [x] Redo Indices Management
   - [x] Re-implement ChunkManager as new rendering system
-- [ ] Fix `math.go` and/or iteration to load only necessary heightmap
-- [ ] Fix height rendering via Y coordinate (`heightmap.Gray16At(x, z)`)
+- [x] Fix `math.go` and/or iteration to load only necessary heightmap
+- [x] Fix height rendering via Y coordinate (`heightmap.Gray16At(x, z)`)
+- [ ] Find and fix GPU hanging
 - [ ] Re-Work Frustum Culling with ChunkManager
 - [ ] Add LODs with ChunkManager
 - [ ] Rework Main method to not use ticker-based system
