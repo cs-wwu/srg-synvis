@@ -49,7 +49,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/n48w123_google.png",
+	"assets/textures/checkerboard.png",
 }
 
 // Depth Constants

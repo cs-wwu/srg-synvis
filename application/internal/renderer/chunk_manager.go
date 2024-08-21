@@ -423,8 +423,8 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			chunk.vertices[z*CHUNK_SIZE+x] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
 				TexCoord: lin.Vec3{
-					float32(worldX) / float32(MAP_LENGTH-1),
-					float32(worldZ) / float32(MAP_LENGTH-1),
+					float32(localX) / float32(MAP_LENGTH),
+					float32(localZ) / float32(MAP_LENGTH),
 					float32(isWater),
 				},
 			}
