@@ -70,7 +70,7 @@ type DrawCommand struct {
 
 func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 	if cm.lastPosition[0] == 0.0 { // TODO Test if statement
-		cm.LoadMaps("n48w123")
+		cm.LoadMaps("n47w123")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	cm.lastPosition = pos
@@ -104,11 +104,13 @@ func (cm *ChunkManager) LoadChunks() {
 
 		// Convert map coordinate to world coordinates
 		mapX, mapZ := CoordinateMapToInt(mapCoord)
-		log.Printf("Top-left coordinate: %d, %d\n", mapX, mapZ)
+		mapZ -= MAP_LENGTH
+		log.Printf("Map coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
-		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE * 2 {
-			for z := mapZ - MAP_LENGTH + CHUNK_SIZE; z < mapZ; z += CHUNK_SIZE {
+		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
+			for z := mapZ + CHUNK_SIZE; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
+				fmt.Printf("Loading chunk at (%d, %d)\n", x-mapX, z-mapZ)
 				cm.LoadChunk(x, z)
 				counter++
 			}
@@ -357,7 +359,7 @@ func loadMap(filepath string) (image.Image, error) {
 
 	// Verify image size
 	width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
-	if width != length || height != length {
+	if width != MAP_LENGTH+1 || height != MAP_LENGTH+1 {
 		return nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
 	}
 
@@ -414,7 +416,6 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			worldZ := chunk.Z + z
 
 			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
-			localZ = MAP_LENGTH - 1 - localZ
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
 			height := float32(int(pixelValue) - 32768)
@@ -423,8 +424,8 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			chunk.vertices[z*CHUNK_SIZE+x] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
 				TexCoord: lin.Vec3{
-					float32(worldX) / float32(length-1),
-					float32(worldZ) / float32(length-1),
+					float32(worldX) / float32(MAP_LENGTH-1),
+					float32(worldZ) / float32(MAP_LENGTH-1),
 					float32(isWater),
 				},
 			}
