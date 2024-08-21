@@ -55,8 +55,8 @@ type ChunkManager struct {
 	drawCommands      []DrawCommand
 
 	chunks        map[string]*Chunk
+	visibleChunks map[string]bool
 	orderedChunks []*Chunk
-	visibleChunks []*Chunk
 
 	heightmaps map[string]*image.Gray16
 	watermaps  map[string]*image.Gray
@@ -87,8 +87,8 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		drawCommands:  make([]DrawCommand, 0),
 		chunks:        make(map[string]*Chunk),
+		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
-		visibleChunks: make([]*Chunk, 0),
 		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
 		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
 	}
@@ -105,7 +105,8 @@ func (cm *ChunkManager) updateDrawCommands() {
 	var baseIndex uint32 = 0
 
 	for _, chunk := range cm.orderedChunks {
-		if containsChunk(chunk, cm.visibleChunks) {
+		chunkKey := ChunkKey(chunk.X, chunk.Z)
+		if cm.visibleChunks[chunkKey] {
 			cmd := ChunkToDrawCommand(chunk, baseVertex, baseIndex)
 			cm.drawCommands = append(cm.drawCommands, cmd)
 		}
@@ -113,48 +114,6 @@ func (cm *ChunkManager) updateDrawCommands() {
 		baseVertex += int32(len(chunk.vertices))
 		baseIndex += uint32(len(chunk.indices))
 	}
-
-	// TODO find the visible chunks
-	// var minX int
-	// var maxX int
-	// var minZ int
-	// var maxZ int
-
-	// for i, chunk := range cm.visibleChunks {
-	// 	if i == 0 {
-	// 		minX = chunk.X
-	// 		maxX = chunk.X
-	// 		minZ = chunk.Z
-	// 		maxZ = chunk.Z
-	// 		continue
-	// 	}
-
-	// 	if chunk.X < minX {
-	// 		minX = chunk.X
-	// 	}
-	// 	if chunk.X > maxX {
-	// 		maxX = chunk.X
-	// 	}
-	// 	if chunk.Z < minZ {
-	// 		minZ = chunk.Z
-	// 	}
-	// 	if chunk.Z > maxZ {
-	// 		maxZ = chunk.Z
-	// 	}
-	// }
-
-	// fmt.Printf("       %7d\n", maxZ)
-	// fmt.Printf("%7d       %7d\n", minX, maxX)
-	// fmt.Printf("       %7d\n", minZ)
-}
-
-func containsChunk(chunk *Chunk, chunkArray []*Chunk) bool {
-	for _, otherChunk := range chunkArray {
-		if chunk == otherChunk {
-			return true
-		}
-	}
-	return false
 }
 
 // To be called after updating the drawcommand array
