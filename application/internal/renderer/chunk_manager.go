@@ -412,9 +412,13 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
 			worldZ := chunk.Z + z
-			pixelValue := heightmap.Gray16At(CoordinateIntToPixel(worldX, worldZ)).Y
+
+			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
+			localZ = MAP_LENGTH - 1 - localZ
+
+			pixelValue := heightmap.Gray16At(localX, localZ).Y
 			height := float32(int(pixelValue) - 32768)
-			isWater := watermap.GrayAt(CoordinateIntToPixel(worldX, worldZ)).Y
+			isWater := watermap.GrayAt(CoordinateIntToPixel(localX, localZ)).Y
 
 			chunk.vertices[z*CHUNK_SIZE+x] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
