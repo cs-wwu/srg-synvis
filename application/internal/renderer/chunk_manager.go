@@ -52,6 +52,7 @@ type ChunkManager struct {
 	indexMemory       vk.DeviceMemory
 	drawCommandBuffer vk.Buffer
 	drawCommandMemory vk.DeviceMemory
+	drawCommands      []DrawCommand
 
 	chunks        map[string]*Chunk
 	visibleChunks []*Chunk
@@ -82,6 +83,7 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 		device:        device,
 		memProps:      memProps,
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
+		drawCommands:  make([]DrawCommand, 0),
 		visibleChunks: make([]*Chunk, 0),
 		chunks:        make(map[string]*Chunk),
 		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
@@ -91,6 +93,29 @@ func NewChunkManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPropert
 	cm.InitBuffers()
 
 	return cm
+}
+
+func (cm *ChunkManager) updateDrawCommandBuffer() {
+	drawCommandData := make([]byte, len(cm.drawCommands)*int(unsafe.Sizeof(DrawCommand{})))
+	for i, cmd := range cm.drawCommands {
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+0:], cmd.IndexCount)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+4:], cmd.InstanceCount)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+8:], cmd.FirstIndex)
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+12:], uint32(cmd.VertexOffset))
+		binary.LittleEndian.PutUint32(drawCommandData[i*20+16:], cmd.FirstInstance)
+	}
+
+	var pDrawCommandData unsafe.Pointer
+	ret := vk.MapMemory(*cm.device, cm.drawCommandMemory, 0, vk.DeviceSize(len(drawCommandData)), 0, &pDrawCommandData)
+	if ret != vk.Success {
+		log.Printf("Failed to map draw command memory: %v", ret)
+		return
+	}
+	n := vk.Memcopy(pDrawCommandData, drawCommandData)
+	if n != len(drawCommandData) {
+		log.Printf("Failed to copy draw command data: %d != %d", n, len(drawCommandData))
+	}
+	vk.UnmapMemory(*cm.device, cm.drawCommandMemory)
 }
 
 // Loads all chunks referenced by the current map(s)
@@ -206,14 +231,11 @@ func (cm *ChunkManager) FillBuffers() {
 	vk.UnmapMemory(*cm.device, cm.indexMemory)
 
 	// Prepare draw command data
-	drawCommandData := make([]byte, len(drawCommands)*int(unsafe.Sizeof(DrawCommand{})))
-	for i, cmd := range drawCommands {
-		binary.LittleEndian.PutUint32(drawCommandData[i*20+0:], cmd.IndexCount)
-		binary.LittleEndian.PutUint32(drawCommandData[i*20+4:], cmd.InstanceCount)
-		binary.LittleEndian.PutUint32(drawCommandData[i*20+8:], cmd.FirstIndex)
-		binary.LittleEndian.PutUint32(drawCommandData[i*20+12:], uint32(cmd.VertexOffset))
-		binary.LittleEndian.PutUint32(drawCommandData[i*20+16:], cmd.FirstInstance)
-	}
+	maxDrawCommands := MAX_CHUNKS
+	drawCommandData := make([]byte, maxDrawCommands*int(unsafe.Sizeof(DrawCommand{})))
+	drawCommandBuffer := as.CreateBuffer(*cm.device, *cm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
+	cm.drawCommandBuffer = drawCommandBuffer.Buffer
+	cm.drawCommandMemory = drawCommandBuffer.Memory
 
 	// Update draw command buffer
 	log.Printf("DrawCommand Data size: %d\n", len(drawCommandData))

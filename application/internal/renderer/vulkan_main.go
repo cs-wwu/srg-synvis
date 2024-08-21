@@ -58,10 +58,10 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Update the view frustum and visibleChunks
-	// if app.frameCount%CULLING_INTERVAL == 0 {
-	// 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	// 	app.determineVisibleChunks()
-	// }
+	if app.frameCount%CULLING_INTERVAL == 0 {
+		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+		app.determineVisibleChunks()
+	}
 }
 
 // called every frame by asche
@@ -142,7 +142,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindIndexBuffer(cmd, app.ChunkManager.indexBuffer, 0, vk.IndexTypeUint32)
 
 	// Draw all chunks using indirect drawing
-	vk.CmdDrawIndexedIndirect(cmd, app.ChunkManager.drawCommandBuffer, 0, uint32(len(app.ChunkManager.visibleChunks)), uint32(unsafe.Sizeof(DrawCommand{})))
+	vk.CmdDrawIndexedIndirect(cmd, app.ChunkManager.drawCommandBuffer, 0, uint32(len(app.ChunkManager.drawCommands)), uint32(unsafe.Sizeof(DrawCommand{})))
 
 	// End render pass
 	vk.CmdEndRenderPass(cmd)

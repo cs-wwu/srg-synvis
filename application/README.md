@@ -23,12 +23,12 @@ go run cmd/svs/main.go
   - [x] Re-implement ChunkManager as new rendering system
 - [x] Fix `math.go` and/or iteration to load only necessary heightmap
 - [x] Fix height rendering via Y coordinate (`heightmap.Gray16At(x, z)`)
-- [ ] Find and fix GPU hanging
+- [x] Change heightmap loading and position to be modular based on arcseconds
+  - [x] Attempt Rendering of more than one heightmap
+- [x] Begin Implementation Unit and Integration Testing
 - [ ] Re-Work Frustum Culling with ChunkManager
 - [ ] Add LODs with ChunkManager
 - [ ] Rework Main method to not use ticker-based system
-- [x] Change heightmap loading and position to be modular based on arcminutes
-  - [ ] Attempt Rendering of more than one heightmap
 - [ ] Change Camera to use Quaternions
 - [ ] Re-implement UI (try to use original `asche`?)
-- [ ] Begin Implementation Unit and Integration Testing
+- [ ] Find and fix GPU hanging
