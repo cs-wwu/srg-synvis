@@ -104,14 +104,13 @@ func (cm *ChunkManager) LoadChunks() {
 
 		// Convert map coordinate to world coordinates
 		mapX, mapZ := CoordinateMapToInt(mapCoord)
-		mapZ -= MAP_LENGTH
 		log.Printf("Map coordinate: %d, %d\n", mapX, mapZ)
 
 		counter := 0
 		for x := mapX; x < mapX+MAP_LENGTH; x += CHUNK_SIZE {
 			// Iterate from top right
 			for z := mapZ + CHUNK_SIZE; z < mapZ+MAP_LENGTH; z += CHUNK_SIZE {
-				fmt.Printf("Loading chunk at (%d, %d)\n", x-mapX, z-mapZ)
+				fmt.Printf("Loading chunk at (%d, %d)\n", mapX, mapZ)
 				cm.LoadChunk(x, z)
 				counter++
 			}

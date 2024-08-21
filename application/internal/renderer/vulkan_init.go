@@ -140,11 +140,11 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	if err != nil {
 		OrPanic(err)
 	}
+
 	tex := &Texture{
 		texWidth:    int32(width),
 		texHeight:   int32(height),
-		imageLayout: TextureDefaultImageLayout,
-	}
+		imageLayout: TextureDefaultImageLayout}
 
 	var image vk.Image
 	imageCreateInfo := vk.ImageCreateInfo{
@@ -740,7 +740,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.initUBO()
 	app.prepareDepth()
 	app.prepareTextures()
-	
+
 	// Testing for loading all maps and chunks
 	// Update the last position so that we load the map
 	app.ChunkManager = NewChunkManager(&dev, &memProps)

@@ -54,6 +54,7 @@ const (
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
 func CoordinateIntToMap(x, z int) string {
+	z = -z // Flip for vulkan
 	// Adjust coordinates to handle the overlap
 	lat := z / int(ARC_DEGREES_TO_SECONDS)
 	lon := x / int(ARC_DEGREES_TO_SECONDS)
@@ -107,6 +108,8 @@ func CoordinateMapToInt(coord string) (x, z int) {
 	}
 	z += ARC_DEGREES_TO_SECONDS
 
+	z = -z // Flip for vulkan
+
 	return x, z
 }
 
@@ -121,10 +124,8 @@ func CoordinateIntToPixel(x, z int) (int, int) {
 
 	// Handle latitude (z)
 	z %= int(ARC_DEGREES_TO_SECONDS)
-	if z >= 0 {
-		z = int(ARC_DEGREES_TO_SECONDS) - z
-	} else {
-		z = -z
+	if z < 0 {
+		z = z + int(ARC_DEGREES_TO_SECONDS)
 	}
 	return x, z
 }
