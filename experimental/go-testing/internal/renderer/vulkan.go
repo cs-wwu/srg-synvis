@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 	"unsafe"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -92,6 +93,8 @@ type Application struct {
 	indexBufferMemory  vk.DeviceMemory
 	fontImages         []image.Image
 	font               *truetype.Font
+	click              bool
+	lastClickTime      time.Time
 
 	camera        *Camera
 	frustum       *Frustum
@@ -516,7 +519,7 @@ func (app *Application) prepareuiDescriptorLayout() {
 	ret := vk.CreateDescriptorSetLayout(dev, &vk.DescriptorSetLayoutCreateInfo{
 		SType:        vk.StructureTypeDescriptorSetLayoutCreateInfo,
 		BindingCount: 1,
-		PBindings: []vk.DescriptorSetLayoutBinding{{	// diff
+		PBindings: []vk.DescriptorSetLayoutBinding{{ // diff
 			Binding:         0,
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
 			DescriptorCount: uint32(len(app.fontImages)),
@@ -959,7 +962,7 @@ func (app *Application) prepareDescriptorSet() {
 	texInfos2 := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
 	for _, tex := range app.uiTextures {
 		texInfos2 = append(texInfos2, vk.DescriptorImageInfo{
-			Sampler:     tex.sampler,	// diff
+			Sampler:     tex.sampler, // diff
 			ImageView:   tex.view,
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
 		})
@@ -977,7 +980,7 @@ func (app *Application) prepareDescriptorSet() {
 
 		res.SetDescriptorSet(set)
 
-		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{	// diff
+		vk.UpdateDescriptorSets(dev, 1, []vk.WriteDescriptorSet{{ // diff
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
@@ -1062,12 +1065,12 @@ func prepareFont(fontPath string) *truetype.Font {
 	return font
 }
 
-func renderTextToBitmap(font *truetype.Font, text string, size float64, width int, height int) image.Image {
+func renderTextToBitmap(font *truetype.Font, text string, size float64, width int, height int, bgc color.RGBA) image.Image {
 	c := freetype.NewContext()
 	c.SetFont(font)
 	c.SetFontSize(size)
 	dst := image.NewRGBA(image.Rect(0, 0, width, height))
-	bgc := color.RGBA{0, 0, 0, 128}
+	// bgc := color.RGBA{0, 0, 0, 128}
 	bg := image.NewUniform(bgc)
 	draw.Draw(dst, dst.Bounds(), bg, image.Point{0, 0}, draw.Src)
 	c.SetDst(dst) // Adjust size as needed
@@ -1082,13 +1085,17 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64, width in
 	return dst
 }
 
-func (app *Application) updateText(str string, size float64, width int, height int) {
+func (app *Application) updateText(str string, size float64, width, height, quad int) {
 	dev := app.Context().Device()
-	text := renderTextToBitmap(app.font, str, size, width, height)
+	bgc := color.RGBA{0, 0, 0, 128}
+	if app.click && quad == 1 {
+		bgc = color.RGBA{0, 0, 0, 1}
+	}
+	text := renderTextToBitmap(app.font, str, size, width, height, bgc)
 
 	// upload to buffer
 	var layout vk.SubresourceLayout
-	vk.GetImageSubresourceLayout(dev, app.uiTextures[0].image, &vk.ImageSubresource{
+	vk.GetImageSubresourceLayout(dev, app.uiTextures[quad].image, &vk.ImageSubresource{
 		AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
 	}, &layout)
 	layout.Deref()
@@ -1098,7 +1105,7 @@ func (app *Application) updateText(str string, size float64, width int, height i
 	}
 	// uploadsize := width * height * 4
 	var pData unsafe.Pointer
-	ret := vk.MapMemory(dev, app.uiTextures[0].stagingbuf.Memory, 0, vk.DeviceSize(len(data)), 0, &pData)
+	ret := vk.MapMemory(dev, app.uiTextures[quad].stagingbuf.Memory, 0, vk.DeviceSize(len(data)), 0, &pData)
 	OrPanic(as.NewError(ret))
 	n := vk.Memcopy(pData, data)
 	if n != len(data) {
@@ -1106,10 +1113,10 @@ func (app *Application) updateText(str string, size float64, width int, height i
 	}
 	vk.FlushMappedMemoryRanges(dev, 1, []vk.MappedMemoryRange{{
 		SType:  vk.StructureTypeMappedMemoryRange,
-		Memory: app.uiTextures[0].stagingbuf.Memory,
+		Memory: app.uiTextures[quad].stagingbuf.Memory,
 		Size:   vk.DeviceSize(len(data)),
 	}})
-	vk.UnmapMemory(dev, app.uiTextures[0].stagingbuf.Memory)
+	vk.UnmapMemory(dev, app.uiTextures[quad].stagingbuf.Memory)
 	// copy to image
 	cmd := app.beginSingleTimeCommands()
 	if cmd == nil {
@@ -1122,14 +1129,14 @@ func (app *Application) updateText(str string, size float64, width int, height i
 		NewLayout:           vk.ImageLayoutTransferDstOptimal,
 		SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
 		DstQueueFamilyIndex: vk.QueueFamilyIgnored,
-		Image:               app.uiTextures[0].image,
+		Image:               app.uiTextures[quad].image,
 		SubresourceRange: vk.ImageSubresourceRange{
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
 			LayerCount: 1,
 			LevelCount: 1,
 		},
 	}})
-	vk.CmdCopyBufferToImage(cmd[0], app.uiTextures[0].stagingbuf.Buffer, app.uiTextures[0].image, vk.ImageLayoutTransferDstOptimal, 1, []vk.BufferImageCopy{{
+	vk.CmdCopyBufferToImage(cmd[0], app.uiTextures[quad].stagingbuf.Buffer, app.uiTextures[quad].image, vk.ImageLayoutTransferDstOptimal, 1, []vk.BufferImageCopy{{
 		ImageSubresource: vk.ImageSubresourceLayers{
 			MipLevel:   0,
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
@@ -1146,7 +1153,7 @@ func (app *Application) updateText(str string, size float64, width int, height i
 		NewLayout:           vk.ImageLayoutShaderReadOnlyOptimal,
 		SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
 		DstQueueFamilyIndex: vk.QueueFamilyIgnored,
-		Image:               app.uiTextures[0].image,
+		Image:               app.uiTextures[quad].image,
 		SubresourceRange: vk.ImageSubresourceRange{
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
 			LayerCount: 1,
@@ -1155,28 +1162,6 @@ func (app *Application) updateText(str string, size float64, width int, height i
 	}})
 	app.endSingleTimeCommands(cmd)
 
-}
-
-func (app *Application) initUIDimensions() {
-	vertices := []UIVertex{
-		// don't need to pass texcoord?
-		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
-
-		{Position: lin.Vec2{0.5, -0.75}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec2{0.75, -0.75}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec2{0.75, -0.5}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{0.5, -0.5}, TexCoord: lin.Vec2{0, 1}},
-
-	}
-	app.vertices = vertices
-
-	app.indices = []Index{
-		0, 1, 2, 2, 3, 0, // Front face (CLOCKWISE)
-		4, 5, 6, 6, 7, 4,
-	}
 }
 
 func (app *Application) prepareuiQuad() {
@@ -1221,9 +1206,9 @@ func (app *Application) VulkanContextPrepare() error {
 	app.watermap = watermap
 
 	app.font = prepareFont("assets/SourceSansPro-Regular.ttf")
-	text := renderTextToBitmap(app.font, "X", 72, 800, 600)
+	text := renderTextToBitmap(app.font, "X", 72, 800, 600, color.RGBA{0, 0, 0, 128})
 	app.fontImages = append(app.fontImages, text)
-	text2:= renderTextToBitmap(app.font, "\\O.o/", 72, 200, 125);
+	text2 := renderTextToBitmap(app.font, "click", 72, 200, 125, color.RGBA{0, 0, 0, 128})
 	app.fontImages = append(app.fontImages, text2)
 	// look at
 	//	descriptorTypeStorageBufferDynamic
@@ -1265,6 +1250,8 @@ func (app *Application) VulkanContextPrepare() error {
 }
 
 func (app *Application) VulkanContextCleanup() error {
+	app.click = false
+	app.lastClickTime = time.Now()
 	c := app.Context()
 	dev := c.Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
@@ -1319,7 +1306,12 @@ func (app *Application) NextFrame(fps int) {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
-	app.updateText("fps: " + strconv.Itoa(fps), 72, 800, 600)
+	app.updateText("fps: "+strconv.Itoa(fps), 72, 800, 600, 0)
+	if app.click {
+		app.updateText("on", 72, 200, 125, 1)
+	} else {
+		app.updateText("off", 72, 200, 125, 1)
+	}
 }
 
 // called every frame by asche
