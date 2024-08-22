@@ -9,5 +9,5 @@ layout (location = 1) in flat int num;
 layout (location = 0) out vec4 uFragColor;
 
 void main() {
-   uFragColor = texture(tex[2], texcoord);
+   uFragColor = texture(tex[num], texcoord);
 }
