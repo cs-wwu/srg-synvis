@@ -9,5 +9,12 @@ layout (location = 1) in flat int num;
 layout (location = 0) out vec4 uFragColor;
 
 void main() {
-   uFragColor = texture(tex[num], texcoord);
+   // uFragColor = texture(tex[num], texcoord);
+   if (num == 0) {
+      uFragColor = texture(tex[0], texcoord);
+   } else if (num == 1) {
+      uFragColor = texture(tex[1], texcoord);
+   } else {
+      uFragColor = texture(tex[2], texcoord);
+   }
 }
