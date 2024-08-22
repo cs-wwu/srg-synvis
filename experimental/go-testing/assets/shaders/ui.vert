@@ -16,9 +16,11 @@ void main()
 {
    texcoord = inTexCoord;
    gl_Position = vec4(inPosition, 0.0, 1.0);
-   if (gl_VertexIndex > 3) {
+   if (gl_VertexIndex < 4) {
+        num = 0;
+   } else if (gl_VertexIndex < 8) {
         num = 1;
    } else {
-        num = 0;
+        num = 2;
    }
 }

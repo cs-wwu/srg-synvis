@@ -19,16 +19,17 @@ type buttonx struct {
 }
 
 func (app *Application) prepareButtons() {
+	xlow1, xhigh1, ylow1, yhigh1 := app.findDimensions(1)
 	buttons := []buttonx{
 		{
-			xlow:          0.5,
-			xhigh:         0.75,
-			ylow:          -0.75,
-			yhigh:         -0.5,
+			xlow:          xlow1,
+			xhigh:         xhigh1,
+			ylow:          ylow1,
+			yhigh:         yhigh1,
 			click:         false,
 			lastClickTime: time.Now(),
 			text:          []string{"on", "off"},
-			bgc:		   []color.RGBA{{0, 0, 0, 128},{0, 0, 0, 0}},
+			bgc:           []color.RGBA{{0, 0, 0, 128}, {0, 0, 0, 0}},
 		},
 	}
 	app.buttons = buttons
@@ -74,4 +75,30 @@ func OverButton(mousex, mousey, buttonxlow, buttonxhigh, buttonylow, buttonyhigh
 	} else {
 		return false
 	}
+}
+
+// given the quad index, find the bounds of the quad using app.vertices
+func (app *Application) findDimensions(quad int) (xlow, xhigh, ylow, yhigh float64) {
+	start := quad*4
+	end := start+3
+	var xl, yl, xh, yh float32
+	xl = 1.0
+	yl = 1.0
+	xh = -1.0
+	yh = -1.0
+
+	myvert := app.vertices[start:end]
+	for i := range myvert {
+		if xl > myvert[i].Position[0] {
+			xl = myvert[i].Position[0]
+		} else if xh < myvert[i].Position[0] {
+			xh = myvert[i].Position[0]
+		}
+		if yl > myvert[i].Position[1] {
+			yl = myvert[i].Position[1]
+		} else if yh < myvert[i].Position[1] {
+			yh = myvert[i].Position[1]
+		}
+	}
+	return float64(xl), float64(xh), float64(yl), float64(yh)
 }

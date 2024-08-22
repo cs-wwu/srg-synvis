@@ -196,24 +196,32 @@ func (app *Application) prepareuiQuads() {
 
 func (app *Application) initUIDimensions() {
 	vertices := []UIVertex{
-		// fps box
+		// fps box: 0-3
 		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
 		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
 		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
 		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
 
-		// button
+		// button: 4-7
 		{Position: lin.Vec2{0.5, -0.75}, TexCoord: lin.Vec2{0, 0}},
 		{Position: lin.Vec2{0.75, -0.75}, TexCoord: lin.Vec2{1, 0}},
 		{Position: lin.Vec2{0.75, -0.5}, TexCoord: lin.Vec2{1, 1}},
 		{Position: lin.Vec2{0.5, -0.5}, TexCoord: lin.Vec2{0, 1}},
+
+		// sprite: 8-11
+		{Position: lin.Vec2{-.1, 0.75}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{0.1, 0.75}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec2{0.1, 1.0}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-.1, 1.0}, TexCoord: lin.Vec2{0, 1}},
 	}
 	app.vertices = vertices
 
+	// x, x+1, x+2, x+2, x+3, x
 	app.indices = []Index{
 		// Front face (CLOCKWISE)
 		0, 1, 2, 2, 3, 0, // fps box
 		4, 5, 6, 6, 7, 4, // button
+		8, 9, 10, 10, 11, 8,	// airplane
 	}
 }
 
@@ -223,7 +231,6 @@ func (app *Application) PrepareUI() error {
 	app.fontImages = append(app.fontImages, text)
 	text2 := renderTextToBitmap(app.font, "click", 72, 200, 125, color.RGBA{0, 0, 0, 128})
 	app.fontImages = append(app.fontImages, text2)
-	app.prepareButtons()
 	// look at
 	//	descriptorTypeStorageBufferDynamic
 	//	descriptorTypeUniformBufferDynamic
@@ -232,6 +239,7 @@ func (app *Application) PrepareUI() error {
 
 	app.initUIDimensions()
 	app.prepareuiQuads()
+	app.prepareButtons()
 	return nil
 }
 
@@ -244,7 +252,7 @@ func (app *Application) prepareuiDescriptorLayout() {
 		PBindings: []vk.DescriptorSetLayoutBinding{{ // diff
 			Binding:         0,
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-			DescriptorCount: uint32(len(app.fontImages)),
+			DescriptorCount: uint32(len(app.uiTextures)),
 			StageFlags:      vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
 		}},
 	}, nil, &descLayout)
@@ -423,7 +431,7 @@ func (app *Application) prepareuiDescriptorPool() {
 		PoolSizeCount: 1,
 		PPoolSizes: []vk.DescriptorPoolSize{{
 			Type:            vk.DescriptorTypeCombinedImageSampler,
-			DescriptorCount: uint32(len(uiswapchainImageResources) * len(app.fontImages)),
+			DescriptorCount: uint32(len(uiswapchainImageResources) * len(app.uiTextures)),
 		}},
 	}, nil, &uidescPool)
 	OrPanic(as.NewError(ret))
@@ -432,9 +440,9 @@ func (app *Application) prepareuiDescriptorPool() {
 
 func (app *Application) prepareuiDescriptorSet() {
 	dev := app.Context().Device()
-	texInfos2 := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
+	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.uiTextures))
 	for _, tex := range app.uiTextures {
-		texInfos2 = append(texInfos2, vk.DescriptorImageInfo{
+		texInfos = append(texInfos, vk.DescriptorImageInfo{
 			Sampler:     tex.sampler, // diff
 			ImageView:   tex.view,
 			ImageLayout: vk.ImageLayoutShaderReadOnlyOptimal,
@@ -457,9 +465,9 @@ func (app *Application) prepareuiDescriptorSet() {
 			SType:           vk.StructureTypeWriteDescriptorSet,
 			DstBinding:      0,
 			DstSet:          set,
-			DescriptorCount: uint32(len(app.fontImages)),
+			DescriptorCount: uint32(len(app.uiTextures)),
 			DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
-			PImageInfo:      texInfos2,
+			PImageInfo:      texInfos,
 		}}, 0, nil)
 	}
 }
@@ -559,8 +567,10 @@ func (app *Application) VulkanuiContextCleanup() error {
 	vk.DestroyDescriptorSetLayout(dev, app.uidescLayout, nil)
 
 	// TODO more to destroy here?
-	for i := 0; i < len(app.uiTextures); i++ {
+	for i := 0; i < len(app.fontImages); i++ {
 		app.uiTextures[i].stagingbuf.Destroy()
+	}
+	for i := 0; i < len(app.uiTextures); i++ {
 		app.uiTextures[i].Destroy(dev)
 	}
 

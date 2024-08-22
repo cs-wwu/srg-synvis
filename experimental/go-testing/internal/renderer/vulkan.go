@@ -32,6 +32,9 @@ const (
 var texEnabled = []string{
 	"assets/textures/test.png",
 }
+var sprites = []string{
+	"assets/textures/airplane.png",
+}
 
 func NewApplication() *Application {
 	camera := NewCamera()
@@ -453,10 +456,14 @@ func (app *Application) prepareTextures() {
 	}
 
 	// TODO move ui stuff?
-	app.uiTextures = make([]*Texture, 0, len(app.fontImages))
+	app.uiTextures = make([]*Texture, 0, len(app.fontImages) + len(sprites))
 	for _, img := range app.fontImages {
 		app.uiTextures = append(app.uiTextures, prepareTex("", img))
 	}
+	for _, sprite := range sprites {
+		app.uiTextures = append(app.uiTextures, prepareTex(sprite, nil)) 
+	}
+	log.Printf("uitextures len is %d", len(app.uiTextures))
 }
 
 func (app *Application) prepareUniformBuffers() {

@@ -20,6 +20,10 @@ Experimental vulkan testing in `Go`.
 - [ ] Create a modular coordinate system
 - [ ] Splice Heightmaps together
 - [X] (opt) Render Text on-screen
+  - [X] Render dynamic text
+  - [X] Clickable button
+  - [ ] Display Location
+  - [ ] Wireframe Mockup
 - [ ] Pull Data from RPi Sensors
 - [ ] Render Live Location from RPi Sensors
 - [ ] Render View Vectors based on RPi Sensors
