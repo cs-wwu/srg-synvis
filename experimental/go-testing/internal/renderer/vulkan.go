@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"time"
 	"unsafe"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -93,8 +92,7 @@ type Application struct {
 	indexBufferMemory  vk.DeviceMemory
 	fontImages         []image.Image
 	font               *truetype.Font
-	click              bool
-	lastClickTime      time.Time
+	buttons            []buttonx
 
 	camera        *Camera
 	frustum       *Frustum
@@ -1088,9 +1086,6 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64, width in
 func (app *Application) updateText(str string, size float64, width, height, quad int) {
 	dev := app.Context().Device()
 	bgc := color.RGBA{0, 0, 0, 128}
-	if app.click && quad == 1 {
-		bgc = color.RGBA{0, 0, 0, 1}
-	}
 	text := renderTextToBitmap(app.font, str, size, width, height, bgc)
 
 	// upload to buffer
@@ -1164,7 +1159,7 @@ func (app *Application) updateText(str string, size float64, width, height, quad
 
 }
 
-func (app *Application) prepareuiQuad() {
+func (app *Application) prepareuiQuads() {
 	dev := app.Context().Device()
 
 	vertBufSize := len(app.vertices) * UIVertexSize
@@ -1192,6 +1187,29 @@ func (app *Application) prepareuiQuad() {
 	app.indexBuffer = buf2.Buffer
 }
 
+func (app *Application) initUIDimensions() {
+	vertices := []UIVertex{
+		// fps box
+		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
+
+		// button
+		{Position: lin.Vec2{0.5, -0.75}, TexCoord: lin.Vec2{0, 0}},
+		{Position: lin.Vec2{0.75, -0.75}, TexCoord: lin.Vec2{1, 0}},
+		{Position: lin.Vec2{0.75, -0.5}, TexCoord: lin.Vec2{1, 1}},
+		{Position: lin.Vec2{0.5, -0.5}, TexCoord: lin.Vec2{0, 1}},
+	}
+	app.vertices = vertices
+
+	app.indices = []Index{
+		// Front face (CLOCKWISE)
+		0, 1, 2, 2, 3, 0, // fps box
+		4, 5, 6, 6, 7, 4, // button
+	}
+}
+
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
 	app.height = dim.Height
@@ -1210,6 +1228,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.fontImages = append(app.fontImages, text)
 	text2 := renderTextToBitmap(app.font, "click", 72, 200, 125, color.RGBA{0, 0, 0, 128})
 	app.fontImages = append(app.fontImages, text2)
+	app.prepareButtons()
 	// look at
 	//	descriptorTypeStorageBufferDynamic
 	//	descriptorTypeUniformBufferDynamic
@@ -1220,7 +1239,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	app.initUIDimensions()
-	app.prepareuiQuad()
+	app.prepareuiQuads()
 
 	// Load all available chunks for now
 	app.LoadAllChunks()
@@ -1250,8 +1269,6 @@ func (app *Application) VulkanContextPrepare() error {
 }
 
 func (app *Application) VulkanContextCleanup() error {
-	app.click = false
-	app.lastClickTime = time.Now()
 	c := app.Context()
 	dev := c.Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
@@ -1307,7 +1324,7 @@ func (app *Application) NextFrame(fps int) {
 		app.determineVisibleChunks()
 	}
 	app.updateText("fps: "+strconv.Itoa(fps), 72, 800, 600, 0)
-	if app.click {
+	if app.buttons[0].click {
 		app.updateText("on", 72, 200, 125, 1)
 	} else {
 		app.updateText("off", 72, 200, 125, 1)

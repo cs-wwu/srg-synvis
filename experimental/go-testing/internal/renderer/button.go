@@ -1,36 +1,26 @@
 package renderer
 
 import (
-	// "fmt"
 	"log"
 	"time"
-	// "math"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	lin "github.com/xlab/linmath"
 )
 
-func (app *Application) initUIDimensions() {
-	vertices := []UIVertex{
-		// fps box
-		{Position: lin.Vec2{-1.0, -1.0}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec2{0.0, -1.0}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec2{0.0, 0.0}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{-1.0, 0.0}, TexCoord: lin.Vec2{0, 1}},
+type buttonx struct {
+	xlow          float64
+	xhigh         float64
+	ylow          float64
+	yhigh         float64
+	click         bool
+	lastClickTime time.Time
+}
 
-		// button
-		{Position: lin.Vec2{0.5, -0.75}, TexCoord: lin.Vec2{0, 0}},
-		{Position: lin.Vec2{0.75, -0.75}, TexCoord: lin.Vec2{1, 0}},
-		{Position: lin.Vec2{0.75, -0.5}, TexCoord: lin.Vec2{1, 1}},
-		{Position: lin.Vec2{0.5, -0.5}, TexCoord: lin.Vec2{0, 1}},
+func (app *Application) prepareButtons() {
+	buttons := []buttonx{
+		{xlow: 0.5, xhigh: 0.75, ylow: -0.75, yhigh: -0.5, click: false, lastClickTime: time.Now()},
 	}
-	app.vertices = vertices
-
-	app.indices = []Index{
-		// Front face (CLOCKWISE)
-		0, 1, 2, 2, 3, 0, // fps box
-		4, 5, 6, 6, 7, 4, // button
-	}
+	app.buttons = buttons
 }
 
 // Processes input from the glfw mouse
@@ -43,17 +33,20 @@ func (app *Application) CheckMouse(window *glfw.Window) {
 
 		leftclick := window.GetMouseButton(glfw.MouseButtonLeft)
 		currtime := time.Now()
-		if leftclick == glfw.Press && (currtime.Sub(app.lastClickTime).Milliseconds() > 200) {
-			app.click = !app.click
-			app.lastClickTime = currtime
-			if OverButton1(xpos, ypos, 0.5, 0.75, -0.75, 0.5) {
-				log.Printf("clicked button")
-			} // todo hardcoded - get vals from app.vertices
+		if leftclick == glfw.Press {
+			for i := range app.buttons {
+				button := &app.buttons[i]
+				if currtime.Sub(button.lastClickTime).Milliseconds() > 200 && OverButton(xpos, ypos, button.xlow, button.xhigh, button.ylow, button.yhigh) {
+					button.click = !button.click
+					button.lastClickTime = currtime
+					log.Printf("clicked button")
+				}
+			}
 		}
 	}
 }
 
-func OverButton1(mousex, mousey, buttonxlow, buttonxhigh, buttonylow, buttonyhigh float64) bool {
+func OverButton(mousex, mousey, buttonxlow, buttonxhigh, buttonylow, buttonyhigh float64) bool {
 	if buttonxlow < mousex && mousex < buttonxhigh && buttonylow < mousey && mousey < buttonyhigh {
 		return true
 	} else {
