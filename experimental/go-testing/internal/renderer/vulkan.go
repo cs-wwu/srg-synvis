@@ -1068,7 +1068,6 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64, width in
 	c.SetFont(font)
 	c.SetFontSize(size)
 	dst := image.NewRGBA(image.Rect(0, 0, width, height))
-	// bgc := color.RGBA{0, 0, 0, 128}
 	bg := image.NewUniform(bgc)
 	draw.Draw(dst, dst.Bounds(), bg, image.Point{0, 0}, draw.Src)
 	c.SetDst(dst) // Adjust size as needed
@@ -1083,9 +1082,8 @@ func renderTextToBitmap(font *truetype.Font, text string, size float64, width in
 	return dst
 }
 
-func (app *Application) updateText(str string, size float64, width, height, quad int) {
+func (app *Application) updateText(str string, size float64, width, height, quad int, bgc color.RGBA) {
 	dev := app.Context().Device()
-	bgc := color.RGBA{0, 0, 0, 128}
 	text := renderTextToBitmap(app.font, str, size, width, height, bgc)
 
 	// upload to buffer
@@ -1323,12 +1321,9 @@ func (app *Application) NextFrame(fps int) {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.determineVisibleChunks()
 	}
-	app.updateText("fps: "+strconv.Itoa(fps), 72, 800, 600, 0)
-	if app.buttons[0].click {
-		app.updateText("on", 72, 200, 125, 1)
-	} else {
-		app.updateText("off", 72, 200, 125, 1)
-	}
+
+	// update ui
+	app.updateText("fps: "+strconv.Itoa(fps), 72, 800, 600, 0, color.RGBA{0, 0, 0, 128})
 }
 
 // called every frame by asche
@@ -1354,12 +1349,11 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	}
 	vk.UnmapMemory(dev, res.UniformMemory())
 
-	// update ui state
-
 	// New command buffer update logic
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
 
+	// update ui state
 	res2 := app.Context().UISwapchainImageResources()[imageIdx]
 	cmd2 := res2.CommandBuffer()
 	app.updateuiCommandBuffer(res2, cmd2)
