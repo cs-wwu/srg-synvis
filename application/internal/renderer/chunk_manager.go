@@ -36,7 +36,10 @@ const (
 	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
 	INDICES_PER_CHUNK  = 2*CHUNK_SIZE*(CHUNK_SIZE-1) + 2*((CHUNK_SIZE-1)-1)
 
-	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcminutes
+	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
+
+	LOD_LEVELS             = 3
+	LOD_DISTANCE_THRESHOLD = 500.0
 )
 
 // A single ChunkManager to manage load/unloading images and chunks
@@ -304,23 +307,12 @@ func (cm *ChunkManager) InitBuffers() {
 	cm.indexMemory = indexBuf.Memory
 
 	// Create the draw command buffer
-	maxDrawComamnds := MAX_CHUNKS * int(unsafe.Sizeof(DrawCommand{}))
-	drawCommandData := make([]byte, maxDrawComamnds)
-	log.Printf("Allocating %d * %dB = %d Bytes for Draw commands\n", MAX_CHUNKS, int(unsafe.Sizeof(DrawCommand{})), maxDrawComamnds)
+	maxDrawCommands := MAX_CHUNKS * int(unsafe.Sizeof(DrawCommand{}))
+	drawCommandData := make([]byte, maxDrawCommands)
+	log.Printf("Allocating %d * %dB = %d Bytes for Draw commands\n", MAX_CHUNKS, int(unsafe.Sizeof(DrawCommand{})), maxDrawCommands)
 	drawCommandBuffer := as.CreateBuffer(*cm.device, *cm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
 	cm.drawCommandBuffer = drawCommandBuffer.Buffer
 	cm.drawCommandMemory = drawCommandBuffer.Memory
-}
-
-func ChunkKey(chunkX, chunkZ int) string {
-	return fmt.Sprintf("%d,%d", chunkX, chunkZ)
-}
-
-type Chunk struct {
-	vertices []Vertex
-	indices  []Index
-	X        int // Global X Position of the top-left chunk corner
-	Z        int // Global Z Position of the top-left chunk corner
 }
 
 // Loads both maps associated with the coordinate
@@ -413,7 +405,6 @@ func loadMap(filepath string) (image.Image, error) {
 
 	return rawImg, nil
 }
-
 
 func (cm *ChunkManager) Destroy() {
 	vk.DestroyBuffer(*cm.device, cm.vertexBuffer, nil)

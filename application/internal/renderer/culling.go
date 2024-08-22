@@ -111,4 +111,3 @@ func (app *Application) determineVisibleChunks() {
 
 	log.Printf("Visible chunks: %d\n", len(cm.visibleChunks))
 }
-

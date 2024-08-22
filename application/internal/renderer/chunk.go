@@ -1,11 +1,23 @@
 package renderer
 
 import (
+	"fmt"
 	"image"
 	"log"
 
 	lin "github.com/xlab/linmath"
 )
+
+func ChunkKey(chunkX, chunkZ int) string {
+	return fmt.Sprintf("%d,%d", chunkX, chunkZ)
+}
+
+type Chunk struct {
+	vertices []Vertex
+	indices  []Index
+	X        int // Global X Position of the top-left chunk corner
+	Z        int // Global Z Position of the top-left chunk corner
+}
 
 // Loads a specific chunk into memory, x and z are the upper-left corner of
 // the chunk (world is in arcsecond coordinates)
