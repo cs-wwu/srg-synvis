@@ -15,7 +15,9 @@ Synthetic Vision System (SVS) for Systems Research Group at WWU
 
 ## Installation
 
-To install all necessary libraries and the latest `Go` vesrsion, run `./install.sh <arch>` where `<arch> is arm64 or amd64`.
+To install all necessary libraries and the latest `Go` version, run:
+
+`sudo ./install.sh <arch>` where `<arch> is arm64 or amd64`.
 
 ## Founding Members
 
