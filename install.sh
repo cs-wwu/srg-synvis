@@ -11,8 +11,20 @@ get_latest_go_version() {
     wget -qO- https://golang.org/VERSION?m=text | cut -d' ' -f2
 }
 
+# Function to get the current installed Go version
+get_current_go_version() {
+    if command -v go &> /dev/null; then
+        go version | cut -d' ' -f3 | sed 's/go//'
+    else
+        echo "none"
+    fi
+}
+
 # Get the latest Go version
 LATEST_GO_VERSION=$(get_latest_go_version)
+
+# Get the current installed Go version
+CURRENT_GO_VERSION=$(get_current_go_version)
 
 # Check if the architecture flag is provided
 if [ "$#" -ne 1 ]; then
@@ -28,30 +40,43 @@ if [ "$ARCH" != "arm64" ] && [ "$ARCH" != "amd64" ]; then
     exit 1
 fi
 
-# Download the appropriate Go package
-DOWNLOADEDFILE="go${LATEST_GO_VERSION}.linux-${ARCH}.tar.gz"
-wget "https://golang.org/dl/${DOWNLOADEDFILE}"
+# Check if Go needs to be installed or updated
+if [ "$CURRENT_GO_VERSION" = "$LATEST_GO_VERSION" ]; then
+    echo "Go $CURRENT_GO_VERSION is already installed and up to date."
+else
+    echo "Installing Go $LATEST_GO_VERSION..."
 
-# Extract the downloaded file
-tar -C /usr/local -xzf "$DOWNLOADEDFILE"
+    # Remove existing Go installation if it exists
+    if [ -d "/usr/local/go" ]; then
+        echo "Removing existing Go installation..."
+        rm -rf /usr/local/go
+    fi
 
-# Remove the downloaded file
-rm "$DOWNLOADEDFILE"
+    # Download the appropriate Go package
+    DOWNLOADEDFILE="go${LATEST_GO_VERSION}.linux-${ARCH}.tar.gz"
+    wget "https://golang.org/dl/${DOWNLOADEDFILE}"
+
+    # Extract the downloaded file
+    tar -C /usr/local -xzf "$DOWNLOADEDFILE"
+
+    # Remove the downloaded file
+    rm "$DOWNLOADEDFILE"
+
+    echo "Go $LATEST_GO_VERSION has been installed successfully!"
+fi
 
 # Set GOPATH and update PATH if not already set
 GOPATH="$HOME/go"
 if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
     echo "export GOPATH=$GOPATH" >> "$HOME/.bashrc"
-    echo "export PATH=\$PATH:\$GOPATH/bin" >> "$HOME/.bashrc"
+    echo "export PATH=\$PATH:\$GOPATH/bin:/usr/local/go/bin" >> "$HOME/.bashrc"
     source "$HOME/.bashrc"
 fi
 
 # Install required packages
+echo "Installing Vulkan tools and related packages..."
 apt update
 apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev
-
-echo "Go $LATEST_GO_VERSION has been installed successfully!"
-echo "Please restart your terminal or run 'source ~/.bashrc' to apply the PATH changes."
 
 # Run vkcube and check its exit status
 echo "Running vkcube to verify Vulkan installation..."
@@ -68,3 +93,5 @@ else
     echo "vkcube encountered an error (exit status: $VKCUBE_EXIT_STATUS)."
     echo "There might be an issue with the Vulkan installation."
 fi
+
+echo "Please restart your terminal or run 'source ~/.bashrc' to apply the PATH changes."
