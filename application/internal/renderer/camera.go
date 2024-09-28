@@ -13,13 +13,13 @@ import (
 
 var (
 	// For heightmap model
-	startX, startZ = CoordinateGPSToFloat("48.0, -122.0")
-	HeightMeters = float32(3000.0)
+	startX, startZ = CoordinateGPSToFloat("-54.6, -069.6")
+	HeightMeters = float32(8000.0)
 	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
 	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT = lin.Vec3{0.5, 0.0, 0.5}
+	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
 )

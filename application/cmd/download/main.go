@@ -23,7 +23,7 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 		targetDir += "/"
 	}
 
-	new_heightmaps := []string{}
+	newHeightmaps := []string{}
 	for _, heightmap := range heightmaps {
 		// if "MAPS_PATH/heightmap.hgt.png" and "MAPS_PATH/heightmap.swb.png" already exists,
 		// then don't add it to the new heightmaps list
@@ -31,12 +31,12 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 		hgtPngPath := targetDir + heightmap + ".hgt.png"
 		swbPngPath := targetDir + heightmap + ".swb.png"
 		if _, err := os.Stat(hgtPngPath); os.IsNotExist(err) {
-			new_heightmaps = append(new_heightmaps, heightmap)
+			newHeightmaps = append(newHeightmaps, heightmap)
 		} else if _, err := os.Stat(swbPngPath); os.IsNotExist(err) {
-			new_heightmaps = append(new_heightmaps, heightmap)
+			newHeightmaps = append(newHeightmaps, heightmap)
 		}
 	}
-	heightmaps = new_heightmaps
+	heightmaps = newHeightmaps
 
 	// This should only be called once due to client cookies and sign-in
 	err := api.DownloadHeightmaps(heightmaps, targetDir)
@@ -80,7 +80,7 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 // Current Example Usage
 func main() {
 	targetDir := "assets/maps/"
-	heightmaps := []string{"n48w123", "n48w122", "n47w123", "n47w122"}
+	heightmaps := []string{"s55w070"}
 	err := ProcessHeightmaps(heightmaps, targetDir)
 	if err != nil {
 		fmt.Printf("failed to process heightmaps: %v\n", err)
