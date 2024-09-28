@@ -61,7 +61,7 @@ echo "Detected architecture: $ARCH"
 
 # Check if Go needs to be installed or updated
 if [ "$CURRENT_GO_VERSION" = "$LATEST_GO_VERSION" ]; then
-    echo "Go $CURRENT_GO_VERSION is already installed and up to date."
+    echo -e "${GREEN}Go $CURRENT_GO_VERSION is already installed and up to date.${NC}"
 else
     echo "Installing Go $LATEST_GO_VERSION..."
 
@@ -98,12 +98,21 @@ else
 fi
 
 # Set up Go environment for the actual user
-cat << EOF | sudo -u $ACTUAL_USER tee -a $USER_HOME/.bashrc > /dev/null
-
+GO_SETTINGS="
 # Go settings
 export GOPATH=\$HOME/go
-export PATH=\$PATH:/usr/local/go/bin:\$GOPATH/bin
-EOF
+export PATH=\$PATH:/usr/local/go/bin:\$GOPATH/bin"
+
+# Check if Go settings are already in .bashrc
+if ! grep -q "# Go settings" "$USER_HOME/.bashrc"; then
+    echo "Adding Go settings to $USER_HOME/.bashrc"
+    echo "$GO_SETTINGS" | sudo -u $ACTUAL_USER tee -a $USER_HOME/.bashrc > /dev/null
+else
+    echo "Go settings already exist in $USER_HOME/.bashrc. Skipping addition."
+fi
+
+# Make sure the GOPATH directory exists
+sudo -u $ACTUAL_USER mkdir -p $USER_HOME/go
 
 # Make sure the GOPATH directory exists
 sudo -u $ACTUAL_USER mkdir -p $USER_HOME/go
@@ -119,7 +128,7 @@ timeout 1s vkcube > /dev/null 2>&1
 VKCUBE_EXIT_STATUS=$?
 
 if [ $VKCUBE_EXIT_STATUS -eq 124 ]; then
-    echo -e "${GREEN}vkcube ran successfully for 21 second and was terminated.${NC}"
+    echo -e "${GREEN}vkcube ran successfully for 1 second and was terminated.${NC}"
     echo "Vulkan tools appear to be installed correctly."
 elif [ $VKCUBE_EXIT_STATUS -eq 0 ]; then
     echo -e "${GREEN}vkcube ran successfully and exited normally.${NC}"
