@@ -75,7 +75,10 @@ type DrawCommand struct {
 
 func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 	if cm.lastPosition[0] == 0.0 { // TODO Test if statement, make dynamic
-		cm.LoadMaps("s55w070")
+		cm.LoadMaps("n48w123")
+		cm.LoadMaps("n48w122")
+		cm.LoadMaps("n47w123")
+		cm.LoadMaps("n47w122")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	cm.lastPosition = pos

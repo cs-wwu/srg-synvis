@@ -69,4 +69,4 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 - [ ] Rework Main method to not use ticker-based system
 - [ ] Change Camera to use Quaternions
 - [ ] Re-implement UI (try to use original `asche`?)
-- [ ] Find and fix GPU hanging
+- [ ] Find and fix GPU hanging (LODs)?

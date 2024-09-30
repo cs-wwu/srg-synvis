@@ -80,7 +80,7 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 // Current Example Usage
 func main() {
 	targetDir := "assets/maps/"
-	heightmaps := []string{"s55w070"}
+	heightmaps := []string{"n48w123", "n48w122", "n47w123", "n47w122"}
 	err := ProcessHeightmaps(heightmaps, targetDir)
 	if err != nil {
 		fmt.Printf("failed to process heightmaps: %v\n", err)

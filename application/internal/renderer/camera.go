@@ -13,7 +13,7 @@ import (
 
 var (
 	// For heightmap model
-	startX, startZ = CoordinateGPSToFloat("-54.6, -069.6")
+	startX, startZ = CoordinateGPSToFloat("45.0, -123.0")
 	HeightMeters = float32(8000.0)
 	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
