@@ -1,0 +1,39 @@
+#version 450
+#extension GL_ARB_separate_shader_objects : enable
+#extension GL_ARB_shading_language_420pack : enable
+
+
+layout(std140, binding = 0) uniform UBO {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 normalM;
+    vec3 lightDir;
+} ubo;
+
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inTexCoord;
+layout(location = 2) in vec3 inNormal;
+
+const float AMBIENT = 0.04;
+
+layout(location = 0) out vec3 fragColor;
+layout(location = 1) out vec3 fragTexCoord;
+layout(location = 2) out vec3 worldPos;
+
+out gl_PerVertex {
+    vec4 gl_Position;
+};
+
+void main() 
+{
+    vec4 worldPosition = ubo.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * worldPosition;
+
+    vec3 world = normalize(mat3(ubo.normalM) * inNormal);
+    float intense = AMBIENT + max(dot(world, ubo.lightDir), 0);
+
+    fragColor = intense * vec3(1.0);
+    fragTexCoord = inTexCoord;
+    worldPos = worldPosition.xyz;
+}
