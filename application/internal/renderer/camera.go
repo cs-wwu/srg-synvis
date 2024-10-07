@@ -82,31 +82,31 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		tmp := lin.Vec3{}
 
 		// Camera Movement
-		if window.GetKey(glfw.KeyW) == glfw.Press { // Forward
+		if window.GetKey(glfw.KeyW) == glfw.Press { // Move Forward
 			tmp.Scale(c.Front, c.Speed)
 			c.Pos.Add(c.Pos, &tmp)
 		}
-		if window.GetKey(glfw.KeyS) == glfw.Press { // Backward
+		if window.GetKey(glfw.KeyS) == glfw.Press { // Move Backward
 			tmp.Scale(c.Front, c.Speed)
 			c.Pos.Sub(c.Pos, &tmp)
 		}
-		if window.GetKey(glfw.KeyA) == glfw.Press { // Left
+		if window.GetKey(glfw.KeyA) == glfw.Press { // Move Left
 			tmp.MultCross(c.Front, c.Up)
 			tmp.Norm(&tmp)
 			tmp.Scale(&tmp, c.Speed)
 			c.Pos.Sub(c.Pos, &tmp)
 		}
-		if window.GetKey(glfw.KeyD) == glfw.Press { // Right
+		if window.GetKey(glfw.KeyD) == glfw.Press { // Move Right
 			tmp.MultCross(c.Front, c.Up)
 			tmp.Norm(&tmp)
 			tmp.Scale(&tmp, c.Speed)
 			c.Pos.Add(c.Pos, &tmp)
 		}
-		if window.GetKey(glfw.KeySpace) == glfw.Press { // Upp
+		if window.GetKey(glfw.KeySpace) == glfw.Press { // Move Up
 			tmp.Scale(c.Up, c.Speed)
 			c.Pos.Add(c.Pos, &tmp)
 		}
-		if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Down
+		if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Move Down
 			tmp.Scale(c.Up, c.Speed)
 			c.Pos.Sub(c.Pos, &tmp)
 		}
@@ -115,16 +115,16 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		pitch := c.getPitch()
 
 		// Camera Viewing using quaternions
-		if window.GetKey(glfw.KeyUp) == glfw.Press { // Up
+		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
 			pitch += float64(c.Sensitivity)
 		}
-		if window.GetKey(glfw.KeyDown) == glfw.Press { // Down
+		if window.GetKey(glfw.KeyDown) == glfw.Press { // View Down
 			pitch -= float64(c.Sensitivity)
 		}
-		if window.GetKey(glfw.KeyLeft) == glfw.Press { // Left
+		if window.GetKey(glfw.KeyLeft) == glfw.Press { // View Left
 			yaw -= float64(c.Sensitivity)
 		}
-		if window.GetKey(glfw.KeyRight) == glfw.Press { // Right
+		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
 			yaw += float64(c.Sensitivity)
 		}
 
@@ -135,7 +135,9 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
 			fmt.Printf("Vectors: %v\n", c.GetViewVectors())
 		}
-		// Update the camera's front, right, and up vectors for quaternions
+		// TODO: Update the camera's front, right, and up vectors for quaternions
+		// remove the current method of clamping top and bottom view vectors,
+		
 		// c.updateCameraVectors()
 	}
 }
