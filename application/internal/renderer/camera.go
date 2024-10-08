@@ -113,6 +113,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 
 		yaw := c.getYaw()
 		pitch := c.getPitch()
+		roll := c.getRoll()
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
@@ -127,8 +128,15 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
 			yaw += float64(c.Sensitivity)
 		}
+		if window.GetKey(glfw.KeyE) == glfw.Press {	// Roll Right
+			roll += float64(c.Sensitivity)
+		}
+		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
+			roll -= float64(c.Sensitivity)
+		}
 
 		front := calcFrontVector(pitch, yaw)
+		// front := calcQuat(roll, pitch, yaw)
 		c.Front = &front
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
@@ -168,12 +176,22 @@ func calcFrontVector(pitch, yaw float64) lin.Vec3 {
 	return front
 }
 
+func calcQuat(roll, pitch, yaw float64) lin.Vec3 {
+	// TODO
+	var front lin.Vec3
+	return front
+}
+
 func (c *Camera) getYaw() float64 {
 	return math.Atan2(float64(c.Front[2]), float64(c.Front[0]))
 }
 
 func (c *Camera) getPitch() float64 {
 	return math.Asin(float64(c.Front[1]))
+}
+
+func (c *Camera) getRoll() float64 {
+	return math.Atan2(float64(c.Front[1]), float64(c.Front[0]))
 }
 
 // Update the camera's front, right, and up vectors based on the current rotation
