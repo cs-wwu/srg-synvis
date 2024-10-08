@@ -64,6 +64,11 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [x] Attempt Rendering of more than one heightmap
 - [x] Begin Implementation Unit and Integration Testing
 - [x] Re-Work Frustum Culling with ChunkManager
+- [ ] Look at feasiblity of https://github.com/zeux/meshoptimizer
+  - [ ] If it looks good, create CGo bindings
+  - [ ] Redo ChunkManager with meshoptimizer
+  - [ ] Work in ChunkManager LODs with meshoptimizer
+  - [ ] GPU Crashing?
 - [ ] Add LODs with ChunkManager
 - [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
