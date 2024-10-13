@@ -48,7 +48,11 @@ func NewCamera() *Camera {
 
 	right := lin.Vec3{}
 	right.MultCross(&front, &worldUp)
+	// right.MultCross(&worldUp, &front)
 	right.Norm(&right)
+
+	// new: compute orthonormal upvector
+	//up.MultCross(&front, &right)
 
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
@@ -114,25 +118,32 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		yaw := c.getYaw()
 		pitch := c.getPitch()
 		roll := c.getRoll()
+		var updateQuat = false
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
 			pitch += float64(c.Sensitivity)
+			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyDown) == glfw.Press { // View Down
 			pitch -= float64(c.Sensitivity)
+			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyLeft) == glfw.Press { // View Left
 			yaw -= float64(c.Sensitivity)
+			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
 			yaw += float64(c.Sensitivity)
+			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyE) == glfw.Press {	// Roll Right
 			roll += float64(c.Sensitivity)
+			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
 			roll -= float64(c.Sensitivity)
+			updateQuat = true
 		}
 
 		front := calcFrontVector(pitch, yaw)
@@ -145,7 +156,9 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// TODO: Update the camera's front, right, and up vectors for quaternions
 		// remove the current method of clamping top and bottom view vectors,
 		
-		//c.updateCameraVectors()
+		if updateQuat {
+			// c.updateCameraVectors(roll, pitch, yaw)
+		}
 	}
 }
 
@@ -175,24 +188,53 @@ func calcFrontVector(pitch, yaw float64) lin.Vec3 {
 	return front
 }
 
-func (c *Camera) getYaw() float64 {
+func (c *Camera) getYaw() float64 { // z
 	return math.Atan2(float64(c.Front[2]), float64(c.Front[0]))
+	// return math.Asin(-float64(c.Front[1]))
 }
 
-func (c *Camera) getPitch() float64 {
+func (c *Camera) getPitch() float64 { // y
 	return math.Asin(float64(c.Front[1]))
+	// return math.Atan2(float64(c.Front[0]), float64(c.Front[2]))
 }
 
-func (c *Camera) getRoll() float64 {
-	return math.Atan2(float64(c.Front[1]), float64(c.Front[0]))
+func (c *Camera) getRoll() float64 { // x
+	// assume up and front vectors are orthonormal
+	x0 := lin.Vec3{}
+	x0.MultCross(&lin.Vec3{0,1,0}, c.Front)
+	x0.Norm(&x0)
+	y0 := lin.Vec3{}
+	y0.MultCross(c.Front, &x0)
+	
+	y0yr := dotProduct(y0, *c.Up)
+	cos0 := math.Acos(float64(y0yr))
+	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2]))/float64(x0[2]))
+}
+
+func dotProduct(v1, v2 lin.Vec3) float32 {
+	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }
 
 // Update the camera's front, right, and up vectors based on the current rotation
-func (c *Camera) updateCameraVectors() {
-	front := lin.Vec3{0, 0, -1}
-	front = RotateQuat(&front, c.Rotation)
-	front.Norm(&front)
+func (c *Camera) updateCameraVectors(roll, pitch, yaw float64) {
+	// Create quaternion for yaw, pitch, and roll
+	yawQuat := QuatRotate(yaw, &lin.Vec3{0, 1, 0}) // Rotate around Y-axis
+	pitchQuat := QuatRotate(pitch, &lin.Vec3{1, 0, 0}) // Rotate around X-axis
+	rollQuat := QuatRotate(roll, &lin.Vec3{0, 0, 1}) // Rotate around Z-axis
+
+	// Combine rotations
+	c.Rotation.Mult(c.Rotation, &rollQuat)
+	c.Rotation.Mult(c.Rotation, &pitchQuat)
+	c.Rotation.Mult(c.Rotation, &yawQuat)
+	c.Rotation.Norm(c.Rotation)
+
+	// calculate new front, right, and up vectors
+
+	front := lin.Vec3{0, 0, -1} // Default front vector
+	front = RotateQuat(&front, c.Rotation) // Rotate by the combined quaternion
+	front.Norm(&front) // Normalize the front vector
 	c.Front = &front
+
 
 	right := lin.Vec3{1, 0, 0}
 	right = RotateQuat(&right, c.Rotation)
@@ -207,11 +249,12 @@ func (c *Camera) updateCameraVectors() {
 	fmt.Printf("Front: %v, Right: %v, Up: %v, Rot: %v\n", c.Front, c.Right, c.Up, c.Rotation)
 }
 
+
 // Helper Functions for Quaternion Rotations
-// lin.Quat defined as [x,y,x,w] NOT [w,x,y,z]
+// lin.Quat defined as [x,y,x,w]
 
 // QuatRotate creates a quaternion representing a rotation around an axis
-func QuatRotate(angle float32, axis *lin.Vec3) lin.Quat {
+func QuatRotate(angle float64, axis *lin.Vec3) lin.Quat {
 	halfAngle := angle / 2
 	s := float32(math.Sin(float64(halfAngle)))
 	return lin.Quat{
