@@ -416,4 +416,8 @@ func (cm *ChunkManager) Destroy() {
 
 	vk.DestroyBuffer(*cm.device, cm.indexBuffer, nil)
 	vk.FreeMemory(*cm.device, cm.indexMemory, nil)
+
+	// Cleanup draw command buffer - this was missing
+	vk.DestroyBuffer(*cm.device, cm.drawCommandBuffer, nil)
+	vk.FreeMemory(*cm.device, cm.drawCommandMemory, nil)
 }
