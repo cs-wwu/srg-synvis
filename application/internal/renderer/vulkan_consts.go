@@ -112,6 +112,7 @@ const (
 	TextureMemoryPropertyHostCoherentBit  = vk.MemoryPropertyHostCoherentBit
 	TextureMemoryPropertyDeviceLocalBit   = vk.MemoryPropertyDeviceLocalBit
 	TextureAccessHostWriteBit             = vk.AccessHostWriteBit
+	TexturePipelineStageHostBit           = vk.PipelineStageHostBit
 	TextureAccessTransferWriteBit         = vk.AccessTransferWriteBit
 	TexturePipelineStageTopOfPipeBit      = vk.PipelineStageTopOfPipeBit
 	TexturePipelineStageFragmentShaderBit = vk.PipelineStageFragmentShaderBit

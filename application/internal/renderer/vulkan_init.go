@@ -35,6 +35,7 @@ func (app *Application) VulkanLayers() []string {
 		// "VK_LAYER_LUNARG_api_dump",
 		// "VK_LAYER_LUNARG_swapchain",
 		// "VK_LAYER_GOOGLE_unique_objects",
+		"VK_LAYER_KHRONOS_validation",
 	}
 }
 
@@ -290,7 +291,7 @@ func (app *Application) prepareTextures() {
 			app.setImageLayout(tex.image, TextureImageAspect,
 				TextureImageLayoutPreinitialized, tex.imageLayout,
 				TextureAccessHostWriteBit,
-				TexturePipelineStageTopOfPipeBit, TexturePipelineStageFragmentShaderBit)
+				TexturePipelineStageHostBit, TexturePipelineStageFragmentShaderBit)
 
 		} else if props.OptimalTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureSampledImageBit) != 0 {
 			//  Must use staging buffer to copy linear texture to optimized
