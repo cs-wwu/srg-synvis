@@ -35,9 +35,15 @@ type Context interface {
 	PresentImage(imageIdx int) (outdated bool, err error)
 }
 
+type ApplicationCommandPool interface {
+	// VulkanCommandPoolCreateInfo allows customizing command pool creation
+	VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.CommandPoolCreateInfo
+}
+
 type context struct {
 	platform Platform
 	device   vk.Device
+	app      Application // New Field
 
 	onPrepare    func() error
 	onCleanup    func() error
@@ -157,11 +163,20 @@ func (c *context) prepare(needCleanup bool) {
 		}
 	}
 
+	// Check if application provides custom command pool settings
+	var cmdPoolInfo vk.CommandPoolCreateInfo
+	if app, ok := c.app.(ApplicationCommandPool); ok {
+		cmdPoolInfo = app.VulkanCommandPoolCreateInfo(c.platform.GraphicsQueueFamilyIndex())
+	} else {
+		// Default settings with reset capability
+		cmdPoolInfo = vk.CommandPoolCreateInfo{
+			SType:            vk.StructureTypeCommandPoolCreateInfo,
+			QueueFamilyIndex: c.platform.GraphicsQueueFamilyIndex(),
+		}
+	}
+
 	var cmdPool vk.CommandPool
-	ret := vk.CreateCommandPool(c.device, &vk.CommandPoolCreateInfo{
-		SType:            vk.StructureTypeCommandPoolCreateInfo,
-		QueueFamilyIndex: c.platform.GraphicsQueueFamilyIndex(),
-	}, nil, &cmdPool)
+	ret := vk.CreateCommandPool(c.device, &cmdPoolInfo, nil, &cmdPool)
 	orPanic(NewError(ret))
 	c.cmdPool = cmdPool
 

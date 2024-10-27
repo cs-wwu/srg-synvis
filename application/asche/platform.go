@@ -46,6 +46,7 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		basePlatform: basePlatform{
 			context: &context{
 				// TODO: make configurable
+				app: app, // Might not be a great way to store app ref
 				// defines count of slots allocated in swapchain
 				frameLag: 3,
 			},

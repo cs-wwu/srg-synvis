@@ -31,7 +31,6 @@ type Application struct {
 
 	frameCount int
 
-	// uniformBuffersMapped []unsafe.Pointer
 	ubo UniformBufferObject
 
 	camera       *Camera

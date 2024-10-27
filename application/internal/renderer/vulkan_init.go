@@ -37,7 +37,7 @@ func (app *Application) VulkanLayers() []string {
 		// "VK_LAYER_LUNARG_api_dump",
 		// "VK_LAYER_LUNARG_swapchain",
 		// "VK_LAYER_GOOGLE_unique_objects",
-		"VK_LAYER_KHRONOS_validation",
+		"VK_LAYER_KHRONOS_validation", // TODO remove validation layers in prod
 	}
 }
 
@@ -68,6 +68,17 @@ func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
 		{
 			MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
 		},
+	}
+}
+
+func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.CommandPoolCreateInfo {
+	return vk.CommandPoolCreateInfo{
+		SType:            vk.StructureTypeCommandPoolCreateInfo,
+		QueueFamilyIndex: queueFamilyIndex,
+		Flags: vk.CommandPoolCreateFlags(
+			vk.CommandPoolCreateResetCommandBufferBit |
+				vk.CommandPoolCreateTransientBit, // Transient Command Buffers?
+		),
 	}
 }
 
