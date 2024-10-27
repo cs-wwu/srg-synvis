@@ -35,8 +35,8 @@ type Platform interface {
 	Destroy()
 }
 
-// ApplicationDeviceFeatures interface for applications to specify device features
 type ApplicationDeviceFeatures interface {
+	// VulkanDeviceFeatures allows for customizing device features upon creation
 	VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures
 }
 

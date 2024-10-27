@@ -107,10 +107,19 @@ Use the following interface to add Physical Device Features upon creation
 
 ```golang
 type ApplicationDeviceFeatures interface {
+    // VulkanDeviceFeatures allows for customizing device features upon creation
     VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures
 }
 ```
 
+Use the following interface to add Command Pool Creation Features
+
+```golang
+type ApplicationCommandPool interface {
+	// VulkanCommandPoolCreateInfo allows customizing command pool creation
+	VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.CommandPoolCreateInfo
+}
+```
 
 
 ## License
