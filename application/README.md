@@ -78,3 +78,6 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 - [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
 - [ ] Change Camera to use Quaternions (sensors?)
+
+- [ ] Eventually remove local `asche` copy (public repo)
+- [ ] Eventually remove local `meshopt` copy (public repo)
