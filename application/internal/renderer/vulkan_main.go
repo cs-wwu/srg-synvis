@@ -27,9 +27,12 @@ func NewApplication() *Application {
 }
 
 func (app *Application) VulkanContextCleanup() error {
+	// Wait for device to be idle before cleanup
+	dev := app.Context().Device()
+	vk.DeviceWaitIdle(dev)
+
 	app.ChunkManager.Destroy()
 
-	dev := app.Context().Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)

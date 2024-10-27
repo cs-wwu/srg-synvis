@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"time"
 
+	as "github.com/cs-wwu/srg-synvis/asche"
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
 	mo "github.com/cs-wwu/srg-synvis/meshopt/meshoptimizer"
-	as "github.com/cs-wwu/srg-synvis/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	// as "github.com/vulkan-go/asche"
@@ -16,7 +16,7 @@ import (
 	"github.com/xlab/closer"
 )
 
-const FRAME_RATE = 20
+const FRAME_RATE = 60
 
 func init() {
 	runtime.LockOSThread()
