@@ -750,7 +750,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.ChunkManager.LoadChunks()
 	app.ChunkManager.FillBuffers()
 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	app.updateVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()

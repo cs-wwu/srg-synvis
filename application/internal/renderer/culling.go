@@ -90,7 +90,7 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 }
 
 // determines visible chunks and updates the ChunkManager buffers accordingly
-func (app *Application) determineVisibleChunks() {
+func (app *Application) updateVisibleChunks() {
 	cm := app.ChunkManager
 
 	// Clear the previous visible chunk map
@@ -104,10 +104,6 @@ func (app *Application) determineVisibleChunks() {
 			cm.visibleChunks[chunkKey] = true
 		}
 	}
-
-	// Update the draw command buffer
-	cm.updateDrawCommands()
-	cm.updateDrawCommandBuffer()
 
 	log.Printf("Visible chunks: %d\n", len(cm.visibleChunks))
 }

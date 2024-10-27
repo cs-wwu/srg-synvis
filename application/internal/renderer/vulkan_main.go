@@ -27,6 +27,8 @@ func NewApplication() *Application {
 }
 
 func (app *Application) VulkanContextCleanup() error {
+	app.ChunkManager.Destroy()
+
 	dev := app.Context().Device()
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
@@ -38,8 +40,6 @@ func (app *Application) VulkanContextCleanup() error {
 	for i := 0; i < len(app.textures); i++ {
 		app.textures[i].Destroy(dev)
 	}
-
-	app.ChunkManager.Destroy()
 
 	app.depth.Destroy(dev)
 	return nil
@@ -58,7 +58,15 @@ func (app *Application) NextFrame() {
 
 	//Update the view frustum and visibleChunks
 	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	app.updateVisibleChunks()
+
+	// Wait for the device to be idle before updating visible chunks
+	// This ensures we're not modifying data while the GPU is using it
+	if len(app.ChunkManager.visibleChunks) > 0 {
+		vk.DeviceWaitIdle(app.Context().Device())
+		app.ChunkManager.updateDrawCommands()
+		app.ChunkManager.updateDrawCommandBuffer()
+	}
 }
 
 // called every frame by asche
