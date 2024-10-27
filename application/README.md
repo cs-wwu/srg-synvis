@@ -73,6 +73,8 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [x] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
   - [ ] Use the forked `asche` to allow for UI implementation?
 - [x] Find and fix all validation layer issues
+  - [x] Fix Main validation layer issues
+  - [ ] Fix on-close validation layer issues
 - [x] Find and fix GPU hanging
 - [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
