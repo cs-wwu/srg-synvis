@@ -68,13 +68,12 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [x] If it looks good, create CGo bindings
   - [ ] Redo ChunkManager with meshoptimizer
   - [ ] Work in ChunkManager LODs with meshoptimizer
-  - [ ] GPU Crashing?
-- [ ] Fork `asche`:
-  - [ ] Allow for Physical Device Feature Settings (`vk.MultiDrawIndirect`)
-  - [ ] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
+- [x] Fork `asche`:
+  - [x] Allow for Physical Device Feature Settings (`vk.MultiDrawIndirect`)
+  - [x] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
   - [ ] Use the forked `asche` to allow for UI implementation?
-- [ ] Find and fix all validation layer issues
-- [ ] Find and fix GPU hanging (LODs)?
+- [x] Find and fix all validation layer issues
+- [x] Find and fix GPU hanging
 - [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
 - [ ] Change Camera to use Quaternions (sensors?)
