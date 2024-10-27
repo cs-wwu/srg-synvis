@@ -35,6 +35,11 @@ type Platform interface {
 	Destroy()
 }
 
+// ApplicationDeviceFeatures interface for applications to specify device features
+type ApplicationDeviceFeatures interface {
+	VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures
+}
+
 func NewPlatform(app Application) (pFace Platform, err error) {
 	// defer checkErr(&err)
 	p := &platform{
@@ -215,6 +220,14 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		})
 	}
 
+	var features []vk.PhysicalDeviceFeatures
+	if app, ok := app.(ApplicationDeviceFeatures); ok {
+		features = app.VulkanDeviceFeatures()
+	} else {
+		// Provide an empty set with one element for disabled
+		features = []vk.PhysicalDeviceFeatures{{}}
+	}
+
 	var device vk.Device
 	ret = vk.CreateDevice(p.gpu, &vk.DeviceCreateInfo{
 		SType:                   vk.StructureTypeDeviceCreateInfo,
@@ -224,6 +237,7 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		PpEnabledExtensionNames: deviceExtensions,
 		EnabledLayerCount:       uint32(len(validationLayers)),
 		PpEnabledLayerNames:     validationLayers,
+		PEnabledFeatures:        features,
 	}, nil, &device)
 	orPanic(NewError(ret))
 	p.device = device

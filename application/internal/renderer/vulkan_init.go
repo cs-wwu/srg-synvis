@@ -63,6 +63,14 @@ func (app *Application) VulkanInstanceExtensions() []string {
 	return extensions
 }
 
+func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
+	return []vk.PhysicalDeviceFeatures{
+		{
+			MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
+		},
+	}
+}
+
 // Initialize the Uniform Buffer Object
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)

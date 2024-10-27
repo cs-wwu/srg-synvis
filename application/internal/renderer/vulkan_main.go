@@ -95,7 +95,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// Begin command buffer
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
-		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
+		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit | vk.CommandBufferUsageOneTimeSubmitBit),
 	})
 	OrPanic(as.NewError(ret))
 

@@ -101,6 +101,18 @@ type Context interface {
 
 Both **Vulkan Platform Interface** and **Vulkan Context** terms are made up just for clarity, please note that Vulkan API has a little to none amount of abstraction, so Asche provides this state management tools to free the developer from extra burden. However, it's too easy to create leaky abstractions for Vulkan API, so Asche tries to be as minimal and pragmatic as possible.
 
+## New Features
+
+Use the following interface to add Physical Device Features upon creation
+
+```golang
+type ApplicationDeviceFeatures interface {
+    VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures
+}
+```
+
+
+
 ## License
 
 MIT
