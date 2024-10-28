@@ -66,8 +66,9 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 - [x] Re-Work Frustum Culling with ChunkManager
 - [x] Look at feasiblity of https://github.com/zeux/meshoptimizer
   - [x] If it looks good, create CGo bindings
-  - [ ] Redo ChunkManager with meshoptimizer
-  - [ ] Work in ChunkManager LODs with meshoptimizer
+  - [x] Redo ChunkManager with meshoptimizer
+  - [ ] Reduce memory overhead from TerrainManager (back to triangle strips?)
+  - [ ] Work in TerrainManager LODs with meshoptimizer
 - [x] Fork `asche`:
   - [x] Allow for Physical Device Feature Settings (`vk.MultiDrawIndirect`)
   - [x] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
