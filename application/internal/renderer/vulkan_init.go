@@ -573,8 +573,8 @@ func (app *Application) preparePipeline() {
 		},
 		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
 			SType:                  PipelineInputAssemblyStateCreateInfoSType,
-			Topology:               PrimitiveTopologyTriangleStrip,
-			PrimitiveRestartEnable: vk.True,
+			Topology:               PrimitiveTopologyTriangleList,
+			PrimitiveRestartEnable: vk.False,
 		},
 		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
 			SType:       PipelineRasterizationStateCreateInfoSType,
@@ -745,12 +745,11 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Testing for loading all maps and chunks
 	// Update the last position so that we load the map
-	app.ChunkManager = NewChunkManager(&dev, &memProps)
-	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
-	app.ChunkManager.LoadChunks()
-	app.ChunkManager.FillBuffers()
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.updateVisibleChunks()
+	app.TerrainManager = NewTerrainManager(&dev, &memProps)
+	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
+	app.TerrainManager.FillBuffers()
+	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// app.updateVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()

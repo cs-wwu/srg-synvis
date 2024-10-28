@@ -17,10 +17,10 @@ import (
 
 func NewApplication() *Application {
 	camera := NewCamera()
-	frustum := &Frustum{}
+	// frustum := &Frustum{}
 	app := &Application{
-		camera:  camera,
-		frustum: frustum,
+		camera: camera,
+		// frustum: frustum,
 	}
 
 	return app
@@ -31,7 +31,7 @@ func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
 
-	app.ChunkManager.Destroy()
+	app.TerrainManager.Destroy()
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
@@ -60,16 +60,17 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	//Update the view frustum and visibleChunks
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.updateVisibleChunks()
+	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// app.updateVisibleChunks()
 
 	// Wait for the device to be idle before updating visible chunks
 	// This ensures we're not modifying data while the GPU is using it
-	if len(app.ChunkManager.visibleChunks) > 0 {
-		vk.DeviceWaitIdle(app.Context().Device())
-		app.ChunkManager.updateDrawCommands()
-		app.ChunkManager.updateDrawCommandBuffer()
-	}
+	// if len(app.ChunkManager.visibleChunks) > 0 {
+	// 	vk.DeviceWaitIdle(app.Context().Device())
+	// 	app.ChunkManager.updateDrawCommands()
+	// 	app.ChunkManager.updateDrawCommandBuffer()
+	// }
+	vk.DeviceWaitIdle(app.Context().Device())
 }
 
 // called every frame by asche
@@ -146,12 +147,16 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	}})
 
 	// Bind vertex and index buffers
-	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.ChunkManager.vertexBuffer}, []vk.DeviceSize{0})
-	vk.CmdBindIndexBuffer(cmd, app.ChunkManager.indexBuffer, 0, vk.IndexTypeUint32)
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.TerrainManager.vertexBuffer}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, app.TerrainManager.indexBuffer, 0, vk.IndexTypeUint32)
 
 	// Draw all chunks using indirect drawing
-	vk.CmdDrawIndexedIndirect(cmd, app.ChunkManager.drawCommandBuffer, 0, uint32(len(app.ChunkManager.drawCommands)), uint32(unsafe.Sizeof(DrawCommand{})))
-
+	vk.CmdDrawIndexedIndirect(cmd,
+		app.TerrainManager.drawCommandBuffer, // renamed from ChunkManager
+		0,                                    // offset
+		1,                                    // drawCount (just 1 command now)
+		uint32(unsafe.Sizeof(DrawCommand{})), // stride
+	)
 	// End render pass
 	vk.CmdEndRenderPass(cmd)
 

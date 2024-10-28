@@ -33,9 +33,9 @@ type Application struct {
 
 	ubo UniformBufferObject
 
-	camera       *Camera
-	ChunkManager *ChunkManager
-	frustum      *Frustum
+	camera         *Camera
+	TerrainManager *TerrainManager
+	// frustum      *Frustum
 	WindowHandle *glfw.Window
 }
 
@@ -195,7 +195,8 @@ const (
 	DynamicStateViewport                      = vk.DynamicStateViewport
 	PipelineVertexInputStateCreateInfoSType   = vk.StructureTypePipelineVertexInputStateCreateInfo
 	PipelineInputAssemblyStateCreateInfoSType = vk.StructureTypePipelineInputAssemblyStateCreateInfo
-	PrimitiveTopologyTriangleStrip            = vk.PrimitiveTopologyTriangleStrip
+	// PrimitiveTopologyTriangleStrip            = vk.PrimitiveTopologyTriangleStrip
+	PrimitiveTopologyTriangleList             = vk.PrimitiveTopologyTriangleList
 	PipelineRasterizationStateCreateInfoSType = vk.StructureTypePipelineRasterizationStateCreateInfo
 	PolygonModeFill                           = vk.PolygonModeFill
 	CullModeBackBit                           = vk.CullModeBackBit
