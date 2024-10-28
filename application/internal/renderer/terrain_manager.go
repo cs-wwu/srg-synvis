@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
+	mo "github.com/cs-wwu/srg-synvis/meshopt/meshoptimizer"
 
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -44,6 +45,9 @@ type TerrainManager struct {
 	memProps *vk.PhysicalDeviceMemoryProperties
 
 	// Per heightmap data
+	origVertices []Vertex
+	origIndices  []uint32 // Identical to type Index
+
 	vertices []Vertex
 	indices  []uint32 // Identical to type Index
 
@@ -85,8 +89,8 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 	tm := &TerrainManager{
 		device:       device,
 		memProps:     memProps,
-		vertices:     make([]Vertex, 0),
-		indices:      make([]uint32, 0),
+		origVertices: make([]Vertex, 0),
+		origIndices:  make([]uint32, 0),
 		lastPosition: lin.Vec3{0.0, 0.0, 0.0},
 		heightmaps:   make(map[string]*image.Gray16, NUM_MAPS),
 		watermaps:    make(map[string]*image.Gray, NUM_MAPS),
@@ -96,6 +100,71 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 	tm.InitBuffers()
 
 	return tm
+}
+
+func (tm *TerrainManager) optimizeGeometry() {
+	// Step 1: Generate vertex remap to optimize vertex cache and remove duplicates
+	fmt.Println("Vertex Remapping...")
+	remap := make([]uint32, len(tm.origVertices))
+	vertexCount := mo.GenerateVertexRemap(
+		remap,
+		tm.origIndices,
+		uint64(len(tm.origIndices)),
+		unsafe.Pointer(&tm.origVertices[0]),
+		uint64(len(tm.origVertices)),
+		uint64(VertexSize),
+	)
+
+	// Step 2: Allocate space for optimized buffers
+	tm.vertices = make([]Vertex, vertexCount)
+	tm.indices = make([]uint32, len(tm.origIndices))
+
+	// Step 3: Remap vertices (removes duplicates)
+	mo.RemapVertexBuffer(
+		unsafe.Pointer(&tm.vertices[0]),
+		unsafe.Pointer(&tm.origVertices[0]),
+		uint64(len(tm.origVertices)),
+		uint64(VertexSize),
+		remap,
+	)
+
+	// Step 4: Remap indices to match new vertices
+	fmt.Println("Index Remapping...")
+	mo.RemapIndexBuffer(
+		tm.indices,
+		tm.origIndices,
+		uint64(len(tm.origIndices)),
+		remap,
+	)
+
+	// Step 5: Optimize vertex cache
+	fmt.Println("Vertex Cache Optimizing...")
+	mo.OptimizeVertexCache(
+		tm.indices,
+		tm.indices,
+		uint64(len(tm.indices)),
+		uint64(len(tm.vertices)),
+	)
+
+	// Step 6: Optimize vertex fetch
+	fmt.Println("Vertex Fetch Optimizing...")
+	mo.OptimizeVertexFetch(
+		unsafe.Pointer(&tm.vertices[0]),
+		tm.indices,
+		uint64(len(tm.indices)),
+		unsafe.Pointer(&tm.vertices[0]),
+		uint64(len(tm.vertices)),
+		uint64(VertexSize),
+	)
+
+	// Update draw command with new counts
+	tm.drawCommand = DrawCommand{
+		IndexCount:    uint32(len(tm.indices)),
+		InstanceCount: 1,
+		FirstIndex:    0,
+		VertexOffset:  0,
+		FirstInstance: 0,
+	}
 }
 
 // Calculate vertices for entire heightmap
@@ -204,7 +273,7 @@ func (tm *TerrainManager) FillBuffers() {
 	// Fill index buffer
 	indexData := make([]byte, len(tm.indices)*4)
 	for i, index := range tm.indices {
-		binary.LittleEndian.PutUint32(indexData[i*4:], uint32(index))
+		binary.LittleEndian.PutUint32(indexData[i*4:], index)
 	}
 
 	var pIndexData unsafe.Pointer
@@ -248,40 +317,32 @@ func (tm *TerrainManager) InitBuffers() {
 }
 
 // Loads both maps associated with the coordinate
-func (tm *TerrainManager) LoadMap(coord string) error {
-	log.Printf("Loading terrain for %s", coord)
 
-	// Load heightmap and watermap images
+func (tm *TerrainManager) LoadMap(coord string) error {
+	// Load heightmap and watermap
 	if err := tm.LoadHeightmap(coord); err != nil {
 		return err
 	}
-
 	if err := tm.LoadWatermap(coord); err != nil {
 		return err
 	}
 
-	// Convert map coordinate to world position
 	mapX, mapZ := CoordinateMapToInt(coord)
 
-	// Generate geometry with progress tracking
-	fmt.Printf("Generating vertices and indices...\n")
-	tm.vertices = generateVertices(tm.heightmaps[coord], tm.watermaps[coord], mapX, mapZ)
-	tm.indices = generateIndices()
-	calculateNormals(tm.vertices)
+	// Generate original geometry
+	fmt.Println("Generating Vertices...")
+	tm.origVertices = generateVertices(tm.heightmaps[coord], tm.watermaps[coord], mapX, mapZ)
+	fmt.Println("Generating Indices...")
+	tm.origIndices = generateIndices()
+	fmt.Println("Generating Normals...")
+	calculateNormals(tm.origVertices)
 
-	// Single draw command for entire heightmap
-	tm.drawCommand = DrawCommand{
-		IndexCount:    uint32(len(tm.indices)),
-		InstanceCount: 1,
-		FirstIndex:    0,
-		VertexOffset:  0,
-		FirstInstance: 0,
-	}
+	// Optimize geometry
+	tm.optimizeGeometry()
 
-	// Fill GPU buffers with progress tracking
+	// Fill GPU buffers with optimized data
+	fmt.Println("Filling Buffers...")
 	tm.FillBuffers()
-	log.Printf("Terrain loaded successfully: %d vertices, %d indices",
-		len(tm.vertices), len(tm.indices))
 
 	return nil
 }
