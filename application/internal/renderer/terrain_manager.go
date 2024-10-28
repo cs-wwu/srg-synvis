@@ -24,7 +24,7 @@ const (
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 
 	MAP_LENGTH = 3600
-	NUM_MAPS   = 4 // TODO change to 9 in final version (after LOD)
+	NUM_MAPS   = 4 // TODO change to 9 in final version? (after LOD)
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
@@ -73,9 +73,9 @@ type DrawCommand struct {
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
 	if tm.lastPosition[0] == 0.0 { // TODO Make dynamic based on location
 		tm.LoadMap("n48w123")
-		// tm.LoadMaps("n48w122")
-		// tm.LoadMaps("n47w123")
-		// tm.LoadMaps("n47w122")
+		// tm.LoadMap("n48w122")
+		// tm.LoadMap("n47w123")
+		// tm.LoadMap("n47w122")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	tm.lastPosition = pos

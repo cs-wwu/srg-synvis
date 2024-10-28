@@ -36,6 +36,7 @@ type Application struct {
 	camera         *Camera
 	TerrainManager *TerrainManager
 	// frustum      *Frustum
+	fpsCounter   *FPSCounter
 	WindowHandle *glfw.Window
 }
 

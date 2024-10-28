@@ -9,6 +9,7 @@ import (
 	as "github.com/cs-wwu/srg-synvis/asche"
 
 	// as "github.com/vulkan-go/asche"
+	"github.com/go-gl/glfw/v3.3/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -17,16 +18,54 @@ import (
 
 func NewApplication() *Application {
 	camera := NewCamera()
+	fpsCounter := NewFPSCounter()
 	// frustum := &Frustum{}
 	app := &Application{
-		camera: camera,
+		camera:     camera,
+		fpsCounter: fpsCounter,
 		// frustum: frustum,
 	}
 
 	return app
 }
 
+type FPSCounter struct {
+	frames   uint32
+	lastTime float64
+	fpsTime  float64
+	fps      float64
+}
+
+func NewFPSCounter() *FPSCounter {
+	return &FPSCounter{
+		lastTime: glfw.GetTime(),
+		fpsTime:  glfw.GetTime(),
+	}
+}
+
+// Update FPS counter and print
+func (fc *FPSCounter) Update() {
+	currentTime := glfw.GetTime()
+	fc.frames++
+
+	// Update FPS every second
+	if currentTime-fc.fpsTime >= 1.0 {
+		fc.fps = float64(fc.frames) / (currentTime - fc.fpsTime)
+		fc.frames = 0
+		fc.fpsTime = currentTime
+
+		// Clear line and print new FPS
+		fmt.Printf("\r\033[K") // Clear current line
+		fmt.Printf("FPS: %.1f | Frame Time: %.2fms",
+			fc.fps,
+			1000.0/fc.fps,
+		)
+	}
+}
+
 func (app *Application) VulkanContextCleanup() error {
+	fmt.Println()
+
 	// Wait for device to be idle before cleanup
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
@@ -49,11 +88,7 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
-	app.frameCount++
-	fmt.Printf("%d ", app.frameCount)
-	if app.frameCount%60 == 0 {
-		fmt.Printf("\n")
-	}
+	app.fpsCounter.Update()
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
