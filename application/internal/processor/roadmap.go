@@ -27,21 +27,38 @@ type OverpassResponse struct {
 }
 
 // Creates an array of roads: [road#][point#][x, y]
-func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element) [][][]int {
+func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int) [][][]int {
 	roads := [][][]int{}
+	c := float64(scale)
 	for i := range highways {
 		tempRoad := [][]int{}
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			x := int(math.Round((math.Abs(node.Lat) - 48) * (2*length - 2)))
-			y := int(math.Round((1 - (math.Abs(node.Lon) - 122)) * (2*length - 2)))
+			y := int(math.Round((1- (math.Abs(node.Lat) - 48)) * (c*length - c)))
+			x := int(math.Round((1 - (math.Abs(node.Lon) - 122)) * (c*length - c)))
 			index := []int{x, y}
 			tempRoad = append(tempRoad, index)
 		}
 		roads = append(roads, tempRoad)
 	}
 	return roads
+}
+
+func drawLine(p1 []int, p2 []int, img *image.Gray) {
+	x1 := p1[0]
+	x2 := p2[0]
+	y1 := p1[1]
+	y2 := p2[1]
+	dx := x2 - x1
+	dy := y2 - y1
+	if dx != 0 {
+		m := dy / dx
+		for x := x1; x < x2; x++ {
+			y := m*(x-x1) + y1
+			img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
+		}
+	}
 }
 
 func GenerateOsmPng(pngFilepath string) error {
@@ -85,19 +102,16 @@ func GenerateOsmPng(pngFilepath string) error {
 	}
 
 	// Turn the lat/lon to an arry of 3600 indexed float32
-	roads := convertCoordsToPngIndex(highways, nodes)
+	c := 2
+	roads := convertCoordsToPngIndex(highways, nodes, c)
 
-	grayImage := image.NewGray(image.Rect(0, 0, 2*length, 2*length))
+	grayImage := image.NewGray(image.Rect(0, 0, c*length, c*length))
 	for r := range roads {
 		road := roads[r]
-		for p := 0; p < len(road)-1; p++{
+		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			x1 := p1[0]
-			y1 := p1[1]
-			x2 := p2[0]
-			y2 := p2[1]
-			grayImage.SetGray(x1, y1, color.Gray{Y: math.MaxUint8})
+			drawLine(p1, p2, grayImage)
 		}
 	}
 
