@@ -24,7 +24,7 @@ const (
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 
 	MAP_LENGTH = 3600
-	NUM_MAPS   = 4 // TODO change to 9 in final version? (after LOD)
+	NUM_MAPS   = 2 // TODO change to 9 in final version? (after LOD)
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
