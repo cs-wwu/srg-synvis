@@ -196,8 +196,8 @@ const (
 	DynamicStateViewport                      = vk.DynamicStateViewport
 	PipelineVertexInputStateCreateInfoSType   = vk.StructureTypePipelineVertexInputStateCreateInfo
 	PipelineInputAssemblyStateCreateInfoSType = vk.StructureTypePipelineInputAssemblyStateCreateInfo
-	// PrimitiveTopologyTriangleStrip            = vk.PrimitiveTopologyTriangleStrip
-	PrimitiveTopologyTriangleList             = vk.PrimitiveTopologyTriangleList
+	PrimitiveTopologyTriangleStrip            = vk.PrimitiveTopologyTriangleStrip
+	// PrimitiveTopologyTriangleList             = vk.PrimitiveTopologyTriangleList
 	PipelineRasterizationStateCreateInfoSType = vk.StructureTypePipelineRasterizationStateCreateInfo
 	PolygonModeFill                           = vk.PolygonModeFill
 	CullModeBackBit                           = vk.CullModeBackBit

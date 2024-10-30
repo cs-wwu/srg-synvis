@@ -31,7 +31,7 @@ const (
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
 
 	VERTICES_PER_MAP = (MAP_LENGTH + 1) * (MAP_LENGTH + 1)
-	INDICES_PER_MAP  = MAP_LENGTH * MAP_LENGTH * 6
+	INDICES_PER_MAP  = MAP_LENGTH * ((MAP_LENGTH+1)*2 + 1)
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
 
@@ -81,7 +81,7 @@ type DrawCommand struct {
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
 	if tm.lastPosition[0] == 0.0 { // TODO Make dynamic based on location
 		tm.LoadMap("n48w123")
-		tm.LoadMap("n48w122")
+		// tm.LoadMap("n48w122")
 		// tm.LoadMap("n47w123")
 		// tm.LoadMap("n47w122")
 		log.Printf("Updating camera position to %v\n", pos)
@@ -137,28 +137,41 @@ func (tm *TerrainManager) generateVertices(heightmap *image.Gray16, watermap *im
 
 // Generate indices for a heightmap section
 func (tm *TerrainManager) generateIndices(baseVertex uint32) []uint32 {
+	// For a grid of N×N quads, we need (N+1)×(N+1) vertices
+	// and N×N×2 triangles (6 indices per quad)
 	indices := make([]uint32, MAP_LENGTH*MAP_LENGTH*6)
 	idx := 0
 
-	for z := 0; z < MAP_LENGTH; z++ {
-		for x := 0; x < MAP_LENGTH; x++ {
-			// Calculate the indices for the quad, offset by baseVertex
-			topLeft := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
-			topRight := topLeft + 1
-			bottomLeft := topLeft + uint32(MAP_LENGTH+1)
-			bottomRight := bottomLeft + 1
+	// Generate indices in a cache-friendly pattern
+	// Process the grid in 2x2 quad blocks to improve vertex cache coherency
+	const BLOCK_SIZE = 32 // Adjust based on testing
 
-			// First triangle
-			indices[idx] = topLeft
-			indices[idx+1] = bottomLeft
-			indices[idx+2] = bottomRight
+	for blockZ := 0; blockZ < MAP_LENGTH; blockZ += BLOCK_SIZE {
+		for blockX := 0; blockX < MAP_LENGTH; blockX += BLOCK_SIZE {
+			// Process each block
+			maxZ := min(blockZ+BLOCK_SIZE, MAP_LENGTH)
+			maxX := min(blockX+BLOCK_SIZE, MAP_LENGTH)
 
-			// Second triangle
-			indices[idx+3] = topLeft
-			indices[idx+4] = bottomRight
-			indices[idx+5] = topRight
+			for z := blockZ; z < maxZ; z++ {
+				for x := blockX; x < maxX; x++ {
+					topLeft := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
+					topRight := topLeft + 1
+					bottomLeft := topLeft + uint32(MAP_LENGTH+1)
+					bottomRight := bottomLeft + 1
 
-			idx += 6
+					// First triangle (counter-clockwise winding)
+					indices[idx] = topLeft
+					indices[idx+1] = bottomLeft
+					indices[idx+2] = topRight
+
+					// Second triangle (counter-clockwise winding)
+					indices[idx+3] = bottomLeft
+					indices[idx+4] = bottomRight
+					indices[idx+5] = topRight
+
+					idx += 6
+				}
+			}
 		}
 	}
 
@@ -244,64 +257,67 @@ func (tm *TerrainManager) optimizeGeometry() {
 		return
 	}
 
-	fmt.Println("Generating Vertex Remap...")
-	// Step 1: Generate vertex remap
-	remap := make([]uint32, len(tm.vertices))
-	vertexCount := mo.GenerateVertexRemap(
-		remap,
+	tm.printGeometryStats("Before Optimization")
+
+	// Analyze initial state
+	fmt.Println("\nInitial Analysis:")
+	initialCache := mo.AnalyzeVertexCache(
 		tm.indices,
 		uint64(len(tm.indices)),
-		unsafe.Pointer(&tm.vertices[0]),
+		uint64(len(tm.vertices)),
+		32, // Cache size: typical post-transform cache size
+		32, // Warp size: typical GPU SIMD width
+		32, // Primitive group size: optimal triangle batch size
+	)
+	fmt.Printf("Initial ACMR: %.2f, ATVR: %.2f\n", initialCache.Acmr, initialCache.Atvr)
+
+	initialFetch := mo.AnalyzeVertexFetch(
+		tm.indices,
+		uint64(len(tm.indices)),
 		uint64(len(tm.vertices)),
 		uint64(VertexSize),
 	)
+	fmt.Printf("Initial Overfetch: %.2f\n", initialFetch.Overfetch)
 
-	// Step 2: Create temporary buffers for optimized data
-	optimizedVertices := make([]Vertex, vertexCount)
-	optimizedIndices := make([]uint32, len(tm.indices))
-
-	// Step 3: Remap vertices
-	fmt.Println("Remapping Vertex Buffer...")
-	mo.RemapVertexBuffer(
-		unsafe.Pointer(&optimizedVertices[0]),
-		unsafe.Pointer(&tm.vertices[0]),
-		uint64(len(tm.vertices)),
-		uint64(VertexSize),
-		remap,
-	)
-
-	// Step 4: Remap indices
-	fmt.Println("Remapping Index Buffer...")
-	mo.RemapIndexBuffer(
-		optimizedIndices,
+	// Step 1: Try strip-based optimization instead of regular cache optimization
+	fmt.Println("\nOptimizing Vertex Cache (Strip)...")
+	mo.OptimizeVertexCacheStrip(
+		tm.indices,
 		tm.indices,
 		uint64(len(tm.indices)),
-		remap,
+		uint64(len(tm.vertices)),
 	)
 
-	// Step 5: Optimize vertex cache
-	fmt.Println("Optimizing Vertex Cache...")
-	mo.OptimizeVertexCache(
-		optimizedIndices,
-		optimizedIndices,
-		uint64(len(optimizedIndices)),
-		uint64(len(optimizedVertices)),
+	// Analyze after cache optimization
+	cacheOptimized := mo.AnalyzeVertexCache(
+		tm.indices,
+		uint64(len(tm.indices)),
+		uint64(len(tm.vertices)),
+		32, // Cache size
+		32, // Warp size
+		32, // Primitive group size
 	)
+	fmt.Printf("Post-Cache ACMR: %.2f, ATVR: %.2f\n", cacheOptimized.Acmr, cacheOptimized.Atvr)
 
-	// Step 6: Optimize vertex fetch
-	fmt.Println("Optimizing Vertex Fetch...")
+	// Step 2: Optimize vertex fetch
+	fmt.Println("\nOptimizing Vertex Fetch...")
 	mo.OptimizeVertexFetch(
-		unsafe.Pointer(&optimizedVertices[0]),
-		optimizedIndices,
-		uint64(len(optimizedIndices)),
-		unsafe.Pointer(&optimizedVertices[0]),
-		uint64(len(optimizedVertices)),
+		unsafe.Pointer(&tm.vertices[0]),
+		tm.indices,
+		uint64(len(tm.indices)),
+		unsafe.Pointer(&tm.vertices[0]),
+		uint64(len(tm.vertices)),
 		uint64(VertexSize),
 	)
 
-	// Replace original data with optimized data
-	tm.vertices = optimizedVertices
-	tm.indices = optimizedIndices
+	// Analyze final state
+	fetchOptimized := mo.AnalyzeVertexFetch(
+		tm.indices,
+		uint64(len(tm.indices)),
+		uint64(len(tm.vertices)),
+		uint64(VertexSize),
+	)
+	fmt.Printf("Final Overfetch: %.2f\n\n", fetchOptimized.Overfetch)
 
 	// Update draw command
 	tm.drawCommand = DrawCommand{
@@ -311,6 +327,8 @@ func (tm *TerrainManager) optimizeGeometry() {
 		VertexOffset:  0,
 		FirstInstance: 0,
 	}
+
+	tm.printGeometryStats("After Optimization")
 }
 
 // FillBuffers updates GPU buffers with current geometry
@@ -463,4 +481,16 @@ func (tm *TerrainManager) Destroy() {
 	// Cleanup draw command buffer - this was missing
 	vk.DestroyBuffer(*tm.device, tm.drawCommandBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.drawCommandMemory, nil)
+}
+
+func (tm *TerrainManager) printGeometryStats(label string) {
+	vertexSizeMB := float64(len(tm.vertices)*VertexSize) / (1024 * 1024)
+	indexSizeMB := float64(len(tm.indices)*4) / (1024 * 1024) // uint32 = 4 bytes
+	totalSizeMB := vertexSizeMB + indexSizeMB
+
+	fmt.Printf("\n=== Geometry Stats (%s) ===\n", label)
+	fmt.Printf("Vertices: %d (%.2f MB)\n", len(tm.vertices), vertexSizeMB)
+	fmt.Printf("Indices: %d (%.2f MB)\n", len(tm.indices), indexSizeMB)
+	fmt.Printf("Total Size: %.2f MB\n", totalSizeMB)
+	fmt.Printf("==========================\n\n")
 }
