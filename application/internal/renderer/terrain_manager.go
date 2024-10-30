@@ -10,7 +10,6 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
-	mo "github.com/cs-wwu/srg-synvis/meshopt/meshoptimizer"
 
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -135,43 +134,29 @@ func (tm *TerrainManager) generateVertices(heightmap *image.Gray16, watermap *im
 	return vertices
 }
 
-// Generate indices for a heightmap section
+// Generate indices for a heightmap section (Triangle Strips)
 func (tm *TerrainManager) generateIndices(baseVertex uint32) []uint32 {
-	// For a grid of N×N quads, we need (N+1)×(N+1) vertices
-	// and N×N×2 triangles (6 indices per quad)
-	indices := make([]uint32, MAP_LENGTH*MAP_LENGTH*6)
+	indices := make([]uint32, MAP_LENGTH*((MAP_LENGTH+1)*2+1))
 	idx := 0
 
-	// Generate indices in a cache-friendly pattern
-	// Process the grid in 2x2 quad blocks to improve vertex cache coherency
-	const BLOCK_SIZE = 32 // Adjust based on testing
+	primitiveRestartIndex := uint32(0xFFFFFFFF) // Special index for primitive restart
 
-	for blockZ := 0; blockZ < MAP_LENGTH; blockZ += BLOCK_SIZE {
-		for blockX := 0; blockX < MAP_LENGTH; blockX += BLOCK_SIZE {
-			// Process each block
-			maxZ := min(blockZ+BLOCK_SIZE, MAP_LENGTH)
-			maxX := min(blockX+BLOCK_SIZE, MAP_LENGTH)
+	for z := 0; z < MAP_LENGTH; z++ {
+		if z > 0 {
+			// Add primitive restart index between rows
+			indices[idx] = primitiveRestartIndex
+			idx++
+		}
 
-			for z := blockZ; z < maxZ; z++ {
-				for x := blockX; x < maxX; x++ {
-					topLeft := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
-					topRight := topLeft + 1
-					bottomLeft := topLeft + uint32(MAP_LENGTH+1)
-					bottomRight := bottomLeft + 1
+		// Generate strip for this row
+		for x := 0; x <= MAP_LENGTH; x++ {
+			// Switch order: Add two vertices for each column: top then bottom (reversed from before)
+			topVertex := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
+			bottomVertex := baseVertex + uint32((z+1)*(MAP_LENGTH+1)+x)
 
-					// First triangle (counter-clockwise winding)
-					indices[idx] = topLeft
-					indices[idx+1] = bottomLeft
-					indices[idx+2] = topRight
-
-					// Second triangle (counter-clockwise winding)
-					indices[idx+3] = bottomLeft
-					indices[idx+4] = bottomRight
-					indices[idx+5] = topRight
-
-					idx += 6
-				}
-			}
+			indices[idx] = topVertex      // Was bottomVertex
+			indices[idx+1] = bottomVertex // Was topVertex
+			idx += 2
 		}
 	}
 
@@ -257,67 +242,23 @@ func (tm *TerrainManager) optimizeGeometry() {
 		return
 	}
 
-	tm.printGeometryStats("Before Optimization")
+	tm.printGeometryStats("Before Strip Conversion")
 
-	// Analyze initial state
-	fmt.Println("\nInitial Analysis:")
-	initialCache := mo.AnalyzeVertexCache(
-		tm.indices,
-		uint64(len(tm.indices)),
-		uint64(len(tm.vertices)),
-		32, // Cache size: typical post-transform cache size
-		32, // Warp size: typical GPU SIMD width
-		32, // Primitive group size: optimal triangle batch size
-	)
-	fmt.Printf("Initial ACMR: %.2f, ATVR: %.2f\n", initialCache.Acmr, initialCache.Atvr)
+	// Calculate strip statistics, properly accounting for primitive restart indices
+	numRestartIndices := MAP_LENGTH // One per row except first
+	actualIndices := len(tm.indices) - numRestartIndices
+	numTriangles := actualIndices - 2 // In a strip, each new vertex after the first two creates one triangle
 
-	initialFetch := mo.AnalyzeVertexFetch(
-		tm.indices,
-		uint64(len(tm.indices)),
-		uint64(len(tm.vertices)),
-		uint64(VertexSize),
-	)
-	fmt.Printf("Initial Overfetch: %.2f\n", initialFetch.Overfetch)
+	fmt.Printf("\nStrip Analysis:\n")
+	fmt.Printf("Total indices: %d\n", len(tm.indices))
+	fmt.Printf("Actual vertices used (excluding restarts): %d\n", actualIndices)
+	fmt.Printf("Triangles generated: %d\n", numTriangles)
+	fmt.Printf("Vertices per triangle: %.2f\n", float64(actualIndices)/float64(numTriangles))
+	fmt.Printf("Primitive restart indices: %d\n", numRestartIndices)
 
-	// Step 1: Try strip-based optimization instead of regular cache optimization
-	fmt.Println("\nOptimizing Vertex Cache (Strip)...")
-	mo.OptimizeVertexCacheStrip(
-		tm.indices,
-		tm.indices,
-		uint64(len(tm.indices)),
-		uint64(len(tm.vertices)),
-	)
-
-	// Analyze after cache optimization
-	cacheOptimized := mo.AnalyzeVertexCache(
-		tm.indices,
-		uint64(len(tm.indices)),
-		uint64(len(tm.vertices)),
-		32, // Cache size
-		32, // Warp size
-		32, // Primitive group size
-	)
-	fmt.Printf("Post-Cache ACMR: %.2f, ATVR: %.2f\n", cacheOptimized.Acmr, cacheOptimized.Atvr)
-
-	// Step 2: Optimize vertex fetch
-	fmt.Println("\nOptimizing Vertex Fetch...")
-	mo.OptimizeVertexFetch(
-		unsafe.Pointer(&tm.vertices[0]),
-		tm.indices,
-		uint64(len(tm.indices)),
-		unsafe.Pointer(&tm.vertices[0]),
-		uint64(len(tm.vertices)),
-		uint64(VertexSize),
-	)
-
-	// Analyze final state
-	fetchOptimized := mo.AnalyzeVertexFetch(
-		tm.indices,
-		uint64(len(tm.indices)),
-		uint64(len(tm.vertices)),
-		uint64(VertexSize),
-	)
-	fmt.Printf("Final Overfetch: %.2f\n\n", fetchOptimized.Overfetch)
+	// For vertex fetch optimization, we need to create a temporary buffer without restart indices
+	// or skip optimization entirely since our grid is already optimally laid out
+	fmt.Println("\nSkipping vertex fetch optimization for strip format")
 
 	// Update draw command
 	tm.drawCommand = DrawCommand{
