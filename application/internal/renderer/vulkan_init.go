@@ -66,7 +66,7 @@ func (app *Application) VulkanInstanceExtensions() []string {
 func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
 	return []vk.PhysicalDeviceFeatures{
 		{
-			MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
+			//  MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
 		},
 	}
 }
