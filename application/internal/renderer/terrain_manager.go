@@ -30,7 +30,7 @@ const (
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
 
 	VERTICES_PER_MAP = (MAP_LENGTH + 1) * (MAP_LENGTH + 1)
-	INDICES_PER_MAP  = MAP_LENGTH * ((MAP_LENGTH+1)*2 + 1)
+	INDICES_PER_MAP  = MAP_LENGTH*((MAP_LENGTH+1)*2+1) + MAP_LENGTH + 1
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
 
@@ -136,31 +136,33 @@ func (tm *TerrainManager) generateVertices(heightmap *image.Gray16, watermap *im
 
 // Generate indices for a heightmap section (Triangle Strips)
 func (tm *TerrainManager) generateIndices(baseVertex uint32) []uint32 {
-	indices := make([]uint32, MAP_LENGTH*((MAP_LENGTH+1)*2+1))
+	indices := make([]uint32, INDICES_PER_MAP)
 	idx := 0
 
 	primitiveRestartIndex := uint32(0xFFFFFFFF) // Special index for primitive restart
 
 	for z := 0; z < MAP_LENGTH; z++ {
-		if z > 0 {
-			// Add primitive restart index between rows
-			indices[idx] = primitiveRestartIndex
-			idx++
-		}
+		// Add primitive restart index between ALL rows, including first
+		// This ensures no unwanted connections between heightmaps
+		indices[idx] = primitiveRestartIndex
+		idx++
 
 		// Generate strip for this row
 		for x := 0; x <= MAP_LENGTH; x++ {
-			// Switch order: Add two vertices for each column: top then bottom (reversed from before)
 			topVertex := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
 			bottomVertex := baseVertex + uint32((z+1)*(MAP_LENGTH+1)+x)
 
-			indices[idx] = topVertex      // Was bottomVertex
-			indices[idx+1] = bottomVertex // Was topVertex
+			indices[idx] = topVertex
+			indices[idx+1] = bottomVertex
 			idx += 2
 		}
 	}
 
-	return indices
+	// Add a final primitive restart to ensure no connection to next heightmap
+	indices[idx] = primitiveRestartIndex
+	idx++
+
+	return indices[:idx] // Return only the indices we actually used
 }
 
 func (tm *TerrainManager) calculateNormals(vertices []Vertex, startIdx int) {
