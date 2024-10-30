@@ -4,9 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"math"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -24,7 +23,24 @@ type OverpassResponse struct {
 	Elements []Element `json:"elements"`
 }
 
-func RunQuery(outputPath string) {
+// Creates an array of roads: [road#][x][y]
+func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element) [][][]int {
+	roads := [][][]int{}
+	for i := range highways {
+		tempRoad := [][]int{}
+		for j := range highways[i].Nodes {
+			node := nodes[highways[i].Nodes[j]]
+			x := int(math.Round((math.Abs(node.Lat)-48) * (2*length - 2)))
+			y := int(math.Round((1-(math.Abs(node.Lon)-122)) * (2*length - 2)))
+			index := []int{x, y}
+			tempRoad = append(tempRoad, index)
+		}
+		roads = append(roads, tempRoad)
+	}
+	return roads
+}
+
+func GenerateOsmPng(outputPath string) error {
 	// Make a request to Overpass API
 	query := `
 	[out:json];
@@ -34,23 +50,20 @@ func RunQuery(outputPath string) {
 	`
 	resp, err := http.Post("http://overpass-api.de/api/interpreter", "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
-		fmt.Println("Error:", err)
-		return
+		return fmt.Errorf("error: %e", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println("Error reading response:", err)
-		return
+		return fmt.Errorf("error reading response: %e", err)
 	}
 
 	// Parse JSON response
 	var osmData OverpassResponse
 	err = json.Unmarshal(body, &osmData)
 	if err != nil {
-		fmt.Println("Error unmarshaling JSON:", err)
-		return
+		return fmt.Errorf("error unmarshaling JSON: %e", err)
 	}
 
 	// Filter the data to keep only relevant highways
@@ -67,17 +80,12 @@ func RunQuery(outputPath string) {
 		}
 	}
 
-	jsonData, err := json.Marshal(osmData)
-	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-	jsonfile, err := os.Create(outputPath)
-	if err != nil {
-		log.Fatalf("%v\n", err)
-	}
-	_, err = jsonfile.Write(jsonData)
-	if err != nil {
-		log.Fatalf("%v\n", err)
+	// Turn the lat/lon to an arry of 3600 indexed float32
+	roads := convertCoordsToPngIndex(highways, nodes)
+
+	for r := range roads {
+		fmt.Println(roads[r])
 	}
 
+	return nil
 }
