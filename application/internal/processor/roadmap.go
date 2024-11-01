@@ -35,7 +35,7 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			y := int(math.Round((1- (math.Abs(node.Lat) - 48)) * (c*length - c)))
+			y := int(math.Round((1 - (math.Abs(node.Lat) - 48)) * (c*length - c)))
 			x := int(math.Round((1 - (math.Abs(node.Lon) - 122)) * (c*length - c)))
 			index := []int{x, y}
 			tempRoad = append(tempRoad, index)
@@ -46,7 +46,13 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 }
 
 func drawLine(p1 []int, p2 []int, img *image.Gray) {
-	x1 := p1[0]
+	road := image.Rect(p1[0], p1[1], p2[0], p2[1])
+	for x := road.Min.X-10; x < road.Max.X+10; x++ {
+		for y := road.Min.Y-10; y < road.Max.Y+10; y++ {
+			img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
+		}
+	}
+	/* x1 := p1[0]
 	x2 := p2[0]
 	y1 := p1[1]
 	y2 := p2[1]
@@ -58,14 +64,18 @@ func drawLine(p1 []int, p2 []int, img *image.Gray) {
 			y := m*(x-x1) + y1
 			img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
 		}
-	}
+	} */
 }
 
 func GenerateOsmPng(pngFilepath string) error {
 	// Make a request to Overpass API
 	query := `
 	[out:json];
-	way["highway"](48,-123,49,-122);
+	(
+	 way["highway"="motorway"](48,-123,49,-122);
+	 way["highway"="trunk"](48,-123,49,-122);
+	 way["highway"="primary"](48,-123,49,-122);
+	);
 	(._;>;);
 	out body;
 	`
