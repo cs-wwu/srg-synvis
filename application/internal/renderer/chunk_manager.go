@@ -28,7 +28,7 @@ const (
 	CHUNKS_PER_SIDE = 20
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
-	NUM_MAPS        = 4 // TODO change to 9 in final version (after LOD)
+	NUM_MAPS        = 1 // TODO change to 9 in final version (after LOD)
 	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
@@ -79,9 +79,9 @@ type DrawCommand struct {
 func (cm *ChunkManager) UpdateLastPosition(pos lin.Vec3) {
 	if cm.lastPosition[0] == 0.0 { // TODO Make dynamic based on location
 		cm.LoadMaps("n48w123")
-		cm.LoadMaps("n48w122")
-		cm.LoadMaps("n47w123")
-		cm.LoadMaps("n47w122")
+		//cm.LoadMaps("n48w122")
+		//cm.LoadMaps("n47w123")
+		//cm.LoadMaps("n47w122")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
 	cm.lastPosition = pos

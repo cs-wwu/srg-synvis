@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
+	"github.com/stratoberry/go-gpsd"
 )
 
 var (
@@ -24,6 +25,9 @@ var (
 	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
+	
+	LAT = float64(0.0)
+	LON = float64(0.0)
 )
 
 type Camera struct {
@@ -80,10 +84,35 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	return result
 }
 
+ func trygps() {
+		gps, err := gpsd.Dial("localhost:2947")
+		if err != nil { panic(err)}
+
+		tpvFilter := func(r interface{}) {
+				report := r.(*gpsd.TPVReport)
+				// fmt.Println("Location updated:", report.Lat, report.Lon)
+				LAT = report.Lat
+				LON = report.Lon
+				fmt.Println("Location:", LAT, LON)
+				// 48.734321667, -122.487568333
+		}		
+		gps.AddFilter("TPV", tpvFilter)
+
+		done := gps.Watch()
+		<- done
+		
+		gps.Close()		
+}
+
+
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
 func (c *Camera) ProcessInput(window *glfw.Window) {
+	go trygps()
+	newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
+	(*c.Pos)[0] = newX
+	(*c.Pos)[2] = newZ
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 		// cmd := exec.Command("python3", "./internal/renderer/hello.py")
 		// Create a pipe for standard output

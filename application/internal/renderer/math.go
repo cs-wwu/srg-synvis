@@ -157,3 +157,10 @@ func CoordinateGPSToFloat(coord string) (float32, float32) {
 
 	return x, z
 }
+
+func CoordinateGPSFloatToFloat(lat, lon float32) (float32, float32) {
+	x := float32(lon * 3600)
+	z := float32(-lat * 3600)
+	
+	return x, z
+}
