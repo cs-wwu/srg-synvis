@@ -46,10 +46,16 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 }
 
 func drawLine(p1 []int, p2 []int, img *image.Gray) {
-	road := image.Rect(p1[0], p1[1], p2[0], p2[1])
-	for x := road.Min.X-10; x < road.Max.X+10; x++ {
-		for y := road.Min.Y-10; y < road.Max.Y+10; y++ {
-			img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
+	if (math.Abs(float64(p2[0]-p1[0])) > 10 && math.Abs(float64(p2[1]-p1[1])) > 10) {
+		p3 := []int{(p1[0] + (p2[0] - p1[0])/2), (p1[1] + (p2[1] - p1[1])/2)}
+		drawLine(p1, p3, img)
+		drawLine(p3, p2, img)
+	} else {
+		road := image.Rect(p1[0], p1[1], p2[0], p2[1])
+		for x := road.Min.X-10; x < road.Max.X+10; x++ {
+			for y := road.Min.Y-10; y < road.Max.Y+10; y++ {
+				img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
+			}
 		}
 	}
 	/* x1 := p1[0]
