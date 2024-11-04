@@ -26,8 +26,11 @@ type OverpassResponse struct {
 	Elements []Element `json:"elements"`
 }
 
+const imgLength = 3600
+const scale = 4
+
 // Creates an array of roads: [road#][point#][x, y]
-func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int) [][][]int {
+func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int, lat int, lon int) [][][]int {
 	roads := [][][]int{}
 	c := float64(scale)
 	for i := range highways {
@@ -35,8 +38,8 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			y := int(math.Round((1 - (math.Abs(node.Lat) - 48)) * (c*length - c)))
-			x := int(math.Round((1 - (math.Abs(node.Lon) - 122)) * (c*length - c)))
+			y := int(math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (c * imgLength)))
+			x := int(math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (c * imgLength)))
 			index := []int{x, y}
 			tempRoad = append(tempRoad, index)
 		}
@@ -45,57 +48,59 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 	return roads
 }
 
-// Draws a rectangle between each set of points, if the diagonal distance 
+// Draws a rectangle between each set of points, if the diagonal distance
 // is too far, it cuts it into subrectangles
 func drawLine(p1 []int, p2 []int, img *image.Gray) {
-	if (math.Abs(float64(p2[0]-p1[0])) > 10 && math.Abs(float64(p2[1]-p1[1])) > 10) {
-		p3 := []int{(p1[0] + (p2[0] - p1[0])/2), (p1[1] + (p2[1] - p1[1])/2)}
+	if math.Abs(float64(p2[0]-p1[0])) > 10 && math.Abs(float64(p2[1]-p1[1])) > 10 {
+		p3 := []int{(p1[0] + (p2[0]-p1[0])/2), (p1[1] + (p2[1]-p1[1])/2)}
 		drawLine(p1, p3, img)
 		drawLine(p3, p2, img)
 	} else {
 		road := image.Rect(p1[0], p1[1], p2[0], p2[1])
-		for x := road.Min.X-10; x < road.Max.X+10; x++ {
-			for y := road.Min.Y-10; y < road.Max.Y+10; y++ {
-				img.SetGray(x, y, color.Gray{Y: math.MaxUint8})
+		for x := road.Min.X - 10; x < road.Max.X+10; x++ {
+			for y := road.Min.Y - 10; y < road.Max.Y+10; y++ {
+				img.SetGray(x, y, color.Gray{Y: 0})
 			}
 		}
 	}
 }
 
 func Itoa(n int) string {
-    if n == 0 {
-        return "0"
-    }
+	if n == 0 {
+		return "0"
+	}
 
-    sign := ""
-    if n < 0 {
-        sign = "-"
-        n = -n
-    }
+	sign := ""
+	if n < 0 {
+		sign = "-"
+		n = -n
+	}
 
-    q := ""
-    for n > 0 {
-        digits := n % 10
-        q = string(rune('0'+digits)) + q
-        n /= 10
-    }
+	q := ""
+	for n > 0 {
+		digits := n % 10
+		q = string(rune('0'+digits)) + q
+		n /= 10
+	}
 
-    return sign + q
+	return sign + q
 }
 
 func GenerateOsmPng(maps [][]int, targetDir string) error {
 	for i := range maps {
-		bounds  := "(" + Itoa(maps[i][0]) + "," + Itoa(maps[i][1]) + "," + Itoa(maps[i][0] + 1) + "," + Itoa(maps[i][1] + 1) + ");"
+		lat := maps[i][0]
+		lon := maps[i][1]
+		bounds := "(" + Itoa(lat) + "," + Itoa(lon) + "," + Itoa(lat+1) + "," + Itoa(lon+1) + ");"
 		// Make a request to Overpass API
 		query := `
 		[out:json];
 		(
-			way["highway"="motorway"]`+bounds+
-			`way["highway"="trunk"]`+bounds+
-			`way["highway"="primary"]`+bounds+
-			`way["highway"="secondary"]`+bounds+
-			`way["highway"="tertiary"]`+bounds+
-		`);
+			way["highway"="motorway"]` + bounds +
+			`way["highway"="trunk"]` + bounds +
+			`way["highway"="primary"]` + bounds +
+			`way["highway"="secondary"]` + bounds +
+			`way["highway"="tertiary"]` + bounds +
+			`);
 		(._;>;);
 		out body;
 		`
@@ -132,10 +137,14 @@ func GenerateOsmPng(maps [][]int, targetDir string) error {
 		}
 
 		// Turn the lat/lon to an arry of 3600 indexed float32
-		c := 2
-		roads := convertCoordsToPngIndex(highways, nodes, c)
+		roads := convertCoordsToPngIndex(highways, nodes, scale, lat, lon)
 
-		grayImage := image.NewGray(image.Rect(0, 0, c*length, c*length))
+		grayImage := image.NewGray(image.Rect(0, 0, scale*imgLength, scale*imgLength))
+		for x := 0; x < imgLength*scale; x++ {
+			for y := 0; y < imgLength*scale; y++ {
+				grayImage.SetGray(x, y, color.Gray{Y: 255})
+			}
+		}
 		for r := range roads {
 			road := roads[r]
 			for p := 0; p < len(road)-1; p++ {
