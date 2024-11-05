@@ -27,20 +27,20 @@ type OverpassResponse struct {
 }
 
 const imgLength = 3600
-const scale = 4
+const scale = 2
 
 // Creates an array of roads: [road#][point#][x, y]
-func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int, lat int, lon int) [][][]int {
-	roads := [][][]int{}
+func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int, lat int, lon int) [][]Point {
+	roads := [][]Point{}
 	c := float64(scale)
 	for i := range highways {
-		tempRoad := [][]int{}
+		tempRoad := []Point{}
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			y := int(math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (c * imgLength)))
-			x := int(math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (c * imgLength)))
-			index := []int{x, y}
+			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (c * imgLength))
+			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (c * imgLength))
+			index := Point{x, y}
 			tempRoad = append(tempRoad, index)
 		}
 		roads = append(roads, tempRoad)
@@ -48,21 +48,87 @@ func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 	return roads
 }
 
-// Draws a rectangle between each set of points, if the diagonal distance
-// is too far, it cuts it into subrectangles
-func drawLine(p1 []int, p2 []int, img *image.Gray) {
-	if math.Abs(float64(p2[0]-p1[0])) > 10 && math.Abs(float64(p2[1]-p1[1])) > 10 {
-		p3 := []int{(p1[0] + (p2[0]-p1[0])/2), (p1[1] + (p2[1]-p1[1])/2)}
-		drawLine(p1, p3, img)
-		drawLine(p3, p2, img)
-	} else {
-		road := image.Rect(p1[0], p1[1], p2[0], p2[1])
-		for x := road.Min.X - 10; x < road.Max.X+10; x++ {
-			for y := road.Min.Y - 10; y < road.Max.Y+10; y++ {
-				img.SetGray(x, y, color.Gray{Y: 0})
+// Point represents a 2D point with X and Y coordinates
+type Point struct {
+	X, Y float64
+}
+
+// DrawLine creates a new image and draws a black line between two points with specified width
+// Parameters:
+//   - start: starting point of the line
+//   - end: ending point of the line
+//   - width: width of the line in pixels
+//   - backgroundColor: background color of the image
+//
+// Returns:
+//   - *image.RGBA: the resulting image containing the drawn line
+func DrawLine(start, end Point, width float64, img *image.Gray) {
+	// Calculate line parameters
+	dx := end.X - start.X
+	dy := end.Y - start.Y
+	length := math.Sqrt(dx*dx + dy*dy)
+
+	// Normalize direction vector
+	if length > 0 {
+		dx /= length
+		dy /= length
+	}
+
+	// Calculate perpendicular vector for line thickness
+	perpX := -dy * (width / 2)
+	perpY := dx * (width / 2)
+
+	// Create corners of the thick line
+	corners := []Point{
+		{start.X + perpX, start.Y + perpY},
+		{start.X - perpX, start.Y - perpY},
+		{end.X - perpX, end.Y - perpY},
+		{end.X + perpX, end.Y + perpY},
+	}
+
+	// Draw filled polygon
+	drawFilledPolygon(img, corners, color.Black)
+}
+
+// drawFilledPolygon draws a filled polygon with the specified color
+func drawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
+	// Find bounding box
+	minX := points[0].X
+	minY := points[0].Y
+	maxX := points[0].X
+	maxY := points[0].Y
+
+	for _, p := range points {
+		minX = math.Min(minX, p.X)
+		minY = math.Min(minY, p.Y)
+		maxX = math.Max(maxX, p.X)
+		maxY = math.Max(maxY, p.Y)
+	}
+
+	// Check each pixel in the bounding box
+	for y := int(minY); y <= int(maxY); y++ {
+		for x := int(minX); x <= int(maxX); x++ {
+			if isPointInPolygon(float64(x), float64(y), points) {
+				img.Set(x, y, c)
 			}
 		}
 	}
+}
+
+// isPointInPolygon determines if a point is inside a polygon using ray casting algorithm
+func isPointInPolygon(x, y float64, points []Point) bool {
+	inside := false
+	j := len(points) - 1
+
+	for i := 0; i < len(points); i++ {
+		if ((points[i].Y > y) != (points[j].Y > y)) &&
+			(x < (points[j].X-points[i].X)*(y-points[i].Y)/(points[j].Y-points[i].Y)+points[i].X) {
+			inside = !inside
+		}
+		j = i
+	}
+
+	return inside
 }
 
 func Itoa(n int) string {
@@ -150,7 +216,7 @@ func GenerateOsmPng(maps [][]int, targetDir string) error {
 			for p := 0; p < len(road)-1; p++ {
 				p1 := road[p]
 				p2 := road[p+1]
-				drawLine(p1, p2, grayImage)
+				DrawLine(p1, p2, 8, grayImage)
 			}
 		}
 
