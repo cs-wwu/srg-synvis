@@ -77,5 +77,30 @@ func TestMakeApiRequest(t *testing.T) {
 
 }
 func TestIsPointInPolygon(t *testing.T) {
+	polygon := []processor.Point{{X: 0.0, Y: 0.0}, {X: 1.0, Y: 0.0}, {X: 1.0, Y: 1.0}, {X: 0.0, Y: 1.0}}
 
+	retA := processor.IsPointInPolygon(-1, -1, polygon)
+	if retA {
+		t.Errorf("ran on (-1, -1), wanted false, got true")
+	}
+
+	retB := processor.IsPointInPolygon(0, 0, polygon)
+	if !retB {
+		t.Errorf("ran on (0, 0), wanted true, got false")
+	}
+
+	retC := processor.IsPointInPolygon(0.5, 0.5, polygon)
+	if !retC {
+		t.Errorf("ran on (0.5, 0.5), wanted true, got false")
+	}
+
+	retD := processor.IsPointInPolygon(-1.0, 0.5, polygon)
+	if retD {
+		t.Errorf("ran on (-1.0, 0.5), wanted false, got true")
+	}
+
+	retF := processor.IsPointInPolygon(-1.0, 1.0, polygon)
+	if retF {
+		t.Errorf("ran on (-1.0, 1.0), wanted false got true")
+	}
 }
