@@ -43,7 +43,7 @@ type Application struct {
 const (
 	HGT_PATH         = "assets/maps/n48w123.hgt.png" // TODO hardcoded
 	FOV              = 60.0                          // Field Of View in Degrees
-	CULLING_INTERVAL = 1                             // Perform culling every x frames
+	CULLING_INTERVAL = 3                           // Perform culling every x frames
 	MAPS_PATH        = "assets/maps/"
 
 	WINDOW_HEIGHT = 480

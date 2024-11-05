@@ -99,7 +99,7 @@ func (app *Application) NextFrame() {
 	vk.DeviceWaitIdle(app.Context().Device())
 	
 	// Update the view frustum and visible chunks periodically
-	if app.frameCount%CULLING_INTERVAL == 0 {
+	if app.frameCount%CULLING_INTERVAL == 1 {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.updateVisibleChunks()
 	}

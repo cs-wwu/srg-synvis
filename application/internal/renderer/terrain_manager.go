@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"time"
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
@@ -139,6 +140,7 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 // FillBuffers updates GPU buffers with current geometry
 func (tm *TerrainManager) FillBuffers() {
+	startTime := time.Now()
 	if len(tm.chunks) == 0 {
 		return
 	}
@@ -200,6 +202,8 @@ func (tm *TerrainManager) FillBuffers() {
 	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
 	vk.Memcopy(pCommandData, commandData)
 	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
+
+	log.Printf("\n\nFillBuffers() took %v\n\n", time.Since(startTime))
 }
 
 // Intializes the ChunkManager buffers
@@ -227,26 +231,30 @@ func (tm *TerrainManager) InitBuffers() {
 
 // updateDrawCommands updates the draw commands for visible chunks
 func (tm *TerrainManager) updateDrawCommand() {
-	// First count total number of indices for all visible chunks
-	totalIndexCount := uint32(0)
+	startTime := time.Now()
+
+	// Pre-calculate total sizes to avoid reallocation
+	totalVertices := 0
+	totalIndices := 0
 	for _, chunk := range tm.orderedChunks {
 		chunkKey := ChunkKey(chunk.X, chunk.Z)
 		if tm.visibleChunks[chunkKey] {
-			totalIndexCount += uint32(len(chunk.indices))
+			totalVertices += len(chunk.vertices)
+			totalIndices += len(chunk.indices)
 		}
 	}
 
-	// Create a single draw command for all visible chunks
+	// Create single draw command
 	tm.drawCommand = DrawCommand{
-		IndexCount:    totalIndexCount,
+		IndexCount:    uint32(totalIndices),
 		InstanceCount: 1,
 		FirstIndex:    0,
 		VertexOffset:  0,
 		FirstInstance: 0,
 	}
 
-	// Update draw command buffer
-	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
+	// Update draw command buffer (can be static since it's small)
+	commandData := [20]byte{} // sizeof(DrawCommand) = 20
 	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
 	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
 	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
@@ -254,49 +262,50 @@ func (tm *TerrainManager) updateDrawCommand() {
 	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
 
 	var pCommandData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
-	vk.Memcopy(pCommandData, commandData)
+	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(20), 0, &pCommandData)
+	vk.Memcopy(pCommandData, commandData[:])
 	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
 
-	// Update buffers with vertex and index data for visible chunks
-	vertices := make([]Vertex, 0)
-	indices := make([]uint32, 0)
+	// Allocate exact buffer sizes once
+	vertexData := make([]byte, totalVertices*VertexSize)
+	indexData := make([]byte, totalIndices*4)
+
+	// Fill buffers directly without intermediate slices
 	vertexOffset := 0
+	indexOffset := 0
+	vertexCount := 0
 
-	// Collect vertices and indices from visible chunks
 	for _, chunk := range tm.orderedChunks {
-		chunkKey := ChunkKey(chunk.X, chunk.Z)
-		if tm.visibleChunks[chunkKey] {
-			// Add vertices
-			vertices = append(vertices, chunk.vertices...)
-
-			// Add indices with offset
-			for _, idx := range chunk.indices {
-				indices = append(indices, uint32(idx)+uint32(vertexOffset))
+		if tm.visibleChunks[ChunkKey(chunk.X, chunk.Z)] {
+			// Copy vertices directly to vertexData
+			for i, vertex := range chunk.vertices {
+				copy(vertexData[(vertexOffset+i)*VertexSize:], vertex.Data())
 			}
+
+			// Copy indices directly to indexData with offset
+			for _, idx := range chunk.indices {
+				binary.LittleEndian.PutUint32(indexData[indexOffset:], uint32(idx)+uint32(vertexCount))
+				indexOffset += 4
+			}
+
 			vertexOffset += len(chunk.vertices)
+			vertexCount += len(chunk.vertices)
 		}
 	}
 
 	// Update vertex buffer
-	vertexData := make([]byte, len(vertices)*VertexSize)
-	for i, vertex := range vertices {
-		copy(vertexData[i*VertexSize:], vertex.Data())
-	}
 	var pVertexData unsafe.Pointer
 	vk.MapMemory(*tm.device, tm.vertexMemory, 0, vk.DeviceSize(len(vertexData)), 0, &pVertexData)
 	vk.Memcopy(pVertexData, vertexData)
 	vk.UnmapMemory(*tm.device, tm.vertexMemory)
 
 	// Update index buffer
-	indexData := make([]byte, len(indices)*4)
-	for i, index := range indices {
-		binary.LittleEndian.PutUint32(indexData[i*4:], index)
-	}
 	var pIndexData unsafe.Pointer
 	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
 	vk.Memcopy(pIndexData, indexData)
 	vk.UnmapMemory(*tm.device, tm.indexMemory)
+
+	log.Printf("\n\nupdateDrawCommand() took %v\n\n", time.Since(startTime))
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
