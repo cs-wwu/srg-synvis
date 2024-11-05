@@ -231,8 +231,6 @@ func (tm *TerrainManager) InitBuffers() {
 
 // updateDrawCommands updates the draw commands for visible chunks
 func (tm *TerrainManager) updateDrawCommand() {
-	startTime := time.Now()
-
 	// Pre-calculate total sizes to avoid reallocation
 	totalVertices := 0
 	totalIndices := 0
@@ -304,8 +302,6 @@ func (tm *TerrainManager) updateDrawCommand() {
 	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
 	vk.Memcopy(pIndexData, indexData)
 	vk.UnmapMemory(*tm.device, tm.indexMemory)
-
-	log.Printf("\n\nupdateDrawCommand() took %v\n\n", time.Since(startTime))
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
