@@ -27,7 +27,7 @@ type OverpassResponse struct {
 }
 
 const imgLength = 3600
-const scale = 2
+const scale = 4
 
 // Creates an array of roads: [road#][point#][x, y]
 func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int, lat int, lon int) [][]Point {
@@ -58,10 +58,10 @@ type Point struct {
 //   - start: starting point of the line
 //   - end: ending point of the line
 //   - width: width of the line in pixels
-//   - backgroundColor: background color of the image
+//   - img: img to be drawn too
 //
-// Returns:
-//   - *image.RGBA: the resulting image containing the drawn line
+// Return:
+//   - updates img with the line drawn between two points
 func DrawLine(start, end Point, width float64, img *image.Gray) {
 	// Calculate line parameters
 	dx := end.X - start.X
@@ -153,6 +153,10 @@ func Itoa(n int) string {
 }
 
 func GenerateOsmPng(maps [][]int, targetDir string) error {
+	if maps == nil || targetDir == "" {
+		return fmt.Errorf("no maps or targetDir specified")
+	}
+
 	for i := range maps {
 		lat := maps[i][0]
 		lon := maps[i][1]
