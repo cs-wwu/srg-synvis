@@ -23,14 +23,18 @@ const (
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 
-	MAP_LENGTH = 3600
-	NUM_MAPS   = 2 // TODO change to 9 in final version? (after LOD)
+	MAP_LENGTH      = 3600
+	CHUNKS_PER_SIDE = 20
+	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
+	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
+	NUM_MAPS        = 2 // TODO: Adjust based on view distance
+	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
 
-	VERTICES_PER_MAP = (MAP_LENGTH + 1) * (MAP_LENGTH + 1)
-	INDICES_PER_MAP  = MAP_LENGTH*((MAP_LENGTH+1)*2+1) + MAP_LENGTH + 1
+	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
+	INDICES_PER_CHUNK  = 2*CHUNK_SIZE*(CHUNK_SIZE-1) + 2*((CHUNK_SIZE-1)-1)
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
 
@@ -44,7 +48,7 @@ type TerrainManager struct {
 	memProps *vk.PhysicalDeviceMemoryProperties
 
 	vertices []Vertex
-	indices  []uint32 // Identical to type Index
+	indices  []uint32
 
 	lastPosition lin.Vec3
 
@@ -55,18 +59,13 @@ type TerrainManager struct {
 	drawCommandBuffer vk.Buffer
 	drawCommandMemory vk.DeviceMemory
 
-	heightmaps map[string]*image.Gray16
-	watermaps  map[string]*image.Gray
-	mapData    map[string]*MapGeometry
+	heightmaps    map[string]*image.Gray16
+	watermaps     map[string]*image.Gray
+	chunks        map[string]*Chunk
+	visibleChunks map[string]bool
+	orderedChunks []*Chunk
 
 	drawCommand DrawCommand
-}
-
-type MapGeometry struct {
-	vertexOffset uint32
-	indexOffset  uint32
-	indexCount   uint32
-	mapX, mapZ   int
 }
 
 type DrawCommand struct {
@@ -90,110 +89,27 @@ func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
 
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
 	tm := &TerrainManager{
-		device:       device,
-		memProps:     memProps,
-		lastPosition: lin.Vec3{0.0, 0.0, 0.0},
-		heightmaps:   make(map[string]*image.Gray16, NUM_MAPS),
-		watermaps:    make(map[string]*image.Gray, NUM_MAPS),
-		mapData:      make(map[string]*MapGeometry),
-		drawCommand:  DrawCommand{},
+		device:        device,
+		memProps:      memProps,
+		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
+		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
+		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
+		chunks:        make(map[string]*Chunk),
+		visibleChunks: make(map[string]bool),
+		orderedChunks: make([]*Chunk, 0),
+		drawCommand:   DrawCommand{},
 	}
 
 	tm.InitBuffers()
-
 	return tm
-}
-
-// Generate vertices for a single heightmap
-func (tm *TerrainManager) generateVertices(heightmap *image.Gray16, watermap *image.Gray,
-	mapX, mapZ int) []Vertex {
-
-	vertices := make([]Vertex, (MAP_LENGTH+1)*(MAP_LENGTH+1))
-
-	for z := MAP_LENGTH; z >= 0; z-- {
-		worldZ := mapZ + z
-		for x := 0; x <= MAP_LENGTH; x++ {
-			worldX := mapX + x
-
-			pixelValue := heightmap.Gray16At(x, z).Y
-			height := float32(int(pixelValue) - 32768)
-			isWater := watermap.GrayAt(x, z).Y
-
-			idx := z*(MAP_LENGTH+1) + x
-			vertices[idx] = Vertex{
-				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
-				TexCoord: lin.Vec3{
-					float32(x) / float32(MAP_LENGTH),
-					float32(z) / float32(MAP_LENGTH),
-					float32(isWater),
-				},
-			}
-		}
-	}
-
-	return vertices
-}
-
-// Generate indices for a heightmap section (Triangle Strips)
-func (tm *TerrainManager) generateIndices(baseVertex uint32) []uint32 {
-	indices := make([]uint32, INDICES_PER_MAP)
-	idx := 0
-
-	primitiveRestartIndex := uint32(0xFFFFFFFF) // Special index for primitive restart
-
-	for z := 0; z < MAP_LENGTH; z++ {
-		// Add primitive restart index between ALL rows, including first
-		// This ensures no unwanted connections between heightmaps
-		indices[idx] = primitiveRestartIndex
-		idx++
-
-		// Generate strip for this row
-		for x := 0; x <= MAP_LENGTH; x++ {
-			topVertex := baseVertex + uint32(z*(MAP_LENGTH+1)+x)
-			bottomVertex := baseVertex + uint32((z+1)*(MAP_LENGTH+1)+x)
-
-			indices[idx] = topVertex
-			indices[idx+1] = bottomVertex
-			idx += 2
-		}
-	}
-
-	// Add a final primitive restart to ensure no connection to next heightmap
-	indices[idx] = primitiveRestartIndex
-	idx++
-
-	return indices[:idx] // Return only the indices we actually used
-}
-
-func (tm *TerrainManager) calculateNormals(vertices []Vertex, startIdx int) {
-	width := MAP_LENGTH + 1
-
-	for z := 0; z < MAP_LENGTH; z++ {
-		for x := 0; x < MAP_LENGTH; x++ {
-			idx := startIdx + z*width + x
-
-			// Get vertices for normal calculation
-			current := vertices[idx].Position
-			right := vertices[idx+1].Position
-			down := vertices[idx+width].Position
-
-			// Calculate normal using cross product
-			var normal, a, b lin.Vec3
-			a.Sub(&down, &current)
-			b.Sub(&right, &current)
-			normal.MultCross(&a, &b)
-			normal.Norm(&normal)
-
-			vertices[idx].Normal = normal
-		}
-	}
 }
 
 // LoadMap loads a heightmap and its associated watermap
 func (tm *TerrainManager) LoadMap(coord string) error {
 	fmt.Printf("Loading map: %s\n", coord)
+
 	// Skip if already loaded
-	if _, exists := tm.mapData[coord]; exists {
+	if _, exists := tm.heightmaps[coord]; exists {
 		return nil
 	}
 
@@ -205,33 +121,15 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		return err
 	}
 
+	// Generate chunks for this map
 	mapX, mapZ := CoordinateMapToInt(coord)
-
-	// Generate vertices for this map
-	fmt.Println("Generating Geometry...")
-	vertices := tm.generateVertices(tm.heightmaps[coord], tm.watermaps[coord], mapX, mapZ)
-	vertexOffset := uint32(len(tm.vertices))
-	tm.vertices = append(tm.vertices, vertices...)
-
-	// Generate indices for this map
-	indices := tm.generateIndices(vertexOffset)
-	indexOffset := uint32(len(tm.indices))
-	tm.indices = append(tm.indices, indices...)
-
-	// Calculate normals for the new vertices
-	tm.calculateNormals(tm.vertices, int(vertexOffset))
-
-	// Store map data
-	tm.mapData[coord] = &MapGeometry{
-		vertexOffset: vertexOffset,
-		indexOffset:  indexOffset,
-		indexCount:   uint32(len(indices)),
-		mapX:         mapX,
-		mapZ:         mapZ,
+	for x := 0; x < CHUNKS_PER_SIDE; x++ {
+		for z := 0; z < CHUNKS_PER_SIDE; z++ {
+			chunkX := mapX + x*CHUNK_SIZE
+			chunkZ := mapZ + z*CHUNK_SIZE
+			tm.LoadChunk(chunkX, chunkZ)
+		}
 	}
-
-	// Optimize the combined geometry
-	tm.optimizeGeometry()
 
 	// Update GPU buffers
 	tm.FillBuffers()
@@ -239,51 +137,29 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 	return nil
 }
 
-func (tm *TerrainManager) optimizeGeometry() {
-	if len(tm.vertices) == 0 {
-		return
-	}
-
-	tm.printGeometryStats("Before Strip Conversion")
-
-	// Calculate strip statistics, properly accounting for primitive restart indices
-	numRestartIndices := MAP_LENGTH // One per row except first
-	actualIndices := len(tm.indices) - numRestartIndices
-	numTriangles := actualIndices - 2 // In a strip, each new vertex after the first two creates one triangle
-
-	fmt.Printf("\nStrip Analysis:\n")
-	fmt.Printf("Total indices: %d\n", len(tm.indices))
-	fmt.Printf("Actual vertices used (excluding restarts): %d\n", actualIndices)
-	fmt.Printf("Triangles generated: %d\n", numTriangles)
-	fmt.Printf("Vertices per triangle: %.2f\n", float64(actualIndices)/float64(numTriangles))
-	fmt.Printf("Primitive restart indices: %d\n", numRestartIndices)
-
-	// For vertex fetch optimization, we need to create a temporary buffer without restart indices
-	// or skip optimization entirely since our grid is already optimally laid out
-	fmt.Println("\nSkipping vertex fetch optimization for strip format")
-
-	// Update draw command
-	tm.drawCommand = DrawCommand{
-		IndexCount:    uint32(len(tm.indices)),
-		InstanceCount: 1,
-		FirstIndex:    0,
-		VertexOffset:  0,
-		FirstInstance: 0,
-	}
-
-	tm.printGeometryStats("After Optimization")
-}
-
 // FillBuffers updates GPU buffers with current geometry
 func (tm *TerrainManager) FillBuffers() {
-	fmt.Println("Filling Buffers...")
-	if len(tm.vertices) == 0 || len(tm.indices) == 0 {
+	if len(tm.chunks) == 0 {
 		return
 	}
 
-	// Fill vertex buffer
-	vertexData := make([]byte, len(tm.vertices)*VertexSize)
-	for i, vertex := range tm.vertices {
+	// Collect all vertices and indices
+	var totalVertices []Vertex
+	var totalIndices []uint32
+
+	for _, chunk := range tm.orderedChunks {
+		totalVertices = append(totalVertices, chunk.vertices...)
+		for _, idx := range chunk.indices {
+			totalIndices = append(totalIndices, uint32(idx))
+		}
+	}
+
+	tm.vertices = totalVertices
+	tm.indices = totalIndices
+
+	// Update vertex buffer
+	vertexData := make([]byte, len(totalVertices)*VertexSize)
+	for i, vertex := range totalVertices {
 		copy(vertexData[i*VertexSize:], vertex.Data())
 	}
 
@@ -292,9 +168,9 @@ func (tm *TerrainManager) FillBuffers() {
 	vk.Memcopy(pVertexData, vertexData)
 	vk.UnmapMemory(*tm.device, tm.vertexMemory)
 
-	// Fill index buffer
-	indexData := make([]byte, len(tm.indices)*4)
-	for i, index := range tm.indices {
+	// Update index buffer
+	indexData := make([]byte, len(totalIndices)*4)
+	for i, index := range totalIndices {
 		binary.LittleEndian.PutUint32(indexData[i*4:], index)
 	}
 
@@ -302,6 +178,15 @@ func (tm *TerrainManager) FillBuffers() {
 	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
 	vk.Memcopy(pIndexData, indexData)
 	vk.UnmapMemory(*tm.device, tm.indexMemory)
+
+	// Update draw command
+	tm.drawCommand = DrawCommand{
+		IndexCount:    uint32(len(totalIndices)),
+		InstanceCount: 1,
+		FirstIndex:    0,
+		VertexOffset:  0,
+		FirstInstance: 0,
+	}
 
 	// Update draw command buffer
 	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
@@ -320,22 +205,98 @@ func (tm *TerrainManager) FillBuffers() {
 // Intializes the ChunkManager buffers
 func (tm *TerrainManager) InitBuffers() {
 	// Vertex buffer
-	vertexData := make([]byte, VERTICES_PER_MAP*VertexSize*NUM_MAPS)
+	maxVertices := MAX_CHUNKS * VERTICES_PER_CHUNK
+	vertexData := make([]byte, maxVertices*VertexSize)
 	vertexBuf := as.CreateBuffer(*tm.device, *tm.memProps, vertexData, BufferUsageVertexBufferBit)
 	tm.vertexBuffer = vertexBuf.Buffer
 	tm.vertexMemory = vertexBuf.Memory
 
 	// Index buffer
-	indexData := make([]byte, INDICES_PER_MAP*4*NUM_MAPS) // uint32 = 4 bytes
+	maxIndices := MAX_CHUNKS * INDICES_PER_CHUNK
+	indexData := make([]byte, maxIndices*4) // uint32 = 4 bytes
 	indexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
 	tm.indexBuffer = indexBuf.Buffer
 	tm.indexMemory = indexBuf.Memory
 
-	// Draw command buffer (single command)
+	// Draw command buffer
 	drawCommandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
 	drawCommandBuffer := as.CreateBuffer(*tm.device, *tm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
 	tm.drawCommandBuffer = drawCommandBuffer.Buffer
 	tm.drawCommandMemory = drawCommandBuffer.Memory
+}
+
+// updateDrawCommands updates the draw commands for visible chunks
+func (tm *TerrainManager) updateDrawCommand() {
+	// First count total number of indices for all visible chunks
+	totalIndexCount := uint32(0)
+	for _, chunk := range tm.orderedChunks {
+		chunkKey := ChunkKey(chunk.X, chunk.Z)
+		if tm.visibleChunks[chunkKey] {
+			totalIndexCount += uint32(len(chunk.indices))
+		}
+	}
+
+	// Create a single draw command for all visible chunks
+	tm.drawCommand = DrawCommand{
+		IndexCount:    totalIndexCount,
+		InstanceCount: 1,
+		FirstIndex:    0,
+		VertexOffset:  0,
+		FirstInstance: 0,
+	}
+
+	// Update draw command buffer
+	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
+	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
+	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
+	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
+	binary.LittleEndian.PutUint32(commandData[12:], uint32(tm.drawCommand.VertexOffset))
+	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
+
+	var pCommandData unsafe.Pointer
+	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
+	vk.Memcopy(pCommandData, commandData)
+	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
+
+	// Update buffers with vertex and index data for visible chunks
+	vertices := make([]Vertex, 0)
+	indices := make([]uint32, 0)
+	vertexOffset := 0
+
+	// Collect vertices and indices from visible chunks
+	for _, chunk := range tm.orderedChunks {
+		chunkKey := ChunkKey(chunk.X, chunk.Z)
+		if tm.visibleChunks[chunkKey] {
+			// Add vertices
+			vertices = append(vertices, chunk.vertices...)
+
+			// Add indices with offset
+			for _, idx := range chunk.indices {
+				indices = append(indices, uint32(idx)+uint32(vertexOffset))
+			}
+			vertexOffset += len(chunk.vertices)
+		}
+	}
+
+	// Update vertex buffer
+	vertexData := make([]byte, len(vertices)*VertexSize)
+	for i, vertex := range vertices {
+		copy(vertexData[i*VertexSize:], vertex.Data())
+	}
+	var pVertexData unsafe.Pointer
+	vk.MapMemory(*tm.device, tm.vertexMemory, 0, vk.DeviceSize(len(vertexData)), 0, &pVertexData)
+	vk.Memcopy(pVertexData, vertexData)
+	vk.UnmapMemory(*tm.device, tm.vertexMemory)
+
+	// Update index buffer
+	indexData := make([]byte, len(indices)*4)
+	for i, index := range indices {
+		binary.LittleEndian.PutUint32(indexData[i*4:], index)
+	}
+	var pIndexData unsafe.Pointer
+	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
+	vk.Memcopy(pIndexData, indexData)
+	vk.UnmapMemory(*tm.device, tm.indexMemory)
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
@@ -424,16 +385,4 @@ func (tm *TerrainManager) Destroy() {
 	// Cleanup draw command buffer - this was missing
 	vk.DestroyBuffer(*tm.device, tm.drawCommandBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.drawCommandMemory, nil)
-}
-
-func (tm *TerrainManager) printGeometryStats(label string) {
-	vertexSizeMB := float64(len(tm.vertices)*VertexSize) / (1024 * 1024)
-	indexSizeMB := float64(len(tm.indices)*4) / (1024 * 1024) // uint32 = 4 bytes
-	totalSizeMB := vertexSizeMB + indexSizeMB
-
-	fmt.Printf("\n=== Geometry Stats (%s) ===\n", label)
-	fmt.Printf("Vertices: %d (%.2f MB)\n", len(tm.vertices), vertexSizeMB)
-	fmt.Printf("Indices: %d (%.2f MB)\n", len(tm.indices), indexSizeMB)
-	fmt.Printf("Total Size: %.2f MB\n", totalSizeMB)
-	fmt.Printf("==========================\n\n")
 }

@@ -8,7 +8,6 @@ import (
 
 	as "github.com/cs-wwu/srg-synvis/asche"
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
-	mo "github.com/cs-wwu/srg-synvis/meshopt/meshoptimizer"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	// as "github.com/vulkan-go/asche"
@@ -24,8 +23,6 @@ func init() {
 }
 
 func main() {
-	log.Printf("MESHOPT VERSION: %d\n", mo.VERSION)
-
 	orPanic(glfw.Init())
 	vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
 	orPanic(vk.Init())
