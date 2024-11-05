@@ -62,7 +62,7 @@ type Point struct {
 //
 // Return:
 //   - updates img with the line drawn between two points
-func DrawLine(start, end Point, width float64, img *image.Gray) {
+func drawLine(start, end Point, width float64, img *image.Gray) {
 	// Calculate line parameters
 	dx := end.X - start.X
 	dy := end.Y - start.Y
@@ -131,7 +131,7 @@ func isPointInPolygon(x, y float64, points []Point) bool {
 	return inside
 }
 
-func Itoa(n int) string {
+func itoa(n int) string {
 	if n == 0 {
 		return "0"
 	}
@@ -152,62 +152,95 @@ func Itoa(n int) string {
 	return sign + q
 }
 
+//Make an api request to overpass-api, process the data into and overpassResponse data type
+func makeApiRequest(maps []int) (OverpassResponse, error) {
+	lat := maps[0]
+	lon := maps[1]
+	bounds := "(" + itoa(lat) + "," + itoa(lon) + "," + itoa(lat+1) + "," + itoa(lon+1) + ");"
+	query := `
+	[out:json];
+	(
+		way["highway"="motorway"]` + bounds +
+		`way["highway"="trunk"]` + bounds +
+		`way["highway"="primary"]` + bounds +
+		`way["highway"="secondary"]` + bounds +
+		`way["highway"="tertiary"]` + bounds +
+		`);
+	(._;>;);
+	out body;
+	`
+
+	var osmData OverpassResponse
+	resp, err := http.Post("http://overpass-api.de/api/interpreter", "application/x-www-form-urlencoded", strings.NewReader("data="+query))
+	if err != nil {
+		return osmData, fmt.Errorf("error: %e", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return osmData, fmt.Errorf("error reading response: %e", err)
+	}
+
+	// Parse JSON response
+	
+	err = json.Unmarshal(body, &osmData)
+	if err != nil {
+		return osmData, fmt.Errorf("error unmarshaling JSON: %e", err)
+	}
+
+	return osmData, nil
+}
+
+func coordToString(lat, lon int) string {
+	ret := ""
+	if lat > 0 {
+		ret += "n"
+		ret += itoa(lat)
+	} else {
+		ret += "s"
+		ret += itoa(-1*lat)
+	}
+
+	if lon > 0 {
+		ret += "e"
+		ret += itoa(lon)
+	} else {
+		ret += "w"
+		ret += itoa(-1*lon)
+	}
+
+	return ret
+}
+
 func GenerateOsmPng(maps [][]int, targetDir string) error {
 	if maps == nil || targetDir == "" {
 		return fmt.Errorf("no maps or targetDir specified")
 	}
 
 	for i := range maps {
-		lat := maps[i][0]
-		lon := maps[i][1]
-		bounds := "(" + Itoa(lat) + "," + Itoa(lon) + "," + Itoa(lat+1) + "," + Itoa(lon+1) + ");"
-		// Make a request to Overpass API
-		query := `
-		[out:json];
-		(
-			way["highway"="motorway"]` + bounds +
-			`way["highway"="trunk"]` + bounds +
-			`way["highway"="primary"]` + bounds +
-			`way["highway"="secondary"]` + bounds +
-			`way["highway"="tertiary"]` + bounds +
-			`);
-		(._;>;);
-		out body;
-		`
-		resp, err := http.Post("http://overpass-api.de/api/interpreter", "application/x-www-form-urlencoded", strings.NewReader("data="+query))
-		if err != nil {
-			return fmt.Errorf("error: %e", err)
-		}
-		defer resp.Body.Close()
 
-		body, err := io.ReadAll(resp.Body)
+		osmData, err := makeApiRequest(maps[i])
 		if err != nil {
-			return fmt.Errorf("error reading response: %e", err)
-		}
-
-		// Parse JSON response
-		var osmData OverpassResponse
-		err = json.Unmarshal(body, &osmData)
-		if err != nil {
-			return fmt.Errorf("error unmarshaling JSON: %e", err)
+			return err
 		}
 
 		// Filter the data to keep only relevant highways
 		var highways []Element
 		nodes := make(map[int64]Element)
 
-		for _, element := range osmData.Elements {
-			if element.Type == "way" && element.Tags["highway"] != "" {
+		for _, Element := range osmData.Elements {
+			if Element.Type == "way" && Element.Tags["highway"] != "" {
 				// Keep only highway elements (ways)
-				highways = append(highways, element)
-			} else if element.Type == "node" {
+				highways = append(highways, Element)
+			} else if Element.Type == "node" {
 				// Store nodes in a map for easy access by ID
-				nodes[element.ID] = element
+				nodes[Element.ID] = Element
 			}
 		}
 
 		// Turn the lat/lon to an arry of 3600 indexed float32
-		roads := convertCoordsToPngIndex(highways, nodes, scale, lat, lon)
+		roads := convertCoordsToPngIndex(highways, nodes, scale, maps[i][0], maps[i][1])
 
 		grayImage := image.NewGray(image.Rect(0, 0, scale*imgLength, scale*imgLength))
 		for x := 0; x < imgLength*scale; x++ {
@@ -215,15 +248,17 @@ func GenerateOsmPng(maps [][]int, targetDir string) error {
 				grayImage.SetGray(x, y, color.Gray{Y: 255})
 			}
 		}
+		
 		for r := range roads {
 			road := roads[r]
 			for p := 0; p < len(road)-1; p++ {
 				p1 := road[p]
 				p2 := road[p+1]
-				DrawLine(p1, p2, 8, grayImage)
+				drawLine(p1, p2, 8, grayImage)
 			}
 		}
 
+		bounds := coordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
 		pngFile, err := os.Create(pngFilepath)
 		if err != nil {
