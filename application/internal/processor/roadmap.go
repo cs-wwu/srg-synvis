@@ -27,10 +27,17 @@ type OverpassResponse struct {
 }
 
 const imgLength = 3600
-const scale = 4
+const scale = 1.5
+var widths = map[string]float64 {
+	"motorway": 8,
+	"trunk": 6,
+	"primary": 4,
+	"secondary": 2,
+	"tertiary": 1,
+}
 
 // Creates an array of roads: [road#][point#][x, y]
-func convertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale int, lat int, lon int) [][]Point {
+func ConvertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale float32, lat int, lon int) [][]Point {
 	roads := [][]Point{}
 	c := float64(scale)
 	for i := range highways {
@@ -62,7 +69,7 @@ type Point struct {
 //
 // Return:
 //   - updates img with the line drawn between two points
-func drawLine(start, end Point, width float64, img *image.Gray) {
+func DrawLine(start, end Point, width float64, img *image.Gray) {
 	// Calculate line parameters
 	dx := end.X - start.X
 	dy := end.Y - start.Y
@@ -87,11 +94,11 @@ func drawLine(start, end Point, width float64, img *image.Gray) {
 	}
 
 	// Draw filled polygon
-	drawFilledPolygon(img, corners, color.Black)
+	DrawFilledPolygon(img, corners, color.Black)
 }
 
 // drawFilledPolygon draws a filled polygon with the specified color
-func drawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
+func DrawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
 	// Find bounding box
 	minX := points[0].X
 	minY := points[0].Y
@@ -108,7 +115,7 @@ func drawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
 	// Check each pixel in the bounding box
 	for y := int(minY); y <= int(maxY); y++ {
 		for x := int(minX); x <= int(maxX); x++ {
-			if isPointInPolygon(float64(x), float64(y), points) {
+			if IsPointInPolygon(float64(x), float64(y), points) {
 				img.Set(x, y, c)
 			}
 		}
@@ -116,7 +123,7 @@ func drawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
 }
 
 // isPointInPolygon determines if a point is inside a polygon using ray casting algorithm
-func isPointInPolygon(x, y float64, points []Point) bool {
+func IsPointInPolygon(x, y float64, points []Point) bool {
 	inside := false
 	j := len(points) - 1
 
@@ -131,7 +138,7 @@ func isPointInPolygon(x, y float64, points []Point) bool {
 	return inside
 }
 
-func itoa(n int) string {
+func Itoa(n int) string {
 	if n == 0 {
 		return "0"
 	}
@@ -153,10 +160,10 @@ func itoa(n int) string {
 }
 
 //Make an api request to overpass-api, process the data into and overpassResponse data type
-func makeApiRequest(maps []int) (OverpassResponse, error) {
+func MakeApiRequest(maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
-	bounds := "(" + itoa(lat) + "," + itoa(lon) + "," + itoa(lat+1) + "," + itoa(lon+1) + ");"
+	bounds := "(" + Itoa(lat) + "," + Itoa(lon) + "," + Itoa(lat+1) + "," + Itoa(lon+1) + ");"
 	query := `
 	[out:json];
 	(
@@ -192,25 +199,40 @@ func makeApiRequest(maps []int) (OverpassResponse, error) {
 	return osmData, nil
 }
 
-func coordToString(lat, lon int) string {
+func CoordToString(lat, lon int) string {
 	ret := ""
 	if lat > 0 {
 		ret += "n"
-		ret += itoa(lat)
+		ret += Itoa(lat)
 	} else {
 		ret += "s"
-		ret += itoa(-1*lat)
+		ret += Itoa(-1*lat)
 	}
 
 	if lon > 0 {
 		ret += "e"
-		ret += itoa(lon)
+		ret += Itoa(lon)
 	} else {
 		ret += "w"
-		ret += itoa(-1*lon)
+		ret += Itoa(-1*lon)
 	}
 
 	return ret
+}
+
+func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.Gray, roadType string) {
+	// Turn the lat/lon to an arry of 3600 indexed float32
+	roads := ConvertCoordsToPngIndex(ways, nodes, scale, coords[0], coords[1])
+
+	// Connect all the points
+	for r := range roads {
+		road := roads[r]
+		for p := 0; p < len(road)-1; p++ {
+			p1 := road[p]
+			p2 := road[p+1]
+			DrawLine(p1, p2, widths[roadType], grayImage)
+		}
+	}
 }
 
 func GenerateOsmPng(maps [][]int, targetDir string) error {
@@ -220,45 +242,49 @@ func GenerateOsmPng(maps [][]int, targetDir string) error {
 
 	for i := range maps {
 
-		osmData, err := makeApiRequest(maps[i])
+		osmData, err := MakeApiRequest(maps[i])
 		if err != nil {
 			return err
 		}
 
 		// Filter the data to keep only relevant highways
-		var highways []Element
+		var motorways, trunks, primaries, secondaries, tertiaries []Element
 		nodes := make(map[int64]Element)
 
 		for _, Element := range osmData.Elements {
-			if Element.Type == "way" && Element.Tags["highway"] != "" {
-				// Keep only highway elements (ways)
-				highways = append(highways, Element)
+			// Sorts the roads based on type, and stores the nodes in a map for easy access by ID
+			if Element.Type == "way" && Element.Tags["highway"] == "motorway" {
+				motorways = append(motorways, Element)
+			} else if Element.Type == "way" && Element.Tags["highway"] == "trunk" {
+				trunks = append(trunks, Element)
+			} else if Element.Type == "way" && Element.Tags["highway"] == "primary" {
+				primaries = append(primaries, Element)
+			} else if Element.Type == "way" && Element.Tags["highway"] == "secondary" {
+				secondaries = append(secondaries, Element)
+			} else if Element.Type == "way" && Element.Tags["highway"] == "tertiary" {
+				tertiaries = append(tertiaries, Element)   
 			} else if Element.Type == "node" {
-				// Store nodes in a map for easy access by ID
 				nodes[Element.ID] = Element
 			}
 		}
 
-		// Turn the lat/lon to an arry of 3600 indexed float32
-		roads := convertCoordsToPngIndex(highways, nodes, scale, maps[i][0], maps[i][1])
-
+		// Generate an all white PNG
 		grayImage := image.NewGray(image.Rect(0, 0, scale*imgLength, scale*imgLength))
 		for x := 0; x < imgLength*scale; x++ {
 			for y := 0; y < imgLength*scale; y++ {
 				grayImage.SetGray(x, y, color.Gray{Y: 255})
 			}
 		}
-		
-		for r := range roads {
-			road := roads[r]
-			for p := 0; p < len(road)-1; p++ {
-				p1 := road[p]
-				p2 := road[p+1]
-				drawLine(p1, p2, 8, grayImage)
-			}
-		}
 
-		bounds := coordToString(maps[i][0], maps[i][1])
+		// Draw each set of roads
+		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway")
+		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk")
+		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
+		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary")
+		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary")
+		
+
+		bounds := CoordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
 		pngFile, err := os.Create(pngFilepath)
 		if err != nil {
