@@ -64,14 +64,22 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [x] Attempt Rendering of more than one heightmap
 - [x] Begin Implementation Unit and Integration Testing
 - [x] Re-Work Frustum Culling with ChunkManager
-- [ ] Look at feasiblity of https://github.com/zeux/meshoptimizer
-  - [ ] If it looks good, create CGo bindings
-  - [ ] Redo ChunkManager with meshoptimizer
-  - [ ] Work in ChunkManager LODs with meshoptimizer
-  - [ ] GPU Crashing?
-- [ ] Add LODs with ChunkManager
+- [x] Look at feasiblity of https://github.com/zeux/meshoptimizer
+  - [x] If it looks good, create CGo bindings
+  - [x] Redo ChunkManager with meshoptimizer
+  - [ ] Reduce memory overhead from TerrainManager (back to triangle strips?)
+  - [ ] Work in TerrainManager LODs with meshoptimizer
+- [x] Fork `asche`:
+  - [x] Allow for Physical Device Feature Settings (`vk.MultiDrawIndirect`)
+  - [x] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
+  - [ ] Use the forked `asche` to allow for UI implementation?
+- [x] Find and fix all validation layer issues
+  - [x] Fix Main validation layer issues
+  - [ ] Fix on-close validation layer issues
+- [x] Find and fix GPU hanging
 - [ ] Make Map and chunk rendering dynamic based on position
 - [ ] Rework Main method to not use ticker-based system
-- [ ] Change Camera to use Quaternions
-- [ ] Re-implement UI (try to use original `asche`?)
-- [ ] Find and fix GPU hanging (LODs)?
+- [ ] Change Camera to use Quaternions (sensors?)
+
+- [ ] Eventually remove local `asche` copy (public repo)
+- [ ] Eventually remove local `meshopt` copy (public repo)

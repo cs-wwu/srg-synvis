@@ -6,7 +6,9 @@ import (
 	"log"
 	"unsafe"
 
-	as "github.com/vulkan-go/asche"
+	as "github.com/cs-wwu/srg-synvis/asche"
+
+	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -35,6 +37,7 @@ func (app *Application) VulkanLayers() []string {
 		// "VK_LAYER_LUNARG_api_dump",
 		// "VK_LAYER_LUNARG_swapchain",
 		// "VK_LAYER_GOOGLE_unique_objects",
+		"VK_LAYER_KHRONOS_validation", // TODO remove validation layers in prod
 	}
 }
 
@@ -58,6 +61,25 @@ func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
 	extensions = append(extensions, "VK_EXT_debug_report") // TODO: Remove if no debug
 	return extensions
+}
+
+func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
+	return []vk.PhysicalDeviceFeatures{
+		{
+			//  MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
+		},
+	}
+}
+
+func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.CommandPoolCreateInfo {
+	return vk.CommandPoolCreateInfo{
+		SType:            vk.StructureTypeCommandPoolCreateInfo,
+		QueueFamilyIndex: queueFamilyIndex,
+		Flags: vk.CommandPoolCreateFlags(
+			vk.CommandPoolCreateResetCommandBufferBit |
+				vk.CommandPoolCreateTransientBit, // Transient Command Buffers?
+		),
+	}
 }
 
 // Initialize the Uniform Buffer Object
@@ -290,7 +312,7 @@ func (app *Application) prepareTextures() {
 			app.setImageLayout(tex.image, TextureImageAspect,
 				TextureImageLayoutPreinitialized, tex.imageLayout,
 				TextureAccessHostWriteBit,
-				TexturePipelineStageTopOfPipeBit, TexturePipelineStageFragmentShaderBit)
+				TexturePipelineStageHostBit, TexturePipelineStageFragmentShaderBit)
 
 		} else if props.OptimalTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureSampledImageBit) != 0 {
 			//  Must use staging buffer to copy linear texture to optimized
@@ -723,12 +745,11 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Testing for loading all maps and chunks
 	// Update the last position so that we load the map
-	app.ChunkManager = NewChunkManager(&dev, &memProps)
-	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
-	app.ChunkManager.LoadChunks()
-	app.ChunkManager.FillBuffers()
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	app.TerrainManager = NewTerrainManager(&dev, &memProps)
+	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
+	app.TerrainManager.FillBuffers()
+	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
+	// app.updateVisibleChunks()
 
 	app.prepareUniformBuffers() // need to be called after loadhm()
 	app.prepareDescriptorLayout()
