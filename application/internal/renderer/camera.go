@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 	"math"
-	// "os/exec"
-	// "io"
+	"os/exec"
+	"io"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
@@ -104,43 +104,48 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 		gps.Close()		
 }
 
+func trySense() {
+	cmd := exec.Command("python3", "./internal/renderer/hello.py")
+	// Create a pipe for standard output
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Println("Error creating stdout pipe:", err)
+		return
+	}
+	// Start the command
+	err = cmd.Start()
+	if err != nil {
+		fmt.Println("Error starting command:", err)
+		return
+	}
+	// Read the output from the pipe
+	output, err := io.ReadAll(stdout)
+	if err != nil {
+		fmt.Println("Error reading output:", err)
+		return
+	}
+	// Print the output
+	fmt.Println("output " + string(output))
+	// Wait for the command to finish
+	err = cmd.Wait()
+	if err != nil {
+		fmt.Println("Error waiting for command:", err)
+		return
+	}
+}
+
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
 func (c *Camera) ProcessInput(window *glfw.Window) {
-	go trygps()
-	newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
-	(*c.Pos)[0] = newX
-	(*c.Pos)[2] = newZ
+	// go trygps()
+	// newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
+	// (*c.Pos)[0] = newX
+	// (*c.Pos)[2] = newZ
 	if window.GetAttrib(glfw.Focused) == glfw.True {
-		// cmd := exec.Command("python3", "./internal/renderer/hello.py")
-		// Create a pipe for standard output
-		// stdout, err := cmd.StdoutPipe()
-		// if err != nil {
-		// 	fmt.Println("Error creating stdout pipe:", err)
-		// 	return
-		// }
-		// // Start the command
-		// err = cmd.Start()
-		// if err != nil {
-		// 	fmt.Println("Error starting command:", err)
-		// 	return
-		// }
-		// // Read the output from the pipe
-		// output, err := io.ReadAll(stdout)
-		// if err != nil {
-		// 	fmt.Println("Error reading output:", err)
-		// 	return
-		// }
-		// // Print the output
-		// fmt.Println("output " + string(output))
-		// // Wait for the command to finish
-		// err = cmd.Wait()
-		// if err != nil {
-		// 	fmt.Println("Error waiting for command:", err)
-		// 	return
-		// }
+
+		go trySense()
 
 		tmp := lin.Vec3{}
 
