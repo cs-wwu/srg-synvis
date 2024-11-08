@@ -147,28 +147,37 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 func (tm *TerrainManager) HasCrossedThreshold(new lin.Vec3) bool {
 	dx := math.Abs(float64(new[0] - tm.lastPosition[0]))
+	dy := math.Abs(float64(new[1] - tm.lastPosition[1]))
 	dz := math.Abs(float64(new[2] - tm.lastPosition[2]))
 
-	return dx >= LOD_DISTANCE_THRESHOLD || dz >= LOD_DISTANCE_THRESHOLD
+	// Calculate 3D distance
+	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+	return dist >= LOD_DISTANCE_THRESHOLD
 }
 
-// add LOD selection based on distance
 func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3) LODLevel {
-	// Calculate distance from camera to chunk center
+	// Calculate chunk center position
 	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
 	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
 
-	dx := chunkCenterX - cameraPos[0]
-	dz := chunkCenterZ - cameraPos[2]
-	distSq := dx*dx + dz*dz
+	// Calculate average height for chunk center (or use actual terrain height if available)
+	// For now, using camera Y directly since terrain height might be complex to calculate
+	chunkCenterY := float32(0.0) // This could be refined based on actual terrain height
 
-	// Select LOD based on distance
+	// Calculate 3D distance
+	dx := chunkCenterX - cameraPos[0]
+	dy := chunkCenterY - cameraPos[1]
+	dz := chunkCenterZ - cameraPos[2]
+	dist3DSq := dx*dx + dy*dy + dz*dz
+
+	// Updated thresholds for 3D distance
+	// Square root of previous values to maintain similar visual transitions
 	switch {
-	case distSq < 180_000: // ~424 units away
+	case dist3DSq < 240_000: // ~490 units away (including height)
 		return LOD_0
-	case distSq < 720_000: // ~849 units away
+	case dist3DSq < 960_000: // ~980 units away
 		return LOD_1
-	case distSq < 2_880_000: // ~1697 units away
+	case dist3DSq < 3_840_000: // ~1960 units away
 		return LOD_2
 	default:
 		return LOD_3
