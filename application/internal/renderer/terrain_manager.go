@@ -77,7 +77,7 @@ type DrawCommand struct {
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
-	if tm.lastPosition[0] == 0.0 { // TODO Make dynamic based on location
+	if len(tm.chunks) == 0 { // TODO Make dynamic based on location
 		tm.LoadMap("n48w123")
 		// tm.LoadMap("n48w122")
 		// tm.LoadMap("n47w123")
@@ -131,10 +131,40 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
+	sizes := make([]int, 4)
+	for _, chunk := range tm.chunks {
+		sizes[chunk.lodLevel]++
+	}
+
+	log.Printf("\n%v\n\n", sizes)
+
 	// Update GPU buffers
 	tm.FillBuffers()
 
 	return nil
+}
+
+// add LOD selection based on distance
+func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3) LODLevel {
+	// Calculate distance from camera to chunk center
+	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
+	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
+
+	dx := chunkCenterX - cameraPos[0]
+	dz := chunkCenterZ - cameraPos[2]
+	distSq := dx*dx + dz*dz
+
+	// Select LOD based on distance
+	switch {
+	case distSq < 180_000: // ~424 units away
+		return LOD_0
+	case distSq < 720_000: // ~849 units away
+		return LOD_1
+	case distSq < 2_880_000: // ~1697 units away
+		return LOD_2
+	default:
+		return LOD_3
+	}
 }
 
 // FillBuffers updates GPU buffers with current geometry
