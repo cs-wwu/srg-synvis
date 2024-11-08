@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"unsafe"
 
@@ -27,7 +28,7 @@ const (
 	CHUNKS_PER_SIDE = 20
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
-	NUM_MAPS        = 2 // TODO: Adjust based on view distance
+	NUM_MAPS        = 2 // TODO: Figure it out better
 	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
@@ -39,7 +40,7 @@ const (
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
 
 	LOD_LEVELS             = 3
-	LOD_DISTANCE_THRESHOLD = 500.0
+	LOD_DISTANCE_THRESHOLD = CHUNK_SIZE * 2
 )
 
 // A single TerrainManager to manage load/unloading images and chunks
@@ -50,7 +51,8 @@ type TerrainManager struct {
 	vertices []Vertex
 	indices  []uint32
 
-	lastPosition lin.Vec3
+	lastPosition  lin.Vec3
+	lastUpdatePos lin.Vec3
 
 	vertexBuffer      vk.Buffer
 	vertexMemory      vk.DeviceMemory
@@ -77,14 +79,14 @@ type DrawCommand struct {
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
-	if len(tm.chunks) == 0 { // TODO Make dynamic based on location
+	if tm.HasCrossedThreshold(pos) { // TODO Make dynamic based on location
+		tm.lastPosition = pos
 		tm.LoadMap("n48w123")
 		// tm.LoadMap("n48w122")
 		// tm.LoadMap("n47w123")
 		// tm.LoadMap("n47w122")
 		log.Printf("Updating camera position to %v\n", pos)
 	}
-	tm.lastPosition = pos
 }
 
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
@@ -108,17 +110,15 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 func (tm *TerrainManager) LoadMap(coord string) error {
 	log.Printf("Loading map: %s\n", coord)
 
-	// Skip if already loaded
-	if _, exists := tm.heightmaps[coord]; exists {
-		return nil
-	}
-
-	// Load heightmap and watermap
-	if err := tm.LoadHeightmap(coord); err != nil {
-		return err
-	}
-	if err := tm.LoadWatermap(coord); err != nil {
-		return err
+	// Skip heightmaps if already loaded
+	if _, exists := tm.heightmaps[coord]; !exists {
+		// Load heightmap and watermap
+		if err := tm.LoadHeightmap(coord); err != nil {
+			return err
+		}
+		if err := tm.LoadWatermap(coord); err != nil {
+			return err
+		}
 	}
 
 	// Generate chunks for this map
@@ -131,17 +131,25 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
+	// TODO remove lod calculation
 	sizes := make([]int, 4)
 	for _, chunk := range tm.chunks {
 		sizes[chunk.lodLevel]++
 	}
 
-	log.Printf("\n%v\n\n", sizes)
+	log.Printf("\nLOD sizes: %v\n\n", sizes)
 
 	// Update GPU buffers
 	tm.FillBuffers()
 
 	return nil
+}
+
+func (tm *TerrainManager) HasCrossedThreshold(new lin.Vec3) bool {
+	dx := math.Abs(float64(new[0] - tm.lastPosition[0]))
+	dz := math.Abs(float64(new[2] - tm.lastPosition[2]))
+
+	return dx >= LOD_DISTANCE_THRESHOLD || dz >= LOD_DISTANCE_THRESHOLD
 }
 
 // add LOD selection based on distance

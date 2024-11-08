@@ -47,12 +47,14 @@ func (tm *TerrainManager) LoadChunk(chunkX, chunkZ int) {
 		return
 	}
 
+	lodlevel := tm.selectLODLevel(chunkX, chunkZ, tm.lastPosition)
 	chunkKey := ChunkKey(chunkX, chunkZ)
-	if _, exists := tm.chunks[chunkKey]; exists {
+	_, exists := tm.chunks[chunkKey]
+
+	// Skip loading if it exists and the lodLevel's are the same
+	if exists && (lodlevel == tm.chunks[chunkKey].lodLevel) {
 		return
 	}
-
-	lodlevel := tm.selectLODLevel(chunkX, chunkZ, tm.lastPosition)
 
 	chunk := &Chunk{
 		X:        chunkX,
