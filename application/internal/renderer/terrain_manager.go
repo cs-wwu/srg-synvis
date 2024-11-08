@@ -7,7 +7,6 @@ import (
 	"image/png"
 	"log"
 	"os"
-	"time"
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
@@ -107,7 +106,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 
 // LoadMap loads a heightmap and its associated watermap
 func (tm *TerrainManager) LoadMap(coord string) error {
-	fmt.Printf("Loading map: %s\n", coord)
+	log.Printf("Loading map: %s\n", coord)
 
 	// Skip if already loaded
 	if _, exists := tm.heightmaps[coord]; exists {
@@ -140,7 +139,6 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 // FillBuffers updates GPU buffers with current geometry
 func (tm *TerrainManager) FillBuffers() {
-	startTime := time.Now()
 	if len(tm.chunks) == 0 {
 		return
 	}
@@ -202,8 +200,6 @@ func (tm *TerrainManager) FillBuffers() {
 	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
 	vk.Memcopy(pCommandData, commandData)
 	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
-
-	log.Printf("\n\nFillBuffers() took %v\n\n", time.Since(startTime))
 }
 
 // Intializes the ChunkManager buffers

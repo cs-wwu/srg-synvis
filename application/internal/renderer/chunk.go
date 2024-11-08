@@ -61,9 +61,9 @@ func (tm *TerrainManager) LoadChunk(chunkX, chunkZ int) {
 func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	chunk.vertices = make([]Vertex, (CHUNK_SIZE+1)*(CHUNK_SIZE+1))
 
-	for z := 0; z <= CHUNK_SIZE; z++ {
+	for z := 0; z < CHUNK_SIZE; z++ {
 		worldZ := chunk.Z + z
-		for x := 0; x <= CHUNK_SIZE; x++ {
+		for x := 0; x < CHUNK_SIZE; x++ {
 			worldX := chunk.X + x
 			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
 
@@ -71,7 +71,7 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			height := float32(int(pixelValue) - 32768)
 			isWater := watermap.GrayAt(localX, localZ).Y
 
-			idx := z*(CHUNK_SIZE+1) + x
+			idx := z*CHUNK_SIZE + x
 			chunk.vertices[idx] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
 				TexCoord: lin.Vec3{
@@ -86,25 +86,29 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 
 // Generate indices (triangle strip)
 func calculateChunkIndices(chunk *Chunk) {
-	chunk.indices = make([]Index, 2*CHUNK_SIZE*(CHUNK_SIZE+1)+2*(CHUNK_SIZE-1))
+	numStrips := CHUNK_SIZE - 1
+	verticesPerStrip := CHUNK_SIZE * 2
+	degenerateVertices := (numStrips - 1) * 2
+
+	chunk.indices = make([]Index, (numStrips*verticesPerStrip)+degenerateVertices)
 	indexPos := 0
 
-	for z := 0; z < CHUNK_SIZE; z++ {
+	for z := 0; z < CHUNK_SIZE-1; z++ {
 		if z > 0 {
-			// Degenerate triangle to connect strips
-			chunk.indices[indexPos] = Index(z * (CHUNK_SIZE + 1))
+			// Degenerate triangle - connect strips
+			chunk.indices[indexPos] = Index(z * CHUNK_SIZE)
 			indexPos++
 		}
 
-		for x := 0; x <= CHUNK_SIZE; x++ {
-			chunk.indices[indexPos] = Index(z*(CHUNK_SIZE+1) + x)
-			chunk.indices[indexPos+1] = Index((z+1)*(CHUNK_SIZE+1) + x)
+		for x := 0; x < CHUNK_SIZE; x++ {
+			chunk.indices[indexPos] = Index(z*CHUNK_SIZE + x)
+			chunk.indices[indexPos+1] = Index((z+1)*CHUNK_SIZE + x)
 			indexPos += 2
 		}
 
-		if z < CHUNK_SIZE-1 {
-			// Degenerate triangle to connect strips
-			chunk.indices[indexPos] = Index((z+1)*(CHUNK_SIZE+1) + CHUNK_SIZE)
+		if z < CHUNK_SIZE-2 {
+			// Degenerate triangle - prepare for next strip
+			chunk.indices[indexPos] = Index((z+1)*CHUNK_SIZE + (CHUNK_SIZE - 1))
 			indexPos++
 		}
 	}
