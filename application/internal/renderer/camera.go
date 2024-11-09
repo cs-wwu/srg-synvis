@@ -8,6 +8,8 @@ import (
 	"math"
 	"os/exec"
 	"io"
+	"strings"
+	"strconv"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
@@ -104,34 +106,35 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 		gps.Close()		
 }
 
-func trySense() {
+func trySense() string {
 	cmd := exec.Command("python3", "./internal/renderer/hello.py")
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return
+		return "[0,0,0]"
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return
+		return "[0,0,0]"
 	}
 	// Read the output from the pipe
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		fmt.Println("Error reading output:", err)
-		return
+		return "[0,0,0]"
 	}
 	// Print the output
-	fmt.Println("output " + string(output))
+	// fmt.Println("output " + string(output))
 	// Wait for the command to finish
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return
+		return "[0,0,0]"
 	}
+	return string(output)
 }
 
 
@@ -145,7 +148,16 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 	// (*c.Pos)[2] = newZ
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
-		trySense()
+		input := trySense()
+		input = strings.Trim(input, "[]")
+		parts := strings.Split(input, ", ")
+		roll, err := strconv.ParseFloat(parts[0], 64)
+		pitch, err := strconv.ParseFloat(parts[1], 64)
+		yaw, err := strconv.ParseFloat(parts[2], 64)
+		if err != nil {
+			fmt.Println("error parsing")
+		}
+
 
 		tmp := lin.Vec3{}
 
@@ -179,35 +191,29 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			c.Pos.Sub(c.Pos, &tmp)
 		}
 
-		yaw := c.getYaw()
-		pitch := c.getPitch()
-		roll := c.getRoll()
-		var updateQuat = false
+		// yaw := c.getYaw()
+		// pitch := c.getPitch()
+		// roll := c.getRoll()
+		fmt.Println(roll, pitch, yaw)
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
 			pitch += float64(c.Sensitivity)
-			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyDown) == glfw.Press { // View Down
 			pitch -= float64(c.Sensitivity)
-			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyLeft) == glfw.Press { // View Left
 			yaw -= float64(c.Sensitivity)
-			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
 			yaw += float64(c.Sensitivity)
-			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyE) == glfw.Press {	// Roll Right
 			roll += float64(c.Sensitivity)
-			updateQuat = true
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
 			roll -= float64(c.Sensitivity)
-			updateQuat = true
 		}
 
 		front := calcFrontVector(pitch, yaw)
@@ -219,10 +225,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		}
 		// TODO: Update the camera's front, right, and up vectors for quaternions
 		// remove the current method of clamping top and bottom view vectors,
-		
-		if updateQuat {
-			// c.updateCameraVectors(roll, pitch, yaw)
-		}
+
 	}
 }
 
