@@ -145,7 +145,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 	// (*c.Pos)[2] = newZ
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
-		go trySense()
+		trySense()
 
 		tmp := lin.Vec3{}
 
