@@ -18,8 +18,9 @@ import (
 
 var (
 	// For heightmap model
-	startX, startZ = CoordinateGPSToFloat("48.0, -123.0")
-	HeightMeters = float32(13000.0)
+
+	startX, startZ = CoordinateGPSToFloat("48.732476667, -122.4858033333")
+	HeightMeters = float32(1300.0)
 	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
 	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
@@ -142,18 +143,23 @@ func trySense() string {
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
 func (c *Camera) ProcessInput(window *glfw.Window) {
+	
 	// go trygps()
 	// newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
 	// (*c.Pos)[0] = newX
 	// (*c.Pos)[2] = newZ
+	
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
 		input := trySense()
+		// rinput := trySense()
+		// fmt.Println(rinput)
+		// input := "[-2.19, -0.52, -0.37, 0]"
 		input = strings.Trim(input, "[]")
 		parts := strings.Split(input, ", ")
-		roll, err := strconv.ParseFloat(parts[0], 64)
-		pitch, err := strconv.ParseFloat(parts[1], 64)
-		yaw, err := strconv.ParseFloat(parts[2], 64)
+		yaw, err := strconv.ParseFloat(parts[0], 64)
+		roll, err := strconv.ParseFloat(parts[1], 64)
+		pitch, err := strconv.ParseFloat(parts[2], 64)
 		if err != nil {
 			fmt.Println("error parsing")
 		}
