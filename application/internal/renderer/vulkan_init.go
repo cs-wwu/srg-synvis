@@ -373,17 +373,15 @@ func (app *Application) prepareTextures() {
 		var sampler vk.Sampler
 		ret := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
 			SType:                   SamplerCreateInfoSType,
-			MagFilter:               SamplerFilterNearest,
-			MinFilter:               SamplerFilterNearest,
+			MagFilter:               vk.FilterLinear,
+			MinFilter:               vk.FilterLinear,
 			MipmapMode:              SamplerMipmapModeNearest,
 			AddressModeU:            SamplerAddressModeRepeat,
 			AddressModeV:            SamplerAddressModeRepeat,
 			AddressModeW:            SamplerAddressModeRepeat,
-			AnisotropyEnable:        SamplerAnisotropyEnable,
-			MaxAnisotropy:           SamplerMaxAnisotropy,
 			CompareOp:               SamplerCompareOpNever,
 			BorderColor:             SamplerBorderColorFloatOpaqueWhite,
-			UnnormalizedCoordinates: SamplerUnnormalizedCoordinates,
+			UnnormalizedCoordinates: vk.False,
 		}, nil, &sampler)
 		OrPanic(as.NewError(ret))
 		tex.sampler = sampler
