@@ -18,8 +18,9 @@ layout(location = 2) in vec3 inNormal;
 const float AMBIENT = 0.04;
 
 layout(location = 0) out vec3 fragColor;
-layout(location = 1) out vec3 fragTexCoord;
-layout(location = 2) out vec3 worldPos;
+layout(location = 1) out vec2 fragTexCoord;
+layout(location = 2) out float isWater;
+layout(location = 3) out vec3 worldPos;
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -34,6 +35,7 @@ void main()
     float intense = AMBIENT + max(dot(world, ubo.lightDir), 0);
 
     fragColor = intense * vec3(1.0);
-    fragTexCoord = inTexCoord;
+    fragTexCoord = inTexCoord.xy;
+    isWater = inTexCoord.z;
     worldPos = worldPosition.xyz;
 }

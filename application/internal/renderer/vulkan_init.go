@@ -510,9 +510,9 @@ func (app *Application) prepareRenderPass() {
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
-	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/cube.vert.spv"))
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/shader.vert.spv"))
 	OrPanic(err)
-	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/cube.frag.spv"))
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/shader.frag.spv"))
 	OrPanic(err)
 
 	var pipelineCache vk.PipelineCache
