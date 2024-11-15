@@ -106,9 +106,26 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 	return tm
 }
 
+// Clears all chunks in the terrain manager (chunks in buffers are left)
+func (tm *TerrainManager) ClearChunks() {
+	// Clear the chunks map
+	for k := range tm.chunks {
+		delete(tm.chunks, k)
+	}
+
+	// Clear the ordered chunks slice
+	tm.orderedChunks = tm.orderedChunks[:0]
+
+	// Clear the visible chunks map
+	for k := range tm.visibleChunks {
+		delete(tm.visibleChunks, k)
+	}
+}
+
 // LoadMap loads a heightmap and its associated watermap
 func (tm *TerrainManager) LoadMap(coord string) error {
 	log.Printf("Loading map: %s\n", coord)
+	tm.ClearChunks()
 
 	// Skip heightmaps if already loaded
 	if _, exists := tm.heightmaps[coord]; !exists {
