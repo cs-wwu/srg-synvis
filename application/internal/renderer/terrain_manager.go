@@ -8,6 +8,9 @@ import (
 	"log"
 	"math"
 	"os"
+	"sync"
+	"sync/atomic"
+	"time"
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
@@ -23,19 +26,23 @@ import (
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
+	MAX_IMAGE_MAPS      = 6
+
+	TICKER_SPEED = time.Second / 30 // x times per second
 
 	MAP_LENGTH      = 3600
 	CHUNKS_PER_SIDE = 20
 	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
-	NUM_MAPS        = 2 // TODO: Figure it out better
-	MAX_CHUNKS      = NUM_MAPS * CHUNKS_PER_MAP
 
 	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
 	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
 
 	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
 	INDICES_PER_CHUNK  = 2*CHUNK_SIZE*(CHUNK_SIZE-1) + 2*((CHUNK_SIZE-1)-1)
+
+	MAX_VERTICES = VERTICES_PER_CHUNK * CHUNKS_PER_MAP
+	MAX_INDICES  = INDICES_PER_CHUNK * CHUNKS_PER_MAP
 
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
 
@@ -48,18 +55,29 @@ type TerrainManager struct {
 	device   *vk.Device
 	memProps *vk.PhysicalDeviceMemoryProperties
 
-	vertices []Vertex
-	indices  []uint32
+	activeVertices  []Vertex
+	activeIndices   []Index
+	pendingVertices []Vertex
+	pendingIndices  []Index
+
+	updated    atomic.Bool
+	chunkMutex sync.RWMutex
+
+	activeVertexBuffer  vk.Buffer
+	activeIndexBuffer   vk.Buffer
+	pendingVertexBuffer vk.Buffer
+	pendingIndexBuffer  vk.Buffer
+
+	activeIndexMemory   vk.DeviceMemory
+	activeVertexMemory  vk.DeviceMemory
+	pendingIndexMemory  vk.DeviceMemory
+	pendingVertexMemory vk.DeviceMemory
+
+	drawCommandBuffer vk.Buffer
+	drawCommandMemory vk.DeviceMemory
 
 	lastPosition  lin.Vec3
 	lastUpdatePos lin.Vec3
-
-	vertexBuffer      vk.Buffer
-	vertexMemory      vk.DeviceMemory
-	indexBuffer       vk.Buffer
-	indexMemory       vk.DeviceMemory
-	drawCommandBuffer vk.Buffer
-	drawCommandMemory vk.DeviceMemory
 
 	heightmaps    map[string]*image.Gray16
 	watermaps     map[string]*image.Gray
@@ -68,6 +86,8 @@ type TerrainManager struct {
 	orderedChunks []*Chunk
 
 	drawCommand DrawCommand
+
+	shutdown chan struct{}
 }
 
 type DrawCommand struct {
@@ -79,14 +99,9 @@ type DrawCommand struct {
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
-	if tm.HasCrossedThreshold(pos) { // TODO Make dynamic based on location
-		tm.lastPosition = pos
-		tm.LoadMap("n48w123")
-		// tm.LoadMap("n48w122")
-		// tm.LoadMap("n47w123")
-		// tm.LoadMap("n47w122")
-		log.Printf("Updating camera position to %v\n", pos)
-	}
+	tm.chunkMutex.Lock()
+	tm.lastPosition = pos
+	tm.chunkMutex.Unlock()
 }
 
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
@@ -94,15 +109,19 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		device:        device,
 		memProps:      memProps,
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
-		heightmaps:    make(map[string]*image.Gray16, NUM_MAPS),
-		watermaps:     make(map[string]*image.Gray, NUM_MAPS),
+		heightmaps:    make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
+		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:        make(map[string]*Chunk),
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
 		drawCommand:   DrawCommand{},
+		shutdown:      make(chan struct{}),
 	}
 
 	tm.InitBuffers()
+
+	go tm.updateLoop()
+
 	return tm
 }
 
@@ -124,12 +143,14 @@ func (tm *TerrainManager) ClearChunks() {
 
 // LoadMap loads a heightmap and its associated watermap
 func (tm *TerrainManager) LoadMap(coord string) error {
-	log.Printf("Loading map: %s\n", coord)
+	tm.chunkMutex.Lock()
+	defer tm.chunkMutex.Unlock()
+
+	log.Printf("\nLoading map: %s\n", coord)
 	tm.ClearChunks()
 
 	// Skip heightmaps if already loaded
 	if _, exists := tm.heightmaps[coord]; !exists {
-		// Load heightmap and watermap
 		if err := tm.LoadHeightmap(coord); err != nil {
 			return err
 		}
@@ -148,26 +169,24 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
-	// TODO remove lod calculation
+	// Calculate LOD sizes for debugging
 	sizes := make([]int, 4)
 	for _, chunk := range tm.chunks {
 		sizes[chunk.lodLevel]++
 	}
-
 	log.Printf("\nLOD sizes: %v\n\n", sizes)
-
-	// Update GPU buffers
-	tm.FillBuffers()
 
 	return nil
 }
 
 func (tm *TerrainManager) HasCrossedThreshold(new lin.Vec3) bool {
-	dx := math.Abs(float64(new[0] - tm.lastPosition[0]))
-	dy := math.Abs(float64(new[1] - tm.lastPosition[1]))
-	dz := math.Abs(float64(new[2] - tm.lastPosition[2]))
+	tm.chunkMutex.RLock()
+	defer tm.chunkMutex.RUnlock()
 
-	// Calculate 3D distance
+	dx := math.Abs(float64(new[0] - tm.lastUpdatePos[0]))
+	dy := math.Abs(float64(new[1] - tm.lastUpdatePos[1]))
+	dz := math.Abs(float64(new[2] - tm.lastUpdatePos[2]))
+
 	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
 	return dist >= LOD_DISTANCE_THRESHOLD
 }
@@ -201,167 +220,84 @@ func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3)
 	}
 }
 
-// FillBuffers updates GPU buffers with current geometry
-func (tm *TerrainManager) FillBuffers() {
-	if len(tm.chunks) == 0 {
-		return
+func (tm *TerrainManager) FillPendingBuffers() {
+	// Clear pending data
+	tm.pendingVertices = tm.pendingVertices[:0]
+	tm.pendingIndices = tm.pendingIndices[:0]
+
+	// Collect vertices and indices
+	vertexOffset := Index(0)
+	for _, chunk := range tm.orderedChunks {
+		// Add vertices
+		tm.pendingVertices = append(tm.pendingVertices, chunk.vertices...)
+
+		// Add indices with offset
+		for _, idx := range chunk.indices {
+			// Add the vertex offset to the current index
+			newIndex := idx + Index(vertexOffset)
+			tm.pendingIndices = append(tm.pendingIndices, newIndex)
+		}
+		vertexOffset += Index(len(chunk.vertices))
 	}
 
-	// Collect all vertices and indices
-	var totalVertices []Vertex
-	var totalIndices []uint32
+	// Update pending buffers
+	tm.updateBuffer(tm.pendingVertexMemory, tm.pendingVertices)
+	tm.updateBuffer(tm.pendingIndexMemory, tm.pendingIndices)
+}
 
-	for _, chunk := range tm.orderedChunks {
-		totalVertices = append(totalVertices, chunk.vertices...)
-		for _, idx := range chunk.indices {
-			totalIndices = append(totalIndices, uint32(idx))
+func (tm *TerrainManager) checkForUpdates() {
+	if tm.HasCrossedThreshold(tm.lastPosition) {
+		// Load new chunks and update pending buffers
+		tm.LoadMap("n48w123") // Example coordinate
+		tm.FillPendingBuffers()
+
+		// Mark as updated so main thread knows to swap buffers
+		tm.updated.Store(true)
+		tm.lastUpdatePos = tm.lastPosition
+	}
+}
+
+func (tm *TerrainManager) updateLoop() {
+	log.Println("Starting update loop.")
+	ticker := time.NewTicker(TICKER_SPEED)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-tm.shutdown:
+			return
+		case <-ticker.C:
+			tm.checkForUpdates()
 		}
 	}
 
-	tm.vertices = totalVertices
-	tm.indices = totalIndices
-
-	// Update vertex buffer
-	vertexData := make([]byte, len(totalVertices)*VertexSize)
-	for i, vertex := range totalVertices {
-		copy(vertexData[i*VertexSize:], vertex.Data())
-	}
-
-	var pVertexData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.vertexMemory, 0, vk.DeviceSize(len(vertexData)), 0, &pVertexData)
-	vk.Memcopy(pVertexData, vertexData)
-	vk.UnmapMemory(*tm.device, tm.vertexMemory)
-
-	// Update index buffer
-	indexData := make([]byte, len(totalIndices)*4)
-	for i, index := range totalIndices {
-		binary.LittleEndian.PutUint32(indexData[i*4:], index)
-	}
-
-	var pIndexData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
-	vk.Memcopy(pIndexData, indexData)
-	vk.UnmapMemory(*tm.device, tm.indexMemory)
-
-	// Update draw command
-	tm.drawCommand = DrawCommand{
-		IndexCount:    uint32(len(totalIndices)),
-		InstanceCount: 1,
-		FirstIndex:    0,
-		VertexOffset:  0,
-		FirstInstance: 0,
-	}
-
-	// Update draw command buffer
-	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
-	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
-	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
-	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
-	binary.LittleEndian.PutUint32(commandData[12:], uint32(tm.drawCommand.VertexOffset))
-	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
-
-	var pCommandData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
-	vk.Memcopy(pCommandData, commandData)
-	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
 }
 
 // Intializes the ChunkManager buffers
 func (tm *TerrainManager) InitBuffers() {
-	// Vertex buffer
-	maxVertices := MAX_CHUNKS * VERTICES_PER_CHUNK
-	vertexData := make([]byte, maxVertices*VertexSize)
-	vertexBuf := as.CreateBuffer(*tm.device, *tm.memProps, vertexData, BufferUsageVertexBufferBit)
-	tm.vertexBuffer = vertexBuf.Buffer
-	tm.vertexMemory = vertexBuf.Memory
+	// Vertex buffers
+	vertexData := make([]byte, MAX_VERTICES*VertexSize)
+	activeVertexBuf := as.CreateBuffer(*tm.device, *tm.memProps, vertexData, BufferUsageVertexBufferBit)
+	tm.activeVertexBuffer = activeVertexBuf.Buffer
+	tm.activeVertexMemory = activeVertexBuf.Memory
+	pendingVertexBuf := as.CreateBuffer(*tm.device, *tm.memProps, vertexData, BufferUsageVertexBufferBit)
+	tm.pendingVertexBuffer = pendingVertexBuf.Buffer
+	tm.pendingVertexMemory = pendingVertexBuf.Memory
 
-	// Index buffer
-	maxIndices := MAX_CHUNKS * INDICES_PER_CHUNK
-	indexData := make([]byte, maxIndices*4) // uint32 = 4 bytes
-	indexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
-	tm.indexBuffer = indexBuf.Buffer
-	tm.indexMemory = indexBuf.Memory
+	// Index buffers
+	indexData := make([]byte, MAX_INDICES*IndexSize) // uint32 = 4 bytes
+	activeIndexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
+	tm.activeIndexBuffer = activeIndexBuf.Buffer
+	tm.activeIndexMemory = activeIndexBuf.Memory
+	pendingIndexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
+	tm.pendingIndexBuffer = pendingIndexBuf.Buffer
+	tm.pendingIndexMemory = pendingIndexBuf.Memory
 
 	// Draw command buffer
 	drawCommandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
 	drawCommandBuffer := as.CreateBuffer(*tm.device, *tm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
 	tm.drawCommandBuffer = drawCommandBuffer.Buffer
 	tm.drawCommandMemory = drawCommandBuffer.Memory
-}
-
-// updateDrawCommands updates the draw commands for visible chunks
-func (tm *TerrainManager) updateDrawCommand() {
-	// Pre-calculate total sizes to avoid reallocation
-	totalVertices := 0
-	totalIndices := 0
-	for _, chunk := range tm.orderedChunks {
-		chunkKey := ChunkKey(chunk.X, chunk.Z)
-		if tm.visibleChunks[chunkKey] {
-			totalVertices += len(chunk.vertices)
-			totalIndices += len(chunk.indices)
-		}
-	}
-
-	// Create single draw command
-	tm.drawCommand = DrawCommand{
-		IndexCount:    uint32(totalIndices),
-		InstanceCount: 1,
-		FirstIndex:    0,
-		VertexOffset:  0,
-		FirstInstance: 0,
-	}
-
-	// Update draw command buffer (can be static since it's small)
-	commandData := [20]byte{} // sizeof(DrawCommand) = 20
-	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
-	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
-	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
-	binary.LittleEndian.PutUint32(commandData[12:], uint32(tm.drawCommand.VertexOffset))
-	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
-
-	var pCommandData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(20), 0, &pCommandData)
-	vk.Memcopy(pCommandData, commandData[:])
-	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
-
-	// Allocate exact buffer sizes once
-	vertexData := make([]byte, totalVertices*VertexSize)
-	indexData := make([]byte, totalIndices*4)
-
-	// Fill buffers directly without intermediate slices
-	vertexOffset := 0
-	indexOffset := 0
-	vertexCount := 0
-
-	for _, chunk := range tm.orderedChunks {
-		if tm.visibleChunks[ChunkKey(chunk.X, chunk.Z)] {
-			// Copy vertices directly to vertexData
-			for i, vertex := range chunk.vertices {
-				copy(vertexData[(vertexOffset+i)*VertexSize:], vertex.Data())
-			}
-
-			// Copy indices directly to indexData with offset
-			for _, idx := range chunk.indices {
-				binary.LittleEndian.PutUint32(indexData[indexOffset:], uint32(idx)+uint32(vertexCount))
-				indexOffset += 4
-			}
-
-			vertexOffset += len(chunk.vertices)
-			vertexCount += len(chunk.vertices)
-		}
-	}
-
-	// Update vertex buffer
-	var pVertexData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.vertexMemory, 0, vk.DeviceSize(len(vertexData)), 0, &pVertexData)
-	vk.Memcopy(pVertexData, vertexData)
-	vk.UnmapMemory(*tm.device, tm.vertexMemory)
-
-	// Update index buffer
-	var pIndexData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.indexMemory, 0, vk.DeviceSize(len(indexData)), 0, &pIndexData)
-	vk.Memcopy(pIndexData, indexData)
-	vk.UnmapMemory(*tm.device, tm.indexMemory)
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
@@ -440,14 +376,110 @@ func loadMap(filepath string) (image.Image, error) {
 	return rawImg, nil
 }
 
+func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data interface{}) {
+	var bufferData []byte
+	switch v := data.(type) {
+	case []Vertex:
+		bufferData = make([]byte, len(v)*VertexSize)
+		for i, vertex := range v {
+			copy(bufferData[i*VertexSize:], vertex.Data())
+		}
+	case []Index:
+		bufferData = make([]byte, len(v)*4)
+		for i, index := range v {
+			binary.LittleEndian.PutUint32(bufferData[i*4:], uint32(index))
+		}
+	default:
+		log.Printf("Warning: Unknown buffer data type")
+		return
+	}
+
+	var pData unsafe.Pointer
+	vk.MapMemory(*tm.device, memory, 0, vk.DeviceSize(len(bufferData)), 0, &pData)
+	vk.Memcopy(pData, bufferData)
+	vk.UnmapMemory(*tm.device, memory)
+}
+
+func (tm *TerrainManager) SwapBuffers() bool {
+	if !tm.updated.Load() {
+		return false
+	}
+
+	tm.chunkMutex.Lock()
+	defer tm.chunkMutex.Unlock()
+
+	// Swap buffer pointers
+	tm.activeVertexBuffer, tm.pendingVertexBuffer = tm.pendingVertexBuffer, tm.activeVertexBuffer
+	tm.activeIndexBuffer, tm.pendingIndexBuffer = tm.pendingIndexBuffer, tm.activeIndexBuffer
+	tm.activeVertexMemory, tm.pendingVertexMemory = tm.pendingVertexMemory, tm.activeVertexMemory
+	tm.activeIndexMemory, tm.pendingIndexMemory = tm.pendingIndexMemory, tm.activeIndexMemory
+
+	// Store the active counts
+	tm.activeVertices = tm.pendingVertices
+	tm.activeIndices = tm.pendingIndices
+
+	// Update draw command with correct counts
+	tm.drawCommand = DrawCommand{
+		IndexCount:    uint32(len(tm.activeIndices)),
+		InstanceCount: 1,
+		FirstIndex:    0,
+		VertexOffset:  0,
+		FirstInstance: 0,
+	}
+
+	// Update draw command buffer
+	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
+	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
+	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
+	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
+	binary.LittleEndian.PutUint32(commandData[12:], uint32(tm.drawCommand.VertexOffset))
+	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
+
+	var pCommandData unsafe.Pointer
+	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
+	vk.Memcopy(pCommandData, commandData)
+	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
+
+	tm.updated.Store(false)
+	return true
+}
+
 func (tm *TerrainManager) Destroy() {
-	vk.DestroyBuffer(*tm.device, tm.vertexBuffer, nil)
-	vk.FreeMemory(*tm.device, tm.vertexMemory, nil)
+	// Signal shutdown
+	close(tm.shutdown)
 
-	vk.DestroyBuffer(*tm.device, tm.indexBuffer, nil)
-	vk.FreeMemory(*tm.device, tm.indexMemory, nil)
+	// Destroy buffers
+	vk.DestroyBuffer(*tm.device, tm.activeVertexBuffer, nil)
+	vk.DestroyBuffer(*tm.device, tm.activeIndexBuffer, nil)
+	vk.DestroyBuffer(*tm.device, tm.pendingVertexBuffer, nil)
+	vk.DestroyBuffer(*tm.device, tm.pendingIndexBuffer, nil)
 
-	// Cleanup draw command buffer - this was missing
+	// Free memory
+	vk.FreeMemory(*tm.device, tm.activeVertexMemory, nil)
+	vk.FreeMemory(*tm.device, tm.activeIndexMemory, nil)
+	vk.FreeMemory(*tm.device, tm.pendingVertexMemory, nil)
+	vk.FreeMemory(*tm.device, tm.pendingIndexMemory, nil)
+
+	// Destroy command buffer
 	vk.DestroyBuffer(*tm.device, tm.drawCommandBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.drawCommandMemory, nil)
+}
+
+// GetActiveBuffers returns the currently active vertex and index buffers
+func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
+	tm.chunkMutex.RLock()
+	defer tm.chunkMutex.RUnlock()
+	return tm.activeVertexBuffer, tm.activeIndexBuffer
+}
+
+func (tm *TerrainManager) GetDrawCommand() DrawCommand {
+	tm.chunkMutex.RLock()
+	defer tm.chunkMutex.RUnlock()
+	return tm.drawCommand
+}
+
+func (tm *TerrainManager) GetVisibleChunks() int {
+	tm.chunkMutex.RLock()
+	defer tm.chunkMutex.RUnlock()
+	return len(tm.visibleChunks)
 }

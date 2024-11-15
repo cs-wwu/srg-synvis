@@ -89,22 +89,31 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
-	app.fpsCounter.Update(len(app.TerrainManager.visibleChunks))
+	// Get visible chunks count thread-safely
+	app.TerrainManager.chunkMutex.RLock()
+	visibleCount := len(app.TerrainManager.visibleChunks)
+	app.TerrainManager.chunkMutex.RUnlock()
+	app.fpsCounter.Update(visibleCount)
+
 	app.frameCount++
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
-	vk.DeviceWaitIdle(app.Context().Device())
-	
+	// Check for buffer updates from TerrainManager
+	if app.TerrainManager.SwapBuffers() {
+		// Force device to be idle before swapping buffers
+		vk.DeviceWaitIdle(app.Context().Device())
+	}
+
 	// Update the view frustum and visible chunks periodically
-	if app.frameCount%CULLING_INTERVAL == 1 {
+	if app.frameCount%CULLING_INTERVAL == 0 {
 		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
 		app.updateVisibleChunks()
 	}
 
-	// Update terrain based on camera position
+	// Update terrain position - TerrainManager handles updates in its own thread
 	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
 }
 
@@ -139,11 +148,22 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 }
 
 func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+	// Wait for command buffer to complete before reusing
+	dev := app.Context().Device()
+	vk.DeviceWaitIdle(dev)
+
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
 	})
 	OrPanic(as.NewError(ret))
+
+	// Check for buffer updates from TerrainManager first
+	if app.TerrainManager.SwapBuffers() {
+		activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
+	}
 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
@@ -177,9 +197,10 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	// Bind vertex and index buffers
-	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.TerrainManager.vertexBuffer}, []vk.DeviceSize{0})
-	vk.CmdBindIndexBuffer(cmd, app.TerrainManager.indexBuffer, 0, vk.IndexTypeUint32)
+	// Get current active buffers
+	activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
 
 	// Draw using indirect buffer
 	vk.CmdDrawIndexedIndirect(cmd,

@@ -100,6 +100,16 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 func (app *Application) updateVisibleChunks() {
 	tm := app.TerrainManager
 
+	// Get write lock since we're modifying visible chunks
+	tm.chunkMutex.Lock()
+	defer tm.chunkMutex.Unlock()
+
+	// Store old visible chunks for comparison
+	oldVisibleChunks := make(map[string]bool, len(tm.visibleChunks))
+	for k, v := range tm.visibleChunks {
+		oldVisibleChunks[k] = v
+	}
+
 	// Clear the previous visible chunk map
 	for k := range tm.visibleChunks {
 		delete(tm.visibleChunks, k)
@@ -115,8 +125,22 @@ func (app *Application) updateVisibleChunks() {
 		}
 	}
 
-	// If the visible chunks changed significantly, update the draw commands
-	if visibleCount > 0 {
-		tm.updateDrawCommand()
+	// Check if visibility actually changed
+	if visibleCount > 0 && !mapsEqual(oldVisibleChunks, tm.visibleChunks) {
+		tm.FillPendingBuffers()
+		tm.updated.Store(true)
 	}
+}
+
+// Helper function to compare visibility maps
+func mapsEqual(m1, m2 map[string]bool) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+	for k, v1 := range m1 {
+		if v2, ok := m2[k]; !ok || v1 != v2 {
+			return false
+		}
+	}
+	return true
 }

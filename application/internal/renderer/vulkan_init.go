@@ -741,15 +741,13 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Testing for loading all maps and chunks
-	// Update the last position so that we load the map
+	// Initialize TerrainManager
 	app.TerrainManager = NewTerrainManager(&dev, &memProps)
+	// Just update position - the terrain manager will handle loading in its own thread
 	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
-	app.TerrainManager.FillBuffers()
-	// app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	// app.updateVisibleChunks()
 
-	app.prepareUniformBuffers() // need to be called after loadhm()
+	log.Println("Finished Terrain Manager")
+	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
@@ -757,9 +755,12 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
+	log.Println("Initializing Command Buffers")
+	// Initialize command buffers
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
+	log.Println("Finished Pipeline")
 	return nil
 }
