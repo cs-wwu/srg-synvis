@@ -51,7 +51,7 @@ func (app *Application) NextFrame() {
 	}
 
 	// Process Input and update the camera
-	app.camera.ProcessInput(app.WindowHandle)
+	app.camera.ProcessInput(app.WindowHandle, app.Gps, app.Hat)
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	//Update the view frustum and visibleChunks

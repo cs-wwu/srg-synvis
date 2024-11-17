@@ -36,6 +36,9 @@ type Application struct {
 	ChunkManager *ChunkManager
 	frustum      *Frustum
 	WindowHandle *glfw.Window
+
+	Gps bool
+	Hat bool
 }
 
 const (

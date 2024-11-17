@@ -57,11 +57,7 @@ func NewCamera() *Camera {
 
 	right := lin.Vec3{}
 	right.MultCross(&front, &worldUp)
-	// right.MultCross(&worldUp, &front)
 	right.Norm(&right)
-
-	// new: compute orthonormal upvector
-	//up.MultCross(&front, &right)
 
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
@@ -97,7 +93,6 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 				LAT = report.Lat
 				LON = report.Lon
 				fmt.Println("Location:", LAT, LON)
-				// 48.734321667, -122.487568333
 		}		
 		gps.AddFilter("TPV", tpvFilter)
 
@@ -113,19 +108,19 @@ func trySense() string {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return "[0,0,0]"
+		return "[0,0,0,0]"
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return "[0,0,0]"
+		return "[0,0,0,0]"
 	}
 	// Read the output from the pipe
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		fmt.Println("Error reading output:", err)
-		return "[0,0,0]"
+		return "[0,0,0,0]"
 	}
 	// Print the output
 	// fmt.Println("output " + string(output))
@@ -133,7 +128,7 @@ func trySense() string {
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return "[0,0,0]"
+		return "[0,0,0,0]"
 	}
 	return string(output)
 }
@@ -142,28 +137,43 @@ func trySense() string {
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
-func (c *Camera) ProcessInput(window *glfw.Window) {
-	
-	// go trygps()
-	// newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
-	// (*c.Pos)[0] = newX
-	// (*c.Pos)[2] = newZ
-	
-	if window.GetAttrib(glfw.Focused) == glfw.True {
+func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 
+	if gps {
+		go trygps()
+		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
+		(*c.Pos)[0] = newX
+		(*c.Pos)[2] = newZ
+	}
+
+	if hat {
+		// Get the sense data
 		input := trySense()
-		// rinput := trySense()
-		// fmt.Println(rinput)
-		// input := "[-2.19, -0.52, -0.37, 0]"
+		
+		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
 		input = strings.Trim(input, "[]")
 		parts := strings.Split(input, ", ")
 		yaw, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil {
+			fmt.Println("Error parsing")
+		}
 		roll, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			fmt.Println("Error parsing")
+		}
 		pitch, err := strconv.ParseFloat(parts[2], 64)
 		if err != nil {
-			fmt.Println("error parsing")
+			fmt.Println("Error parsing")
 		}
+		fmt.Println(roll, pitch, yaw)
 
+		// Update the front vector with pitch and yaw data
+		front := calcFrontVector(pitch, yaw)
+		c.Front = &front	
+	}
+
+	
+	if window.GetAttrib(glfw.Focused) == glfw.True {
 
 		tmp := lin.Vec3{}
 
@@ -197,10 +207,9 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			c.Pos.Sub(c.Pos, &tmp)
 		}
 
-		// yaw := c.getYaw()
-		// pitch := c.getPitch()
-		// roll := c.getRoll()
-		fmt.Println(roll, pitch, yaw)
+		yaw := c.getYaw()
+		pitch := c.getPitch()
+		roll := c.getRoll()
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
