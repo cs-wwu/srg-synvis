@@ -103,7 +103,7 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 }
 
 func trySense() string {
-	cmd := exec.Command("python3", "./internal/renderer/hello.py")
+	cmd := exec.Command("python3", "./internal/renderer/hat.py")
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
