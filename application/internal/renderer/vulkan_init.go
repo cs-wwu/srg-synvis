@@ -746,7 +746,6 @@ func (app *Application) VulkanContextPrepare() error {
 	// Just update position - the terrain manager will handle loading in its own thread
 	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
 
-	log.Println("Finished Terrain Manager")
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
@@ -755,12 +754,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
-	log.Println("Initializing Command Buffers")
 	// Initialize command buffers
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
-	log.Println("Finished Pipeline")
 	return nil
 }

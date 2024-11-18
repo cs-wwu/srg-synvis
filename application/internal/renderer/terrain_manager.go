@@ -146,7 +146,6 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()
 
-	log.Printf("\nLoading map: %s\n", coord)
 	tm.ClearChunks()
 
 	// Skip heightmaps if already loaded
@@ -174,7 +173,6 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 	for _, chunk := range tm.chunks {
 		sizes[chunk.lodLevel]++
 	}
-	log.Printf("\nLOD sizes: %v\n\n", sizes)
 
 	return nil
 }

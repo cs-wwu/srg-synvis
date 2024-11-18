@@ -90,10 +90,7 @@ func (app *Application) VulkanContextCleanup() error {
 
 func (app *Application) NextFrame() {
 	// Get visible chunks count thread-safely
-	app.TerrainManager.chunkMutex.RLock()
-	visibleCount := len(app.TerrainManager.visibleChunks)
-	app.TerrainManager.chunkMutex.RUnlock()
-	app.fpsCounter.Update(visibleCount)
+	app.fpsCounter.Update(app.TerrainManager.GetVisibleChunks())
 
 	app.frameCount++
 
@@ -102,10 +99,6 @@ func (app *Application) NextFrame() {
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Check for buffer updates from TerrainManager
-	if app.TerrainManager.SwapBuffers() {
-		// Force device to be idle before swapping buffers
-		vk.DeviceWaitIdle(app.Context().Device())
-	}
 
 	// Update the view frustum and visible chunks periodically
 	if app.frameCount%CULLING_INTERVAL == 0 {
