@@ -1,9 +1,14 @@
 package renderer
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"log"
+	"os"
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
@@ -760,4 +765,51 @@ func (app *Application) VulkanContextPrepare() error {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
 	return nil
+}
+
+func IsError(ret vk.Result) bool {
+	return ret != vk.Success
+}
+
+func OrPanic(err error, finalizers ...func()) {
+	if err != nil {
+		for _, fn := range finalizers {
+			fn()
+		}
+		panic(err)
+	}
+}
+
+// Converts the given file to a byte array to be used
+func FileToBytes(filename string) []byte {
+	file, err := os.Open(filename)
+	OrPanic(err)
+	defer file.Close()
+
+	// Read the file into data
+	fileInfo, err := file.Stat()
+	OrPanic(err)
+	fileSize := fileInfo.Size()
+	data := make([]byte, fileSize)
+	_, err = file.Read(data)
+	OrPanic(err)
+
+	return data
+}
+
+func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
+	data := FileToBytes(name)
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	newImg := image.NewRGBA(img.Bounds())
+	if rowPitch <= 4*img.Bounds().Dy() {
+		// apply the proposed row pitch only if supported,
+		// as we're using only optimal textures.
+		newImg.Stride = rowPitch
+	}
+	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
+	size := newImg.Bounds().Size()
+	return []byte(newImg.Pix), size.X, size.Y, nil
 }
