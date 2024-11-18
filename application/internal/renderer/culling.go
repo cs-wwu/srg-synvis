@@ -97,12 +97,12 @@ func (f *Frustum) IsChunkVisible(chunk *Chunk) bool {
 }
 
 // UpdateVisibleChunks updates the TerrainManager's visible chunks based on frustum culling
-func (app *Application) updateVisibleChunks() {
-	tm := app.TerrainManager
-
-	// Get write lock since we're modifying visible chunks
+func (tm *TerrainManager) updateVisibleChunks() {
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()
+
+	// Update frustum with current matrices
+	tm.frustum.Update(tm.viewMatrix, tm.projMatrix)
 
 	// Store old visible chunks for comparison
 	oldVisibleChunks := make(map[string]bool, len(tm.visibleChunks))
@@ -118,7 +118,7 @@ func (app *Application) updateVisibleChunks() {
 	visibleCount := 0
 	// Check each chunk against the frustum
 	for _, chunk := range tm.orderedChunks {
-		if app.frustum.IsChunkVisible(chunk) {
+		if tm.frustum.IsChunkVisible(chunk) {
 			chunkKey := ChunkKey(chunk.X, chunk.Z)
 			tm.visibleChunks[chunkKey] = true
 			visibleCount++

@@ -67,8 +67,8 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 - [x] Look at feasiblity of https://github.com/zeux/meshoptimizer
   - [x] If it looks good, create CGo bindings
   - [x] Redo ChunkManager with meshoptimizer
-  - [ ] Reduce memory overhead from TerrainManager (back to triangle strips?)
-  - [ ] Work in TerrainManager LODs with meshoptimizer
+  - [x] Undo meshoptimizer due to no benefit
+  - [x] Reduce memory overhead from TerrainManager (back to triangle strips?)
 - [x] Fork `asche`:
   - [x] Allow for Physical Device Feature Settings (`vk.MultiDrawIndirect`)
   - [x] Allow for Command Pool Flag Settings (`vk.CommandPoolCreateResetCommandBufferBit`)
@@ -77,7 +77,11 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [x] Fix Main validation layer issues
   - [ ] Fix on-close validation layer issues
 - [x] Find and fix GPU hanging
-- [ ] Make Map and chunk rendering dynamic based on position
+- [x] Add LODs to Chunk Loading
+  - [ ] Move frustum culling from app to TerrainManager
+  - [ ] Load all visible png heightmaps if they exist
+  - [ ] Load only visible chunks
+  - [ ] If chunks do not exist, load water chunks
 - [ ] Rework Main method to not use ticker-based system
 - [ ] Change Camera to use Quaternions (sensors?)
 

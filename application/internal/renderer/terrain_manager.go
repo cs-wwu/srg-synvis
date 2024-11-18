@@ -87,6 +87,10 @@ type TerrainManager struct {
 
 	drawCommand DrawCommand
 
+	frustum    *Frustum
+	viewMatrix *lin.Mat4x4
+	projMatrix *lin.Mat4x4
+
 	shutdown chan struct{}
 }
 
@@ -115,13 +119,14 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
 		drawCommand:   DrawCommand{},
+		frustum:       &Frustum{},
+		viewMatrix:    &lin.Mat4x4{},
+		projMatrix:    &lin.Mat4x4{},
 		shutdown:      make(chan struct{}),
 	}
 
 	tm.InitBuffers()
-
 	go tm.updateLoop()
-
 	return tm
 }
 
@@ -253,6 +258,8 @@ func (tm *TerrainManager) checkForUpdates() {
 		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
 	}
+
+	tm.updateVisibleChunks()
 }
 
 func (tm *TerrainManager) updateLoop() {
@@ -461,6 +468,14 @@ func (tm *TerrainManager) Destroy() {
 	// Destroy command buffer
 	vk.DestroyBuffer(*tm.device, tm.drawCommandBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.drawCommandMemory, nil)
+}
+
+func (tm *TerrainManager) UpdateMatrices(view, proj *lin.Mat4x4) {
+	tm.chunkMutex.Lock()
+	defer tm.chunkMutex.Unlock()
+
+	*tm.viewMatrix = *view
+	*tm.projMatrix = *proj
 }
 
 // GetActiveBuffers returns the currently active vertex and index buffers

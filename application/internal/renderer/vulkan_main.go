@@ -19,11 +19,9 @@ import (
 func NewApplication() *Application {
 	camera := NewCamera()
 	fpsCounter := NewFPSCounter()
-	frustum := &Frustum{}
 	app := &Application{
 		camera:     camera,
 		fpsCounter: fpsCounter,
-		frustum:    frustum,
 	}
 
 	return app
@@ -91,7 +89,6 @@ func (app *Application) VulkanContextCleanup() error {
 func (app *Application) NextFrame() {
 	// Get visible chunks count thread-safely
 	app.fpsCounter.Update(app.TerrainManager.GetVisibleChunks())
-
 	app.frameCount++
 
 	// Process Input and update the camera
@@ -101,10 +98,7 @@ func (app *Application) NextFrame() {
 	// Check for buffer updates from TerrainManager
 
 	// Update the view frustum and visible chunks periodically
-	if app.frameCount%CULLING_INTERVAL == 0 {
-		app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-		app.updateVisibleChunks()
-	}
+	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
 
 	// Update terrain position - TerrainManager handles updates in its own thread
 	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
