@@ -259,7 +259,7 @@ func (tm *TerrainManager) checkForUpdates() {
 		tm.lastUpdatePos = tm.lastPosition
 	}
 
-	tm.updateVisibleChunks()
+	// tm.updateVisibleChunks()
 }
 
 func (tm *TerrainManager) updateLoop() {
