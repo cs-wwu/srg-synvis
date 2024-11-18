@@ -151,12 +151,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	})
 	OrPanic(as.NewError(ret))
 
-	// Check for buffer updates from TerrainManager first
-	if app.TerrainManager.SwapBuffers() {
-		activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
-		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
-		vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
-	}
+	app.TerrainManager.SwapBuffers()
 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
@@ -190,7 +185,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	// Get current active buffers
+	// Get current active buffers and bind them
 	activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
 	vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
