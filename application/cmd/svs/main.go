@@ -5,6 +5,7 @@ import (
 	"log"
 	"runtime"
 	"time"
+	"flag"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
@@ -23,12 +24,19 @@ func init() {
 }
 
 func main() {
+	// Define and get flags
+	gpsFlag := flag.Bool("gps", false, "Enable GPS")
+	hatFlag := flag.Bool("hat", false, "Enable Hat")
+	flag.Parse()
+
 	orPanic(glfw.Init())
 	vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
 	orPanic(vk.Init())
 	defer closer.Close()
 
 	app := renderer.NewApplication()
+	app.Gps = *gpsFlag
+	app.Hat = *hatFlag
 	reqDim := app.VulkanSwapchainDimensions()
 	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
 	glfw.WindowHint(glfw.Resizable, glfw.False)

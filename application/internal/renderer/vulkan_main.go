@@ -92,7 +92,7 @@ func (app *Application) NextFrame() {
 	app.frameCount++
 
 	// Process Input and update the camera
-	app.camera.ProcessInput(app.WindowHandle)
+	app.camera.ProcessInput(app.WindowHandle, app.Gps, app.Hat)
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Check for buffer updates from TerrainManager

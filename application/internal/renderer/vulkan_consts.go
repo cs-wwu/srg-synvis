@@ -37,6 +37,9 @@ type Application struct {
 	TerrainManager *TerrainManager
 	fpsCounter     *FPSCounter
 	WindowHandle   *glfw.Window
+
+	Gps bool
+	Hat bool
 }
 
 const (

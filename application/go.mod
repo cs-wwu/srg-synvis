@@ -14,4 +14,7 @@ require (
 	golang.org/x/term v0.23.0
 )
 
-require golang.org/x/sys v0.23.0 // indirect
+require (
+	github.com/stratoberry/go-gpsd v1.3.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
+)
