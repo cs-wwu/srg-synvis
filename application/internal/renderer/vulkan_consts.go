@@ -1,8 +1,10 @@
 package renderer
 
 import (
+	as "github.com/cs-wwu/srg-synvis/asche"
+
 	"github.com/go-gl/glfw/v3.3/glfw"
-	as "github.com/vulkan-go/asche"
+	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 )
 
@@ -29,13 +31,12 @@ type Application struct {
 
 	frameCount int
 
-	// uniformBuffersMapped []unsafe.Pointer
 	ubo UniformBufferObject
 
-	camera       *Camera
-	ChunkManager *ChunkManager
-	frustum      *Frustum
-	WindowHandle *glfw.Window
+	camera         *Camera
+	TerrainManager *TerrainManager
+	fpsCounter     *FPSCounter
+	WindowHandle   *glfw.Window
 
 	Gps bool
 	Hat bool
@@ -44,7 +45,7 @@ type Application struct {
 const (
 	HGT_PATH         = "assets/maps/n48w123.hgt.png" // TODO hardcoded
 	FOV              = 60.0                          // Field Of View in Degrees
-	CULLING_INTERVAL = 1                             // Perform culling every x frames
+	CULLING_INTERVAL = 30                            // Perform culling every x frames
 	MAPS_PATH        = "assets/maps/"
 
 	WINDOW_HEIGHT = 480
@@ -115,6 +116,7 @@ const (
 	TextureMemoryPropertyHostCoherentBit  = vk.MemoryPropertyHostCoherentBit
 	TextureMemoryPropertyDeviceLocalBit   = vk.MemoryPropertyDeviceLocalBit
 	TextureAccessHostWriteBit             = vk.AccessHostWriteBit
+	TexturePipelineStageHostBit           = vk.PipelineStageHostBit
 	TextureAccessTransferWriteBit         = vk.AccessTransferWriteBit
 	TexturePipelineStageTopOfPipeBit      = vk.PipelineStageTopOfPipeBit
 	TexturePipelineStageFragmentShaderBit = vk.PipelineStageFragmentShaderBit
@@ -197,6 +199,7 @@ const (
 	PipelineVertexInputStateCreateInfoSType   = vk.StructureTypePipelineVertexInputStateCreateInfo
 	PipelineInputAssemblyStateCreateInfoSType = vk.StructureTypePipelineInputAssemblyStateCreateInfo
 	PrimitiveTopologyTriangleStrip            = vk.PrimitiveTopologyTriangleStrip
+	// PrimitiveTopologyTriangleList             = vk.PrimitiveTopologyTriangleList
 	PipelineRasterizationStateCreateInfoSType = vk.StructureTypePipelineRasterizationStateCreateInfo
 	PolygonModeFill                           = vk.PolygonModeFill
 	CullModeBackBit                           = vk.CullModeBackBit

@@ -120,7 +120,7 @@ sudo -u $ACTUAL_USER mkdir -p $USER_HOME/go
 # Install required packages
 echo "Installing Vulkan tools and related packages..."
 apt update
-apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxcursor-dev libmeshoptimizer-dev
+apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxcursor-dev libmeshoptimizer-dev=0.18+dfsg-2
 
 # Run vkcube and check its exit status
 echo "Running vkcube to verify Vulkan installation..."

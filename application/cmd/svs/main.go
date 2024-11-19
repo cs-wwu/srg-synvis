@@ -7,15 +7,16 @@ import (
 	"time"
 	"flag"
 
+	as "github.com/cs-wwu/srg-synvis/asche"
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	as "github.com/vulkan-go/asche"
+	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )
 
-const FRAME_RATE = 20
+const FRAME_RATE = 60
 
 func init() {
 	runtime.LockOSThread()
@@ -28,28 +29,28 @@ func main() {
 	hatFlag := flag.Bool("hat", false, "Enable Hat")
 	flag.Parse()
 
-    orPanic(glfw.Init())
-    vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
-    orPanic(vk.Init())
-    defer closer.Close()
+	orPanic(glfw.Init())
+	vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
+	orPanic(vk.Init())
+	defer closer.Close()
 
-    app := renderer.NewApplication()
+	app := renderer.NewApplication()
 	app.Gps = *gpsFlag
 	app.Hat = *hatFlag
-    reqDim := app.VulkanSwapchainDimensions()
+	reqDim := app.VulkanSwapchainDimensions()
 	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
 	glfw.WindowHint(glfw.Resizable, glfw.False)
 	window, err := glfw.CreateWindow(int(reqDim.Width), int(reqDim.Height), "Vulkan", nil, nil)
-    orPanic(err)
+	orPanic(err)
 	app.WindowHandle = window
 
-    platform, err := as.NewPlatform(app)
-    orPanic(err)
+	platform, err := as.NewPlatform(app)
+	orPanic(err)
 
-    dim := app.Context().SwapchainDimensions()
+	dim := app.Context().SwapchainDimensions()
 	log.Printf("Initialized %s with %+v swapchain", app.VulkanAppName(), dim)
 
-    // some sync logic
+	// some sync logic
 	doneC := make(chan struct{}, 2)
 	exitC := make(chan struct{}, 2)
 	defer closer.Bind(func() {
@@ -58,12 +59,12 @@ func main() {
 		log.Println("Bye!")
 	})
 
-    fpsDelay := time.Second / FRAME_RATE
-    fpsTicker := time.NewTicker(fpsDelay)
+	fpsDelay := time.Second / FRAME_RATE
+	fpsTicker := time.NewTicker(fpsDelay)
 
-    for {
-        select {
-        case <- exitC:
+	for {
+		select {
+		case <-exitC:
 			app.Destroy()
 			platform.Destroy()
 			window.Destroy()
@@ -71,15 +72,15 @@ func main() {
 			fpsTicker.Stop()
 			doneC <- struct{}{}
 			return
-        case <- fpsTicker.C:
-            if window.ShouldClose() {
-                exitC <- struct{}{}
-                continue
-            }
-            glfw.PollEvents()
-            app.NextFrame()
+		case <-fpsTicker.C:
+			if window.ShouldClose() {
+				exitC <- struct{}{}
+				continue
+			}
+			glfw.PollEvents()
+			app.NextFrame()
 
-            imageIdx, outdated, err := app.Context().AcquireNextImage()
+			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			orPanic(err)
 			if outdated {
 				imageIdx, _, err = app.Context().AcquireNextImage()
@@ -87,8 +88,8 @@ func main() {
 			}
 			_, err = app.Context().PresentImage(imageIdx)
 			orPanic(err)
-        }
-    }
+		}
+	}
 }
 
 func orPanic(err interface{}) {
