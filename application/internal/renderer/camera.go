@@ -4,31 +4,31 @@ package renderer
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os/exec"
-	"io"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	lin "github.com/xlab/linmath"
 	"github.com/stratoberry/go-gpsd"
+	lin "github.com/xlab/linmath"
 )
 
 var (
 	// For heightmap model
 
-	startX, startZ = CoordinateGPSToFloat("48.732476667, -122.4858033333")
-	HeightMeters = float32(1300.0)
-	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
+	startX, startZ   = CoordinateGPSToFloat("48.732476667, -122.4858033333")
+	HeightMeters     = float32(1300.0)
+	HeightArcseconds = HeightMeters * float32(60.0/1852.0)
 
 	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
-	
+
 	LAT = float64(0.0)
 	LON = float64(0.0)
 )
@@ -83,27 +83,29 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	return result
 }
 
- func trygps() {
-		gps, err := gpsd.Dial("localhost:2947")
-		if err != nil { panic(err)}
+func trygps() {
+	gps, err := gpsd.Dial("localhost:2947")
+	if err != nil {
+		panic(err)
+	}
 
-		tpvFilter := func(r interface{}) {
-				report := r.(*gpsd.TPVReport)
-				// fmt.Println("Location updated:", report.Lat, report.Lon)
-				LAT = report.Lat
-				LON = report.Lon
-				fmt.Println("Location:", LAT, LON)
-		}		
-		gps.AddFilter("TPV", tpvFilter)
+	tpvFilter := func(r interface{}) {
+		report := r.(*gpsd.TPVReport)
+		// fmt.Println("Location updated:", report.Lat, report.Lon)
+		LAT = report.Lat
+		LON = report.Lon
+		fmt.Println("Location:", LAT, LON)
+	}
+	gps.AddFilter("TPV", tpvFilter)
 
-		done := gps.Watch()
-		<- done
-		
-		gps.Close()		
+	done := gps.Watch()
+	<-done
+
+	gps.Close()
 }
 
 func trySense() string {
-	cmd := exec.Command("python3", "./internal/renderer/hat.py")
+	cmd := exec.Command("python3", "./internal/senors/hat.py")
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -133,12 +135,10 @@ func trySense() string {
 	return string(output)
 }
 
-
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
 func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
-
 	if gps {
 		go trygps()
 		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
@@ -149,30 +149,29 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 	if hat {
 		// Get the sense data
 		input := trySense()
-		
+
 		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
 		input = strings.Trim(input, "[]")
 		parts := strings.Split(input, ", ")
 		yaw, err := strconv.ParseFloat(parts[0], 64)
 		if err != nil {
-			fmt.Println("Error parsing")
+			fmt.Printf("yaw processing error: %v\n", err)
 		}
 		roll, err := strconv.ParseFloat(parts[1], 64)
 		if err != nil {
-			fmt.Println("Error parsing")
+			fmt.Printf("roll processing error: %v\n", err)
 		}
 		pitch, err := strconv.ParseFloat(parts[2], 64)
 		if err != nil {
-			fmt.Println("Error parsing")
+			fmt.Printf("pitch processing error: %v\n", err)
 		}
 		fmt.Println(roll, pitch, yaw)
 
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
-		c.Front = &front	
+		c.Front = &front
 	}
 
-	
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
 		tmp := lin.Vec3{}
@@ -224,7 +223,7 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
 			yaw += float64(c.Sensitivity)
 		}
-		if window.GetKey(glfw.KeyE) == glfw.Press {	// Roll Right
+		if window.GetKey(glfw.KeyE) == glfw.Press { // Roll Right
 			roll += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
@@ -283,14 +282,14 @@ func (c *Camera) getPitch() float64 { // y
 func (c *Camera) getRoll() float64 { // x
 	// assume up and front vectors are orthonormal
 	x0 := lin.Vec3{}
-	x0.MultCross(&lin.Vec3{0,1,0}, c.Front)
+	x0.MultCross(&lin.Vec3{0, 1, 0}, c.Front)
 	x0.Norm(&x0)
 	y0 := lin.Vec3{}
 	y0.MultCross(c.Front, &x0)
-	
+
 	y0yr := dotProduct(y0, *c.Up)
 	cos0 := math.Acos(float64(y0yr))
-	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2]))/float64(x0[2]))
+	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2])) / float64(x0[2]))
 }
 
 func dotProduct(v1, v2 lin.Vec3) float32 {
@@ -300,9 +299,9 @@ func dotProduct(v1, v2 lin.Vec3) float32 {
 // Update the camera's front, right, and up vectors based on the current rotation
 func (c *Camera) updateCameraVectors(roll, pitch, yaw float64) {
 	// Create quaternion for yaw, pitch, and roll
-	yawQuat := QuatRotate(yaw, &lin.Vec3{0, 1, 0}) // Rotate around Y-axis
+	yawQuat := QuatRotate(yaw, &lin.Vec3{0, 1, 0})     // Rotate around Y-axis
 	pitchQuat := QuatRotate(pitch, &lin.Vec3{1, 0, 0}) // Rotate around X-axis
-	rollQuat := QuatRotate(roll, &lin.Vec3{0, 0, 1}) // Rotate around Z-axis
+	rollQuat := QuatRotate(roll, &lin.Vec3{0, 0, 1})   // Rotate around Z-axis
 
 	// Combine rotations
 	c.Rotation.Mult(c.Rotation, &rollQuat)
@@ -312,11 +311,10 @@ func (c *Camera) updateCameraVectors(roll, pitch, yaw float64) {
 
 	// calculate new front, right, and up vectors
 
-	front := lin.Vec3{0, 0, -1} // Default front vector
+	front := lin.Vec3{0, 0, -1}            // Default front vector
 	front = RotateQuat(&front, c.Rotation) // Rotate by the combined quaternion
-	front.Norm(&front) // Normalize the front vector
+	front.Norm(&front)                     // Normalize the front vector
 	c.Front = &front
-
 
 	right := lin.Vec3{1, 0, 0}
 	right = RotateQuat(&right, c.Rotation)
@@ -330,7 +328,6 @@ func (c *Camera) updateCameraVectors(roll, pitch, yaw float64) {
 
 	fmt.Printf("Front: %v, Right: %v, Up: %v, Rot: %v\n", c.Front, c.Right, c.Up, c.Rotation)
 }
-
 
 // Helper Functions for Quaternion Rotations
 // lin.Quat defined as [x,y,x,w]
