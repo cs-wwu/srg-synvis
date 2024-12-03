@@ -3,18 +3,22 @@ package renderer
 // This file should be used to manipulate the camera position and vectors
 
 import (
+	"bufio"
+	_ "embed"
 	"fmt"
 	"log"
 	"math"
 	"os/exec"
-	"io"
-	"strings"
 	"strconv"
+	"strings"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	lin "github.com/xlab/linmath"
 	"github.com/stratoberry/go-gpsd"
+	lin "github.com/xlab/linmath"
 )
+
+//go:embed out
+var outstr []byte
 
 var (
 	// For heightmap model
@@ -41,12 +45,13 @@ type Camera struct {
 	WorldUp  *lin.Vec3 // Global up vector
 	Rotation *lin.Quat // Quaternion for Rotation
 
+
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
 }
 
 // NewCamera creates and initializes a new Camera
-func NewCamera() *Camera {
+func NewCamera(hat bool) *Camera {
 	pos := START_CAMERA_POS
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
@@ -102,54 +107,35 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 		gps.Close()		
 }
 
-func trySense() string {
-	cmd := exec.Command("python3", "./internal/renderer/hat.py")
+func (c *Camera) TrySense() {
+	// cmd := exec.Command("python3", "./internal/renderer/hat.py")
+	cmd := exec.Command("./internal/renderer/out")
+	// fmt.Println(outstr)
+
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return "[0,0,0,0]"
+		return
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return "[0,0,0,0]"
+		return
 	}
+
 	// Read the output from the pipe
-	output, err := io.ReadAll(stdout)
-	if err != nil {
-		fmt.Println("Error reading output:", err)
-		return "[0,0,0,0]"
-	}
-	// Print the output
-	// fmt.Println("output " + string(output))
-	// Wait for the command to finish
-	err = cmd.Wait()
-	if err != nil {
-		fmt.Println("Error waiting for command:", err)
-		return "[0,0,0,0]"
-	}
-	return string(output)
-}
+	reader := bufio.NewReader(stdout)
+	for {
+		fmt.Println("get input ")
+		input, err := reader.ReadString('\n')
+		fmt.Println("got input " + input)
+		if err != nil {
+			fmt.Println("Error reading output:", err)
+			break
+		}
 
-
-// Processes input from the glfw window and moves the camera accordingly
-// This function is mainly for debugging purposes
-// Uses WASD for movement, and arrow keys for viewing
-func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
-
-	if gps {
-		go trygps()
-		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
-		(*c.Pos)[0] = newX
-		(*c.Pos)[2] = newZ
-	}
-
-	if hat {
-		// Get the sense data
-		input := trySense()
-		
 		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
 		input = strings.Trim(input, "[]")
 		parts := strings.Split(input, ", ")
@@ -166,10 +152,34 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 			fmt.Println("Error parsing")
 		}
 		fmt.Println(roll, pitch, yaw)
-
+	
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
-		c.Front = &front	
+		c.Front = &front
+	}
+
+	// Print the output
+	// fmt.Println("output " + string(output))
+	// Wait for the command to finish
+	err = cmd.Wait()
+	if err != nil {
+		fmt.Println("Error waiting for command:", err)
+		return
+	}
+
+}
+
+
+// Processes input from the glfw window and moves the camera accordingly
+// This function is mainly for debugging purposes
+// Uses WASD for movement, and arrow keys for viewing
+func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
+
+	if gps {
+		go trygps()
+		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
+		(*c.Pos)[0] = newX
+		(*c.Pos)[2] = newZ
 	}
 
 	

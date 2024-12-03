@@ -16,8 +16,11 @@ import (
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication() *Application {
-	camera := NewCamera()
+func NewApplication(hat bool) *Application {
+	camera := NewCamera(hat)
+	if hat {
+		go camera.TrySense()
+	}
 	fpsCounter := NewFPSCounter()
 	app := &Application{
 		camera:     camera,
@@ -92,7 +95,7 @@ func (app *Application) NextFrame() {
 	app.frameCount++
 
 	// Process Input and update the camera
-	app.camera.ProcessInput(app.WindowHandle, app.Gps, app.Hat)
+	app.camera.ProcessInput(app.WindowHandle, app.Gps)
 	app.ubo.View = app.camera.GetViewMatrix()
 
 	// Check for buffer updates from TerrainManager
