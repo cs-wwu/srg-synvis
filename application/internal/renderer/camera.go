@@ -19,7 +19,8 @@ import (
 var (
 	// For heightmap model
 
-	startX, startZ = CoordinateGPSToFloat("48.732476667, -122.4858033333")
+	// startX, startZ = CoordinateGPSToFloat("48.732476667, -123.4858033333")
+	startX, startZ = CoordinateGPSToFloat("48.0, -123.0")
 	HeightMeters = float32(1300.0)
 	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
@@ -102,35 +103,56 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 		gps.Close()		
 }
 
-func trySense() string {
-	cmd := exec.Command("python3", "./internal/renderer/hat.py")
+func (c *Camera) trySense() {
+	// cmd := exec.Command("python3", "./internal/renderer/hat.py")
+	cmd := exec.Command("./internal/renderer/hatexec")
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return "[0,0,0,0]"
+		return
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return "[0,0,0,0]"
+		return
 	}
 	// Read the output from the pipe
 	output, err := io.ReadAll(stdout)
 	if err != nil {
 		fmt.Println("Error reading output:", err)
-		return "[0,0,0,0]"
+		panic(err)
 	}
 	// Print the output
-	// fmt.Println("output " + string(output))
+	fmt.Println("output " + string(output))
 	// Wait for the command to finish
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return "[0,0,0,0]"
+		panic(err)
 	}
-	return string(output)
+	input := string(output)
+	// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
+	input = strings.Trim(input, "[]")
+	parts := strings.Split(input, ", ")
+	yaw, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil {
+		fmt.Println("Error parsing")
+	}
+	roll, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil {
+		fmt.Println("Error parsing")
+	}
+	pitch, err := strconv.ParseFloat(parts[2], 64)
+	if err != nil {
+		fmt.Println("Error parsing")
+	}
+	fmt.Println(roll, pitch, yaw)
+
+	// Update the front vector with pitch and yaw data
+	front := calcFrontVector(pitch, yaw)
+	c.Front = &front
 }
 
 
@@ -148,28 +170,7 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 
 	if hat {
 		// Get the sense data
-		input := trySense()
-		
-		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
-		input = strings.Trim(input, "[]")
-		parts := strings.Split(input, ", ")
-		yaw, err := strconv.ParseFloat(parts[0], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
-		}
-		roll, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
-		}
-		pitch, err := strconv.ParseFloat(parts[2], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
-		}
-		fmt.Println(roll, pitch, yaw)
-
-		// Update the front vector with pitch and yaw data
-		front := calcFrontVector(pitch, yaw)
-		c.Front = &front	
+		go c.trySense()
 	}
 
 	
@@ -231,6 +232,7 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 			roll -= float64(c.Sensitivity)
 		}
 
+		fmt.Println(roll, pitch, yaw)
 		front := calcFrontVector(pitch, yaw)
 		c.Front = &front
 
