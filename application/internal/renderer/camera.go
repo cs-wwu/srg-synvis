@@ -107,10 +107,9 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 }
 
 func (c *Camera) TrySense() {
-	// cmd := exec.Command("python3", "./internal/renderer/hat.py")
-	cmd := exec.Command("./internal/renderer/out")
-	// fmt.Println(outstr)
-
+	cmd := exec.Command("python3", "./internal/renderer/hat.py")
+	// cmd := exec.Command("./internal/renderer/out")
+	
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -127,9 +126,7 @@ func (c *Camera) TrySense() {
 	// Read the output from the pipe
 	reader := bufio.NewReader(stdout)
 	for {
-		fmt.Println("get input ")
 		input, err := reader.ReadString('\n')
-		fmt.Println("got input " + input)
 		if err != nil {
 			fmt.Println("Error reading output:", err)
 			break
@@ -142,15 +139,15 @@ func (c *Camera) TrySense() {
 		if err != nil {
 			fmt.Println("Error parsing")
 		}
-		roll, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
-		}
+		//roll, err := strconv.ParseFloat(parts[1], 64)
+		// if err != nil {
+		// 	fmt.Println("Error parsing")
+		// }
 		pitch, err := strconv.ParseFloat(parts[2], 64)
 		if err != nil {
 			fmt.Println("Error parsing")
 		}
-		fmt.Println(roll, pitch, yaw)
+		// fmt.Println(roll, pitch, yaw)
 	
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
