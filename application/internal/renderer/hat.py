@@ -10,7 +10,6 @@ def main():
 		sense_data.append(orientation["yaw"])
 		sense_data.append(orientation["pitch"])
 		sense_data.append(orientation["roll"])
-		sense_data.append(0)
 		print(sense_data, flush=True)
 
 if __name__ == "__main__":

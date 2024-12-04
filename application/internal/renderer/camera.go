@@ -9,8 +9,6 @@ import (
 	"log"
 	"math"
 	"os/exec"
-	"strconv"
-	"strings"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
@@ -132,22 +130,14 @@ func (c *Camera) TrySense() {
 			break
 		}
 
-		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
-		input = strings.Trim(input, "[]")
-		parts := strings.Split(input, ", ")
-		yaw, err := strconv.ParseFloat(parts[0], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
+		// Parse the sense data
+		var yaw, pitch, roll float64
+		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &pitch, &roll)
+		if err != nil || n != 3 {
+			fmt.Println("Error parsing input:", err)
+			continue
 		}
-		//roll, err := strconv.ParseFloat(parts[1], 64)
-		// if err != nil {
-		// 	fmt.Println("Error parsing")
-		// }
-		pitch, err := strconv.ParseFloat(parts[2], 64)
-		if err != nil {
-			fmt.Println("Error parsing")
-		}
-		// fmt.Println(roll, pitch, yaw)
+		// fmt.Println(yaw, roll, pitch)
 	
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
