@@ -17,13 +17,12 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-//go:embed out
-var outstr []byte
 
 var (
 	// For heightmap model
 
-	startX, startZ = CoordinateGPSToFloat("48.732476667, -122.4858033333")
+	// startX, startZ = CoordinateGPSToFloat("48.732476667, -123.4858033333")
+	startX, startZ = CoordinateGPSToFloat("48.0, -123.0")
 	HeightMeters = float32(1300.0)
 	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
@@ -241,6 +240,7 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
 			roll -= float64(c.Sensitivity)
 		}
 
+		// fmt.Println(roll, pitch, yaw)
 		front := calcFrontVector(pitch, yaw)
 		c.Front = &front
 

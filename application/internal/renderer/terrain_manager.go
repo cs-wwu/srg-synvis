@@ -179,6 +179,8 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		sizes[chunk.lodLevel]++
 	}
 
+	fmt.Printf("\n\nSizes: %v\n\n", sizes)
+
 	return nil
 }
 
