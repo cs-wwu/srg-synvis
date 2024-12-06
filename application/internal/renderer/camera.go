@@ -131,13 +131,13 @@ func (c *Camera) TrySense() {
 		}
 
 		// Parse the sense data
-		var yaw, pitch, roll float64
-		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &pitch, &roll)
+		var yaw, roll, pitch float64
+		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &roll, &pitch)
 		if err != nil || n != 3 {
 			fmt.Println("Error parsing input:", err)
 			continue
 		}
-		// fmt.Println(yaw, roll, pitch)
+		fmt.Println(roll, pitch, yaw)
 	
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
@@ -228,8 +228,8 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
 		}
 
 		// fmt.Println(roll, pitch, yaw)
-		front := calcFrontVector(pitch, yaw)
-		c.Front = &front
+		// front := calcFrontVector(pitch, yaw)
+		// c.Front = &front
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
