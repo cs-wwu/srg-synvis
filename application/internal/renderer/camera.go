@@ -91,10 +91,10 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 
 		tpvFilter := func(r interface{}) {
 				report := r.(*gpsd.TPVReport)
-				// fmt.Println("Location updated:", report.Lat, report.Lon)
+				fmt.Println("Location updated:", report.Lat, report.Lon)
 				LAT = report.Lat
 				LON = report.Lon
-				fmt.Println("Location:", LAT, LON)
+				// fmt.Println("Location:", LAT, LON)
 		}		
 		gps.AddFilter("TPV", tpvFilter)
 
