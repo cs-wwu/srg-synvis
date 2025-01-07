@@ -251,7 +251,7 @@ func (tm *TerrainManager) FillPendingBuffers() {
 func (tm *TerrainManager) checkForUpdates() {
 	if tm.HasCrossedThreshold(tm.lastPosition) {
 		// Load new chunks and update pending buffers
-		tm.LoadMap("n47w123") // Example coordinate
+		tm.LoadMap("n48w123") // Example coordinate
 		tm.FillPendingBuffers()
 
 		// Mark as updated so main thread knows to swap buffers
