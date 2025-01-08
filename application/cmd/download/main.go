@@ -79,11 +79,19 @@ func ProcessHeightmaps(heightmaps []string, targetDir string) error {
 
 // Current Example Usage
 func main() {
-	targetDir := "assets/maps/"
+	/* targetDir := "assets/maps/"
 	heightmaps := []string{"n48w123", "n48w122", "n47w123", "n47w122"}
 	err := ProcessHeightmaps(heightmaps, targetDir)
 	if err != nil {
 		fmt.Printf("failed to process heightmaps: %v\n", err)
+		os.Exit(1)
+	} */
+
+	targetDir := "assets/textures/osm/"
+	maps := [][]int{{48, -123}, {48, -122}, {47, -123}, {41, -88}}
+	err := processor.GenerateOsmPng(maps, targetDir, processor.OSMURL)
+	if err != nil {
+		fmt.Printf("failed to process OSM maps: %v\n", err)
 		os.Exit(1)
 	}
 }

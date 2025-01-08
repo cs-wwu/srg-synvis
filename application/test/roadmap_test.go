@@ -1,6 +1,9 @@
 package test
 
 import (
+	"fmt"
+	"image"
+	"image/color"
 	"testing"
 
 	"github.com/cs-wwu/srg-synvis/internal/processor"
@@ -11,7 +14,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestNoMaps(t *testing.T) {
-	err := processor.GenerateOsmPng(nil, "testdir")
+	err := processor.GenerateOsmPng(nil, "testdir", processor.OSMURL)
 	if err == nil {
 		t.Errorf("ran on nil, wanted err, got nil")
 	}
@@ -19,7 +22,7 @@ func TestNoMaps(t *testing.T) {
 
 func TestEmptyString(t *testing.T) {
 	maps := [][]int{{0, 0}}
-	err := processor.GenerateOsmPng(maps, "")
+	err := processor.GenerateOsmPng(maps, "", processor.OSMURL)
 	if err == nil {
 		t.Errorf("ran on targetDir='', wanted err, got nil")
 	}
@@ -71,7 +74,29 @@ func TestDrawLine(t *testing.T) {
 
 }
 func TestDrawFilledPolygon(t *testing.T) {
+	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	for y := 1; y <= 11; y++ {
+		for x := 1; x <= 11; x++ {
+			baseImage.Set(x, y, color.White)
+		}
+	}
+	corners := []processor.Point{
+		{X: 1, Y: 1},
+		{X: 11, Y: 1},
+		{X: 1, Y: 11},
+		{X: 11, Y: 11},
+	}
+	processor.DrawFilledPolygon(testImage, corners, color.White)
 
+	for p := range baseImage.Pix {
+		if testImage.Pix[p] == 255 {
+			fmt.Printf("%d == %d\n", p, testImage.Pix[p])
+		}
+		if baseImage.Pix[p] != testImage.Pix[p] {
+			t.Errorf("Pixel: %d, %d != %d", p, baseImage.Pix[p], testImage.Pix[p])
+		}
+	}
 }
 func TestMakeApiRequest(t *testing.T) {
 
@@ -103,4 +128,8 @@ func TestIsPointInPolygon(t *testing.T) {
 	if retF {
 		t.Errorf("ran on (-1.0, 1.0), wanted false got true")
 	}
+}
+
+func TestDrawRoads(t *testing.T) {
+
 }

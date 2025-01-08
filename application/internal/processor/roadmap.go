@@ -26,8 +26,12 @@ type OverpassResponse struct {
 	Elements []Element `json:"elements"`
 }
 
-const imgLength = 3600
-const scale = 1.5
+const (
+	imgLength = 3600
+	scale = 1.5
+	OSMURL = "http://overpass-api.de/api/interpreter"
+)
+
 var widths = map[string]float64 {
 	"motorway": 8,
 	"trunk": 6,
@@ -160,7 +164,7 @@ func Itoa(n int) string {
 }
 
 //Make an api request to overpass-api, process the data into and overpassResponse data type
-func MakeApiRequest(maps []int) (OverpassResponse, error) {
+func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
 	bounds := "(" + Itoa(lat) + "," + Itoa(lon) + "," + Itoa(lat+1) + "," + Itoa(lon+1) + ");"
@@ -178,7 +182,7 @@ func MakeApiRequest(maps []int) (OverpassResponse, error) {
 	`
 
 	var osmData OverpassResponse
-	resp, err := http.Post("http://overpass-api.de/api/interpreter", "application/x-www-form-urlencoded", strings.NewReader("data="+query))
+	resp, err := http.Post(apiUrl, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
 		return osmData, fmt.Errorf("error: %e", err)
 	}
@@ -235,14 +239,14 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 	}
 }
 
-func GenerateOsmPng(maps [][]int, targetDir string) error {
+func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 	if maps == nil || targetDir == "" {
 		return fmt.Errorf("no maps or targetDir specified")
 	}
 
 	for i := range maps {
 
-		osmData, err := MakeApiRequest(maps[i])
+		osmData, err := MakeApiRequest(apiURL, maps[i])
 		if err != nil {
 			return err
 		}
