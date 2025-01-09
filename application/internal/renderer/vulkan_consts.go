@@ -43,9 +43,8 @@ type Application struct {
 }
 
 const (
-	HGT_PATH         = "assets/maps/n48w123.hgt.png" // TODO hardcoded
-	FOV              = 60.0                          // Field Of View in Degrees
-	CULLING_INTERVAL = 30                            // Perform culling every x frames
+	FOV              = 60.0 // Field Of View in Degrees
+	CULLING_INTERVAL = 30   // Perform culling every x frames
 	MAPS_PATH        = "assets/maps/"
 
 	WINDOW_HEIGHT = 480
@@ -55,7 +54,7 @@ const (
 )
 
 var texEnabled = []string{
-	"assets/textures/checkerboard.png",
+	"assets/textures/n47w123.osm.png",
 }
 
 // Depth Constants
