@@ -6,7 +6,6 @@ import (
 	"bufio"
 	_ "embed"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os/exec"
@@ -156,7 +155,7 @@ func (c *Camera) TrySense() {
 		fmt.Println("Error waiting for command:", err)
 		return
 	}
-
+}
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
