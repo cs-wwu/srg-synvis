@@ -3,25 +3,27 @@ package renderer
 // This file should be used to manipulate the camera position and vectors
 
 import (
+	"bufio"
+	_ "embed"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"os/exec"
-	"strconv"
-	"strings"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
 	lin "github.com/xlab/linmath"
 )
 
+
 var (
 	// For heightmap model
 
-	startX, startZ   = CoordinateGPSToFloat("47.0, -123.0")
-	HeightMeters     = float32(13000.0)
-	HeightArcseconds = HeightMeters * float32(60.0/1852.0)
+	// startX, startZ = CoordinateGPSToFloat("48.732476667, -123.4858033333")
+	startX, startZ = CoordinateGPSToFloat("48.0, -123.0")
+	HeightMeters = float32(1300.0)
+	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
 
 	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
@@ -41,12 +43,13 @@ type Camera struct {
 	WorldUp  *lin.Vec3 // Global up vector
 	Rotation *lin.Quat // Quaternion for Rotation
 
+
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
 }
 
 // NewCamera creates and initializes a new Camera
-func NewCamera() *Camera {
+func NewCamera(hat bool) *Camera {
 	pos := START_CAMERA_POS
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
@@ -89,14 +92,15 @@ func trygps() {
 		panic(err)
 	}
 
-	tpvFilter := func(r interface{}) {
-		report := r.(*gpsd.TPVReport)
-		// fmt.Println("Location updated:", report.Lat, report.Lon)
-		LAT = report.Lat
-		LON = report.Lon
-		fmt.Println("Location:", LAT, LON)
-	}
-	gps.AddFilter("TPV", tpvFilter)
+		tpvFilter := func(r interface{}) {
+				report := r.(*gpsd.TPVReport)
+				fmt.Println("Location updated:", report.Lat, report.Lon)
+				LAT = report.Lat
+				LON = report.Lon
+				// fmt.Println("Location:", LAT, LON)
+		}		
+		gps.AddFilter("TPV", tpvFilter)
+
 
 	done := gps.Watch()
 	<-done
@@ -104,72 +108,66 @@ func trygps() {
 	gps.Close()
 }
 
-func trySense() string {
-	cmd := exec.Command("python3", "./internal/senors/hat.py")
+
+func (c *Camera) TrySense() {
+	cmd := exec.Command("python3", "./internal/sensors/hat.py")
+
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return "[0,0,0,0]"
+		return
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return "[0,0,0,0]"
+		return
 	}
+
 	// Read the output from the pipe
-	output, err := io.ReadAll(stdout)
-	if err != nil {
-		fmt.Println("Error reading output:", err)
-		return "[0,0,0,0]"
+	reader := bufio.NewReader(stdout)
+	for {
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading output:", err)
+			break
+		}
+
+		// Parse the sense data
+		var yaw, roll, pitch float64
+		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &roll, &pitch)
+		if err != nil || n != 3 {
+			fmt.Println("Error parsing input:", err)
+			continue
+		}
+		fmt.Println(roll, pitch, yaw)
+	
+		// Update the front vector with pitch and yaw data
+		front := calcFrontVector(pitch, yaw)
+		c.Front = &front
 	}
+
 	// Print the output
 	// fmt.Println("output " + string(output))
 	// Wait for the command to finish
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return "[0,0,0,0]"
+		return
 	}
-	return string(output)
-}
+
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
-func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
+func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
+
 	if gps {
 		go trygps()
 		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
 		(*c.Pos)[0] = newX
 		(*c.Pos)[2] = newZ
-	}
-
-	if hat {
-		// Get the sense data
-		input := trySense()
-
-		// Parse the sense data: should be of form "[-2.19, -0.52, -0.37, 0]"
-		input = strings.Trim(input, "[]")
-		parts := strings.Split(input, ", ")
-		yaw, err := strconv.ParseFloat(parts[0], 64)
-		if err != nil {
-			fmt.Printf("yaw processing error: %v\n", err)
-		}
-		roll, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			fmt.Printf("roll processing error: %v\n", err)
-		}
-		pitch, err := strconv.ParseFloat(parts[2], 64)
-		if err != nil {
-			fmt.Printf("pitch processing error: %v\n", err)
-		}
-		fmt.Println(roll, pitch, yaw)
-
-		// Update the front vector with pitch and yaw data
-		front := calcFrontVector(pitch, yaw)
-		c.Front = &front
 	}
 
 	if window.GetAttrib(glfw.Focused) == glfw.True {
@@ -230,8 +228,9 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool, hat bool) {
 			roll -= float64(c.Sensitivity)
 		}
 
-		front := calcFrontVector(pitch, yaw)
-		c.Front = &front
+		// fmt.Println(roll, pitch, yaw)
+		// front := calcFrontVector(pitch, yaw)
+		// c.Front = &front
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())

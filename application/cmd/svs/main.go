@@ -34,7 +34,7 @@ func main() {
 	orPanic(vk.Init())
 	defer closer.Close()
 
-	app := renderer.NewApplication()
+	app := renderer.NewApplication(*hatFlag)
 	app.Gps = *gpsFlag
 	app.Hat = *hatFlag
 	reqDim := app.VulkanSwapchainDimensions()
