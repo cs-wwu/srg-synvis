@@ -6,6 +6,7 @@ import (
 	"bufio"
 	_ "embed"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os/exec"
@@ -100,15 +101,17 @@ func trygps() {
 		}		
 		gps.AddFilter("TPV", tpvFilter)
 
+
 	done := gps.Watch()
 	<-done
 
 	gps.Close()
 }
 
+
 func (c *Camera) TrySense() {
 	cmd := exec.Command("python3", "./internal/sensors/hat.py")
-	
+
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -154,7 +157,6 @@ func (c *Camera) TrySense() {
 		return
 	}
 
-}
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
@@ -168,7 +170,6 @@ func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
 		(*c.Pos)[2] = newZ
 	}
 
-	
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
 		tmp := lin.Vec3{}
