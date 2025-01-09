@@ -106,10 +106,8 @@ func trygps() {
 	gps.Close()
 }
 
-// TODO check /sensors/hat.py
 func (c *Camera) TrySense() {
-	cmd := exec.Command("python3", "./internal/renderer/hat.py")
-	// cmd := exec.Command("./internal/renderer/out")
+	cmd := exec.Command("python3", "./internal/sensors/hat.py")
 	
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
