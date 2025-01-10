@@ -73,7 +73,7 @@ type Point struct {
 //
 // Return:
 //   - updates img with the line drawn between two points
-func DrawLine(start, end Point, width float64, img *image.Gray) {
+func DrawLine(start, end Point, width float64, img *image.Gray, color color.Color) {
 	// Calculate line parameters
 	dx := end.X - start.X
 	dy := end.Y - start.Y
@@ -98,7 +98,7 @@ func DrawLine(start, end Point, width float64, img *image.Gray) {
 	}
 
 	// Draw filled polygon
-	DrawFilledPolygon(img, corners, color.Black)
+	DrawFilledPolygon(img, corners, color)
 }
 
 // drawFilledPolygon draws a filled polygon with the specified color
@@ -234,7 +234,7 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			DrawLine(p1, p2, widths[roadType], grayImage)
+			DrawLine(p1, p2, widths[roadType], grayImage, color.Black)
 		}
 	}
 }

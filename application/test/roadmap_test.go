@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"testing"
@@ -71,28 +70,55 @@ func TestCoordToString(t *testing.T) {
 	}
 }
 func TestDrawLine(t *testing.T) {
-
-}
-func TestDrawFilledPolygon(t *testing.T) {
+	start := processor.Point{X: 1, Y: 8}
+	end := processor.Point{X: 10, Y: 8}
+	width := 4.0
 	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
 	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
-	for y := 1; y <= 11; y++ {
-		for x := 1; x <= 11; x++ {
-			baseImage.Set(x, y, color.White)
+	corners := []processor.Point{
+		{X: 1, Y: 6},
+		{X: 1, Y: 10},
+		{X: 10, Y: 6},
+		{X: 10, Y: 10},
+	}
+
+	for y := 6; y <= 10; y++ {
+		for x := 1; x <= 10; x++ {
+			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
+				baseImage.Set(x, y, color.White)
+			}
 		}
 	}
+
+	processor.DrawLine(start, end, width, testImage, color.White)
+
+	for p := range baseImage.Pix {
+		if baseImage.Pix[p] != testImage.Pix[p] {
+			t.Errorf("Pixel: %d, %d != %d", p, baseImage.Pix[p], testImage.Pix[p])
+		}
+	}
+}
+func TestDrawFilledPolygon(t *testing.T) {
 	corners := []processor.Point{
 		{X: 1, Y: 1},
 		{X: 11, Y: 1},
 		{X: 1, Y: 11},
 		{X: 11, Y: 11},
 	}
+
+	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	for y := 1; y <= 11; y++ {
+		for x := 1; x <= 11; x++ {
+			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
+				baseImage.Set(x, y, color.White)
+			}
+		}
+	}
+
 	processor.DrawFilledPolygon(testImage, corners, color.White)
 
 	for p := range baseImage.Pix {
-		if testImage.Pix[p] == 255 {
-			fmt.Printf("%d == %d\n", p, testImage.Pix[p])
-		}
 		if baseImage.Pix[p] != testImage.Pix[p] {
 			t.Errorf("Pixel: %d, %d != %d", p, baseImage.Pix[p], testImage.Pix[p])
 		}
