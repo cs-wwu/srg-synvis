@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"time"
 	"flag"
+	"os/exec"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
@@ -29,12 +30,23 @@ func main() {
 	hatFlag := flag.Bool("hat", false, "Enable Hat")
 	flag.Parse()
 
+	// Enable gps on device if applicable
+	if *gpsFlag {
+		// if sudo issues
+		// cmd := exec.Command("/bin/bash", "-c", "sudo gpsd /dev/ttyAMA0 -F /var/run/gpsd.sock")
+
+		cmd := exec.Command("sudo", "gpsd", "/dev/ttyAMA0", "-F", "/var/run/gpsd.sock")
+		if err := cmd.Run(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	orPanic(glfw.Init())
 	vk.SetGetInstanceProcAddr(glfw.GetVulkanGetInstanceProcAddress())
 	orPanic(vk.Init())
 	defer closer.Close()
 
-	app := renderer.NewApplication(*hatFlag)
+	app := renderer.NewApplication(*hatFlag, *gpsFlag)
 	app.Gps = *gpsFlag
 	app.Hat = *hatFlag
 	reqDim := app.VulkanSwapchainDimensions()

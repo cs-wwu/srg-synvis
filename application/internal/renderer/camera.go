@@ -4,7 +4,6 @@ package renderer
 
 import (
 	"bufio"
-	_ "embed"
 	"fmt"
 	"log"
 	"math"
@@ -85,21 +84,23 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	return result
 }
 
-func trygps() {
+func (c *Camera) TryGps() {
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to connect to GPSD: %s", err)
 	}
 
-		tpvFilter := func(r interface{}) {
-				report := r.(*gpsd.TPVReport)
-				fmt.Println("Location updated:", report.Lat, report.Lon)
-				LAT = report.Lat
-				LON = report.Lon
-				// fmt.Println("Location:", LAT, LON)
-		}		
-		gps.AddFilter("TPV", tpvFilter)
-
+	tpvFilter := func(r interface{}) {
+		report := r.(*gpsd.TPVReport)
+		fmt.Println("Location updated:", report.Lat, report.Lon)
+		LAT = report.Lat
+		LON = report.Lon
+		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
+		(*c.Pos)[0] = newX
+		(*c.Pos)[2] = newZ
+		// fmt.Println("Location:", LAT, LON)
+	}		
+	gps.AddFilter("TPV", tpvFilter)
 
 	done := gps.Watch()
 	<-done
@@ -160,14 +161,7 @@ func (c *Camera) TrySense() {
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
-func (c *Camera) ProcessInput(window *glfw.Window, gps bool) {
-
-	if gps {
-		go trygps()
-		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
-		(*c.Pos)[0] = newX
-		(*c.Pos)[2] = newZ
-	}
+func (c *Camera) ProcessInput(window *glfw.Window) {
 
 	if window.GetAttrib(glfw.Focused) == glfw.True {
 
