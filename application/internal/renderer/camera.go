@@ -8,29 +8,26 @@ import (
 	"log"
 	"math"
 	"os/exec"
+	"sync"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
 	lin "github.com/xlab/linmath"
 )
 
-
 var (
 	// For heightmap model
 
 	// startX, startZ = CoordinateGPSToFloat("48.732476667, -123.4858033333")
-	startX, startZ = CoordinateGPSToFloat("48.0, -123.0")
-	HeightMeters = float32(1300.0)
-	HeightArcseconds = HeightMeters * float32(60.0 / 1852.0)
+	startX, startZ   = CoordinateGPSToFloat("48.0, -123.0")
+	HeightMeters     = float32(1300.0)
+	HeightArcseconds = HeightMeters * float32(60.0/1852.0)
 
 	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
-
-	LAT = float64(0.0)
-	LON = float64(0.0)
 )
 
 type Camera struct {
@@ -41,6 +38,8 @@ type Camera struct {
 	WorldUp  *lin.Vec3 // Global up vector
 	Rotation *lin.Quat // Quaternion for Rotation
 
+	frontMutex sync.Mutex // Mutex for updating the front vector
+	posMutex   sync.Mutex // Mutex for updating the position vector
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
@@ -93,13 +92,10 @@ func (c *Camera) TryGps() {
 	tpvFilter := func(r interface{}) {
 		report := r.(*gpsd.TPVReport)
 		fmt.Println("Location updated:", report.Lat, report.Lon)
-		LAT = report.Lat
-		LON = report.Lon
-		newX, newZ := CoordinateGPSFloatToFloat(float32(LAT), float32(LON))
-		(*c.Pos)[0] = newX
-		(*c.Pos)[2] = newZ
+		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
+		c.UpdatePos(newX, newZ)
 		// fmt.Println("Location:", LAT, LON)
-	}		
+	}
 	gps.AddFilter("TPV", tpvFilter)
 
 	done := gps.Watch()
@@ -107,7 +103,6 @@ func (c *Camera) TryGps() {
 
 	gps.Close()
 }
-
 
 func (c *Camera) TrySense() {
 	cmd := exec.Command("python3", "./internal/sensors/hat.py")
@@ -142,10 +137,10 @@ func (c *Camera) TrySense() {
 			continue
 		}
 		fmt.Println(roll, pitch, yaw)
-	
+
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
-		c.Front = &front
+		c.UpdateFront(front)
 	}
 
 	// Print the output
@@ -170,31 +165,31 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// Camera Movement
 		if window.GetKey(glfw.KeyW) == glfw.Press { // Move Forward
 			tmp.Scale(c.Front, c.Speed)
-			c.Pos.Add(c.Pos, &tmp)
+			c.AddPos(tmp)
 		}
 		if window.GetKey(glfw.KeyS) == glfw.Press { // Move Backward
 			tmp.Scale(c.Front, c.Speed)
-			c.Pos.Sub(c.Pos, &tmp)
+			c.SubPos(tmp)
 		}
 		if window.GetKey(glfw.KeyA) == glfw.Press { // Move Left
 			tmp.MultCross(c.Front, c.Up)
 			tmp.Norm(&tmp)
 			tmp.Scale(&tmp, c.Speed)
-			c.Pos.Sub(c.Pos, &tmp)
+			c.SubPos(tmp)
 		}
 		if window.GetKey(glfw.KeyD) == glfw.Press { // Move Right
 			tmp.MultCross(c.Front, c.Up)
 			tmp.Norm(&tmp)
 			tmp.Scale(&tmp, c.Speed)
-			c.Pos.Add(c.Pos, &tmp)
+			c.AddPos(tmp)
 		}
 		if window.GetKey(glfw.KeySpace) == glfw.Press { // Move Up
 			tmp.Scale(c.Up, c.Speed)
-			c.Pos.Add(c.Pos, &tmp)
+			c.AddPos(tmp)
 		}
 		if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Move Down
 			tmp.Scale(c.Up, c.Speed)
-			c.Pos.Sub(c.Pos, &tmp)
+			c.SubPos(tmp)
 		}
 
 		yaw := c.getYaw()
@@ -222,8 +217,8 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		}
 
 		// fmt.Println(roll, pitch, yaw)
-		// front := calcFrontVector(pitch, yaw)
-		// c.Front = &front
+		front := calcFrontVector(pitch, yaw)
+		c.UpdateFront(front)
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -346,4 +341,29 @@ func RotateQuat(vec *lin.Vec3, quat *lin.Quat) lin.Vec3 {
 	tmp.Mult(&tmp, &qConj)
 
 	return lin.Vec3{tmp[0], tmp[1], tmp[2]}
+}
+
+func (c *Camera) UpdateFront(front lin.Vec3) {
+	c.frontMutex.Lock()
+	c.Front = &front
+	c.frontMutex.Unlock()
+}
+
+func (c *Camera) UpdatePos(newX, newZ float32) {
+	c.posMutex.Lock()
+	(*c.Pos)[0] = newX
+	(*c.Pos)[2] = newZ
+	c.posMutex.Unlock()
+}
+
+func (c *Camera) AddPos(tmp lin.Vec3) {
+	c.posMutex.Lock()
+	c.Pos.Add(c.Pos, &tmp)
+	c.posMutex.Unlock()
+}
+
+func (c *Camera) SubPos(tmp lin.Vec3) {
+	c.posMutex.Lock()
+	c.Pos.Sub(c.Pos, &tmp)
+	c.posMutex.Unlock()
 }
