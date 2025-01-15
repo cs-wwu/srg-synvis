@@ -1,8 +1,11 @@
 package test
 
 import (
+	"errors"
 	"image"
 	"image/color"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/cs-wwu/srg-synvis/internal/processor"
@@ -76,8 +79,8 @@ func TestDrawLine(t *testing.T) {
 	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
 	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
 	corners := []processor.Point{
-		{X: 1, Y: 6},
 		{X: 1, Y: 10},
+		{X: 1, Y: 6},
 		{X: 10, Y: 6},
 		{X: 10, Y: 10},
 	}
@@ -125,7 +128,187 @@ func TestDrawFilledPolygon(t *testing.T) {
 	}
 }
 func TestMakeApiRequest(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name             string
+		bbStatusCode     int
+		bbBody           string
+		wantElementCount int
+		wantErr          error
+	}{
+		{
+			name:         "bad status code",
+			bbStatusCode: http.StatusInternalServerError,
+			wantErr:      errors.New("error"),
+		},
+		{
+			name:         "one available element",
+			bbStatusCode: http.StatusOK,
+			bbBody: `{
+    				"version": 0.6,
+    				"generator": "Overpass API 0.7.61.8 b1080abd",
+					"osm3s": {
+						"timestamp_osm_base": "2024-10-28T22:08:39Z",
+						"copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+					},
+					"elements": [
+						{
+							"type": "way",
+							"id": 5250240,
+							"bounds": {
+								"minlat": 48.9845541,
+								"minlon": -122.7349281,
+								"maxlat": 48.9893445,
+								"maxlon": -122.7331845
+							},
+							"nodes": [
+								37011528,
+								6343941244,
+								6343941227,
+								6343941247,
+								6343941265,
+								6343941219,
+								6343941239,
+								6346044042,
+								37011529,
+								6346044041,
+								6346044040,
+								6346044039,
+								6346044038,
+								37011531,
+								6346044043,
+								37011534,
+								37011535,
+								37011536,
+								6344179292,
+								37011537
+							],
+							"geometry": [
+								{
+									"lat": 48.9845541,
+									"lon": -122.7331845
+								},
+								{
+									"lat": 48.984787,
+									"lon": -122.7333241
+								},
+								{
+									"lat": 48.9848992,
+									"lon": -122.7334092
+								},
+								{
+									"lat": 48.985143,
+									"lon": -122.733618
+								},
+								{
+									"lat": 48.9853769,
+									"lon": -122.7338266
+								},
+								{
+									"lat": 48.9855963,
+									"lon": -122.734034
+								},
+								{
+									"lat": 48.9859669,
+									"lon": -122.7344037
+								},
+								{
+									"lat": 48.9860565,
+									"lon": -122.7344913
+								},
+								{
+									"lat": 48.9861415,
+									"lon": -122.7345664
+								},
+								{
+									"lat": 48.9862393,
+									"lon": -122.7346408
+								},
+								{
+									"lat": 48.9863257,
+									"lon": -122.7346992
+								},
+								{
+									"lat": 48.9864272,
+									"lon": -122.7347534
+								},
+								{
+									"lat": 48.9865207,
+									"lon": -122.7347949
+								},
+								{
+									"lat": 48.986624,
+									"lon": -122.7348316
+								},
+								{
+									"lat": 48.9867335,
+									"lon": -122.7348613
+								},
+								{
+									"lat": 48.986843,
+									"lon": -122.7348766
+								},
+								{
+									"lat": 48.9869491,
+									"lon": -122.734883
+								},
+								{
+									"lat": 48.9870689,
+									"lon": -122.7348895
+								},
+								{
+									"lat": 48.988876,
+									"lon": -122.7348898
+								},
+								{
+									"lat": 48.9893445,
+									"lon": -122.7349281
+								}
+							],
+							"tags": {
+								"bicycle": "yes",
+								"bus": "designated",
+								"destination": "H Street \u2013 Truck Customs",
+								"destination:ref": "WA 543 North",
+								"hgv": "designated",
+								"highway": "motorway",
+								"maxspeed": "40 mph",
+								"oneway": "yes",
+								"ref": "WA 543",
+								"tiger:cfcc": "A63",
+								"tiger:county": "Whatcom, WA",
+								"tiger:reviewed": "no"
+							}
+						}`,
+			wantElementCount: 1,
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.bbStatusCode)
+				_, err := w.Write([]byte(tc.bbBody))
+				if err != nil {
+					t.Errorf("Issues with httptest server: %e", err)
+				}
+			}))
+			defer testServer.Close()
 
+			maps := []int{48, -123}
+			gotElements, gotErr := processor.MakeApiRequest(testServer.URL, maps)
+
+			if tc.wantErr != nil && gotErr == nil {
+				t.Errorf("wanted err: %e, got err: %e", tc.wantErr, gotErr)
+			}
+			if gotErr == nil {
+				if len(gotElements.Elements) != tc.wantElementCount {
+					t.Errorf("wanted %d elements, got %d elements", len(gotElements.Elements), tc.wantElementCount)
+				}
+			}
+		})
+	}
 }
 func TestIsPointInPolygon(t *testing.T) {
 	polygon := []processor.Point{{X: 0.0, Y: 0.0}, {X: 1.0, Y: 0.0}, {X: 1.0, Y: 1.0}, {X: 0.0, Y: 1.0}}
