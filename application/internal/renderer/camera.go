@@ -163,6 +163,12 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 
 		tmp := lin.Vec3{}
 
+		// Ctrl+C will kill the program
+		if window.GetKey(glfw.KeyLeftControl) == glfw.Press &&
+			window.GetKey(glfw.KeyC) == glfw.Press {
+			window.SetShouldClose(true) // This will trigger the cleanup in main's event loop
+		}
+
 		// Camera Movement
 		if window.GetKey(glfw.KeyW) == glfw.Press { // Move Forward
 			tmp.Scale(c.Front, c.Speed)

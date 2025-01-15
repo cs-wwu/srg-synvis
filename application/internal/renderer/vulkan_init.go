@@ -62,6 +62,11 @@ func (app *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
 	}
 }
 
+func (app *Application) SetSwapchainDimensions(dim *as.SwapchainDimensions) {
+	app.width = dim.Width
+	app.height = dim.Height
+}
+
 func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
 	extensions = append(extensions, "VK_EXT_debug_report") // TODO: Remove if no debug
