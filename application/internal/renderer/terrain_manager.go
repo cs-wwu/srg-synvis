@@ -174,12 +174,12 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 	}
 
 	// Calculate LOD sizes for debugging
-	sizes := make([]int, 4)
-	for _, chunk := range tm.chunks {
-		sizes[chunk.lodLevel]++
-	}
+	// sizes := make([]int, 4)
+	// for _, chunk := range tm.chunks {
+	// 	sizes[chunk.lodLevel]++
+	// }
 
-	fmt.Printf("\n\nSizes: %v\n\n", sizes)
+	// fmt.Printf("\n\nSizes: %v\n\n", sizes)
 
 	return nil
 }
