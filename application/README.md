@@ -75,14 +75,17 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
   - [ ] Use the forked `asche` to allow for UI implementation?
 - [x] Find and fix all validation layer issues
   - [x] Fix Main validation layer issues
-  - [ ] Fix on-close validation layer issues
+  - [x] Fix on-close validation layer issues
 - [x] Find and fix GPU hanging
 - [x] Add LODs to Chunk Loading
   - [ ] Move frustum culling from app to TerrainManager
   - [ ] Load all visible png heightmaps if they exist
   - [ ] Load only visible chunks
   - [ ] If chunks do not exist, load water chunks
-- [ ] Rework Main method to not use ticker-based system
+- [ ] Remove Indirect draw calls
+- [x] Refactor main method
+- [x] Add kill command (Ctrl+C) to window
+- [x] Add fullscreen/monitor selection
 - [ ] Change Camera to use Quaternions (sensors?)
 
 - [ ] Eventually remove local `asche` copy (public repo)
