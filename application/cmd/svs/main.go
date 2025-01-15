@@ -95,8 +95,9 @@ func main() {
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			orPanic(err)
 			if outdated {
-				imageIdx, _, err = app.Context().AcquireNextImage()
-				orPanic(err)
+				// imageIdx, _, err = app.Context().AcquireNextImage()
+				// orPanic(err)
+				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v, err: %s)", imageIdx, outdated, err.Error())
 			}
 			_, err = app.Context().PresentImage(imageIdx)
 			orPanic(err)
