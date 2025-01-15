@@ -8,11 +8,10 @@ import (
 	"runtime"
 	"time"
 
-	as "github.com/cs-wwu/srg-synvis/asche"
+	as "github.com/cs-wwu/srg-synvis/asche" // local asche copy
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
-	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )
@@ -22,6 +21,7 @@ func init() {
 	log.SetFlags(log.Lshortfile)
 }
 
+// Current config settings
 type AppConfig struct {
 	gps        bool
 	hat        bool
@@ -37,6 +37,7 @@ func parseFlags() AppConfig {
 	return config
 }
 
+// Initializes the gps, returns on error
 func initGPS() error {
 	cmd := exec.Command("sudo", "gpsd", "/dev/ttyAMA0", "-F", "/var/run/gpsd.sock")
 	return cmd.Run()
