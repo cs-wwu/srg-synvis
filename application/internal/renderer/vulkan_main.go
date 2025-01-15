@@ -193,11 +193,12 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
 
 	// Draw using indirect buffer
-	vk.CmdDrawIndexedIndirect(cmd,
-		app.TerrainManager.drawCommandBuffer,
-		0,
-		1,
-		uint32(unsafe.Sizeof(DrawCommand{})),
+	vk.CmdDrawIndexed(cmd,
+		uint32(len(app.TerrainManager.activeIndices)), // indexCount
+		1, // instanceCount
+		0, // firstIndex
+		0, // vertexOffset
+		0, // firstInstance
 	)
 
 	vk.CmdEndRenderPass(cmd)
