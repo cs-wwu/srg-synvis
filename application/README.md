@@ -86,4 +86,4 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 - [ ] Change Camera to use Quaternions (sensors?)
 
 - [ ] Eventually remove local `asche` copy (public repo)
-- [ ] Eventually remove local `meshopt` copy (public repo)
+- [x] Eventually remove local `meshopt` copy (public repo)
