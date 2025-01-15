@@ -4,6 +4,7 @@ package renderer
 
 import (
 	"bufio"
+	_ "embed"
 	"fmt"
 	"log"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"github.com/stratoberry/go-gpsd"
 	lin "github.com/xlab/linmath"
 )
+
 
 var (
 	// For heightmap model
@@ -138,10 +140,9 @@ func (c *Camera) TrySense() {
 		}
 		fmt.Println(roll, pitch, yaw)
 
-		// Update the front vector with pitch and yaw data
+    // Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
 		c.UpdateFront(front)
-	}
 
 	// Print the output
 	// fmt.Println("output " + string(output))
