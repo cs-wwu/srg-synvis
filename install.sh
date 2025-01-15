@@ -138,6 +138,12 @@ else
     echo "There might be an issue with the Vulkan installation."
 fi
 
+# Install gpsd
+apt-get update
+apt-get install gpsd gpsd-clients
+systemctl stop gpsd.socket
+systemctl disable gpsd.socket
+
 echo "Go has been installed to /usr/local/go"
 echo "GOPATH has been set to $USER_HOME/go for user $ACTUAL_USER"
 echo "Please restart your terminal or run 'source ~/.bashrc' as $ACTUAL_USER to apply the PATH changes."
