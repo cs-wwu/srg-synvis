@@ -86,7 +86,6 @@ func parseFlags() *Config {
 
 	// Output option flags
 	flag.StringVar(&cfg.outputDir, "out", "assets/maps/", "Output directory for downloaded files")
-	flag.BoolVar(&cfg.keepZipFiles, "keep-zip", false, "Keep zip files after extraction")
 	flag.BoolVar(&cfg.verbose, "v", false, "Verbose output")
 
 	flag.Parse()
