@@ -73,9 +73,6 @@ type TerrainManager struct {
 	pendingIndexMemory  vk.DeviceMemory
 	pendingVertexMemory vk.DeviceMemory
 
-	drawCommandBuffer vk.Buffer
-	drawCommandMemory vk.DeviceMemory
-
 	lastPosition  lin.Vec3
 	lastUpdatePos lin.Vec3
 
@@ -85,21 +82,11 @@ type TerrainManager struct {
 	visibleChunks map[string]bool
 	orderedChunks []*Chunk
 
-	drawCommand DrawCommand
-
 	frustum    *Frustum
 	viewMatrix *lin.Mat4x4
 	projMatrix *lin.Mat4x4
 
 	shutdown chan struct{}
-}
-
-type DrawCommand struct {
-	IndexCount    uint32
-	InstanceCount uint32
-	FirstIndex    uint32
-	VertexOffset  int32
-	FirstInstance uint32
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
@@ -118,7 +105,6 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		chunks:        make(map[string]*Chunk),
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
-		drawCommand:   DrawCommand{},
 		frustum:       &Frustum{},
 		viewMatrix:    &lin.Mat4x4{},
 		projMatrix:    &lin.Mat4x4{},
@@ -299,12 +285,6 @@ func (tm *TerrainManager) InitBuffers() {
 	pendingIndexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
 	tm.pendingIndexBuffer = pendingIndexBuf.Buffer
 	tm.pendingIndexMemory = pendingIndexBuf.Memory
-
-	// Draw command buffer
-	drawCommandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
-	drawCommandBuffer := as.CreateBuffer(*tm.device, *tm.memProps, drawCommandData, BufferUsageIndirectBufferBit)
-	tm.drawCommandBuffer = drawCommandBuffer.Buffer
-	tm.drawCommandMemory = drawCommandBuffer.Memory
 }
 
 // Loads a watermap (coord.swb.png) into the ChunkManager
@@ -425,28 +405,6 @@ func (tm *TerrainManager) SwapBuffers() bool {
 	tm.activeVertices = tm.pendingVertices
 	tm.activeIndices = tm.pendingIndices
 
-	// Update draw command with correct counts
-	tm.drawCommand = DrawCommand{
-		IndexCount:    uint32(len(tm.activeIndices)),
-		InstanceCount: 1,
-		FirstIndex:    0,
-		VertexOffset:  0,
-		FirstInstance: 0,
-	}
-
-	// Update draw command buffer
-	commandData := make([]byte, unsafe.Sizeof(DrawCommand{}))
-	binary.LittleEndian.PutUint32(commandData[0:], tm.drawCommand.IndexCount)
-	binary.LittleEndian.PutUint32(commandData[4:], tm.drawCommand.InstanceCount)
-	binary.LittleEndian.PutUint32(commandData[8:], tm.drawCommand.FirstIndex)
-	binary.LittleEndian.PutUint32(commandData[12:], uint32(tm.drawCommand.VertexOffset))
-	binary.LittleEndian.PutUint32(commandData[16:], tm.drawCommand.FirstInstance)
-
-	var pCommandData unsafe.Pointer
-	vk.MapMemory(*tm.device, tm.drawCommandMemory, 0, vk.DeviceSize(len(commandData)), 0, &pCommandData)
-	vk.Memcopy(pCommandData, commandData)
-	vk.UnmapMemory(*tm.device, tm.drawCommandMemory)
-
 	tm.updated.Store(false)
 	return true
 }
@@ -466,10 +424,6 @@ func (tm *TerrainManager) Destroy() {
 	vk.FreeMemory(*tm.device, tm.activeIndexMemory, nil)
 	vk.FreeMemory(*tm.device, tm.pendingVertexMemory, nil)
 	vk.FreeMemory(*tm.device, tm.pendingIndexMemory, nil)
-
-	// Destroy command buffer
-	vk.DestroyBuffer(*tm.device, tm.drawCommandBuffer, nil)
-	vk.FreeMemory(*tm.device, tm.drawCommandMemory, nil)
 }
 
 func (tm *TerrainManager) UpdateMatrices(view, proj *lin.Mat4x4) {
@@ -480,17 +434,18 @@ func (tm *TerrainManager) UpdateMatrices(view, proj *lin.Mat4x4) {
 	*tm.projMatrix = *proj
 }
 
+// Thread safe index fetching
+func (tm *TerrainManager) getActiveIndices() uint32 {
+	tm.chunkMutex.RLock()
+	defer tm.chunkMutex.RUnlock()
+	return uint32(len(tm.activeIndices))
+}
+
 // GetActiveBuffers returns the currently active vertex and index buffers
 func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()
 	return tm.activeVertexBuffer, tm.activeIndexBuffer
-}
-
-func (tm *TerrainManager) GetDrawCommand() DrawCommand {
-	tm.chunkMutex.RLock()
-	defer tm.chunkMutex.RUnlock()
-	return tm.drawCommand
 }
 
 func (tm *TerrainManager) GetVisibleChunks() int {
