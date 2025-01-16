@@ -51,10 +51,10 @@ func initGPS() error {
 }
 
 // Parses a start position into a lin.vec3
-// Defaults to 0.0, 0.0, 0.0 on parsing error
+// Defaults to 48.0, -123.0, 1300 on parsing error or no input
 func parsePosition(posString string) lin.Vec3 {
 	// Default position
-	pos := lin.Vec3{0.0, 0.0, 0.0}
+	pos := lin.Vec3{-442800, 162.11664, -172800}
 
 	// Split the string by commas
 	parts := strings.Split(posString, ",")
@@ -68,6 +68,8 @@ func parsePosition(posString string) lin.Vec3 {
 	lon, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 32)
 	height, err3 := strconv.ParseFloat(strings.TrimSpace(parts[2]), 32)
 
+	log.Printf("lat: %v, lon: %v, height: %v", lat, lon, height)
+
 	if err1 != nil || err2 != nil || err3 != nil {
 		log.Printf("Warning: Failed to parse position '%s', using default position", posString)
 		return pos
@@ -75,9 +77,9 @@ func parsePosition(posString string) lin.Vec3 {
 
 	// Convert to arcseconds
 	return lin.Vec3{
-		float32(lat * float64(ARC_DEGREES_TO_SECONDS)),               // latitude to arcseconds
+		float32(lon * float64(ARC_DEGREES_TO_SECONDS)),               // latitude to arcseconds
 		float32(height * (float64(ARC_DEGREES_TO_MINUTES) / 1852.0)), // meters to arcseconds
-		float32(lon * float64(ARC_DEGREES_TO_SECONDS)),               // longitude to arcseconds
+		float32(-lat * float64(ARC_DEGREES_TO_SECONDS)),              // longitude to arcseconds
 	}
 }
 
