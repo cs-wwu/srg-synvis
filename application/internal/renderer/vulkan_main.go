@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
+	"github.com/cs-wwu/srg-synvis/models"
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -16,13 +17,13 @@ import (
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication(hat bool, gps bool) *Application {
-	camera := NewCamera(hat)
-	if hat {
+func NewApplication(cfg models.AppConfig) *Application {
+	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos)
+	if cfg.UseHat {
 		go camera.TrySense()
 	}
 
-	if gps {
+	if cfg.UseGPS {
 		go camera.TryGps()
 	}
 
@@ -30,6 +31,8 @@ func NewApplication(hat bool, gps bool) *Application {
 	app := &Application{
 		camera:     camera,
 		fpsCounter: fpsCounter,
+		Gps:        cfg.UseGPS,
+		Hat:        cfg.UseHat,
 	}
 
 	return app

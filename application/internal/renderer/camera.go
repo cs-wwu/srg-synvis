@@ -17,14 +17,6 @@ import (
 )
 
 var (
-	// For heightmap model
-
-	// startX, startZ = CoordinateGPSToFloat("48.732476667, -123.4858033333")
-	startX, startZ   = CoordinateGPSToFloat("48.0, -123.0")
-	HeightMeters     = float32(1300.0)
-	HeightArcseconds = HeightMeters * float32(60.0/1852.0)
-
-	START_CAMERA_POS   = lin.Vec3{startX, float32(HeightArcseconds), startZ}
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
 	CAMERA_SPEED       = float32(10.0)
@@ -47,8 +39,8 @@ type Camera struct {
 }
 
 // NewCamera creates and initializes a new Camera
-func NewCamera(hat bool) *Camera {
-	pos := START_CAMERA_POS
+func NewCamera(hat bool, startPos lin.Vec3) *Camera {
+	pos := startPos
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
 	worldUp := START_CAMERA_UP
