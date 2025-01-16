@@ -37,7 +37,7 @@ func parseFlags() AppConfig {
 	return config
 }
 
-// Initializes the gps, returns on error
+// Initializes the gps, returns an error
 func initGPS() error {
 	cmd := exec.Command("sudo", "gpsd", "/dev/ttyAMA0", "-F", "/var/run/gpsd.sock")
 	return cmd.Run()

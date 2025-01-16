@@ -103,8 +103,6 @@ func (app *Application) NextFrame() {
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
-	// Check for buffer updates from TerrainManager
-
 	// Update the view frustum and visible chunks periodically
 	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
 
@@ -194,11 +192,11 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	// Draw using indirect buffer
 	vk.CmdDrawIndexed(cmd,
-		uint32(len(app.TerrainManager.activeIndices)), // indexCount
-		1, // instanceCount
-		0, // firstIndex
-		0, // vertexOffset
-		0, // firstInstance
+		app.TerrainManager.getActiveIndices(), // indexCount
+		1,                                     // instanceCount
+		0,                                     // firstIndex
+		0,                                     // vertexOffset
+		0,                                     // firstInstance
 	)
 
 	vk.CmdEndRenderPass(cmd)

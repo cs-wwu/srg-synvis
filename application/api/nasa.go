@@ -29,6 +29,7 @@ type Credentials struct {
 	Password string
 }
 
+// Returns the users credentials after prompting and storing them securly
 func promptCredentials() (Credentials, error) {
 	var creds Credentials
 	reader := bufio.NewReader(os.Stdin)
@@ -55,11 +56,13 @@ func promptCredentials() (Credentials, error) {
 	}, nil
 }
 
+// Creates the http client and initializes the cookie jar
 func createClient() (*http.Client, error) {
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cookiejar: %v", err)
 	}
+
 	return &http.Client{
 		Jar: jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -209,6 +212,7 @@ func DownloadHeightmaps(heightmaps []string, directoryPath string) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert heightmap to url: %v", err)
 		}
+
 		filepath := directoryPath + heightmap + ".zip"
 		err = attemptDownload(client, filepath, heightmapURL)
 		if err != nil {
