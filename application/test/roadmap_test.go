@@ -2,8 +2,10 @@ package test
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,7 +33,36 @@ func TestEmptyString(t *testing.T) {
 }
 
 func TestConvertCoordsToPngIndex(t *testing.T) {
+	highways := []processor.Element{}
+	testElement := processor.Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
+	highways = append(highways, testElement)
+	roads := [][]processor.Point{}
+	nodes := make(map[int64]processor.Element)
+	lat := 48
+	lon := -122
+	for i := range highways {
+		tempRoad := []processor.Point{}
+		for j := range highways[i].Nodes {
+			node := nodes[highways[i].Nodes[j]]
+			// Transforms the lat/lon into x/y coordinates
+			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (processor.Scale * processor.ImgLength))
+			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (processor.Scale * processor.ImgLength))
+			index := processor.Point{X: x, Y: y}
+			tempRoad = append(tempRoad, index)
+		}
+		roads = append(roads, tempRoad)
+	}
 
+	testRoads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
+	for i := range roads {
+		for j := range roads[i] {
+			if roads[i][j] != testRoads[i][j] {
+				fmt.Println("roads =", roads[i][j])
+				fmt.Println("testRoads =", testRoads[i][j])
+				t.Errorf("roads[%d][%d] != testRoads[%d][%d]", i, j, i, j)
+			}
+		}
+	}
 }
 
 func TestItoa(t *testing.T) {

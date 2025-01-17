@@ -27,17 +27,17 @@ type OverpassResponse struct {
 }
 
 const (
-	imgLength = 3600
-	scale = 1.5
-	OSMURL = "http://overpass-api.de/api/interpreter"
+	ImgLength = 3600
+	Scale     = 1.5
+	OSMURL    = "http://overpass-api.de/api/interpreter"
 )
 
-var widths = map[string]float64 {
-	"motorway": 8,
-	"trunk": 6,
-	"primary": 4,
+var widths = map[string]float64{
+	"motorway":  8,
+	"trunk":     6,
+	"primary":   4,
 	"secondary": 2,
-	"tertiary": 1,
+	"tertiary":  1,
 }
 
 // Creates an array of roads: [road#][point#][x, y]
@@ -49,8 +49,8 @@ func ConvertCoordsToPngIndex(highways []Element, nodes map[int64]Element, scale 
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (c * imgLength))
-			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (c * imgLength))
+			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (c * ImgLength))
+			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (c * ImgLength))
 			index := Point{x, y}
 			tempRoad = append(tempRoad, index)
 		}
@@ -163,7 +163,7 @@ func Itoa(n int) string {
 	return sign + q
 }
 
-//Make an api request to overpass-api, process the data into and overpassResponse data type
+// Make an api request to overpass-api, process the data into and overpassResponse data type
 func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
@@ -194,7 +194,7 @@ func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	}
 
 	// Parse JSON response
-	
+
 	err = json.Unmarshal(body, &osmData)
 	if err != nil {
 		return osmData, fmt.Errorf("error unmarshaling JSON: %e", err)
@@ -210,7 +210,7 @@ func CoordToString(lat, lon int) string {
 		ret += Itoa(lat)
 	} else {
 		ret += "s"
-		ret += Itoa(-1*lat)
+		ret += Itoa(-1 * lat)
 	}
 
 	if lon > 0 {
@@ -218,7 +218,7 @@ func CoordToString(lat, lon int) string {
 		ret += Itoa(lon)
 	} else {
 		ret += "w"
-		ret += Itoa(-1*lon)
+		ret += Itoa(-1 * lon)
 	}
 
 	return ret
@@ -226,7 +226,7 @@ func CoordToString(lat, lon int) string {
 
 func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.Gray, roadType string) {
 	// Turn the lat/lon to an arry of 3600 indexed float32
-	roads := ConvertCoordsToPngIndex(ways, nodes, scale, coords[0], coords[1])
+	roads := ConvertCoordsToPngIndex(ways, nodes, Scale, coords[0], coords[1])
 
 	// Connect all the points
 	for r := range roads {
@@ -266,16 +266,16 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 			} else if Element.Type == "way" && Element.Tags["highway"] == "secondary" {
 				secondaries = append(secondaries, Element)
 			} else if Element.Type == "way" && Element.Tags["highway"] == "tertiary" {
-				tertiaries = append(tertiaries, Element)   
+				tertiaries = append(tertiaries, Element)
 			} else if Element.Type == "node" {
 				nodes[Element.ID] = Element
 			}
 		}
 
 		// Generate an all white PNG
-		grayImage := image.NewGray(image.Rect(0, 0, scale*imgLength, scale*imgLength))
-		for x := 0; x < imgLength*scale; x++ {
-			for y := 0; y < imgLength*scale; y++ {
+		grayImage := image.NewGray(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
+		for x := 0; x < ImgLength*Scale; x++ {
+			for y := 0; y < ImgLength*Scale; y++ {
 				grayImage.SetGray(x, y, color.Gray{Y: 255})
 			}
 		}
@@ -286,7 +286,6 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
 		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary")
 		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary")
-		
 
 		bounds := CoordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
