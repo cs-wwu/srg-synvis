@@ -371,5 +371,21 @@ func TestIsPointInPolygon(t *testing.T) {
 }
 
 func TestDrawRoads(t *testing.T) {
+	highways := []processor.Element{}
+	testElement := processor.Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
+	highways = append(highways, testElement)
+	nodes := make(map[int64]processor.Element)
+	lat := 48
+	lon := -122
+	roads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
 
+	// Connect all the points
+	for r := range roads {
+		road := roads[r]
+		for p := 0; p < len(road)-1; p++ {
+			p1 := road[p]
+			p2 := road[p+1]
+			processor.DrawLine(p1, p2, widths[roadType], grayImage, color.Black)
+		}
+	}
 }
