@@ -40,6 +40,7 @@ func parseFlags() models.AppConfig {
 	flag.Parse()
 
 	config.CameraStartPos = parsePosition(*startPosString)
+
 	flag.Parse()
 	return config
 }
@@ -224,6 +225,7 @@ func main() {
 
 	// Start the gps if we set the gps flag(s)
 	if config.UseGPS {
+
 		if err := initGPS(); err != nil {
 			log.Fatal(err)
 		}
