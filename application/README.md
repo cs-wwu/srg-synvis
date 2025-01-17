@@ -4,6 +4,16 @@
 go run cmd/svs/main.go
 ```
 
+## Possible Command Arguments
+
+```bash
+go run cmd/svs/main.go
+  -gps Enable GPS
+  -hat Enable Hat
+  -pos <"lat,lon,hgt"> Starting Camera Position (lat,lon,height) where height is in meters (default "48.0,-123.0,1300") 
+  -monitor <int> Monitor selection (0 = windowed, 1 = primary monitor, etc.)
+```
+
 ## Installation
 
 1. Download the latest version of Go
