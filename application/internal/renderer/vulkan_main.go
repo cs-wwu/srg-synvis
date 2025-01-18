@@ -7,6 +7,7 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/asche"
+	"github.com/cs-wwu/srg-synvis/models"
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -16,13 +17,13 @@ import (
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication(hat bool, gps bool) *Application {
-	camera := NewCamera(hat)
-	if hat {
+func NewApplication(cfg models.AppConfig) *Application {
+	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos)
+	if cfg.UseHat {
 		go camera.TrySense()
 	}
 
-	if gps {
+	if cfg.UseGPS {
 		go camera.TryGps()
 	}
 
@@ -30,6 +31,8 @@ func NewApplication(hat bool, gps bool) *Application {
 	app := &Application{
 		camera:     camera,
 		fpsCounter: fpsCounter,
+		Gps:        cfg.UseGPS,
+		Hat:        cfg.UseHat,
 	}
 
 	return app
@@ -102,8 +105,6 @@ func (app *Application) NextFrame() {
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
-
-	// Check for buffer updates from TerrainManager
 
 	// Update the view frustum and visible chunks periodically
 	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
@@ -194,11 +195,11 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	// Draw using indirect buffer
 	vk.CmdDrawIndexed(cmd,
-		uint32(len(app.TerrainManager.activeIndices)), // indexCount
-		1, // instanceCount
-		0, // firstIndex
-		0, // vertexOffset
-		0, // firstInstance
+		app.TerrainManager.getActiveIndices(), // indexCount
+		1,                                     // instanceCount
+		0,                                     // firstIndex
+		0,                                     // vertexOffset
+		0,                                     // firstInstance
 	)
 
 	vk.CmdEndRenderPass(cmd)

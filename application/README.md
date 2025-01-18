@@ -4,6 +4,30 @@
 go run cmd/svs/main.go
 ```
 
+## Possible Command Arguments
+
+```bash
+go run cmd/svs/main.go
+  -gps                      Enable GPS
+  -hat                      Enable Hat
+  -pos     <"lat,lon,hgt">  Starting Camera Position (lat,lon,height) where height is in meters (default "48.0,-123.0,1300") 
+  -monitor <int>            Monitor selection (0 = windowed, 1 = primary monitor, etc.)
+```
+
+The Download api must have at least one "Download" selection (nasa/faa/osm)
+
+```bash
+go run cmd/download/main.go
+  -nasa             Download NASA elevation data
+  -faa              Download FAA airport/navigation data
+  -osm              Download OpenStreetMap data
+  -v                Verbose output
+  -bbox   <string>  Bounding box coordinates (e.g., '49,-125,45,-118') in format 'n, e, s, w'
+  -out    <string>  Output directory for downloaded files (default "assets/maps/")
+  -preset <string>  Use preset region: [bellingham/washington/...]
+  -region <string>  Comma-separated list of region codes (e.g., 'n48w123,n48w122')
+```
+
 ## Installation
 
 1. Download the latest version of Go

@@ -6,14 +6,23 @@ import (
 	"log"
 	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	as "github.com/cs-wwu/srg-synvis/asche" // local asche copy
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
+	"github.com/cs-wwu/srg-synvis/models"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
+	lin "github.com/xlab/linmath"
+)
+
+const (
+	ARC_DEGREES_TO_MINUTES = 60.0
+	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 )
 
 func init() {
@@ -21,26 +30,58 @@ func init() {
 	log.SetFlags(log.Lshortfile)
 }
 
-// Current config settings
-type AppConfig struct {
-	gps        bool
-	hat        bool
-	monitorNum int
-}
+func parseFlags() models.AppConfig {
+	config := models.AppConfig{}
+	flag.BoolVar(&config.UseGPS, "gps", false, "Enable GPS")
+	flag.BoolVar(&config.UseHat, "hat", false, "Enable Hat")
+	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
-func parseFlags() AppConfig {
-	config := AppConfig{}
-	flag.BoolVar(&config.gps, "gps", false, "Enable GPS")
-	flag.BoolVar(&config.hat, "hat", false, "Enable Hat")
-	flag.IntVar(&config.monitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
+	startPosString := flag.String("pos", "48.0,-123.0,1300", "Starting Camera Position (lat,lon,height) where height is in meters")
+	flag.Parse()
+
+	config.CameraStartPos = parsePosition(*startPosString)
+
 	flag.Parse()
 	return config
 }
 
-// Initializes the gps, returns on error
+// Initializes the gps, returns an error
 func initGPS() error {
 	cmd := exec.Command("sudo", "gpsd", "/dev/ttyAMA0", "-F", "/var/run/gpsd.sock")
 	return cmd.Run()
+}
+
+// Parses a start position into a lin.vec3
+// Defaults to 48.0, -123.0, 1300 on parsing error or no input
+func parsePosition(posString string) lin.Vec3 {
+	// Default position
+	pos := lin.Vec3{-442800, 162.11664, -172800}
+
+	// Split the string by commas
+	parts := strings.Split(posString, ",")
+	if len(parts) != 3 {
+		log.Printf("Warning: Invalid position format '%s', using default position", posString)
+		return pos
+	}
+
+	// Parse each component
+	lat, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 32)
+	lon, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 32)
+	height, err3 := strconv.ParseFloat(strings.TrimSpace(parts[2]), 32)
+
+	log.Printf("lat: %v, lon: %v, height: %v", lat, lon, height)
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		log.Printf("Warning: Failed to parse position '%s', using default position", posString)
+		return pos
+	}
+
+	// Convert to arcseconds
+	return lin.Vec3{
+		float32(lon * float64(ARC_DEGREES_TO_SECONDS)),               // latitude to arcseconds
+		float32(height * (float64(ARC_DEGREES_TO_MINUTES) / 1852.0)), // meters to arcseconds
+		float32(-lat * float64(ARC_DEGREES_TO_SECONDS)),              // longitude to arcseconds
+	}
 }
 
 // Sets up the monitor and finds the dimensions/refresh rate
@@ -183,7 +224,8 @@ func main() {
 	config := parseFlags()
 
 	// Start the gps if we set the gps flag(s)
-	if config.gps {
+	if config.UseGPS {
+
 		if err := initGPS(); err != nil {
 			log.Fatal(err)
 		}
@@ -195,12 +237,10 @@ func main() {
 	orPanic(vk.Init())
 	defer closer.Close()
 
-	app := renderer.NewApplication(config.hat, config.gps)
-	app.Gps = config.gps
-	app.Hat = config.hat
+	app := renderer.NewApplication(config)
 
 	// Set up the window, monitor, and refresh rate
-	monitor, videoMode := setupMonitor(config.monitorNum)
+	monitor, videoMode := setupMonitor(config.MonitorNum)
 	window := createWindow(app, monitor, videoMode)
 	app.WindowHandle = window
 
@@ -208,10 +248,8 @@ func main() {
 	orPanic(err)
 
 	dim := app.Context().SwapchainDimensions()
-	log.Printf("Initialized %s with %+v swapchain", app.VulkanAppName(), dim)
-
 	frameDelay, refreshRate := getRefreshRate(monitor)
-	log.Printf("Running at %d FPS", refreshRate)
+	log.Printf("Initialized %s with %+v swapchain, %d FPS", app.VulkanAppName(), dim, refreshRate)
 
 	// Start the main renderer loop
 	runMainLoop(app, window, platform, frameDelay)
