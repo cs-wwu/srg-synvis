@@ -76,27 +76,34 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	return result
 }
 
+// Connect to the gpsd service and get lat, lon, and alt with TPV report until closed
+// Run as one go thread separate from main
 func (c *Camera) TryGps() {
+	// Connect to gspd
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
 		log.Fatalf("Failed to connect to GPSD: %s", err)
 	}
 
+	// Set up the TPV function that will run indefintely
 	tpvFilter := func(r interface{}) {
 		report := r.(*gpsd.TPVReport)
-		fmt.Println("Location updated:", report.Lat, report.Lon)
+		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
-		c.UpdatePos(newX, newZ)
+		c.UpdatePos(newX, newZ, float32(report.Alt))
 		// fmt.Println("Location:", LAT, LON)
 	}
 	gps.AddFilter("TPV", tpvFilter)
 
+	// Start watching event stream with channel done to signal stop
 	done := gps.Watch()
 	<-done
 
 	gps.Close()
 }
 
+// Gets yaw, pitch and roll from the sense hat via a pipe and updates the front vector indefinitely
+// Run as one go thread separate from main
 func (c *Camera) TrySense() {
 	cmd := exec.Command("python3", "./internal/sensors/hat.py")
 
@@ -348,10 +355,11 @@ func (c *Camera) UpdateFront(front lin.Vec3) {
 	c.frontMutex.Unlock()
 }
 
-func (c *Camera) UpdatePos(newX, newZ float32) {
+func (c *Camera) UpdatePos(newX, newZ, newY float32) {
 	c.posMutex.Lock()
 	(*c.Pos)[0] = newX
 	(*c.Pos)[2] = newZ
+	(*c.Pos)[1] = newY
 	c.posMutex.Unlock()
 }
 
