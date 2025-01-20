@@ -4,6 +4,8 @@ github.com/stratoberry/go-gpsd v1.3.0 h1:JxJOEC4SgD0QY65AE7B1CtJtweP73nqJghZeLNU
 github.com/stratoberry/go-gpsd v1.3.0/go.mod h1:nVf/vTgfYxOMxiQdy9BtJjojbFRtG8H3wNula++VgkU=
 github.com/vulkan-go/vulkan v0.0.0-20221209234627-c0a353ae26c8 h1:qPHDyQTLtn40kezY6y4UL7bH7Z0Im9wSu1tQtM2wbUU=
 github.com/vulkan-go/vulkan v0.0.0-20221209234627-c0a353ae26c8/go.mod h1:Y5Ti1uUBdKDsb0W8aPtIo9krs+29Y7p6Bc9yyy4AM6g=
+github.com/westphae/geomag v1.0.2 h1:dpcizAXfjKV0PR6ohY7PX3hHfiIPVjJC03M8KyJjqRI=
+github.com/westphae/geomag v1.0.2/go.mod h1:xOwtBFVzYXv+tutDPYOuV3PSwS1f9hHuGQsPAUzVYf8=
 github.com/xlab/closer v1.1.0 h1:yrDiOXjd/B7pZ3lZkl/EZ1gWrR2M2N5XpBnixynm4mc=
 github.com/xlab/closer v1.1.0/go.mod h1:Ff8YcUPbn5jju6nClrMCmJHQABM0S/obEK0za/1yVMk=
 github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40 h1:FmU7+0eD5GaZzxlbNxVMiC7th7/7qHtskrkWt0ltFkU=

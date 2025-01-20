@@ -4,15 +4,19 @@ package renderer
 
 import (
 	"bufio"
-	_ "embed"
+	// _ "embed"
 	"fmt"
 	"log"
 	"math"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
+	"github.com/westphae/geomag/pkg/egm96"
+	"github.com/westphae/geomag/pkg/wmm"
+
 	lin "github.com/xlab/linmath"
 )
 
@@ -36,10 +40,14 @@ type Camera struct {
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
+
+	decimal_year time.Time // Date for magnetic world
 }
 
 // NewCamera creates and initializes a new Camera
 func NewCamera(hat bool, startPos lin.Vec3) *Camera {
+	today := time.Now()
+
 	pos := startPos
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
@@ -55,14 +63,15 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
 	return &Camera{
-		Pos:         &pos,
-		Up:          &up,
-		Front:       &front,
-		Right:       &right,
-		WorldUp:     &worldUp,
-		Rotation:    &rotation,
-		Speed:       CAMERA_SPEED,
-		Sensitivity: LOOK_SENSITIVITY,
+		Pos:          &pos,
+		Up:           &up,
+		Front:        &front,
+		Right:        &right,
+		WorldUp:      &worldUp,
+		Rotation:     &rotation,
+		Speed:        CAMERA_SPEED,
+		Sensitivity:  LOOK_SENSITIVITY,
+		decimal_year: today,
 	}
 }
 
@@ -90,8 +99,10 @@ func (c *Camera) TryGps() {
 		report := r.(*gpsd.TPVReport)
 		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
-		c.UpdatePos(newX, newZ, float32(report.Alt))
 		// fmt.Println("Location:", LAT, LON)
+		
+		// Update position
+		c.UpdatePos(newX, newZ, float32(report.Alt))
 	}
 	gps.AddFilter("TPV", tpvFilter)
 
@@ -136,7 +147,14 @@ func (c *Camera) TrySense() {
 			fmt.Println("Error parsing input:", err)
 			continue
 		}
-		fmt.Println(roll, pitch, yaw)
+		// fmt.Println(roll, pitch, yaw)
+				
+		// Account for magnetic world deviation
+		loc := egm96.NewLocationGeodetic(float64(c.Pos[0]), float64(c.Pos[2]), float64(c.Pos[1]))
+		mag, _ := wmm.CalculateWMMMagneticField(loc, c.decimal_year)
+		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
+		yaw = yaw - mag.D()	// Substract the declination from yaw
+		// TODO inclinication?
 
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
