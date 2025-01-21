@@ -4,7 +4,6 @@ package renderer
 
 import (
 	"bufio"
-	// _ "embed"
 	"fmt"
 	"log"
 	"math"
@@ -18,6 +17,10 @@ import (
 	"github.com/westphae/geomag/pkg/wmm"
 
 	lin "github.com/xlab/linmath"
+)
+
+const (
+	BUF_SIZE = 10
 )
 
 var (
@@ -94,15 +97,52 @@ func (c *Camera) TryGps() {
 		log.Fatalf("Failed to connect to GPSD: %s", err)
 	}
 
+	// Set up circular buffer in case of gps fix issues 
+	var oldX [BUF_SIZE]float32
+	var oldY [BUF_SIZE]float32
+	var oldZ [BUF_SIZE]float32
+	oldX[0] = c.Pos[0]
+	oldY[0] = c.Pos[1]
+	oldZ[0] = c.Pos[2]
+	spot := 0 
+	timer := 0 
+	xdif := float32(0)
+	ydif := float32(0)
+	zdif := float32(0)
+
 	// Set up the TPV function that will run indefintely
 	tpvFilter := func(r interface{}) {
+		// Get gpsd data
 		report := r.(*gpsd.TPVReport)
 		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
+		newY := float32(report.Alt)
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
 		// fmt.Println("Location:", LAT, LON)
-		
+
+		// Check if data is faulty, if so, assume spot based on history
+		if (report.Lat == 0 && report.Lon == 0) {
+			log.Println("No fix, using prior data")
+			newX = oldX[spot] + xdif
+			newY = oldY[spot] + ydif
+			newZ = oldZ[spot] + zdif
+			timer--
+		}
+
+		// Log data in buffer
+		timer++
+		if timer == 10 {
+			timer = 0
+			xdif = oldX[spot] - newX
+			ydif = oldY[spot] - newY
+			zdif = oldZ[spot] - newZ
+			spot = (spot + 1) % BUF_SIZE
+			oldX[spot] = newX
+			oldZ[spot] = newZ
+			oldY[spot] = newY
+		}
+
 		// Update position
-		c.UpdatePos(newX, newZ, float32(report.Alt))
+		c.UpdatePos(newX, newZ, newY)
 	}
 	gps.AddFilter("TPV", tpvFilter)
 
@@ -148,13 +188,13 @@ func (c *Camera) TrySense() {
 			continue
 		}
 		// fmt.Println(roll, pitch, yaw)
-				
+
 		// Account for magnetic world deviation
 		loc := egm96.NewLocationGeodetic(float64(c.Pos[0]), float64(c.Pos[2]), float64(c.Pos[1]))
 		mag, _ := wmm.CalculateWMMMagneticField(loc, c.decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
-		yaw = yaw - mag.D()	// Substract the declination from yaw
-		// TODO inclinication?
+		yaw = yaw - mag.D() // Substract the declination from yaw
+		// TODO inclinication + databackup?
 
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
