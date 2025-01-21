@@ -378,6 +378,8 @@ func TestDrawRoads(t *testing.T) {
 	lat := 48
 	lon := -122
 	roads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
+	baseImage := image.NewGray(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	testImage := image.NewGray(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
 
 	// Connect all the points
 	for r := range roads {
@@ -385,7 +387,16 @@ func TestDrawRoads(t *testing.T) {
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			processor.DrawLine(p1, p2, widths[roadType], grayImage, color.Black)
+			processor.DrawLine(p1, p2, 8, baseImage, color.Black)
+		}
+	}
+
+	coords := []int{lat, lon}
+	processor.DrawRoads(highways, nodes, coords, testImage, "motorway")
+
+	for p := range baseImage.Pix {
+		if baseImage.Pix[p] != testImage.Pix[p] {
+			t.Errorf("Pixel: %d, %d != %d", p, baseImage.Pix[p], testImage.Pix[p])
 		}
 	}
 }
