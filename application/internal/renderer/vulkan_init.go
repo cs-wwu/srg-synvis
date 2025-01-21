@@ -1,12 +1,19 @@
 package renderer
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"log"
+	"os"
 	"unsafe"
 
-	as "github.com/vulkan-go/asche"
+	as "github.com/cs-wwu/srg-synvis/asche"
+
+	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -35,6 +42,7 @@ func (app *Application) VulkanLayers() []string {
 		// "VK_LAYER_LUNARG_api_dump",
 		// "VK_LAYER_LUNARG_swapchain",
 		// "VK_LAYER_GOOGLE_unique_objects",
+		"VK_LAYER_KHRONOS_validation", // TODO remove validation layers in prod
 	}
 }
 
@@ -54,10 +62,34 @@ func (app *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
 	}
 }
 
+func (app *Application) SetSwapchainDimensions(dim *as.SwapchainDimensions) {
+	app.width = dim.Width
+	app.height = dim.Height
+}
+
 func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
 	extensions = append(extensions, "VK_EXT_debug_report") // TODO: Remove if no debug
 	return extensions
+}
+
+func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
+	return []vk.PhysicalDeviceFeatures{
+		{
+			//  MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
+		},
+	}
+}
+
+func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.CommandPoolCreateInfo {
+	return vk.CommandPoolCreateInfo{
+		SType:            vk.StructureTypeCommandPoolCreateInfo,
+		QueueFamilyIndex: queueFamilyIndex,
+		Flags: vk.CommandPoolCreateFlags(
+			vk.CommandPoolCreateResetCommandBufferBit |
+				vk.CommandPoolCreateTransientBit, // Transient Command Buffers?
+		),
+	}
 }
 
 // Initialize the Uniform Buffer Object
@@ -290,7 +322,7 @@ func (app *Application) prepareTextures() {
 			app.setImageLayout(tex.image, TextureImageAspect,
 				TextureImageLayoutPreinitialized, tex.imageLayout,
 				TextureAccessHostWriteBit,
-				TexturePipelineStageTopOfPipeBit, TexturePipelineStageFragmentShaderBit)
+				TexturePipelineStageHostBit, TexturePipelineStageFragmentShaderBit)
 
 		} else if props.OptimalTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureSampledImageBit) != 0 {
 			//  Must use staging buffer to copy linear texture to optimized
@@ -351,17 +383,15 @@ func (app *Application) prepareTextures() {
 		var sampler vk.Sampler
 		ret := vk.CreateSampler(dev, &vk.SamplerCreateInfo{
 			SType:                   SamplerCreateInfoSType,
-			MagFilter:               SamplerFilterNearest,
-			MinFilter:               SamplerFilterNearest,
+			MagFilter:               vk.FilterLinear,
+			MinFilter:               vk.FilterLinear,
 			MipmapMode:              SamplerMipmapModeNearest,
 			AddressModeU:            SamplerAddressModeRepeat,
 			AddressModeV:            SamplerAddressModeRepeat,
 			AddressModeW:            SamplerAddressModeRepeat,
-			AnisotropyEnable:        SamplerAnisotropyEnable,
-			MaxAnisotropy:           SamplerMaxAnisotropy,
 			CompareOp:               SamplerCompareOpNever,
 			BorderColor:             SamplerBorderColorFloatOpaqueWhite,
-			UnnormalizedCoordinates: SamplerUnnormalizedCoordinates,
+			UnnormalizedCoordinates: vk.False,
 		}, nil, &sampler)
 		OrPanic(as.NewError(ret))
 		tex.sampler = sampler
@@ -488,9 +518,9 @@ func (app *Application) prepareRenderPass() {
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
-	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/cube.vert.spv"))
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/shader.vert.spv"))
 	OrPanic(err)
-	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/cube.frag.spv"))
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/shader.frag.spv"))
 	OrPanic(err)
 
 	var pipelineCache vk.PipelineCache
@@ -721,16 +751,12 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Testing for loading all maps and chunks
-	// Update the last position so that we load the map
-	app.ChunkManager = NewChunkManager(&dev, &memProps)
-	app.ChunkManager.UpdateLastPosition(*app.camera.Pos)
-	app.ChunkManager.LoadChunks()
-	app.ChunkManager.FillBuffers()
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	// Initialize TerrainManager
+	app.TerrainManager = NewTerrainManager(&dev, &memProps)
+	// Just update position - the terrain manager will handle loading in its own thread
+	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
 
-	app.prepareUniformBuffers() // need to be called after loadhm()
+	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
@@ -738,9 +764,57 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
 
+	// Initialize command buffers
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
 	return nil
+}
+
+func IsError(ret vk.Result) bool {
+	return ret != vk.Success
+}
+
+func OrPanic(err error, finalizers ...func()) {
+	if err != nil {
+		for _, fn := range finalizers {
+			fn()
+		}
+		panic(err)
+	}
+}
+
+// Converts the given file to a byte array to be used
+func FileToBytes(filename string) []byte {
+	file, err := os.Open(filename)
+	OrPanic(err)
+	defer file.Close()
+
+	// Read the file into data
+	fileInfo, err := file.Stat()
+	OrPanic(err)
+	fileSize := fileInfo.Size()
+	data := make([]byte, fileSize)
+	_, err = file.Read(data)
+	OrPanic(err)
+
+	return data
+}
+
+func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
+	data := FileToBytes(name)
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	newImg := image.NewRGBA(img.Bounds())
+	if rowPitch <= 4*img.Bounds().Dy() {
+		// apply the proposed row pitch only if supported,
+		// as we're using only optimal textures.
+		newImg.Stride = rowPitch
+	}
+	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
+	size := newImg.Bounds().Size()
+	return []byte(newImg.Pix), size.X, size.Y, nil
 }

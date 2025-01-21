@@ -34,6 +34,6 @@ void main()
     float intense = AMBIENT + max(dot(world, ubo.lightDir), 0);
 
     fragColor = intense * vec3(1.0);
-    fragTexCoord = inTexCoord;
+    fragTexCoord = inTexCoord.xyz;
     worldPos = worldPosition.xyz;
 }

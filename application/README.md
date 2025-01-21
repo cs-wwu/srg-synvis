@@ -4,6 +4,30 @@
 go run cmd/svs/main.go
 ```
 
+## Possible Command Arguments
+
+```bash
+go run cmd/svs/main.go
+  -gps                      Enable GPS
+  -hat                      Enable Hat
+  -pos     <"lat,lon,hgt">  Starting Camera Position (lat,lon,height) where height is in meters (default "48.0,-123.0,1300") 
+  -monitor <int>            Monitor selection (0 = windowed, 1 = primary monitor, etc.)
+```
+
+The Download api must have at least one "Download" selection (nasa/faa/osm)
+
+```bash
+go run cmd/download/main.go
+  -nasa             Download NASA elevation data
+  -faa              Download FAA airport/navigation data
+  -osm              Download OpenStreetMap data
+  -v                Verbose output
+  -bbox   <string>  Bounding box coordinates (e.g., '49,-125,45,-118') in format 'n, e, s, w'
+  -out    <string>  Output directory for downloaded files (default "assets/maps/")
+  -preset <string>  Use preset region: [bellingham/washington/...]
+  -region <string>  Comma-separated list of region codes (e.g., 'n48w123,n48w122')
+```
+
 ## Installation
 
 1. Download the latest version of Go
@@ -43,35 +67,18 @@ sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-valida
 
 ## TODO
 
-- [x] Messily Move old stuff into Main System
-- [x] Refactor Vulkan initializing data types into vulkan_consts.go
-- [x] Refactor Heightmap loading
-  - [x] Refactor Downloading into cmd/download/main.go
-  - [x] Refactor API Usage into api/nasa.go
-- [x] Rework Chunk Management
-  - [x] Create a Chunk Manager
-  - [x] Maps
-    - [x] Heightmaps as ChunkManager Images (HGT)
-    - [x] Watermaps as ChunkManager Images (SWB)
-    - [x] Readd Processing of watermaps to texcoord[2]
-    - [x] Undo Chunk Skirts
-    - [x] Fix Last Triangle Not Rendering
-    - [x] Redo Indices Management
-    - [x] Re-implement ChunkManager as new rendering system
-- [x] Fix `math.go` and/or iteration to load only necessary heightmap
-- [x] Fix height rendering via Y coordinate (`heightmap.Gray16At(x, z)`)
-- [x] Change heightmap loading and position to be modular based on arcseconds
-  - [x] Attempt Rendering of more than one heightmap
-- [x] Begin Implementation Unit and Integration Testing
-- [x] Re-Work Frustum Culling with ChunkManager
-- [ ] Look at feasiblity of https://github.com/zeux/meshoptimizer
-  - [ ] If it looks good, create CGo bindings
-  - [ ] Redo ChunkManager with meshoptimizer
-  - [ ] Work in ChunkManager LODs with meshoptimizer
-  - [ ] GPU Crashing?
-- [ ] Add LODs with ChunkManager
-- [ ] Make Map and chunk rendering dynamic based on position
-- [ ] Rework Main method to not use ticker-based system
-- [ ] Change Camera to use Quaternions
-- [ ] Re-implement UI (try to use original `asche`?)
-- [ ] Find and fix GPU hanging (LODs)?
+- [ ] Simplify chunk logic
+- [ ] Add capacity to render 4 maps at once
+  - [ ] Find max memory based on LODs and distance
+  - [ ] Increase memory capacity
+  - [ ] If map do not exist, load water square (stitch to corners)
+  - [ ] Add LOD stitching
+  - [ ] Add dynamic map loading
+- [ ] Add dynamic texture loading per map (kyle/roads)
+  - [ ] Fix texture striping
+- [ ] Simplify frustum logic
+  - [ ] Move frustum culling from app to TerrainManager
+  - [ ] Test performance difference
+- [ ] Change Camera to use Quaternions (sensors?)
+
+- [ ] Eventually remove local `asche` copy (public repo)

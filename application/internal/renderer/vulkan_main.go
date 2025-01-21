@@ -6,26 +6,82 @@ import (
 	"log"
 	"unsafe"
 
-	as "github.com/vulkan-go/asche"
+	as "github.com/cs-wwu/srg-synvis/asche"
+	"github.com/cs-wwu/srg-synvis/models"
+
+	// as "github.com/vulkan-go/asche"
+	"github.com/go-gl/glfw/v3.3/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication() *Application {
-	camera := NewCamera()
-	frustum := &Frustum{}
+func NewApplication(cfg models.AppConfig) *Application {
+	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos)
+	if cfg.UseHat {
+		go camera.TrySense()
+	}
+
+	if cfg.UseGPS {
+		go camera.TryGps()
+	}
+
+	fpsCounter := NewFPSCounter()
 	app := &Application{
-		camera:  camera,
-		frustum: frustum,
+		camera:     camera,
+		fpsCounter: fpsCounter,
+		Gps:        cfg.UseGPS,
+		Hat:        cfg.UseHat,
 	}
 
 	return app
 }
 
+type FPSCounter struct {
+	frames   uint32
+	lastTime float64
+	fpsTime  float64
+	fps      float64
+}
+
+func NewFPSCounter() *FPSCounter {
+	return &FPSCounter{
+		lastTime: glfw.GetTime(),
+		fpsTime:  glfw.GetTime(),
+	}
+}
+
+// Update FPS counter and print
+func (fc *FPSCounter) Update(visibleChunks int) {
+	currentTime := glfw.GetTime()
+	fc.frames++
+
+	// Update FPS every second
+	if currentTime-fc.fpsTime >= 1.0 {
+		fc.fps = float64(fc.frames) / (currentTime - fc.fpsTime)
+		fc.frames = 0
+		fc.fpsTime = currentTime
+
+		// Clear line and print new FPS
+		fmt.Printf("\r\033[K") // Clear current line
+		fmt.Printf("FPS: %.1f | Frame Time: %.2fms | Visible Chunks: %d",
+			fc.fps,
+			1000.0/fc.fps,
+			visibleChunks,
+		)
+	}
+}
+
 func (app *Application) VulkanContextCleanup() error {
+	fmt.Println()
+
+	// Wait for device to be idle before cleanup
 	dev := app.Context().Device()
+	vk.DeviceWaitIdle(dev)
+
+	app.TerrainManager.Destroy()
+
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
@@ -37,26 +93,24 @@ func (app *Application) VulkanContextCleanup() error {
 		app.textures[i].Destroy(dev)
 	}
 
-	app.ChunkManager.Destroy()
-
 	app.depth.Destroy(dev)
 	return nil
 }
 
 func (app *Application) NextFrame() {
+	// Get visible chunks count thread-safely
+	app.fpsCounter.Update(app.TerrainManager.GetVisibleChunks())
 	app.frameCount++
-	fmt.Printf("%d ", app.frameCount)
-	if app.frameCount%60 == 0 {
-		fmt.Printf("\n")
-	}
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
-	//Update the view frustum and visibleChunks
-	app.frustum.Update(&app.ubo.View, &app.ubo.Projection)
-	app.determineVisibleChunks()
+	// Update the view frustum and visible chunks periodically
+	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
+
+	// Update terrain position - TerrainManager handles updates in its own thread
+	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
 }
 
 // called every frame by asche
@@ -90,19 +144,22 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 }
 
 func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
-	// Begin command buffer
+	// Wait for command buffer to complete before reusing
+	dev := app.Context().Device()
+	vk.DeviceWaitIdle(dev)
+
 	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
-		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
+		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
 	})
 	OrPanic(as.NewError(ret))
 
-	// Clear values for rendering
+	app.TerrainManager.SwapBuffers()
+
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
 	clearValues[0].SetColor([]float32{0.2, 0.2, 0.2, 0.2})
 
-	// Begin render pass
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
 		RenderPass:  app.renderPass,
@@ -115,34 +172,37 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		PClearValues:    clearValues,
 	}, vk.SubpassContentsInline)
 
-	// Bind pipeline and descriptor sets
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	// Set viewport and scissor
 	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
 		Width:    float32(app.width),
 		Height:   float32(app.height),
 		MinDepth: 0.0,
 		MaxDepth: 1.0,
 	}})
+
 	vk.CmdSetScissor(cmd, 0, 1, []vk.Rect2D{{
 		Offset: vk.Offset2D{X: 0, Y: 0},
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
-	// Bind vertex and index buffers
-	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.ChunkManager.vertexBuffer}, []vk.DeviceSize{0})
-	vk.CmdBindIndexBuffer(cmd, app.ChunkManager.indexBuffer, 0, vk.IndexTypeUint32)
+	// Get current active buffers and bind them
+	activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
 
-	// Draw all chunks using indirect drawing
-	vk.CmdDrawIndexedIndirect(cmd, app.ChunkManager.drawCommandBuffer, 0, uint32(len(app.ChunkManager.drawCommands)), uint32(unsafe.Sizeof(DrawCommand{})))
+	// Draw using indirect buffer
+	vk.CmdDrawIndexed(cmd,
+		app.TerrainManager.getActiveIndices(), // indexCount
+		1,                                     // instanceCount
+		0,                                     // firstIndex
+		0,                                     // vertexOffset
+		0,                                     // firstInstance
+	)
 
-	// End render pass
 	vk.CmdEndRenderPass(cmd)
-
-	// End command buffer
 	ret = vk.EndCommandBuffer(cmd)
 	OrPanic(as.NewError(ret))
 }
