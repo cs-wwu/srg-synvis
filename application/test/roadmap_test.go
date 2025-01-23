@@ -13,10 +13,6 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/processor"
 )
 
-func TestMain(m *testing.M) {
-	m.Run()
-}
-
 func TestNoMaps(t *testing.T) {
 	err := processor.GenerateOsmPng(nil, "testdir", processor.OSMURL)
 	if err == nil {
@@ -64,24 +60,6 @@ func TestConvertCoordsToPngIndex(t *testing.T) {
 		}
 	}
 }
-
-func TestItoa(t *testing.T) {
-	retA := processor.Itoa(-1)
-	if retA != "-1" {
-		t.Errorf("ran on -1, wanted '-1', got %s", retA)
-	}
-
-	retB := processor.Itoa(0)
-	if retB != "0" {
-		t.Errorf("ran on 0, wanted '0', got %s", retB)
-	}
-
-	retC := processor.Itoa(1)
-	if retC != "1" {
-		t.Errorf("ran on 1, wanted '1', got %s", retC)
-	}
-}
-
 func TestCoordToString(t *testing.T) {
 	retA := processor.CoordToString(-49, -20)
 	if retA != "s49w20" {
@@ -101,6 +79,11 @@ func TestCoordToString(t *testing.T) {
 	retD := processor.CoordToString(49, 20)
 	if retD != "n49e20" {
 		t.Errorf("ran on (49, 20), wanted 'n49e20', got %s", retD)
+	}
+
+	retE := processor.CoordToString(0, 0)
+	if retE != "n0e0" {
+		t.Errorf("ran on (0, 0), wanted 'n0e0', got %s", retE)
 	}
 }
 func TestDrawLine(t *testing.T) {
@@ -314,6 +297,10 @@ func TestMakeApiRequest(t *testing.T) {
 			wantElementCount: 1,
 		},
 	}
+
+	// Each iteration of this loop creates a unique in-memory test server to run the http request against.
+	// The post request returns the different data sets that are defined above this comment, those data sets
+	// also include expected return counts for testing purposes
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {

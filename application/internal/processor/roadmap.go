@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -142,32 +143,11 @@ func IsPointInPolygon(x, y float64, points []Point) bool {
 	return inside
 }
 
-func Itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-
-	sign := ""
-	if n < 0 {
-		sign = "-"
-		n = -n
-	}
-
-	q := ""
-	for n > 0 {
-		digits := n % 10
-		q = string(rune('0'+digits)) + q
-		n /= 10
-	}
-
-	return sign + q
-}
-
 // Make an api request to overpass-api, process the data into and overpassResponse data type
 func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
-	bounds := "(" + Itoa(lat) + "," + Itoa(lon) + "," + Itoa(lat+1) + "," + Itoa(lon+1) + ");"
+	bounds := "(" + strconv.Itoa(lat) + "," + strconv.Itoa(lon) + "," + strconv.Itoa(lat+1) + "," + strconv.Itoa(lon+1) + ");"
 	query := `
 	[out:json];
 	(
@@ -184,41 +164,48 @@ func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	var osmData OverpassResponse
 	resp, err := http.Post(apiUrl, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
-		return osmData, fmt.Errorf("error: %e", err)
+		return osmData, fmt.Errorf("failed to make post request to %v: %w", apiUrl, err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return osmData, fmt.Errorf("error reading response: %e", err)
+		return osmData, fmt.Errorf("error reading response: %w", err)
 	}
 
 	// Parse JSON response
 
 	err = json.Unmarshal(body, &osmData)
 	if err != nil {
-		return osmData, fmt.Errorf("error unmarshaling JSON: %e", err)
+		return osmData, fmt.Errorf("error unmarshaling JSON: %w", err)
 	}
 
 	return osmData, nil
 }
 
+// CoordToString takes in the integer representation of the coordinates and
+// returns a string in format "(lat)s(lon)e"
+// Parameters:
+//   - lat, lon: integer representations of lattitude and longitude
+//
+// Return:
+//   - ret: a string representation of lat & lon
 func CoordToString(lat, lon int) string {
 	ret := ""
-	if lat > 0 {
+	if lat >= 0 {
 		ret += "n"
-		ret += Itoa(lat)
+		ret += strconv.Itoa(lat)
 	} else {
 		ret += "s"
-		ret += Itoa(-1 * lat)
+		ret += strconv.Itoa(-1 * lat)
 	}
 
-	if lon > 0 {
+	if lon >= 0 {
 		ret += "e"
-		ret += Itoa(lon)
+		ret += strconv.Itoa(lon)
 	} else {
 		ret += "w"
-		ret += Itoa(-1 * lon)
+		ret += strconv.Itoa(-1 * lon)
 	}
 
 	return ret
@@ -291,12 +278,12 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 		pngFilepath := targetDir + bounds + ".osm.png"
 		pngFile, err := os.Create(pngFilepath)
 		if err != nil {
-			return fmt.Errorf("failed to create %s: %v", pngFilepath, err)
+			return fmt.Errorf("failed to create %s: %w", pngFilepath, err)
 		}
 		defer pngFile.Close()
 
 		if err := encodePNG(pngFile, grayImage); err != nil {
-			return fmt.Errorf("failed to encode %s: %v", pngFilepath, err)
+			return fmt.Errorf("failed to encode %s: %w", pngFilepath, err)
 		}
 	}
 
