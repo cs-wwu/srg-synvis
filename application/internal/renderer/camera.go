@@ -97,15 +97,15 @@ func (c *Camera) TryGps() {
 		log.Fatalf("Failed to connect to GPSD: %s", err)
 	}
 
-	// Set up circular buffer in case of gps fix issues 
+	// Set up circular buffer in case of gps fix issues
 	var oldX [BUF_SIZE]float32
 	var oldY [BUF_SIZE]float32
 	var oldZ [BUF_SIZE]float32
 	oldX[0] = c.Pos[0]
 	oldY[0] = c.Pos[1]
 	oldZ[0] = c.Pos[2]
-	spot := 0 
-	timer := 0 
+	spot := 0
+	timer := 0
 	xdif := float32(0)
 	ydif := float32(0)
 	zdif := float32(0)
@@ -120,7 +120,8 @@ func (c *Camera) TryGps() {
 		// fmt.Println("Location:", LAT, LON)
 
 		// Check if data is faulty, if so, assume spot based on history
-		if (report.Lat == 0 && report.Lon == 0) {
+		// if (report.Lat == 0 && report.Lon == 0) {
+		if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
 			log.Println("No fix, using prior data")
 			newX = oldX[spot] + xdif
 			newY = oldY[spot] + ydif
