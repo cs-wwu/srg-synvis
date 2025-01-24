@@ -62,8 +62,8 @@ func WMM(t *testing.T, c *renderer.Camera) {
 	// check if bellingham declination is within actual range
 	// check that front vector is also updated corretly
 	// Should be roughly [-9.31, 0.0, -3.64]
-	if !(equal(c.Front[0], -.931) && equal(c.Front[1], 0.0) && equal(c.Front[2], -.364)) {
-		t.Errorf("Expected front vector to be updated with inclination, to [-.931, 0.0, -.364], was %f %f %f", c.Front[0], c.Front[1], c.Front[2])
+	if !(equal(c.Front[0], -.931) && equal(c.Front[1], 0.0) && equal(c.Front[2], -.379)) {
+		t.Errorf("Expected front vector to be updated with inclination, to [-.931, 0.0, -.379], was %f %f %f", c.Front[0], c.Front[1], c.Front[2])
 	}
 }
 
@@ -87,6 +87,7 @@ func ProcessInput(t *testing.T, c *renderer.Camera) {
 	// test validity of updating front vector after a sequence of transformations
 }
 
+// For floating point comparisons
 func equal(a, b float32) bool {
 	return math.Abs(float64(a) - float64(b)) <= 0.01
 }

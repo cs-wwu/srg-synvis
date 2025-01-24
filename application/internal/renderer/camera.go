@@ -20,15 +20,17 @@ import (
 )
 
 const (
-	BUF_SIZE = 10
+	BUF_SIZE          = 10
+	HEIGHT_CONVERSION = 60.0 / 1852.0
 )
 
 type Mode int
+
 const (
-    StartPipe Mode = iota
-    StartCommand
-    ReadPipe
-    ParseInput
+	StartPipe Mode = iota
+	StartCommand
+	ReadPipe
+	ParseInput
 	Waiting
 )
 
@@ -126,7 +128,7 @@ func (c *Camera) TryGps() error {
 		// Get gpsd data
 		report := r.(*gpsd.TPVReport)
 		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
-		newY := float32(report.Alt)
+		newY := float32(report.Alt) * HEIGHT_CONVERSION
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
 		// fmt.Println("Location:", LAT, LON)
 
@@ -204,10 +206,9 @@ func (c *Camera) TrySense(filename string) Mode {
 		// fmt.Println(roll, pitch, yaw)
 
 		// Account for magnetic world deviation
-		
-		// fmt.Println("%f, %f, %f", float64(-c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1]))
+
 		// LAT, LON, HEIGHT
-		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1]))
+		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1])/HEIGHT_CONVERSION)
 		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
 		yaw = yaw - mag.D() // Substract the declination from yaw
