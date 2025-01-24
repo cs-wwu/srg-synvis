@@ -205,9 +205,9 @@ func (c *Camera) TrySense(filename string) Mode {
 
 		// Account for magnetic world deviation
 		
-		//loc := egm96.NewLocationGeodetic(float64(c.Pos[0]), float64(c.Pos[2]), float64(c.Pos[1]))
-		fmt.Println("%f, %f, %f", float64(c.Pos[0])/3600, -float64(c.Pos[2])/3600, float64(c.Pos[1]))
-		loc := egm96.NewLocationGeodetic(float64(c.Pos[0])/3600, -float64(c.Pos[2])/3600, float64(c.Pos[1]))
+		// fmt.Println("%f, %f, %f", float64(-c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1]))
+		// LAT, LON, HEIGHT
+		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1]))
 		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
 		yaw = yaw - mag.D() // Substract the declination from yaw
