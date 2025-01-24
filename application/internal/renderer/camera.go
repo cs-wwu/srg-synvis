@@ -23,6 +23,15 @@ const (
 	BUF_SIZE = 10
 )
 
+type Mode int
+const (
+    StartPipe Mode = iota
+    StartCommand
+    ReadPipe
+    ParseInput
+	Waiting
+)
+
 var (
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
 	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
@@ -44,7 +53,7 @@ type Camera struct {
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
 
-	decimal_year time.Time // Date for magnetic world
+	Decimal_year time.Time // Date for magnetic world
 }
 
 // NewCamera creates and initializes a new Camera
@@ -74,7 +83,7 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 		Rotation:     &rotation,
 		Speed:        CAMERA_SPEED,
 		Sensitivity:  LOOK_SENSITIVITY,
-		decimal_year: today,
+		Decimal_year: today,
 	}
 }
 
@@ -90,11 +99,13 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 
 // Connect to the gpsd service and get lat, lon, and alt with TPV report until closed
 // Run as one go thread separate from main
-func (c *Camera) TryGps() {
+func (c *Camera) TryGps() error {
 	// Connect to gspd
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
-		log.Fatalf("Failed to connect to GPSD: %s", err)
+		// log.Fatalf("Failed to connect to GPSD: %s", err)
+		log.Println("Failed to connect to GPSD: %s", err)
+		return err
 	}
 
 	// Set up circular buffer in case of gps fix issues
@@ -152,24 +163,26 @@ func (c *Camera) TryGps() {
 	<-done
 
 	gps.Close()
+	return nil
 }
 
 // Gets yaw, pitch and roll from the sense hat via a pipe and updates the front vector indefinitely
 // Run as one go thread separate from main
-func (c *Camera) TrySense() {
-	cmd := exec.Command("python3", "./internal/sensors/hat.py")
+func (c *Camera) TrySense(filename string) Mode {
+	var md Mode
+	cmd := exec.Command("python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return
+		return StartPipe
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return
+		return StartCommand
 	}
 
 	// Read the output from the pipe
@@ -177,7 +190,6 @@ func (c *Camera) TrySense() {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading output:", err)
 			break
 		}
 
@@ -186,13 +198,17 @@ func (c *Camera) TrySense() {
 		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &roll, &pitch)
 		if err != nil || n != 3 {
 			fmt.Println("Error parsing input:", err)
+			md = ParseInput
 			continue
 		}
 		// fmt.Println(roll, pitch, yaw)
 
 		// Account for magnetic world deviation
-		loc := egm96.NewLocationGeodetic(float64(c.Pos[0]), float64(c.Pos[2]), float64(c.Pos[1]))
-		mag, _ := wmm.CalculateWMMMagneticField(loc, c.decimal_year)
+		
+		//loc := egm96.NewLocationGeodetic(float64(c.Pos[0]), float64(c.Pos[2]), float64(c.Pos[1]))
+		fmt.Println("%f, %f, %f", float64(c.Pos[0])/3600, -float64(c.Pos[2])/3600, float64(c.Pos[1]))
+		loc := egm96.NewLocationGeodetic(float64(c.Pos[0])/3600, -float64(c.Pos[2])/3600, float64(c.Pos[1]))
+		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
 		yaw = yaw - mag.D() // Substract the declination from yaw
 		// TODO inclinication + databackup?
@@ -208,13 +224,16 @@ func (c *Camera) TrySense() {
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return
+		return Waiting
 	}
+
+	return md
 }
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
+// TODO: turn on / off parts based if getting gps or sense?
 func (c *Camera) ProcessInput(window *glfw.Window) {
 
 	if window.GetAttrib(glfw.Focused) == glfw.True {
