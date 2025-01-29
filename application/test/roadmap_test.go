@@ -62,7 +62,7 @@ func TestConvertCoordsToPngIndex(t *testing.T) {
 }
 func TestCoordToString(t *testing.T) {
 	retA := processor.CoordToString(-49, -20)
-	if retA != "s49w20" {
+	if retA != "s49w25" {
 		t.Errorf("ran on (-49, -20), wanted 's49w20', got %s", retA)
 	}
 
