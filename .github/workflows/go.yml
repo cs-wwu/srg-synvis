@@ -10,7 +10,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: ./application/go.mod
+          go-version-file: ./application/go.mod
           cache-dependency-path: ./application/go.sum
 
       # Cache Vulkan and graphics dependencies
