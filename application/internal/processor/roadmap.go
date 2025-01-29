@@ -33,6 +33,8 @@ const (
 	OSMURL    = "http://overpass-api.de/api/interpreter"
 )
 
+// Definition of each road type:
+// https://wiki.openstreetmap.org/wiki/International_highway_classification_equivalence
 var widths = map[string]float64{
 	"motorway":  8,
 	"trunk":     6,
