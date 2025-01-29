@@ -24,7 +24,7 @@ jobs:
           mesa-vulkan-drivers \
           vulkan-tools \
           libvulkan-dev \
-          vulkan-validationlayers-dev \
+          vulkan-utility-libraries-dev \
           spirv-tools \
           libglfw3-dev \
           libglm-dev \
