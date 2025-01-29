@@ -22,7 +22,7 @@ jobs:
         go-version: '1.19.8'
 
     - name: Go to directory
-      run: cd /application/test
+      run: cd ./application/test
 
     - name: Build
       run: go build 
