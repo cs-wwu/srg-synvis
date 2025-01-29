@@ -1,8 +1,4 @@
-# This workflow will build a golang project (srg-synvis)
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
 name: Go
-
 on: [push]
 
 jobs:
@@ -14,25 +10,56 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: "1.23.5"
+          go-version: ./application/go.mod
           cache-dependency-path: ./application/go.sum
 
+      # Cache Vulkan and graphics dependencies
+      - name: Cache Vulkan dependencies
+        id: cache-vulkan
+        uses: actions/cache@v3
+        with:
+          path: |
+            /usr/lib/x86_64-linux-gnu/libvulkan*
+            /usr/lib/x86_64-linux-gnu/libglfw*
+            /usr/lib/x86_64-linux-gnu/libGLX*
+            /usr/lib/x86_64-linux-gnu/libglm*
+            /usr/lib/x86_64-linux-gnu/libXi*
+            /usr/lib/x86_64-linux-gnu/libXxf86vm*
+            /usr/lib/x86_64-linux-gnu/libXcursor*
+            /usr/lib/x86_64-linux-gnu/libXinerama*
+            /usr/include/vulkan/
+            /usr/include/GLFW/
+            /usr/include/glm/
+          key: ${{ runner.os }}-vulkan-${{ hashFiles('.github/workflows/go.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-vulkan-
+
+      # Install dependencies if cache miss
       - name: Install Graphics and Vulkan Dependencies
+        if: steps.cache-vulkan.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-          mesa-vulkan-drivers \
-          vulkan-tools \
-          libvulkan-dev \
-          vulkan-utility-libraries-dev \
-          spirv-tools \
-          libglfw3-dev \
-          libglm-dev \
-          libxi-dev \
-          libxxf86vm-dev \
-          libxcursor-dev \
-          libxinerama-dev \
-          libxcursor-dev
+            mesa-vulkan-drivers \
+            vulkan-tools \
+            libvulkan-dev \
+            vulkan-utility-libraries-dev \
+            spirv-tools \
+            libglfw3-dev \
+            libglm-dev \
+            libxi-dev \
+            libxxf86vm-dev \
+            libxcursor-dev \
+            libxinerama-dev
+
+      # Always ensure proper permissions after cache restore
+      - name: Set permissions
+        run: |
+          sudo chmod -R 755 /usr/include/vulkan/ || true
+          sudo chmod -R 755 /usr/include/GLFW/ || true
+          sudo chmod -R 755 /usr/include/glm/ || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libvulkan* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglfw* || true
 
       - name: Enter application and download dependencies
         run: |
