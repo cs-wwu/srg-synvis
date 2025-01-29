@@ -15,7 +15,7 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: "1.23.5"
-          cache: true
+          cache-dependency-path: ./application/go.sum
 
       - name: Install Graphics and Vulkan Dependencies
         run: |
@@ -24,12 +24,15 @@ jobs:
           mesa-vulkan-drivers \
           vulkan-tools \
           libvulkan-dev \
-          vulkan-utility-libraries-dev \
+          vulkan-validationlayers-dev \
           spirv-tools \
           libglfw3-dev \
           libglm-dev \
           libxi-dev \
-          libxxf86vm-dev
+          libxxf86vm-dev \
+          libxcursor-dev \
+          libxinerama-dev \
+          libxcursor-dev
 
       - name: Enter application and download dependencies
         run: |
