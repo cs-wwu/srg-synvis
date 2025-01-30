@@ -58,8 +58,7 @@ jobs:
           sudo chmod -R 755 /usr/include/vulkan/ || true
           sudo chmod -R 755 /usr/include/GLFW/ || true
           sudo chmod -R 755 /usr/include/glm/ || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libvulkan* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglfw* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/ || true
 
       - name: Enter application and download dependencies
         run: |
