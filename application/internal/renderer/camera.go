@@ -4,16 +4,34 @@ package renderer
 
 import (
 	"bufio"
-	_ "embed"
 	"fmt"
 	"log"
 	"math"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
+	"github.com/westphae/geomag/pkg/egm96"
+	"github.com/westphae/geomag/pkg/wmm"
+
 	lin "github.com/xlab/linmath"
+)
+
+const (
+	BUF_SIZE          = 10
+	HEIGHT_CONVERSION = 60.0 / 1852.0
+)
+
+type Mode int
+
+const (
+	StartPipe Mode = iota
+	StartCommand
+	ReadPipe
+	ParseInput
+	Waiting
 )
 
 var (
@@ -36,10 +54,14 @@ type Camera struct {
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
+
+	Decimal_year time.Time // Date for magnetic world
 }
 
 // NewCamera creates and initializes a new Camera
 func NewCamera(hat bool, startPos lin.Vec3) *Camera {
+	today := time.Now()
+
 	pos := startPos
 	up := START_CAMERA_UP
 	front := START_CAMERA_FRONT
@@ -55,14 +77,15 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
 	return &Camera{
-		Pos:         &pos,
-		Up:          &up,
-		Front:       &front,
-		Right:       &right,
-		WorldUp:     &worldUp,
-		Rotation:    &rotation,
-		Speed:       CAMERA_SPEED,
-		Sensitivity: LOOK_SENSITIVITY,
+		Pos:          &pos,
+		Up:           &up,
+		Front:        &front,
+		Right:        &right,
+		WorldUp:      &worldUp,
+		Rotation:     &rotation,
+		Speed:        CAMERA_SPEED,
+		Sensitivity:  LOOK_SENSITIVITY,
+		Decimal_year: today,
 	}
 }
 
@@ -76,41 +99,92 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 	return result
 }
 
-func (c *Camera) TryGps() {
+// Connect to the gpsd service and get lat, lon, and alt with TPV report until closed
+// Run as one go thread separate from main
+func (c *Camera) TryGps() error {
+	// Connect to gspd
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
-		log.Fatalf("Failed to connect to GPSD: %s", err)
+		// log.Fatalf("Failed to connect to GPSD: %s", err)
+		log.Println("Failed to connect to GPSD: %s", err)
+		return err
 	}
 
+	// Set up circular buffer in case of gps fix issues
+	var oldX [BUF_SIZE]float32
+	var oldY [BUF_SIZE]float32
+	var oldZ [BUF_SIZE]float32
+	oldX[0] = c.Pos[0]
+	oldY[0] = c.Pos[1]
+	oldZ[0] = c.Pos[2]
+	spot := 0
+	timer := 0
+	xdif := float32(0)
+	ydif := float32(0)
+	zdif := float32(0)
+
+	// Set up the TPV function that will run indefintely
 	tpvFilter := func(r interface{}) {
+		// Get gpsd data
 		report := r.(*gpsd.TPVReport)
-		fmt.Println("Location updated:", report.Lat, report.Lon)
+		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
+		newY := float32(report.Alt) * HEIGHT_CONVERSION
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
-		c.UpdatePos(newX, newZ)
 		// fmt.Println("Location:", LAT, LON)
+
+		// Check if data is faulty, if so, assume spot based on history
+		// if (report.Lat == 0 && report.Lon == 0) {
+		if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
+			log.Println("No fix, using prior data")
+			newX = oldX[spot] + xdif
+			newY = oldY[spot] + ydif
+			newZ = oldZ[spot] + zdif
+			timer--
+		}
+
+		// Log data in buffer
+		timer++
+		if timer == 10 {
+			timer = 0
+			xdif = oldX[spot] - newX
+			ydif = oldY[spot] - newY
+			zdif = oldZ[spot] - newZ
+			spot = (spot + 1) % BUF_SIZE
+			oldX[spot] = newX
+			oldZ[spot] = newZ
+			oldY[spot] = newY
+		}
+
+		// Update position
+		c.UpdatePos(newX, newZ, newY)
 	}
 	gps.AddFilter("TPV", tpvFilter)
 
+	// Start watching event stream with channel done to signal stop
 	done := gps.Watch()
 	<-done
 
 	gps.Close()
+	return nil
 }
 
-func (c *Camera) TrySense() {
-	cmd := exec.Command("python3", "./internal/sensors/hat.py")
+// Gets yaw, pitch and roll from the sense hat via a pipe and updates the front vector indefinitely
+// Run as one go thread separate from main
+func (c *Camera) TrySense(filename string) Mode {
+	var md Mode
+	cmd := exec.Command("python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		fmt.Println("Error creating stdout pipe:", err)
-		return
+		return StartPipe
 	}
 	// Start the command
 	err = cmd.Start()
 	if err != nil {
 		fmt.Println("Error starting command:", err)
-		return
+		return StartCommand
 	}
 
 	// Read the output from the pipe
@@ -118,7 +192,6 @@ func (c *Camera) TrySense() {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading output:", err)
 			break
 		}
 
@@ -127,9 +200,19 @@ func (c *Camera) TrySense() {
 		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &roll, &pitch)
 		if err != nil || n != 3 {
 			fmt.Println("Error parsing input:", err)
+			md = ParseInput
 			continue
 		}
-		fmt.Println(roll, pitch, yaw)
+		// fmt.Println(roll, pitch, yaw)
+
+		// Account for magnetic world deviation
+
+		// LAT, LON, HEIGHT
+		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1])/HEIGHT_CONVERSION)
+		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
+		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
+		yaw = yaw - mag.D() // Substract the declination from yaw
+		// TODO inclinication + databackup?
 
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
@@ -142,13 +225,16 @@ func (c *Camera) TrySense() {
 	err = cmd.Wait()
 	if err != nil {
 		fmt.Println("Error waiting for command:", err)
-		return
+		return Waiting
 	}
+
+	return md
 }
 
 // Processes input from the glfw window and moves the camera accordingly
 // This function is mainly for debugging purposes
 // Uses WASD for movement, and arrow keys for viewing
+// TODO: turn on / off parts based if getting gps or sense?
 func (c *Camera) ProcessInput(window *glfw.Window) {
 
 	if window.GetAttrib(glfw.Focused) == glfw.True {
@@ -348,10 +434,11 @@ func (c *Camera) UpdateFront(front lin.Vec3) {
 	c.frontMutex.Unlock()
 }
 
-func (c *Camera) UpdatePos(newX, newZ float32) {
+func (c *Camera) UpdatePos(newX, newZ, newY float32) {
 	c.posMutex.Lock()
 	(*c.Pos)[0] = newX
 	(*c.Pos)[2] = newZ
+	(*c.Pos)[1] = newY
 	c.posMutex.Unlock()
 }
 

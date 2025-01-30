@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/stratoberry/go-gpsd v1.3.0
+	github.com/westphae/geomag v1.0.2
 	github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
 	golang.org/x/term v0.23.0
 )

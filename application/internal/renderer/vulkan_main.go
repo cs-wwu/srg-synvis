@@ -20,7 +20,7 @@ import (
 func NewApplication(cfg models.AppConfig) *Application {
 	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos)
 	if cfg.UseHat {
-		go camera.TrySense()
+		go camera.TrySense("./internal/sensors/hat.py")
 	}
 
 	if cfg.UseGPS {
