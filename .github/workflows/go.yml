@@ -13,30 +13,9 @@ jobs:
           go-version-file: ./application/go.mod
           cache-dependency-path: ./application/go.sum
 
-      # Cache Vulkan and graphics dependencies
-      - name: Cache Vulkan dependencies
-        id: cache-vulkan
-        uses: actions/cache@v3
-        with:
-          path: |
-            /usr/lib/x86_64-linux-gnu/libvulkan*
-            /usr/lib/x86_64-linux-gnu/libglfw*
-            /usr/lib/x86_64-linux-gnu/libGLX*
-            /usr/lib/x86_64-linux-gnu/libglm*
-            /usr/lib/x86_64-linux-gnu/libXi*
-            /usr/lib/x86_64-linux-gnu/libXxf86vm*
-            /usr/lib/x86_64-linux-gnu/libXcursor*
-            /usr/lib/x86_64-linux-gnu/libXinerama*
-            /usr/include/vulkan/
-            /usr/include/GLFW/
-            /usr/include/glm/
-          key: ${{ runner.os }}-vulkan-${{ hashFiles('.github/workflows/go.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-vulkan-
 
       # Install dependencies if cache miss
       - name: Install Graphics and Vulkan Dependencies
-        if: steps.cache-vulkan.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -51,21 +30,6 @@ jobs:
             libxxf86vm-dev \
             libxcursor-dev \
             libxinerama-dev
-
-      # Always ensure proper permissions after cache restore
-      - name: Set permissions
-        run: |
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libvulkan* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglfw* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libGLX* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglm* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXi* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXxf86vm* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXcursor* || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXinerama* || true
-          sudo chmod -R 755 /usr/include/vulkan/ || true
-          sudo chmod -R 755 /usr/include/GLFW/ || true
-          sudo chmod -R 755 /usr/include/glm/ || true
 
       # Ensure that we have Go libraries installed
       - name: Enter application and download dependencies
