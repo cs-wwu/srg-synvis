@@ -60,6 +60,7 @@ jobs:
           sudo chmod -R 755 /usr/include/glm/ || true
           sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/ || true
 
+      # Ensure that we have Go libraries installed
       - name: Enter application and download dependencies
         run: |
           cd ./application
