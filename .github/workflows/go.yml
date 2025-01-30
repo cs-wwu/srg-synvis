@@ -55,10 +55,17 @@ jobs:
       # Always ensure proper permissions after cache restore
       - name: Set permissions
         run: |
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libvulkan* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglfw* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libGLX* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libglm* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXi* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXxf86vm* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXcursor* || true
+          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/libXinerama* || true
           sudo chmod -R 755 /usr/include/vulkan/ || true
           sudo chmod -R 755 /usr/include/GLFW/ || true
           sudo chmod -R 755 /usr/include/glm/ || true
-          sudo chmod -R 755 /usr/lib/x86_64-linux-gnu/ || true
 
       # Ensure that we have Go libraries installed
       - name: Enter application and download dependencies
