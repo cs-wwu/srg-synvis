@@ -1,45 +1,202 @@
 package test
 
 import (
-	"math"
-	"testing"
-
-	"github.com/cs-wwu/srg-synvis/internal/renderer"
-	lin "github.com/xlab/linmath"
+    "math"
+    "net"
+    "sync"
+    "testing"
+    "time"
+    "encoding/json"
+    
+    "github.com/stratoberry/go-gpsd"
+    "github.com/cs-wwu/srg-synvis/internal/renderer"
+    lin "github.com/xlab/linmath"
 )
 
+// MockGPSD is a test double for the GPSD service
+type MockGPSD struct {
+    listener net.Listener
+    done     chan bool
+    connections []net.Conn
+    mu          sync.Mutex
+    closed      bool
+}
+
+// NewMockGPSD creates and starts a mock GPSD server
+func NewMockGPSD(t *testing.T) *MockGPSD {
+    listener, err := net.Listen("tcp", "localhost:2947")
+    if err != nil {
+        t.Fatalf("Failed to start mock GPSD: %v", err)
+    }
+
+    mock := &MockGPSD{
+        listener:    listener,
+        done:       make(chan bool),
+        connections: make([]net.Conn, 0),
+        closed:     false,
+    }
+
+    go mock.accept()
+    return mock
+}
+
+// Accepts a MockGPSD function and adds it to the connections array
+func (m *MockGPSD) accept() {
+    for {
+        conn, err := m.listener.Accept()
+        if err != nil {
+            m.mu.Lock()
+            if m.closed {
+                m.mu.Unlock()
+                return
+            }
+            m.mu.Unlock()
+            continue
+        }
+        
+        m.mu.Lock()
+        m.connections = append(m.connections, conn)
+        m.mu.Unlock()
+        
+        go m.handleConnection(conn)
+    }
+}
+
+// Handles starting the MockGPSD connection
+func (m *MockGPSD) handleConnection(conn net.Conn) {
+    // Send initial GPSD protocol messages
+    initMessages := []string{
+        `{"class":"VERSION","release":"3.17","rev":"3.17","proto_major":3,"proto_minor":12}`,
+        `{"class":"DEVICES","devices":[{"class":"DEVICE","path":"/dev/ttyACM0","driver":"u-blox","subtype":"NEO-M8N"}]}`,
+        `{"class":"WATCH","enable":true,"json":true,"nmea":false,"raw":0,"scaled":false,"timing":false,"split24":false,"pps":false}`,
+    }
+
+    for _, msg := range initMessages {
+        conn.Write([]byte(msg + "\n"))
+    }
+
+    // Wait for done signal
+    <-m.done
+}
+
+// SendTPV sends a full TPV report to all connected clients
+func (m *MockGPSD) SendTPV(lat, lon, alt float64, mode gpsd.Mode) {
+    tpv := map[string]interface{}{
+        "class": "TPV",
+        "device": "/dev/ttyACM0",
+        "mode": mode,
+        "time": time.Now().UTC().Format(time.RFC3339),
+        "lat": lat,
+        "lon": lon,
+        "alt": alt,
+        "epx": 10.0,
+        "epy": 10.0,
+        "epv": 15.0,
+        "track": 0.0,
+        "speed": 0.0,
+        "climb": 0.0,
+    }
+
+    jsonData, _ := json.Marshal(tpv)
+    msg := string(jsonData) + "\n"
+
+    m.mu.Lock()
+    for _, conn := range m.connections {
+        conn.Write([]byte(msg))
+    }
+    m.mu.Unlock()
+}
+
+// Close a GPSD connection
+func (m *MockGPSD) Close() {
+    m.mu.Lock()
+    if m.closed {
+        m.mu.Unlock()
+        return
+    }
+    m.closed = true
+    close(m.done)
+    
+    for _, conn := range m.connections {
+        conn.Close()
+    }
+    m.connections = nil
+    m.listener.Close()
+    m.mu.Unlock()
+}
+
+// Test functions
 func TestMain(t *testing.T) {
+    // Test and create new camera
 	testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
-	InitCamera(t, testCamera)
+ 	InitCamera(t, testCamera)
 
-	NoFix(t, testCamera)
-	WorkingGPS(t, testCamera)
 
+    // GPS tests
+    mock := NewMockGPSD(t)
+    defer mock.Close()
+
+    // Run NoFix test
+    t.Run("NoFix", func(t *testing.T) {
+        testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+        initialPos := testCamera.Pos
+
+        done := make(chan bool)
+        go func() {
+            testCamera.TryGps()
+            done <- true
+        }()
+
+        time.Sleep(500 * time.Millisecond)
+        mock.SendTPV(0, 0, 0, gpsd.NoFix)
+        time.Sleep(500 * time.Millisecond)
+
+        currentPos := testCamera.Pos
+        if !equal(currentPos[0], initialPos[0]) || 
+           !equal(currentPos[1], initialPos[1]) || 
+           !equal(currentPos[2], initialPos[2]) {
+            t.Errorf("Camera position should not change with NoFix. Got %v, expected %v", 
+                currentPos, initialPos)
+        }
+    })
+
+    // Run WorkingGPS test
+    t.Run("WorkingGPS", func(t *testing.T) {
+        testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+        
+        done := make(chan bool)
+        go func() {
+            testCamera.TryGps()
+            done <- true
+        }()
+
+        time.Sleep(500 * time.Millisecond)
+
+        expectedLat := 45.5
+        expectedLon := -122.6
+        expectedAlt := 100.0
+        
+        mock.SendTPV(expectedLat, expectedLon, expectedAlt, gpsd.Mode3D)
+        time.Sleep(500 * time.Millisecond)
+
+        expectedX, expectedZ := renderer.CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
+        expectedY := float32(expectedAlt) * renderer.HEIGHT_CONVERSION
+
+        pos := testCamera.Pos
+        if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
+            t.Errorf("Camera position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)", 
+                pos, expectedX, expectedY, expectedZ)
+        }
+    })
+
+    // Test the sense data and WMM
 	SenseData(t, testCamera)
 	WMM(t, testCamera)
 
+    // Test handling keyboard input
 	ProcessInput(t, testCamera)
 }
 
-// GPS tests
-func NoFix(t *testing.T, c *renderer.Camera) {
-	// Run TryGps which should trigger the panic
-	err := c.TryGps()
-
-	// Since TryGps calls log.Fatalf, it should cause a panic
-	if err == nil {
-		t.Errorf("Expected panic due to GPS connection failure, but got error: %v", err)
-	}
-}
-
-func WorkingGPS(t *testing.T, c *renderer.Camera) {
-	// test working gps + buffer
-	// test that it updates the correct gps coordinates after getting them
-	// check that it runs in a loop
-	// check that the buffer works properly
-
-	// check runtime?
-}
 
 // Sensehat tests
 func SenseData(t *testing.T, c *renderer.Camera) {
@@ -66,6 +223,7 @@ func WMM(t *testing.T, c *renderer.Camera) {
 		t.Errorf("Expected front vector to be updated with inclination, to [-.931, 0.0, -.379], was %f %f %f", c.Front[0], c.Front[1], c.Front[2])
 	}
 }
+
 
 // Camera tests
 func InitCamera(t *testing.T, c *renderer.Camera){
