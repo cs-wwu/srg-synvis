@@ -131,74 +131,21 @@ func TestMain(t *testing.T) {
 	testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
  	InitCamera(t, testCamera)
 
-
-    // GPS tests
-    mock := NewMockGPSD(t)
-    defer mock.Close()
-
-    // Run NoFix test
-    t.Run("NoFix", func(t *testing.T) {
-        testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
-        initialPos := testCamera.Pos
-
-        done := make(chan bool)
-        go func() {
-            testCamera.TryGps()
-            done <- true
-        }()
-
-        time.Sleep(500 * time.Millisecond)
-        mock.SendTPV(0, 0, 0, gpsd.NoFix)
-        time.Sleep(500 * time.Millisecond)
-
-        currentPos := testCamera.Pos
-        if !equal(currentPos[0], initialPos[0]) || 
-           !equal(currentPos[1], initialPos[1]) || 
-           !equal(currentPos[2], initialPos[2]) {
-            t.Errorf("Camera position should not change with NoFix. Got %v, expected %v", 
-                currentPos, initialPos)
-        }
-    })
-
-    // Run WorkingGPS test
-    t.Run("WorkingGPS", func(t *testing.T) {
-        testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
-        
-        done := make(chan bool)
-        go func() {
-            testCamera.TryGps()
-            done <- true
-        }()
-
-        time.Sleep(500 * time.Millisecond)
-
-        expectedLat := 45.5
-        expectedLon := -122.6
-        expectedAlt := 100.0
-        
-        mock.SendTPV(expectedLat, expectedLon, expectedAlt, gpsd.Mode3D)
-        time.Sleep(500 * time.Millisecond)
-
-        expectedX, expectedZ := renderer.CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
-        expectedY := float32(expectedAlt) * renderer.HEIGHT_CONVERSION
-
-        pos := testCamera.Pos
-        if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
-            t.Errorf("Camera position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)", 
-                pos, expectedX, expectedY, expectedZ)
-        }
-    })
-
     // Test the sense data and WMM
 	SenseData(t, testCamera)
 	WMM(t, testCamera)
+
+    // GPS tests
+    NoFix(t, testCamera)
+    WorkingGPS(t, testCamera)
+
 
     // Test handling keyboard input
 	ProcessInput(t, testCamera)
 }
 
-
-// Sensehat tests
+// Sensehat tests: 
+// SenseData tests processing sensehat data correctly
 func SenseData(t *testing.T, c *renderer.Camera) {
 	// test if sense fails on bad data
 	md := c.TrySense("./badhat.py")
@@ -214,6 +161,7 @@ func SenseData(t *testing.T, c *renderer.Camera) {
 	}
 }
 
+// WMM tests if correct declination is found and applied
 func WMM(t *testing.T, c *renderer.Camera) {
 	c.TrySense("./fakehat2.py")
 	// check if bellingham declination is within actual range
@@ -225,7 +173,65 @@ func WMM(t *testing.T, c *renderer.Camera) {
 }
 
 
-// Camera tests
+// GPS tests:
+// NoFix tests if TryGPS handles when the gps has no fix (position should not change)
+func NoFix(t *testing.T, c *renderer.Camera) {
+    mock := NewMockGPSD(t)
+    defer mock.Close()
+    initialPos := c.Pos
+
+    done := make(chan bool)
+    go func() {
+        c.TryGps()
+        done <- true
+    }()
+
+    time.Sleep(500 * time.Millisecond)
+    mock.SendTPV(0, 0, 0, gpsd.NoFix)
+    time.Sleep(500 * time.Millisecond)
+
+    currentPos := c.Pos
+    if !equal(currentPos[0], initialPos[0]) || 
+       !equal(currentPos[1], initialPos[1]) || 
+       !equal(currentPos[2], initialPos[2]) {
+        t.Errorf("Camera position should not change with NoFix. Got %v, expected %v", 
+            currentPos, initialPos)
+    }
+}
+
+// WorkingGPS tests that data is correctly parsed and the position vector is updated
+func WorkingGPS(t *testing.T, c *renderer.Camera) {
+    mock := NewMockGPSD(t)
+    defer mock.Close()
+    
+    done := make(chan bool)
+    go func() {
+        c.TryGps()
+        done <- true
+    }()
+
+    time.Sleep(500 * time.Millisecond)
+
+    expectedLat := 45.5
+    expectedLon := -122.6
+    expectedAlt := 100.0
+    
+    mock.SendTPV(expectedLat, expectedLon, expectedAlt, gpsd.Mode3D)
+    time.Sleep(500 * time.Millisecond)
+
+    expectedX, expectedZ := renderer.CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
+    expectedY := float32(expectedAlt) * renderer.HEIGHT_CONVERSION
+
+    pos := c.Pos
+    if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
+        t.Errorf("Camera position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)", 
+            pos, expectedX, expectedY, expectedZ)
+    }
+}
+
+
+// Camera tests:
+
 func InitCamera(t *testing.T, c *renderer.Camera){
 	// test pos
 	if c.Pos[0] != -442800 || c.Pos[1] != 162.11664 || c.Pos[2] != -172800 {
@@ -235,7 +241,6 @@ func InitCamera(t *testing.T, c *renderer.Camera){
 	if c.Decimal_year.Year() != 2025 {
 		t.Errorf("Date is incorrect")
 	}
-
 }
 
 func ProcessInput(t *testing.T, c *renderer.Camera) {
