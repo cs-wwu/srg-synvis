@@ -1,0 +1,43 @@
+name: Go
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: ./application/go.mod
+          cache-dependency-path: ./application/go.sum
+
+
+      # Install dependencies if cache miss
+      - name: Install Graphics and Vulkan Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            mesa-vulkan-drivers \
+            vulkan-tools \
+            libvulkan-dev \
+            vulkan-utility-libraries-dev \
+            spirv-tools \
+            libglfw3-dev \
+            libglm-dev \
+            libxi-dev \
+            libxxf86vm-dev \
+            libxcursor-dev \
+            libxinerama-dev
+
+      # Ensure that we have Go libraries installed
+      - name: Enter application and download dependencies
+        run: |
+          cd ./application
+          go mod download
+
+      - name: Run Test
+        run: |
+          cd ./application
+          go test -v ./test
