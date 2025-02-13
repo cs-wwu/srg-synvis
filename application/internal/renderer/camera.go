@@ -127,10 +127,10 @@ func (c *Camera) TryGps() error {
 	tpvFilter := func(r interface{}) {
 		// Get gpsd data
 		report := r.(*gpsd.TPVReport)
-		fmt.Println("Location updated:", report.Lat, report.Lon, report.Alt)
+		log.Println("Location updated:", report.Lat, report.Lon, report.Alt)
 		newY := float32(report.Alt) * HEIGHT_CONVERSION
 		newX, newZ := CoordinateGPSFloatToFloat(float32(report.Lat), float32(report.Lon))
-		// fmt.Println("Location:", LAT, LON)
+		// fmt.Println("Location:", report.Lat, report.Lon)
 
 		// Check if data is faulty, if so, assume spot based on history
 		// if (report.Lat == 0 && report.Lon == 0) {
