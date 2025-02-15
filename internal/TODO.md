@@ -6,6 +6,44 @@ These are the internal system TODOs.
 
 ### Cooper
 
+Refactor:
+
+```shell
+srg-synvis/
+├── assets/                # Static assets like shaders, textures, and maps
+├── cmd/                   # Application entry points
+│   ├── download/          # Data download and processing tool
+│   └── svs/               # Main SVS application
+├── internal/              # Internal packages
+│   ├── platform/          # Platform-specific code
+│   │   ├── types/         # Fundamental platform types
+│   │   ├── gpu/           # GPU interface definitions
+│   │   └── vulkan/        # Vulkan implementation
+│   ├── render/            # Rendering system
+│   │   ├── pipeline/      # Render pipeline management
+│   │   ├── mesh/          # Mesh generation and management
+│   │   └── scene/         # Scene management
+│   ├── terrain/           # Terrain system
+│   │   ├── generator/     # Terrain generation
+│   │   ├── chunk/         # Chunk management
+│   │   └── cache/         # Terrain data caching
+│   ├── engine/            # Core engine functionality
+│   │   ├── camera/        # Camera management
+│   │   ├── input/         # Input handling
+│   │   └── config/        # Engine configuration
+│   └── data/              # Data processing
+│       ├── heightmap/     # Height data processing
+│       ├── watermap/      # Water data processing
+│       └── roadmap/       # Road data processing
+├── pkg/                   # Public packages
+│   ├── api/               # External API interfaces
+│   └── wmm/               # World Magnetic Model
+└── test/                  # Testing directory
+    ├── mocks/             # Mock implementations
+    ├── unit/              # Unit tests
+    └── integration/       # Integration tests
+```
+
 - [ ] Simplify chunk logic
 - [ ] Add capacity to render 4 maps at once
   - [ ] Find max memory based on LODs and distance
