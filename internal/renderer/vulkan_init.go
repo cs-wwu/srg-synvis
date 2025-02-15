@@ -11,7 +11,7 @@ import (
 	"os"
 	"unsafe"
 
-	as "github.com/cs-wwu/srg-synvis/asche"
+	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"

@@ -1,7 +1,7 @@
 package renderer
 
 import (
-	as "github.com/cs-wwu/srg-synvis/asche"
+	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	// as "github.com/vulkan-go/asche"

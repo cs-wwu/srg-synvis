@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cs-wwu/srg-synvis/api"
+	"github.com/cs-wwu/srg-synvis/pkg/api"
 	"github.com/cs-wwu/srg-synvis/internal/processor"
 )
 

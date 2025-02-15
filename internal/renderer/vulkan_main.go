@@ -6,8 +6,8 @@ import (
 	"log"
 	"unsafe"
 
-	as "github.com/cs-wwu/srg-synvis/asche"
-	"github.com/cs-wwu/srg-synvis/models"
+	"github.com/cs-wwu/srg-synvis/internal/models"
+	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/go-gl/glfw/v3.3/glfw"

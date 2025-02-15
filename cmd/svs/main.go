@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	as "github.com/cs-wwu/srg-synvis/asche" // local asche copy
 	"github.com/cs-wwu/srg-synvis/internal/renderer"
-	"github.com/cs-wwu/srg-synvis/models"
+	"github.com/cs-wwu/srg-synvis/internal/models"
+	as "github.com/cs-wwu/srg-synvis/pkg/asche" // local asche copy
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	vk "github.com/vulkan-go/vulkan"
