@@ -19,4 +19,8 @@ These are the internal system TODOs.
   - [ ] Move frustum culling from app to TerrainManager
   - [ ] Test performance difference
 - [ ] Change Camera to use Quaternions (sensors?)
-- [ ] Eventually remove local `asche` copy (public repo)
+
+### Anyone
+
+- [ ] Move `asche` changes to a custom pullable public branch
+  - [ ] UI Application in `asche`
