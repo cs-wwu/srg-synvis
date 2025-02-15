@@ -21,7 +21,6 @@ import (
 )
 
 // This file should be used for chunk management, chunk rendering, etc.
-// TODO maybe save raw arrays rather than image pointers?
 
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
@@ -246,8 +245,6 @@ func (tm *TerrainManager) checkForUpdates() {
 		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
 	}
-
-	// tm.updateVisibleChunks()
 }
 
 func (tm *TerrainManager) updateLoop() {
@@ -434,7 +431,7 @@ func (tm *TerrainManager) UpdateMatrices(view, proj *lin.Mat4x4) {
 	*tm.projMatrix = *proj
 }
 
-// Thread safe index fetching
+// Returns active indicies with thread-safety
 func (tm *TerrainManager) getActiveIndices() uint32 {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()
@@ -448,6 +445,7 @@ func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
 	return tm.activeVertexBuffer, tm.activeIndexBuffer
 }
 
+// Returns the visible chunks with thread-safety
 func (tm *TerrainManager) GetVisibleChunks() int {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()

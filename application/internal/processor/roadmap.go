@@ -193,24 +193,25 @@ func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 // Return:
 //   - ret: a string representation of lat & lon
 func CoordToString(lat, lon int) string {
-	ret := ""
+	var latDir, lonDir rune
+
+	// 0 lat is n00
 	if lat >= 0 {
-		ret += "n"
-		ret += strconv.Itoa(lat)
+		latDir = 'n'
 	} else {
-		ret += "s"
-		ret += strconv.Itoa(-1 * lat)
+		latDir = 's'
+		lat = -lat // remove negative
 	}
 
+	// 0 lon is e000
 	if lon >= 0 {
-		ret += "e"
-		ret += strconv.Itoa(lon)
+		lonDir = 'e'
 	} else {
-		ret += "w"
-		ret += strconv.Itoa(-1 * lon)
+		lonDir = 'w'
+		lon = -lon // remove negative
 	}
 
-	return ret
+	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
 }
 
 func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.Gray, roadType string) {

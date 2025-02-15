@@ -60,32 +60,34 @@ func TestConvertCoordsToPngIndex(t *testing.T) {
 		}
 	}
 }
+
 func TestCoordToString(t *testing.T) {
 	retA := processor.CoordToString(-49, -20)
-	if retA != "s49w20" {
-		t.Errorf("ran on (-49, -20), wanted 's49w20', got %s", retA)
+	if retA != "s49w020" {
+		t.Errorf("ran on (-49, -20), wanted 's49w020', got %s", retA)
 	}
 
 	retB := processor.CoordToString(49, -20)
-	if retB != "n49w20" {
-		t.Errorf("ran on (49, -20), wanted 'n49w20', got %s", retB)
+	if retB != "n49w020" {
+		t.Errorf("ran on (49, -20), wanted 'n49w020', got %s", retB)
 	}
 
 	retC := processor.CoordToString(-49, 20)
-	if retC != "s49e20" {
-		t.Errorf("ran on (-49, 20), wanted 's49e20', got %s", retC)
+	if retC != "s49e020" {
+		t.Errorf("ran on (-49, 20), wanted 's49e020', got %s", retC)
 	}
 
 	retD := processor.CoordToString(49, 20)
-	if retD != "n49e20" {
-		t.Errorf("ran on (49, 20), wanted 'n49e20', got %s", retD)
+	if retD != "n49e020" {
+		t.Errorf("ran on (49, 20), wanted 'n49e020', got %s", retD)
 	}
 
 	retE := processor.CoordToString(0, 0)
-	if retE != "n0e0" {
-		t.Errorf("ran on (0, 0), wanted 'n0e0', got %s", retE)
+	if retE != "n00e000" {
+		t.Errorf("ran on (0, 0), wanted 'n00e000', got %s", retE)
 	}
 }
+
 func TestDrawLine(t *testing.T) {
 	start := processor.Point{X: 1, Y: 8}
 	end := processor.Point{X: 10, Y: 8}

@@ -36,9 +36,9 @@ go run cmd/download/main.go
 
     ```bash
     cd ~
-    wget https://go.dev/dl/go1.23.1.linux-arm64.tar.gz
-    sudo tar -xzf go1.23.1.linux-arm64.tar.gz
-    rm go1.23.1.linux-arm64.tar.gz
+    wget https://go.dev/dl/go1.23.5.linux-arm64.tar.gz
+    sudo tar -xzf go1.23.5.linux-arm64.tar.gz
+    rm go1.23.5.linux-arm64.tar.gz
     ```
 
     b. Add the following to the bottom of your `~/.profile`

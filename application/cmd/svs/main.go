@@ -80,7 +80,7 @@ func parsePosition(posString string) lin.Vec3 {
 	return lin.Vec3{
 		float32(lon * float64(ARC_DEGREES_TO_SECONDS)),               // latitude to arcseconds
 		float32(height * (float64(ARC_DEGREES_TO_MINUTES) / 1852.0)), // meters to arcseconds
-		float32(-lat * float64(ARC_DEGREES_TO_SECONDS)),              // longitude to arcseconds
+		float32(-lat * float64(ARC_DEGREES_TO_SECONDS)),              // longitude to arcseconds (flipped for vulkan coords)
 	}
 }
 
