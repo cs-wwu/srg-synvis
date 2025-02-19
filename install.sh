@@ -1,149 +1,125 @@
 #!/bin/bash
 
-# This installs the latest version of go for your architecture
-# This also installs all necessary vulkan libraries and tests them
+# This script installs vulkan dependencies for the current user
+# and installs the version of Go required for the SVS
 
 # Color codes
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check if the script is run with sudo privileges
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}Please run this script with sudo privileges${NC}"
+# Function to print error and exit
+error_exit() {
+    echo -e "${RED}Error: $1${NC}" >&2
     exit 1
-fi
-
-# Get the actual user (not root)
-ACTUAL_USER=$(logname)
-USER_HOME=$(eval echo ~$ACTUAL_USER)
-
-# Function to get the latest Go version
-get_latest_go_version() {
-    wget -qO- https://golang.org/VERSION?m=text | sed -n 's/^go//p'
 }
 
-# Function to get the current installed Go version
-get_current_go_version() {
-    if /usr/local/go/bin/go version &> /dev/null; then
-        /usr/local/go/bin/go version | cut -d' ' -f3 | sed 's/go//'
-    else
-        echo "none"
-    fi
-}
-
-# Function to detect system architecture
-detect_architecture() {
-    local arch=$(uname -m)
-    case $arch in
-        x86_64)
-            echo "amd64"
-            ;;
-        aarch64|armv8*|arm64)
-            echo "arm64"
-            ;;
-        *)
-            echo -e "${RED}Unsupported architecture: $arch${NC}"
-            exit 1
-            ;;
-    esac
-}
-
-# Get the latest Go version
-LATEST_GO_VERSION=$(get_latest_go_version)
-
-# Get the current installed Go version
-CURRENT_GO_VERSION=$(get_current_go_version)
-
-# Detect system architecture
-ARCH=$(detect_architecture)
-echo "Detected architecture: $ARCH"
-
-# Check if Go needs to be installed or updated
-if [ "$CURRENT_GO_VERSION" = "$LATEST_GO_VERSION" ]; then
-    echo -e "${GREEN}Go $CURRENT_GO_VERSION is already installed and up to date.${NC}"
-else
-    echo "Installing Go $LATEST_GO_VERSION..."
-
-    # Remove existing Go installation if it exists
-    if [ -d "/usr/local/go" ]; then
-        echo "Removing existing Go installation..."
-        rm -rf /usr/local/go
-    fi
-
-    # Download the appropriate Go package
-    DOWNLOADEDFILE="go${LATEST_GO_VERSION}.linux-${ARCH}.tar.gz"
-    DOWNLOAD_URL="https://golang.org/dl/${DOWNLOADEDFILE}"
-    echo "Downloading from: $DOWNLOAD_URL"
-    wget "$DOWNLOAD_URL" > /dev/null
-
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to download Go. Please check the URL and try again.${NC}"
-        exit 1
-    fi
-
-    # Extract the downloaded file
-    tar -C /usr/local -xzf "$DOWNLOADEDFILE"
-
-    /usr/local/go/bin/go version
-
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Failed to install Go.${NC}"
-    else
-        echo -e "${GREEN}Go $LATEST_GO_VERSION has been installed successfully!${NC}"
-    fi
-
-    # Remove the downloaded file
-    rm "$DOWNLOADEDFILE"
+# Check if we're on a supported system
+if ! command -v apt >/dev/null 2>&1; then
+    error_exit "This script requires apt package manager"
 fi
 
-# Set up Go environment for the actual user
-GO_SETTINGS="
-# Go settings
-export GOPATH=\$HOME/go
-export PATH=\$PATH:/usr/local/go/bin:\$GOPATH/bin"
-
-# Check if Go settings are already in .bashrc
-if ! grep -q "# Go settings" "$USER_HOME/.bashrc"; then
-    echo "Adding Go settings to $USER_HOME/.bashrc"
-    echo "$GO_SETTINGS" | sudo -u $ACTUAL_USER tee -a $USER_HOME/.bashrc > /dev/null
-else
-    echo "Go settings already exist in $USER_HOME/.bashrc. Skipping addition."
+# Get architecture
+ARCH=$(dpkg --print-architecture)
+if [[ "$ARCH" != "amd64" && "$ARCH" != "arm64" ]]; then
+    error_exit "Unsupported architecture: $ARCH. Only amd64 and arm64 are supported."
 fi
 
-# Make sure the GOPATH directory exists
-sudo -u $ACTUAL_USER mkdir -p $USER_HOME/go
+# Install Vulkan dependencies if running as root
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${GREEN}Installing Vulkan dependencies...${NC}"
+    apt update || error_exit "Failed to update apt"
+    apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev \
+        libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxcursor-dev ||
+        error_exit "Failed to install Vulkan dependencies"
 
-# Make sure the GOPATH directory exists
-sudo -u $ACTUAL_USER mkdir -p $USER_HOME/go
+    # Get the original user who ran the script with sudo
+    REAL_USER=${SUDO_USER:-$USER}
+    if [ "$REAL_USER" = "root" ]; then
+        error_exit "Please run this script as a normal user with sudo"
+    fi
 
-# Install required packages
-echo "Installing Vulkan tools and related packages..."
-apt update
-apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxcursor-dev libmeshoptimizer-dev=0.18+dfsg-2
-
-# Run vkcube and check its exit status
-echo "Running vkcube to verify Vulkan installation..."
-timeout 1s vkcube > /dev/null 2>&1
-VKCUBE_EXIT_STATUS=$?
-
-if [ $VKCUBE_EXIT_STATUS -eq 124 ]; then
-    echo -e "${GREEN}vkcube ran successfully for 1 second and was terminated.${NC}"
-    echo "Vulkan tools appear to be installed correctly."
-elif [ $VKCUBE_EXIT_STATUS -eq 0 ]; then
-    echo -e "${GREEN}vkcube ran successfully and exited normally.${NC}"
-    echo "Vulkan tools appear to be installed correctly."
-else
-    echo -e "${RED}vkcube encountered an error (exit status: $VKCUBE_EXIT_STATUS).${NC}"
-    echo "There might be an issue with the Vulkan installation."
+    # Save original working directory and re-run script as the original user
+    ORIGINAL_PWD="$PWD"
+    echo -e "${GREEN}Running Go installation as user $REAL_USER...${NC}"
+    su - "$REAL_USER" -c "cd \"$ORIGINAL_PWD\" && $(readlink -f "$0")"
+    exit 0
 fi
 
-# Install gpsd
-apt-get update
-apt-get install gpsd gpsd-clients
-systemctl stop gpsd.socket
-systemctl disable gpsd.socket
+# Get Go version from go.mod
+if [ ! -f "go.mod" ]; then
+    error_exit "go.mod file not found in current directory"
+fi
 
-echo "Go has been installed to /usr/local/go"
-echo "GOPATH has been set to $USER_HOME/go for user $ACTUAL_USER"
-echo "Please restart your terminal or run 'source ~/.bashrc' as $ACTUAL_USER to apply the PATH changes."
+GO_VERSION=$(grep -m 1 "^go " go.mod | awk '{print $2}')
+if [ -z "$GO_VERSION" ]; then
+    error_exit "Could not determine Go version from go.mod"
+fi
+
+# Check if Go is already installed and version is sufficient
+if command -v go >/dev/null 2>&1; then
+    CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+    if [ "$(printf '%s\n' "$GO_VERSION" "$CURRENT_GO_VERSION" | sort -V | head -n1)" = "$GO_VERSION" ]; then
+        echo -e "${GREEN}Go $CURRENT_GO_VERSION is already installed and meets the requirement ($GO_VERSION)${NC}"
+        exit 0
+    fi
+fi
+
+# Install Go
+echo -e "${GREEN}Installing Go $GO_VERSION...${NC}"
+GO_INSTALL_DIR="$HOME/.go"
+mkdir -p "$GO_INSTALL_DIR"
+
+# Download and install Go
+GO_FILENAME="go${GO_VERSION}.linux-${ARCH}.tar.gz"
+GO_URL="https://golang.org/dl/${GO_FILENAME}"
+wget -q "$GO_URL" -O "/tmp/${GO_FILENAME}" || error_exit "Failed to download Go"
+tar -C "$GO_INSTALL_DIR" -xzf "/tmp/${GO_FILENAME}" || error_exit "Failed to extract Go"
+rm "/tmp/${GO_FILENAME}"
+
+# Detect shell and update PATH
+SHELL_TYPE=$(basename "$SHELL")
+SHELL_RC=""
+GO_PATH_ENTRY="export PATH=$GO_INSTALL_DIR/go/bin:\$PATH"
+GO_ROOT_ENTRY="export GOROOT=$GO_INSTALL_DIR/go"
+GO_PATH_ENTRY2="export GOPATH=\$HOME/go"
+
+case "$SHELL_TYPE" in
+"bash")
+    SHELL_RC="$HOME/.bashrc"
+    ;;
+"zsh")
+    SHELL_RC="$HOME/.zshrc"
+    ;;
+"fish")
+    SHELL_RC="$HOME/.config/fish/config.fish"
+    GO_PATH_ENTRY="set -x PATH $GO_INSTALL_DIR/go/bin \$PATH"
+    GO_ROOT_ENTRY="set -x GOROOT $GO_INSTALL_DIR/go"
+    GO_PATH_ENTRY2="set -x GOPATH \$HOME/go"
+    mkdir -p "$(dirname "$SHELL_RC")"
+    ;;
+*)
+    error_exit "Unsupported shell: $SHELL_TYPE"
+    ;;
+esac
+
+# Update shell configuration
+if [ ! -f "$SHELL_RC" ]; then
+    touch "$SHELL_RC"
+fi
+
+# Remove any existing Go PATH entries
+sed -i '/export.*GOROOT/d' "$SHELL_RC" 2>/dev/null
+sed -i '/export.*GOPATH/d' "$SHELL_RC" 2>/dev/null
+sed -i '/set -x.*GOROOT/d' "$SHELL_RC" 2>/dev/null
+sed -i '/set -x.*GOPATH/d' "$SHELL_RC" 2>/dev/null
+sed -i '/export.*\/go\/bin/d' "$SHELL_RC" 2>/dev/null
+sed -i '/set -x PATH.*\/go\/bin/d' "$SHELL_RC" 2>/dev/null
+
+# Add new Go PATH entries
+echo "$GO_ROOT_ENTRY" >>"$SHELL_RC"
+echo "$GO_PATH_ENTRY2" >>"$SHELL_RC"
+echo "$GO_PATH_ENTRY" >>"$SHELL_RC"
+
+echo -e "${GREEN}Installation complete!${NC}"
+echo -e "${GREEN}Please restart your shell or run: source $SHELL_RC${NC}"

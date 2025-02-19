@@ -1,5 +1,12 @@
 name: Go
-on: [push]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger
 
 jobs:
   build:
@@ -10,8 +17,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version-file: ./application/go.mod
-          cache-dependency-path: ./application/go.sum
+          go-version-file: ./go.mod
+          cache-dependency-path: ./go.sum
 
 
       # Install dependencies if cache miss
@@ -34,10 +41,8 @@ jobs:
       # Ensure that we have Go libraries installed
       - name: Enter application and download dependencies
         run: |
-          cd ./application
           go mod download
 
       - name: Run Test
         run: |
-          cd ./application
           go test -v ./test
