@@ -150,8 +150,8 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 	// Generate chunks for this map
 	mapX, mapZ := CoordinateMapToInt(coord)
-	for x := 0; x < CHUNKS_PER_SIDE; x++ {
-		for z := 0; z < CHUNKS_PER_SIDE; z++ {
+	for x := range CHUNKS_PER_SIDE {
+		for z := range CHUNKS_PER_SIDE {
 			chunkX := mapX + x*CHUNK_SIZE
 			chunkZ := mapZ + z*CHUNK_SIZE
 			tm.LoadChunk(chunkX, chunkZ)

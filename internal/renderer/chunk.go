@@ -79,9 +79,9 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 	// Allocate vertex array based on LOD level
 	chunk.vertices = make([]Vertex, verticesPerSide*verticesPerSide)
 
-	for z := 0; z < verticesPerSide; z++ {
+	for z := range verticesPerSide {
 		worldZ := chunk.Z + (z * stride)
-		for x := 0; x < verticesPerSide; x++ {
+		for x := range verticesPerSide {
 			worldX := chunk.X + (x * stride)
 			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
 
@@ -113,14 +113,14 @@ func calculateChunkIndices(chunk *Chunk) {
 	chunk.indices = make([]Index, (numStrips*verticesPerStrip)+degenerateVertices)
 	indexPos := 0
 
-	for z := 0; z < verticesPerSide-1; z++ {
+	for z := range verticesPerSide - 1 {
 		if z > 0 {
 			// Degenerate triangle to connect strips
 			chunk.indices[indexPos] = Index(z * verticesPerSide)
 			indexPos++
 		}
 
-		for x := 0; x < verticesPerSide; x++ {
+		for x := range verticesPerSide {
 			chunk.indices[indexPos] = Index(z*verticesPerSide + x)
 			chunk.indices[indexPos+1] = Index((z+1)*verticesPerSide + x)
 			indexPos += 2
@@ -158,13 +158,13 @@ func calculateChunkNormals(chunk *Chunk) {
 	}
 
 	// Handle right edge - use the normal from the vertex to the left
-	for z := 0; z < verticesPerSide-1; z++ {
+	for z := range verticesPerSide-1 {
 		idx := z*verticesPerSide + (verticesPerSide - 1)
 		chunk.vertices[idx].Normal = chunk.vertices[idx-1].Normal
 	}
 
 	// Handle bottom edge - use the normal from the vertex above
-	for x := 0; x < verticesPerSide; x++ {
+	for x := range verticesPerSide {
 		idx := (verticesPerSide-1)*verticesPerSide + x
 		chunk.vertices[idx].Normal = chunk.vertices[idx-verticesPerSide].Normal
 	}
