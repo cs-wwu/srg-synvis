@@ -80,7 +80,7 @@ rm "/tmp/${GO_FILENAME}"
 # Detect shell and update PATH
 SHELL_TYPE=$(basename "$SHELL")
 SHELL_RC=""
-GO_PATH_ENTRY="export PATH=$GO_INSTALL_DIR/go/bin:\$PATH"
+GO_PATH_ENTRY="export PATH=$GO_INSTALL_DIR/bin:$GO_INSTALL_DIR/go/bin:\$PATH"
 GO_ROOT_ENTRY="export GOROOT=$GO_INSTALL_DIR/go"
 GO_PATH_ENTRY2="export GOPATH=\$HOME/go"
 
@@ -95,7 +95,7 @@ case "$SHELL_TYPE" in
     SHELL_RC="$HOME/.config/fish/config.fish"
     GO_PATH_ENTRY="set -x PATH $GO_INSTALL_DIR/go/bin \$PATH"
     GO_ROOT_ENTRY="set -x GOROOT $GO_INSTALL_DIR/go"
-    GO_PATH_ENTRY2="set -x GOPATH \$HOME/go"
+    GO_PATH_ENTRY2="set -x GOPATH \$HOME/.go"
     mkdir -p "$(dirname "$SHELL_RC")"
     ;;
 *)
