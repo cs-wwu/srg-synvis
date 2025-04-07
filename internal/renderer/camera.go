@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
+	quat "github.com/ungerik/go3d/float64/quaternion"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
 
@@ -302,8 +303,9 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		}
 
 		// fmt.Println(roll, pitch, yaw)
-		front := calcFrontVector(pitch, yaw)
-		c.UpdateFront(front)
+		//front := calcFrontVector(pitch, yaw)
+		//c.UpdateFront(front)
+		QuatRotate()
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -452,4 +454,15 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 	c.posMutex.Lock()
 	c.Pos.Sub(c.Pos, &tmp)
 	c.posMutex.Unlock()
+}
+
+func (c *Camera) QuatRotate() {
+	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
+	rotQuat := quat.Mul3(quat.FromZAxisAngle(c.getYaw()),
+		quat.FromXAxisAngle(c.getRoll()),
+		quat.FromYAxisAngle(c.getPitch()))
+
+	rotQuat.RotateVec3(c.Front)
+	rotQuat.RotateVec3(c.Right)
+	rotQuat.RotateVec3(c.Up)
 }
