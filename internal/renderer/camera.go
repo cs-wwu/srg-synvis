@@ -51,9 +51,11 @@ type Camera struct {
 
 	frontMutex sync.Mutex // Mutex for updating the front vector
 	posMutex   sync.Mutex // Mutex for updating the position vector
+	upMutex    sync.Mutex // Mutex for updating the up vector
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
+	RollAngle   float64 // Current roll angle in quaternions
 
 	Decimal_year time.Time // Date for magnetic world
 }
@@ -71,7 +73,7 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 	rotation.Identity()
 
 	right := lin.Vec3{}
-	right.MultCross(&front, &worldUp)
+	right.MultCross(&front, &up)
 	right.Norm(&right)
 
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
@@ -85,6 +87,7 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 		Rotation:     &rotation,
 		Speed:        CAMERA_SPEED,
 		Sensitivity:  LOOK_SENSITIVITY,
+		RollAngle:    0.0,
 		Decimal_year: today,
 	}
 }
@@ -279,7 +282,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 
 		yaw := c.getYaw()
 		pitch := c.getPitch()
-		roll := c.getRoll()
+		roll := c.RollAngle
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
@@ -295,17 +298,25 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			yaw += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Roll Right
-			roll += float64(c.Sensitivity)
+			roll -= float64(c.Sensitivity)
+			if roll > math.Pi {
+				roll -= 2 * math.Pi
+			}
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
-			roll -= float64(c.Sensitivity)
+			roll += float64(c.Sensitivity)
+			if roll < -math.Pi {
+				roll += 2 * math.Pi
+			}
 		}
 
 		// fmt.Println(roll, pitch, yaw)
 		front := calcFrontVector(pitch, yaw)
 		c.UpdateFront(front)
 
-		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
+		c.updateVectorsWithRoll(roll)
+
+		if window.GetKey(glfw.KeyR) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
 			fmt.Printf("Vectors: %v\n", c.GetViewVectors())
 		}
@@ -313,6 +324,48 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// remove the current method of clamping top and bottom view vectors,
 
 	}
+}
+
+// UpdateVectorsWithRoll calculates new right and up vectors based on roll angle
+func (c *Camera) updateVectorsWithRoll(roll float64) {
+    c.RollAngle = roll
+    
+    // Calculate the base right and up vectors (without roll)
+    worldUp := START_CAMERA_UP
+    
+    // Calculate right vector (perpendicular to front and world up)
+    baseRight := lin.Vec3{}
+    baseRight.MultCross(c.Front, &worldUp)
+    baseRight.Norm(&baseRight)
+    
+    // Calculate new right vector with roll applied
+    // right = baseRight * cos(roll) + up * sin(roll)
+    rightWithRoll := lin.Vec3{}
+    tempUp := lin.Vec3{}
+    
+    // Calculate the base up vector (without roll)
+    baseUp := lin.Vec3{}
+    baseUp.MultCross(&baseRight, c.Front)
+    baseUp.Norm(&baseUp)
+    
+    // Apply roll rotation
+    rightWithRoll.Scale(&baseRight, float32(math.Cos(roll)))
+    tempUp.Scale(&baseUp, float32(math.Sin(roll)))
+    rightWithRoll.Add(&rightWithRoll, &tempUp)
+    rightWithRoll.Norm(&rightWithRoll)
+    
+    // Calculate new up vector (perpendicular to front and new right)
+    upWithRoll := lin.Vec3{}
+    upWithRoll.MultCross(&rightWithRoll, c.Front)
+    upWithRoll.Norm(&upWithRoll)
+    
+    // Update the camera vectors
+    c.upMutex.Lock()
+    c.frontMutex.Lock()
+    *c.Right = rightWithRoll
+    *c.Up = upWithRoll
+    c.frontMutex.Unlock()
+    c.upMutex.Unlock()
 }
 
 func (c *Camera) GetPositionString() string {
