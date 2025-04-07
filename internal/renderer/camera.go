@@ -212,6 +212,7 @@ func (c *Camera) TrySense(filename string) Mode {
 		// Update the front vector with pitch and yaw data
 		front := calcFrontVector(pitch, yaw)
 		c.UpdateFront(front)
+		c.updateVectorsWithRoll(roll)
 	}
 
 	// Print the output
