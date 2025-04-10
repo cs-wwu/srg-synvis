@@ -14,6 +14,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
 	quat "github.com/ungerik/go3d/float64/quaternion"
+	"github.com/ungerik/go3d/float64/vec3"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
 
@@ -64,16 +65,21 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 	today := time.Now()
 
 	pos := startPos
-	up := START_CAMERA_UP
-	front := START_CAMERA_FRONT
 	worldUp := START_CAMERA_UP
 
+	// Create identity quaternion for initial rotation
 	var rotation lin.Quat
 	rotation.Identity()
 
+	// Calculate initial vectors based on identity rotation
+	front := START_CAMERA_FRONT
 	right := lin.Vec3{}
 	right.MultCross(&front, &worldUp)
 	right.Norm(&right)
+
+	up := lin.Vec3{}
+	up.MultCross(&right, &front)
+	up.Norm(&up)
 
 	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
@@ -305,7 +311,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// fmt.Println(roll, pitch, yaw)
 		//front := calcFrontVector(pitch, yaw)
 		//c.UpdateFront(front)
-		QuatRotate()
+		c.QuatRotate()
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -370,54 +376,6 @@ func dotProduct(v1, v2 lin.Vec3) float32 {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
 }
 
-// Update the camera's front, right, and up vectors based on the current rotation
-func (c *Camera) updateCameraVectors(roll, pitch, yaw float64) {
-	// Create quaternion for yaw, pitch, and roll
-	yawQuat := QuatRotate(yaw, &lin.Vec3{0, 1, 0})     // Rotate around Y-axis
-	pitchQuat := QuatRotate(pitch, &lin.Vec3{1, 0, 0}) // Rotate around X-axis
-	rollQuat := QuatRotate(roll, &lin.Vec3{0, 0, 1})   // Rotate around Z-axis
-
-	// Combine rotations
-	c.Rotation.Mult(c.Rotation, &rollQuat)
-	c.Rotation.Mult(c.Rotation, &pitchQuat)
-	c.Rotation.Mult(c.Rotation, &yawQuat)
-	c.Rotation.Norm(c.Rotation)
-
-	// calculate new front, right, and up vectors
-
-	front := lin.Vec3{0, 0, -1}            // Default front vector
-	front = RotateQuat(&front, c.Rotation) // Rotate by the combined quaternion
-	front.Norm(&front)                     // Normalize the front vector
-	c.Front = &front
-
-	right := lin.Vec3{1, 0, 0}
-	right = RotateQuat(&right, c.Rotation)
-	right.Norm(&right)
-	c.Right = &right
-
-	up := lin.Vec3{0, 1, 0}
-	up = RotateQuat(&up, c.Rotation)
-	up.Norm(&up)
-	c.Up = &up
-
-	fmt.Printf("Front: %v, Right: %v, Up: %v, Rot: %v\n", c.Front, c.Right, c.Up, c.Rotation)
-}
-
-// Helper Functions for Quaternion Rotations
-// lin.Quat defined as [x,y,x,w]
-
-// QuatRotate creates a quaternion representing a rotation around an axis
-func QuatRotate(angle float64, axis *lin.Vec3) lin.Quat {
-	halfAngle := angle / 2
-	s := float32(math.Sin(float64(halfAngle)))
-	return lin.Quat{
-		axis[0] * s,
-		axis[1] * s,
-		axis[2] * s,
-		float32(math.Cos(float64(halfAngle))),
-	}
-}
-
 // RotateQuat rotates a vector by a quaternion
 func RotateQuat(vec *lin.Vec3, quat *lin.Quat) lin.Vec3 {
 	qv := lin.Quat{vec[0], vec[1], vec[2], 0}
@@ -457,12 +415,31 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 }
 
 func (c *Camera) QuatRotate() {
-	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
-	rotQuat := quat.Mul3(quat.FromZAxisAngle(c.getYaw()),
-		quat.FromXAxisAngle(c.getRoll()),
-		quat.FromYAxisAngle(c.getPitch()))
+	yaw := quat.FromZAxisAngle(c.getYaw())
+	roll := quat.FromXAxisAngle(c.getRoll())
+	pitch := quat.FromYAxisAngle(c.getPitch())
 
-	rotQuat.RotateVec3(c.Front)
-	rotQuat.RotateVec3(c.Right)
-	rotQuat.RotateVec3(c.Up)
+	fmt.Println("Yaw: ", yaw)
+	fmt.Println("Roll: ", roll)
+	fmt.Println("Pitch: ", pitch)
+
+	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
+	rotQuat := quat.Mul3(&yaw, &roll, &pitch)
+
+	front := &vec3.T{float64(c.Front[0]), float64(c.Front[1]), float64(c.Front[2])}
+	right := &vec3.T{float64(c.Right[0]), float64(c.Right[1]), float64(c.Right[2])}
+	up := &vec3.T{float64(c.Up[0]), float64(c.Up[1]), float64(c.Up[2])}
+
+	rotQuat.RotateVec3(front)
+	rotQuat.RotateVec3(right)
+	rotQuat.RotateVec3(up)
+
+	c.Front = &lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])}
+	c.Right = &lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])}
+	c.Up = &lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}
+
+	fmt.Println("Front: ", c.Front)
+	fmt.Println("Right: ", c.Right)
+	fmt.Println("Up: ", c.Up)
+
 }
