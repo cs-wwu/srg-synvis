@@ -325,7 +325,8 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// fmt.Println(roll, pitch, yaw)
 		//front := calcFrontVector(pitch, yaw)
 		//c.UpdateFront(front)
-		c.QuatRotate(pitch, yaw, roll)
+		fmt.Printf("PROCESS INPUT: Yaw: %f, Pitch: %f, Roll: %f\n", yaw, pitch, roll)
+		c.QuatRotate(yaw, roll, pitch)
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -383,7 +384,7 @@ func (c *Camera) getRoll() float64 { // x
 
 	y0yr := dotProduct(y0, *c.Up)
 	cos0 := math.Acos(float64(y0yr))
-	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2])) / float64(x0[2]))
+	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2])) / float64(x0[2])) // TODO: This is returning NaN sometimes
 }
 
 func dotProduct(v1, v2 lin.Vec3) float32 {
@@ -429,6 +430,7 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 }
 
 func (c *Camera) QuatRotate(yaw, roll, pitch float64) {
+	fmt.Printf("QUAT ROTATE START: Yaw: %f, Pitch: %f, Roll: %f\n", yaw, pitch, roll)
 	// Relative Axis
 	front := &vec3.T{float64(c.Front[0]), float64(c.Front[1]), float64(c.Front[2])}
 	right := &vec3.T{float64(c.Right[0]), float64(c.Right[1]), float64(c.Right[2])}
@@ -451,4 +453,6 @@ func (c *Camera) QuatRotate(yaw, roll, pitch float64) {
 	c.Front = &lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])}
 	c.Right = &lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])}
 	c.Up = &lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}
+
+	fmt.Printf("QUAT ROTATE END: C.Front: %v\nC.Right: %v\nC.Up: %v\n", c.Front, c.Right, c.Up)
 }
