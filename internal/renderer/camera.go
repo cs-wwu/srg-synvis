@@ -37,10 +37,13 @@ const (
 )
 
 var (
-	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
-	CAMERA_SPEED       = float32(10.0)
-	LOOK_SENSITIVITY   = float32(0.1)
+	START_CAMERA_UP      = lin.Vec3{0.0, 1.0, 0.0}
+	START_CAMERA_FRONT   = lin.Vec3{-0.5, -0.5, -0.7}
+	Q_START_CAMERA_UP    = vec3.T{0.0, 1.0, 0.0}
+	Q_START_CAMERA_FRONT = vec3.T{-0.5, -0.5, -0.7}
+	Q_START_CAMERA_RIGHT = vec3.Cross(&Q_START_CAMERA_UP, &Q_START_CAMERA_FRONT)
+	CAMERA_SPEED         = float32(10.0)
+	LOOK_SENSITIVITY     = float32(0.1)
 )
 
 type Camera struct {
@@ -113,7 +116,7 @@ func (c *Camera) TryGps() error {
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
 		// log.Fatalf("Failed to connect to GPSD: %s", err)
-		log.Println("Failed to connect to GPSD: %s", err)
+		log.Println("Failed to connect to GPSD: ", err)
 		return err
 	}
 
@@ -222,8 +225,19 @@ func (c *Camera) TrySense(filename string) Mode {
 		// TODO inclinication + databackup?
 
 		// Update the front vector with pitch and yaw data
-		front := calcFrontVector(pitch, yaw)
-		c.UpdateFront(front)
+		qRoll := quat.FromAxisAngle(&Q_START_CAMERA_FRONT, roll)
+		qYaw := quat.FromAxisAngle(&Q_START_CAMERA_UP, yaw)
+		qPitch := quat.FromAxisAngle(&Q_START_CAMERA_RIGHT, pitch)
+		qRotate := quat.Mul3(&qRoll, &qYaw, &qPitch)
+
+		front := qRotate.RotatedVec3(&Q_START_CAMERA_FRONT)
+		up := qRotate.RotatedVec3(&Q_START_CAMERA_UP)
+		right := qRotate.RotatedVec3(&Q_START_CAMERA_RIGHT)
+
+		// Save the newly rotated vectors back into the camera information
+		c.Front = &lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])}
+		c.Right = &lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])}
+		c.Up = &lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}
 	}
 
 	// Print the output
@@ -311,7 +325,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 		// fmt.Println(roll, pitch, yaw)
 		//front := calcFrontVector(pitch, yaw)
 		//c.UpdateFront(front)
-		c.QuatRotate()
+		c.QuatRotate(pitch, yaw, roll)
 
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -414,32 +428,27 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 	c.posMutex.Unlock()
 }
 
-func (c *Camera) QuatRotate() {
-	yaw := quat.FromZAxisAngle(c.getYaw())
-	roll := quat.FromXAxisAngle(c.getRoll())
-	pitch := quat.FromYAxisAngle(c.getPitch())
-
-	fmt.Println("Yaw: ", yaw)
-	fmt.Println("Roll: ", roll)
-	fmt.Println("Pitch: ", pitch)
-
-	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
-	rotQuat := quat.Mul3(&yaw, &roll, &pitch)
-
+func (c *Camera) QuatRotate(yaw, roll, pitch float64) {
+	// Relative Axis
 	front := &vec3.T{float64(c.Front[0]), float64(c.Front[1]), float64(c.Front[2])}
 	right := &vec3.T{float64(c.Right[0]), float64(c.Right[1]), float64(c.Right[2])}
 	up := &vec3.T{float64(c.Up[0]), float64(c.Up[1]), float64(c.Up[2])}
 
+	// Calculate the rotation quaternions for each component
+	qYaw := quat.FromAxisAngle(up, yaw)
+	qRoll := quat.FromAxisAngle(front, roll)
+	qPitch := quat.FromAxisAngle(right, pitch)
+
+	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
+	rotQuat := quat.Mul3(&qYaw, &qRoll, &qPitch)
+
+	// Rotate each vector based on the above quaternion rotation
 	rotQuat.RotateVec3(front)
 	rotQuat.RotateVec3(right)
 	rotQuat.RotateVec3(up)
 
+	// Save the newly rotated vectors back into the camera information
 	c.Front = &lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])}
 	c.Right = &lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])}
 	c.Up = &lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}
-
-	fmt.Println("Front: ", c.Front)
-	fmt.Println("Right: ", c.Right)
-	fmt.Println("Up: ", c.Up)
-
 }
