@@ -25,7 +25,9 @@ import (
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
-	MAX_IMAGE_MAPS      = 6
+	TEXTURE_EXTENSION   = ".osm.png"
+
+	MAX_IMAGE_MAPS = 4
 
 	TICKER_SPEED = time.Second / 30 // x times per second
 
@@ -77,6 +79,7 @@ type TerrainManager struct {
 
 	heightmaps    map[string]*image.Gray16
 	watermaps     map[string]*image.Gray
+	textures      map[string]*Texture
 	chunks        map[string]*Chunk
 	visibleChunks map[string]bool
 	orderedChunks []*Chunk
@@ -101,6 +104,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		heightmaps:    make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
+		textures:      make(map[string]*Texture, MAX_IMAGE_MAPS),
 		chunks:        make(map[string]*Chunk),
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
@@ -146,6 +150,11 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		if err := tm.LoadWatermap(coord); err != nil {
 			return err
 		}
+		// if _, exists := tm.textures[coord]; !exists {
+		// 	if err := tm.LoadTexture(coord); err != nil {
+		// 		return err
+		// 	}
+		// }
 	}
 
 	// Generate chunks for this map
@@ -238,7 +247,7 @@ func (tm *TerrainManager) FillPendingBuffers() {
 func (tm *TerrainManager) checkForUpdates() {
 	if tm.HasCrossedThreshold(tm.lastPosition) {
 		// Load new chunks and update pending buffers
-		tm.LoadMap("n48w123") // Example coordinate
+		tm.LoadMap("n47w123") // Example coordinate
 		tm.FillPendingBuffers()
 
 		// Mark as updated so main thread knows to swap buffers
@@ -284,7 +293,7 @@ func (tm *TerrainManager) InitBuffers() {
 	tm.pendingIndexMemory = pendingIndexBuf.Memory
 }
 
-// Loads a watermap (coord.swb.png) into the ChunkManager
+// Loads a watermap (coord.swb.png) into the TerrainManager
 func (tm *TerrainManager) LoadWatermap(coord string) error {
 	filepath := MAPS_PATH + coord + WATERMAP_EXTENSION
 	rawImg, err := loadMap(filepath)
@@ -303,7 +312,7 @@ func (tm *TerrainManager) LoadWatermap(coord string) error {
 	return nil
 }
 
-// Loads a heightmap (coord.hgt.png) into the ChunkManager
+// Loads a heightmap (coord.hgt.png) into the TerrainManager
 func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	filepath := MAPS_PATH + coord + HEIGHTMAP_EXTENSION
 	rawImg, err := loadMap(filepath)
@@ -322,20 +331,43 @@ func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	return nil
 }
 
+// Loads a texture (coord.osm.png) into the TerrainManager
+// func (tm *TerrainManager) LoadTexture(coord string) error {
+// 	filepath := MAPS_PATH + coord + TEXTURE_EXTENSION
+// 	_, err := loadMap(filepath) // TODO: replace "_" with rawImg
+// 	if err != nil {
+// 		return fmt.Errorf("failed to load file: %w", err)
+// 	}
+// 	// Load and store the texture
+// 	// TODO load the texture into Vulkan with rawImg
+// 	// placeholder
+// 	texture := &Texture{}
+
+// 	// Store that texture in a usable state in the texture map
+// 	tm.textures[coord] = texture
+// 	return nil
+// }
+
 // Unloads both the water and heightmaps
 func (tm *TerrainManager) UnloadMaps(coord string) {
 	tm.unloadWatermap(coord)
 	tm.unloadHeightmap(coord)
+	tm.unloadTexture(coord)
 }
 
-// Unloads a watermap (coord) from the ChunkManager
+// Unloads a watermap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadWatermap(coord string) {
 	delete(tm.watermaps, coord)
 }
 
-// Unloads a heightmap (coord) from the ChunkManager
+// Unloads a heightmap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadHeightmap(coord string) {
 	delete(tm.heightmaps, coord)
+}
+
+// Unloads a texture (coord) from the TerrainManager
+func (tm *TerrainManager) unloadTexture(coord string) {
+	delete(tm.textures, coord) // TODO, problably will need to remove Vulkan stuff
 }
 
 // Loads a map and returns a png

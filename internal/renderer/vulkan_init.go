@@ -168,7 +168,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	usage vk.ImageUsageFlagBits, memoryProps vk.MemoryPropertyFlagBits) *Texture {
 
 	dev := app.Context().Device()
-	_, width, height, err := loadTextureData(path, 0)
+	_, width, height, err := loadTextureData(path)
 	if err != nil {
 		OrPanic(err)
 	}
@@ -223,7 +223,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		}, &layout)
 		layout.Deref()
 
-		data, _, _, err := loadTextureData(path, int(layout.RowPitch))
+		data, _, _, err := loadTextureData(path)
 		OrPanic(err)
 		if len(data) > 0 {
 			var pData unsafe.Pointer
@@ -802,19 +802,25 @@ func FileToBytes(filename string) []byte {
 	return data
 }
 
-func loadTextureData(name string, rowPitch int) ([]byte, int, int, error) {
+// Modified function to handle stride and alignment properly
+func loadTextureData(name string) ([]byte, int, int, error) {
 	data := FileToBytes(name)
 	img, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	newImg := image.NewRGBA(img.Bounds())
-	if rowPitch <= 4*img.Bounds().Dy() {
-		// apply the proposed row pitch only if supported,
-		// as we're using only optimal textures.
-		newImg.Stride = rowPitch
-	}
+
+	bounds := img.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+
+	// Create RGBA image with standard stride
+	newImg := image.NewRGBA(bounds)
+
+	// Don't modify stride - let Go handle the default, which is reliable
+	// The default stride is width * 4 bytes
+
+	// Draw the image
 	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
-	size := newImg.Bounds().Size()
-	return []byte(newImg.Pix), size.X, size.Y, nil
+
+	return []byte(newImg.Pix), width, height, nil
 }

@@ -140,8 +140,8 @@ func calculateChunkNormals(chunk *Chunk) {
 	verticesPerSide := CHUNK_SIZE / stride
 
 	// For each vertex except the last row and column
-	for z := 0; z < verticesPerSide-1; z++ {
-		for x := 0; x < verticesPerSide-1; x++ {
+	for z := range verticesPerSide - 1 {
+		for x := range verticesPerSide - 1 {
 			idx := z*verticesPerSide + x
 			current := chunk.vertices[idx].Position
 			right := chunk.vertices[idx+1].Position
@@ -158,7 +158,7 @@ func calculateChunkNormals(chunk *Chunk) {
 	}
 
 	// Handle right edge - use the normal from the vertex to the left
-	for z := range verticesPerSide-1 {
+	for z := range verticesPerSide - 1 {
 		idx := z*verticesPerSide + (verticesPerSide - 1)
 		chunk.vertices[idx].Normal = chunk.vertices[idx-1].Normal
 	}
