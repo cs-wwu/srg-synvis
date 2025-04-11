@@ -58,7 +58,6 @@ type Camera struct {
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
-	RollAngle   float64 // Current roll angle in quaternions
 
 	Pitch float64 // Pitch  relative to start
 	Yaw   float64 // Yaw relative to start
@@ -92,7 +91,6 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 		Right:        &right,
 		Speed:        CAMERA_SPEED,
 		Sensitivity:  LOOK_SENSITIVITY,
-		RollAngle:    0.0,
 		Decimal_year: today,
 		Pitch:        0.0,
 		Roll:         0.0,
@@ -323,80 +321,12 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 	}
 }
 
-// UpdateVectorsWithRoll calculates new right and up vectors based on roll angle
-func (c *Camera) updateVectorsWithRoll(roll float64) {
-	c.RollAngle = roll
-
-	// Calculate the base right and up vectors (without roll)
-	worldUp := START_CAMERA_UP
-
-	// Calculate right vector (perpendicular to front and world up)
-	baseRight := lin.Vec3{}
-	baseRight.MultCross(c.Front, &worldUp)
-	baseRight.Norm(&baseRight)
-
-	// Calculate new right vector with roll applied
-	// right = baseRight * cos(roll) + up * sin(roll)
-	rightWithRoll := lin.Vec3{}
-	tempUp := lin.Vec3{}
-
-	// Calculate the base up vector (without roll)
-	baseUp := lin.Vec3{}
-	baseUp.MultCross(&baseRight, c.Front)
-	baseUp.Norm(&baseUp)
-
-	// Apply roll rotation
-	rightWithRoll.Scale(&baseRight, float32(math.Cos(roll)))
-	tempUp.Scale(&baseUp, float32(math.Sin(roll)))
-	rightWithRoll.Add(&rightWithRoll, &tempUp)
-	rightWithRoll.Norm(&rightWithRoll)
-
-	// Calculate new up vector (perpendicular to front and new right)
-	upWithRoll := lin.Vec3{}
-	upWithRoll.MultCross(&rightWithRoll, c.Front)
-	upWithRoll.Norm(&upWithRoll)
-
-	// Update the camera vectors
-	c.upMutex.Lock()
-	c.frontMutex.Lock()
-	*c.Right = rightWithRoll
-	*c.Up = upWithRoll
-	c.frontMutex.Unlock()
-	c.upMutex.Unlock()
-}
-
 func (c *Camera) GetPositionString() string {
 	return fmt.Sprintf("%v, %s", c.Pos, CoordinateFloatToGPS(c.Pos[0], c.Pos[2]))
 }
 
 func (c *Camera) GetViewVectors() string {
 	return fmt.Sprintf("(Up: %v, Front: %v, Right: %v)", c.Up, c.Front, c.Right)
-}
-
-// Calculate the front vector without quaternions, from pitch and yaw
-func calcFrontVector(pitch, yaw float64) lin.Vec3 {
-	// Clamping to avoid flipping
-	if pitch > float64(lin.DegreesToRadians(89.0)) {
-		pitch = float64(lin.DegreesToRadians(89.0))
-	}
-	if pitch < -float64(lin.DegreesToRadians(89)) {
-		pitch = -float64(lin.DegreesToRadians(89.0))
-	}
-
-	var front lin.Vec3
-	front[0] = float32(math.Cos(yaw) * math.Cos(pitch))
-	front[1] = float32(math.Sin(pitch))
-	front[2] = float32(math.Sin(yaw) * math.Cos(pitch))
-	front.Norm(&front)
-	return front
-}
-
-func (c *Camera) getYaw() float64 { // z
-	return math.Atan2(float64(c.Front[2]), float64(c.Front[0]))
-}
-
-func (c *Camera) getPitch() float64 { // y
-	return math.Asin(float64(c.Front[1]))
 }
 
 func (c *Camera) UpdateFront(front lin.Vec3) {
@@ -432,7 +362,7 @@ func (c *Camera) QuatRotate() {
 	qPitch := quat.FromAxisAngle(&Q_START_CAMERA_RIGHT, -c.Pitch)
 
 	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
-	rotQuat := quat.Mul3(&qYaw, &qRoll, &qPitch)
+	rotQuat := quat.Mul3(&qYaw, &qPitch, &qRoll)
 
 	// Rotate each vector based on the above quaternion rotation
 	qFront := rotQuat.RotatedVec3(&Q_START_CAMERA_FRONT)
