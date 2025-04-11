@@ -222,7 +222,7 @@ func (c *Camera) TrySense(filename string) Mode {
 		// TODO inclinication + databackup?
 
 		// Update the front vector with pitch, yaw, and roll data
-		c.QuatRotate()
+		c.QuatRotateAbs()
 	}
 
 	// Print the output
@@ -283,36 +283,40 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			c.SubPos(tmp)
 		}
 
+		pitch := 0.0
+		roll := 0.0
+		yaw := 0.0
+
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
-			c.Pitch += float64(c.Sensitivity)
+			pitch += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyDown) == glfw.Press { // View Down
-			c.Pitch -= float64(c.Sensitivity)
+			pitch -= float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyLeft) == glfw.Press { // View Left
-			c.Yaw -= float64(c.Sensitivity)
+			yaw -= float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyRight) == glfw.Press { // View Right
-			c.Yaw += float64(c.Sensitivity)
+			yaw += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Roll Right
-			c.Roll -= float64(c.Sensitivity)
+			roll -= float64(c.Sensitivity)
 			// Stay within the unit circle
-			if c.Roll > math.Pi {
-				c.Roll -= 2 * math.Pi
+			if roll > math.Pi {
+				roll -= 2 * math.Pi
 			}
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
-			c.Roll += float64(c.Sensitivity)
+			roll += float64(c.Sensitivity)
 			// Stay within the unit circle
-			if c.Roll < -math.Pi {
-				c.Roll += 2 * math.Pi
+			if roll < -math.Pi {
+				roll += 2 * math.Pi
 			}
 		}
 
 		// Updated camera position
-		c.QuatRotate()
+		c.QuatRotateRel(yaw, pitch, roll)
 
 		if window.GetKey(glfw.KeyR) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
@@ -355,7 +359,7 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 	c.posMutex.Unlock()
 }
 
-func (c *Camera) QuatRotate() {
+func (c *Camera) QuatRotateAbs() {
 	// Calculate the rotation quaternions for each component
 	qYaw := quat.FromAxisAngle(&Q_START_CAMERA_UP, -c.Yaw)
 	qRoll := quat.FromAxisAngle(&Q_START_CAMERA_FRONT, -c.Roll)
@@ -368,6 +372,35 @@ func (c *Camera) QuatRotate() {
 	qFront := rotQuat.RotatedVec3(&Q_START_CAMERA_FRONT)
 	qRight := rotQuat.RotatedVec3(&Q_START_CAMERA_RIGHT)
 	qUp := rotQuat.RotatedVec3(&Q_START_CAMERA_UP)
+
+	// Save the newly rotated vectors back into the camera information
+	c.frontMutex.Lock()
+	c.upMutex.Lock()
+	c.Front = &lin.Vec3{float32(qFront[0]), float32(qFront[1]), float32(qFront[2])}
+	c.Right = &lin.Vec3{float32(qRight[0]), float32(qRight[1]), float32(qRight[2])}
+	c.Up = &lin.Vec3{float32(qUp[0]), float32(qUp[1]), float32(qUp[2])}
+	c.upMutex.Unlock()
+	c.frontMutex.Unlock()
+}
+
+func (c *Camera) QuatRotateRel(yaw, pitch, roll float64) {
+	// Convert lin.vec3 to quat.vec3
+	qUp := vec3.T{float64(c.Up[0]), float64(c.Up[1]), float64(c.Up[2])}
+	qFront := vec3.T{float64(c.Front[0]), float64(c.Front[1]), float64(c.Front[2])}
+	qRight := vec3.T{float64(c.Right[0]), float64(c.Right[1]), float64(c.Right[2])}
+
+	// Calculate the rotation quaternions for each component
+	qYaw := quat.FromAxisAngle(&qUp, -yaw)
+	qRoll := quat.FromAxisAngle(&qFront, -roll)
+	qPitch := quat.FromAxisAngle(&qRight, pitch)
+
+	// Calculate the rotation quaternion from Yaw, Roll, and Pitch
+	rotQuat := quat.Mul3(&qYaw, &qPitch, &qRoll)
+
+	// Rotate each vector based on the above quaternion rotation
+	rotQuat.RotateVec3(&qFront)
+	rotQuat.RotateVec3(&qRight)
+	rotQuat.RotateVec3(&qUp)
 
 	// Save the newly rotated vectors back into the camera information
 	c.frontMutex.Lock()
