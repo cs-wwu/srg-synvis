@@ -51,14 +51,14 @@ type Camera struct {
 	Up       *lin.Vec3 // Up Direction of the camera
 	Front    *lin.Vec3 // Front direction of the camera
 	Right    *lin.Vec3 // Right direction of the Camera
-	WorldUp  *lin.Vec3 // Global up vector
-	Rotation *lin.Quat // Quaternion for Rotation
 
 	frontMutex sync.Mutex // Mutex for updating the front vector
 	posMutex   sync.Mutex // Mutex for updating the position vector
+	upMutex    sync.Mutex // Mutex for updating the up vector
 
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
+	RollAngle   float64 // Current roll angle in quaternions
 
 	Decimal_year time.Time // Date for magnetic world
 }
@@ -68,16 +68,13 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 	today := time.Now()
 
 	pos := startPos
-	worldUp := START_CAMERA_UP
-
-	// Create identity quaternion for initial rotation
-	var rotation lin.Quat
-	rotation.Identity()
+	up := START_CAMERA_UP
+	front := START_CAMERA_FRONT
 
 	// Calculate initial vectors based on identity rotation
 	front := START_CAMERA_FRONT
 	right := lin.Vec3{}
-	right.MultCross(&front, &worldUp)
+	right.MultCross(&front, &up)
 	right.Norm(&right)
 
 	up := lin.Vec3{}
@@ -91,10 +88,9 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 		Up:           &up,
 		Front:        &front,
 		Right:        &right,
-		WorldUp:      &worldUp,
-		Rotation:     &rotation,
 		Speed:        CAMERA_SPEED,
 		Sensitivity:  LOOK_SENSITIVITY,
+		RollAngle:    0.0,
 		Decimal_year: today,
 	}
 }
@@ -213,7 +209,7 @@ func (c *Camera) TrySense(filename string) Mode {
 			md = ParseInput
 			continue
 		}
-		// fmt.Println(roll, pitch, yaw)
+		fmt.Println(roll, pitch, yaw)
 
 		// Account for magnetic world deviation
 
@@ -224,20 +220,10 @@ func (c *Camera) TrySense(filename string) Mode {
 		yaw = yaw - mag.D() // Substract the declination from yaw
 		// TODO inclinication + databackup?
 
-		// Update the front vector with pitch and yaw data
-		qRoll := quat.FromAxisAngle(&Q_START_CAMERA_FRONT, roll)
-		qYaw := quat.FromAxisAngle(&Q_START_CAMERA_UP, yaw)
-		qPitch := quat.FromAxisAngle(&Q_START_CAMERA_RIGHT, pitch)
-		qRotate := quat.Mul3(&qRoll, &qYaw, &qPitch)
-
-		front := qRotate.RotatedVec3(&Q_START_CAMERA_FRONT)
-		up := qRotate.RotatedVec3(&Q_START_CAMERA_UP)
-		right := qRotate.RotatedVec3(&Q_START_CAMERA_RIGHT)
-
-		// Save the newly rotated vectors back into the camera information
-		c.Front = &lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])}
-		c.Right = &lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])}
-		c.Up = &lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])}
+		// Update the front vector with pitch, yaw, and roll data
+		front := calcFrontVector(pitch, yaw)
+		c.UpdateFront(front)
+		c.updateVectorsWithRoll(roll)
 	}
 
 	// Print the output
@@ -300,7 +286,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 
 		yaw := c.getYaw()
 		pitch := c.getPitch()
-		roll := c.getRoll()
+		roll := c.RollAngle
 
 		// Camera Viewing using quaternions
 		if window.GetKey(glfw.KeyUp) == glfw.Press { // View Up
@@ -316,26 +302,73 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			yaw += float64(c.Sensitivity)
 		}
 		if window.GetKey(glfw.KeyE) == glfw.Press { // Roll Right
-			roll += float64(c.Sensitivity)
+			roll -= float64(c.Sensitivity)
+			// Stay within the unit circle
+			if roll > math.Pi {
+				roll -= 2 * math.Pi
+			}
 		}
 		if window.GetKey(glfw.KeyQ) == glfw.Press { // Roll Left
-			roll -= float64(c.Sensitivity)
+			roll += float64(c.Sensitivity)
+			// Stay within the unit circle
+			if roll < -math.Pi {
+				roll += 2 * math.Pi
+			}
 		}
 
 		// fmt.Println(roll, pitch, yaw)
-		//front := calcFrontVector(pitch, yaw)
-		//c.UpdateFront(front)
-		fmt.Printf("PROCESS INPUT: Yaw: %f, Pitch: %f, Roll: %f\n", yaw, pitch, roll)
-		c.QuatRotate(yaw, roll, pitch)
+		front := calcFrontVector(pitch, yaw)
+		c.UpdateFront(front)
 
-		if window.GetKey(glfw.KeyE) == glfw.Press { // Print Debug
+		c.updateVectorsWithRoll(roll)
+
+		if window.GetKey(glfw.KeyR) == glfw.Press { // Print Debug
 			fmt.Printf("Pos: %v\n", c.GetPositionString())
 			fmt.Printf("Vectors: %v\n", c.GetViewVectors())
 		}
-		// TODO: Update the camera's front, right, and up vectors for quaternions
-		// remove the current method of clamping top and bottom view vectors,
-
 	}
+}
+
+// UpdateVectorsWithRoll calculates new right and up vectors based on roll angle
+func (c *Camera) updateVectorsWithRoll(roll float64) {
+    c.RollAngle = roll
+    
+    // Calculate the base right and up vectors (without roll)
+    worldUp := START_CAMERA_UP
+    
+    // Calculate right vector (perpendicular to front and world up)
+    baseRight := lin.Vec3{}
+    baseRight.MultCross(c.Front, &worldUp)
+    baseRight.Norm(&baseRight)
+    
+    // Calculate new right vector with roll applied
+    // right = baseRight * cos(roll) + up * sin(roll)
+    rightWithRoll := lin.Vec3{}
+    tempUp := lin.Vec3{}
+    
+    // Calculate the base up vector (without roll)
+    baseUp := lin.Vec3{}
+    baseUp.MultCross(&baseRight, c.Front)
+    baseUp.Norm(&baseUp)
+    
+    // Apply roll rotation
+    rightWithRoll.Scale(&baseRight, float32(math.Cos(roll)))
+    tempUp.Scale(&baseUp, float32(math.Sin(roll)))
+    rightWithRoll.Add(&rightWithRoll, &tempUp)
+    rightWithRoll.Norm(&rightWithRoll)
+    
+    // Calculate new up vector (perpendicular to front and new right)
+    upWithRoll := lin.Vec3{}
+    upWithRoll.MultCross(&rightWithRoll, c.Front)
+    upWithRoll.Norm(&upWithRoll)
+    
+    // Update the camera vectors
+    c.upMutex.Lock()
+    c.frontMutex.Lock()
+    *c.Right = rightWithRoll
+    *c.Up = upWithRoll
+    c.frontMutex.Unlock()
+    c.upMutex.Unlock()
 }
 
 func (c *Camera) GetPositionString() string {
@@ -366,41 +399,14 @@ func calcFrontVector(pitch, yaw float64) lin.Vec3 {
 
 func (c *Camera) getYaw() float64 { // z
 	return math.Atan2(float64(c.Front[2]), float64(c.Front[0]))
-	// return math.Asin(-float64(c.Front[1]))
 }
 
 func (c *Camera) getPitch() float64 { // y
 	return math.Asin(float64(c.Front[1]))
-	// return math.Atan2(float64(c.Front[0]), float64(c.Front[2]))
-}
-
-func (c *Camera) getRoll() float64 { // x
-	// assume up and front vectors are orthonormal
-	x0 := lin.Vec3{}
-	x0.MultCross(&lin.Vec3{0, 1, 0}, c.Front)
-	x0.Norm(&x0)
-	y0 := lin.Vec3{}
-	y0.MultCross(c.Front, &x0)
-
-	y0yr := dotProduct(y0, *c.Up)
-	cos0 := math.Acos(float64(y0yr))
-	return math.Asin((float64(y0[2])*cos0 - float64(c.Up[2])) / float64(x0[2])) // TODO: This is returning NaN sometimes
 }
 
 func dotProduct(v1, v2 lin.Vec3) float32 {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
-}
-
-// RotateQuat rotates a vector by a quaternion
-func RotateQuat(vec *lin.Vec3, quat *lin.Quat) lin.Vec3 {
-	qv := lin.Quat{vec[0], vec[1], vec[2], 0}
-	qConj := lin.Quat{-quat[0], -quat[1], -quat[2], quat[3]}
-
-	tmp := lin.Quat{}
-	tmp.Mult(quat, &qv)
-	tmp.Mult(&tmp, &qConj)
-
-	return lin.Vec3{tmp[0], tmp[1], tmp[2]}
 }
 
 func (c *Camera) UpdateFront(front lin.Vec3) {
