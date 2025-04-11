@@ -198,7 +198,7 @@ func (c *Camera) TrySense(filename string) Mode {
 			md = ParseInput
 			continue
 		}
-		// fmt.Println(roll, pitch, yaw)
+		fmt.Println(roll, pitch, yaw)
 
 		// Account for magnetic world deviation
 
@@ -209,7 +209,7 @@ func (c *Camera) TrySense(filename string) Mode {
 		yaw = yaw - mag.D() // Substract the declination from yaw
 		// TODO inclinication + databackup?
 
-		// Update the front vector with pitch and yaw data
+		// Update the front vector with pitch, yaw, and roll data
 		front := calcFrontVector(pitch, yaw)
 		c.UpdateFront(front)
 		c.updateVectorsWithRoll(roll)
