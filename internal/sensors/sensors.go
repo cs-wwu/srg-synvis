@@ -1,5 +1,9 @@
 package sensors
 
+const (
+	DAMP = 0.9
+)
+
 // This file and package should be used for interfacing the raspberry pi
 // sensors with the Go code
 /*
@@ -11,7 +15,11 @@ Location: 48.733436667 -122.487133333
 -.00793076865375042 -0.02032441832125187 -2.8265504837036133
 Location: 48.733438333 -122.487201667
 
-
-
-
 */
+
+func Smoother(new1, old1, new2, old2, new3, old3 float64) (float64, float64, float64) {
+	new1 = new1*DAMP + (1-DAMP)*old1
+	new2 = new2*DAMP + (1-DAMP)*old2
+	new3 = new3*DAMP + (1-DAMP)*old3
+	return new1, new2, new3
+}
