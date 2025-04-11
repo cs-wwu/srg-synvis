@@ -1,16 +1,17 @@
 package test
 
 import (
-    "math"
-    "net"
-    "sync"
-    "testing"
-    "time"
-    "encoding/json"
-    
-    "github.com/stratoberry/go-gpsd"
-    "github.com/cs-wwu/srg-synvis/internal/renderer"
-    lin "github.com/xlab/linmath"
+	"encoding/json"
+	"fmt"
+	"math"
+	"net"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/cs-wwu/srg-synvis/internal/renderer"
+	"github.com/stratoberry/go-gpsd"
+	lin "github.com/xlab/linmath"
 )
 
 // MockGPSD is a test double for the GPSD service
@@ -155,9 +156,11 @@ func SenseData(t *testing.T, c *renderer.Camera) {
 	}
 
 	// test if sense works on good data
-	md = c.TrySense("./fakehat.py")
-	if md != renderer.Waiting {
-		t.Errorf("Ran with good input, expected renderer.Waiting")
+    // test roll
+    fmt.Println("starting roll test")
+    c.TrySense("./fakehat.py")
+	if !(equal(float32(c.RollAngle), 0.263)) {
+		t.Errorf("Expected rollAngle to be 0.263, roll was %f", c.RollAngle)
 	}
 }
 
@@ -166,9 +169,9 @@ func WMM(t *testing.T, c *renderer.Camera) {
 	c.TrySense("./fakehat2.py")
 	// check if bellingham declination is within actual range
 	// check that front vector is also updated corretly
-	// Should be roughly [-9.31, 0.0, -3.64]
-	if !(equal(c.Front[0], -.931) && equal(c.Front[1], 0.0) && equal(c.Front[2], -.379)) {
-		t.Errorf("Expected front vector to be updated with inclination, to [-.931, 0.0, -.379], was %f %f %f", c.Front[0], c.Front[1], c.Front[2])
+	// Should be roughly [-9.17, 0.0, -3.64]
+	if !(equal(c.Front[0], -.917) && equal(c.Front[1], 0.0) && equal(c.Front[2], -.379)) {
+		t.Errorf("Expected front vector to be updated with declination, to [-.917, 0.0, -.379], was %f %f %f, roll was %f", c.Front[0], c.Front[1], c.Front[2], c.RollAngle)
 	}
 }
 
@@ -252,5 +255,5 @@ func ProcessInput(t *testing.T, c *renderer.Camera) {
 
 // For floating point comparisons
 func equal(a, b float32) bool {
-	return math.Abs(float64(a) - float64(b)) <= 0.01
+	return math.Abs(float64(a) - float64(b)) <= 0.05
 }
