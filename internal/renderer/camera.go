@@ -206,6 +206,8 @@ func (c *Camera) TrySense(filename string) Mode {
 			md = ParseInput
 			continue
 		}
+		
+		c.Pitch = -c.Pitch
 
 		// Account for magnetic world deviation
 
