@@ -24,6 +24,8 @@ import (
 const (
 	BUF_SIZE          = 10
 	HEIGHT_CONVERSION = 60.0 / 1852.0
+	FPS               = 60 // Frames per second
+	SPR               = 2 // Seconds per 360 degree rotation
 )
 
 type Mode int
@@ -38,12 +40,12 @@ const (
 
 var (
 	START_CAMERA_UP      = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT   = lin.Vec3{-0.5, -0.5, -0.7}
+	START_CAMERA_FRONT   = lin.Vec3{0, 0, -1.0}
 	Q_START_CAMERA_UP    = vec3.T{0.0, 1.0, 0.0}
-	Q_START_CAMERA_FRONT = vec3.T{-0.5, -0.5, -0.7}
+	Q_START_CAMERA_FRONT = vec3.T{0, 0, -1.0}
 	Q_START_CAMERA_RIGHT = vec3.Cross(&Q_START_CAMERA_UP, &Q_START_CAMERA_FRONT)
 	CAMERA_SPEED         = float32(10.0)
-	LOOK_SENSITIVITY     = float32(0.1)
+	LOOK_SENSITIVITY     = float32((2 * math.Pi)/(SPR * FPS))
 )
 
 type Camera struct {
@@ -59,7 +61,7 @@ type Camera struct {
 	Speed       float32 // Camera speed
 	Sensitivity float32 // Camera sensitivity
 
-	Pitch float64 // Pitch  relative to start
+	Pitch float64 // Pitch relative to start
 	Yaw   float64 // Yaw relative to start
 	Roll  float64 // Roll angle relative to start
 
@@ -221,7 +223,7 @@ func (c *Camera) TrySense(filename string) Mode {
 		c.Yaw = c.Yaw - mag.D() // Substract the declination from yaw
 		// TODO inclinication + databackup?
 
-		// Update the front vector with pitch, yaw, and roll data
+		// Rotate the camera based on the read Yaw, Roll, and Pitch
 		c.QuatRotateAbs()
 	}
 
@@ -283,6 +285,7 @@ func (c *Camera) ProcessInput(window *glfw.Window) {
 			c.SubPos(tmp)
 		}
 
+		// Used to get the relative degree of turning from user input
 		pitch := 0.0
 		roll := 0.0
 		yaw := 0.0
@@ -359,6 +362,7 @@ func (c *Camera) SubPos(tmp lin.Vec3) {
 	c.posMutex.Unlock()
 }
 
+// Calculates rotations based on the original up, fornt, and right vectors
 func (c *Camera) QuatRotateAbs() {
 	// Calculate the rotation quaternions for each component
 	qYaw := quat.FromAxisAngle(&Q_START_CAMERA_UP, -c.Yaw)
@@ -372,6 +376,9 @@ func (c *Camera) QuatRotateAbs() {
 	qFront := rotQuat.RotatedVec3(&Q_START_CAMERA_FRONT)
 	qRight := rotQuat.RotatedVec3(&Q_START_CAMERA_RIGHT)
 	qUp := rotQuat.RotatedVec3(&Q_START_CAMERA_UP)
+	qFront.Normalize()
+	qRight.Normalize()
+	qUp.Normalize()
 
 	// Save the newly rotated vectors back into the camera information
 	c.frontMutex.Lock()
@@ -383,6 +390,7 @@ func (c *Camera) QuatRotateAbs() {
 	c.frontMutex.Unlock()
 }
 
+// Calculates rotations based on the relative up, front, and right vectors
 func (c *Camera) QuatRotateRel(yaw, pitch, roll float64) {
 	// Convert lin.vec3 to quat.vec3
 	qUp := vec3.T{float64(c.Up[0]), float64(c.Up[1]), float64(c.Up[2])}
@@ -401,6 +409,9 @@ func (c *Camera) QuatRotateRel(yaw, pitch, roll float64) {
 	rotQuat.RotateVec3(&qFront)
 	rotQuat.RotateVec3(&qRight)
 	rotQuat.RotateVec3(&qUp)
+	qFront.Normalize()
+	qRight.Normalize()
+	qUp.Normalize()
 
 	// Save the newly rotated vectors back into the camera information
 	c.frontMutex.Lock()
