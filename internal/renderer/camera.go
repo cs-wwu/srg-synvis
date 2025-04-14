@@ -217,7 +217,7 @@ func (c *Camera) TrySense(filename string) Mode {
 		// TODO inclinication + databackup?
 
 		if !first {
-			yaw, roll, pitch = sensors.Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
+			c.Yaw, c.Roll, c.Pitch = sensors.Smoother64(c.Yaw, oldYaw, c.Roll, oldRoll, c.Pitch, oldPitch)
 		}
 		first = false
 
@@ -225,9 +225,9 @@ func (c *Camera) TrySense(filename string) Mode {
 		c.QuatRotateAbs()
 
 		// Log data
-		oldYaw = yaw
-		oldRoll = roll
-		oldPitch = pitch
+		oldYaw = c.Yaw
+		oldRoll = c.Roll
+		oldPitch = c.Pitch
 	}
 
 	// Print the output
