@@ -93,7 +93,6 @@ func NewCamera(hat bool, startPos lin.Vec3) *Camera {
 		Right:        &right,
 		Speed:        CAMERA_SPEED,
 		Sensitivity:  LOOK_SENSITIVITY,
-		RollAngle:    0.0,
 		Decimal_year: today,
 		Pitch:        0.0,
 		Roll:         0.0,
@@ -217,8 +216,18 @@ func (c *Camera) TrySense(filename string) Mode {
 		c.Yaw = c.Yaw - mag.D() // Substract the declination from yaw
 		// TODO inclinication + databackup?
 
+		if !first {
+			yaw, roll, pitch = sensors.Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
+		}
+		first = false
+
 		// Rotate the camera based on the read Yaw, Roll, and Pitch
 		c.QuatRotateAbs()
+
+		// Log data
+		oldYaw = yaw
+		oldRoll = roll
+		oldPitch = pitch
 	}
 
 	// Print the output
