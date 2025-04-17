@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"log"
 	"math"
@@ -142,19 +143,14 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 	tm.ClearChunks()
 
-	// Skip heightmaps if already loaded
-	if _, exists := tm.heightmaps[coord]; !exists {
-		if err := tm.LoadHeightmap(coord); err != nil {
-			return err
-		}
-		if err := tm.LoadWatermap(coord); err != nil {
-			return err
-		}
-		// if _, exists := tm.textures[coord]; !exists {
-		// 	if err := tm.LoadTexture(coord); err != nil {
-		// 		return err
-		// 	}
-		// }
+	// Load heightmap (will generate ocean if file doesn't exist)
+	if err := tm.LoadHeightmap(coord); err != nil {
+		return fmt.Errorf("failed to load heightmap: %w", err)
+	}
+
+	// Load watermap (will generate ocean if file doesn't exist)
+	if err := tm.LoadWatermap(coord); err != nil {
+		return fmt.Errorf("failed to load watermap: %w", err)
 	}
 
 	// Generate chunks for this map
@@ -167,18 +163,11 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
-	// Calculate LOD sizes for debugging
-	// sizes := make([]int, 4)
-	// for _, chunk := range tm.chunks {
-	// 	sizes[chunk.lodLevel]++
-	// }
-
-	// fmt.Printf("\n\nSizes: %v\n\n", sizes)
-
+	log.Printf("Successfully loaded map: %s", coord)
 	return nil
 }
 
-func (tm *TerrainManager) HasCrossedThreshold(new lin.Vec3) bool {
+func (tm *TerrainManager) HasCrossedUpdateThreshold(new lin.Vec3) bool {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()
 
@@ -245,12 +234,29 @@ func (tm *TerrainManager) FillPendingBuffers() {
 }
 
 func (tm *TerrainManager) checkForUpdates() {
-	if tm.HasCrossedThreshold(tm.lastPosition) {
-		// Load new chunks and update pending buffers
-		tm.LoadMap("n47w123") // Example coordinate
-		tm.FillPendingBuffers()
+	if tm.HasCrossedUpdateThreshold(tm.lastPosition) {
+		// Determine the current map based on camera position
+		currentMap := GetMapFromPosition(tm.lastPosition)
 
-		// Mark as updated so main thread knows to swap buffers
+		// Check if we need to load a new map
+		if _, exists := tm.heightmaps[currentMap]; !exists {
+			log.Printf("Camera moving to new map: %s", currentMap)
+
+			// Unload old maps to free memory
+			for mapCoord := range tm.heightmaps {
+				log.Printf("Unloading map: %s", mapCoord)
+				tm.UnloadMaps(mapCoord)
+			}
+
+			// Load the new map - our updated LoadMap will handle missing files
+			err := tm.LoadMap(currentMap)
+			if err != nil {
+				log.Printf("Error loading map %s: %v", currentMap, err)
+			}
+		}
+
+		// Update buffers regardless of whether map changed
+		tm.FillPendingBuffers()
 		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
 	}
@@ -293,12 +299,62 @@ func (tm *TerrainManager) InitBuffers() {
 	tm.pendingIndexMemory = pendingIndexBuf.Memory
 }
 
+// generateOceanHeightmap creates a flat heightmap (all water)
+func (tm *TerrainManager) generateOceanHeightmap() *image.Gray16 {
+	// Create a new Gray16 image with the correct dimensions
+	img := image.NewGray16(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
+
+	// Fill with a constant elevation value slightly below sea level
+	// 32768 is the zero point (sea level) in our 16-bit heightmap
+	oceanLevel := uint16(32760) // Slightly below sea level
+
+	for y := 0; y <= MAP_LENGTH; y++ {
+		for x := 0; x <= MAP_LENGTH; x++ {
+			img.SetGray16(x, y, color.Gray16{Y: oceanLevel})
+		}
+	}
+
+	return img
+}
+
+// generateOceanWatermap creates a watermap with all water
+func (tm *TerrainManager) generateOceanWatermap() *image.Gray {
+	// Create a new Gray image with the correct dimensions
+	img := image.NewGray(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
+
+	// Fill with water value (255 represents water in our implementation)
+	waterValue := uint8(255)
+
+	for y := 0; y <= MAP_LENGTH; y++ {
+		for x := 0; x <= MAP_LENGTH; x++ {
+			img.SetGray(x, y, color.Gray{Y: waterValue})
+		}
+	}
+
+	return img
+}
+
 // Loads a watermap (coord.swb.png) into the TerrainManager
 func (tm *TerrainManager) LoadWatermap(coord string) error {
 	filepath := MAPS_PATH + coord + WATERMAP_EXTENSION
-	rawImg, err := loadMap(filepath)
+
+	// Try to open the file first
+	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to load file: %w", err)
+		if os.IsNotExist(err) {
+			// File doesn't exist, create an ocean watermap instead
+			log.Printf("Watermap file not found for %s, generating ocean tile", coord)
+			tm.watermaps[coord] = tm.generateOceanWatermap()
+			return nil
+		}
+		return fmt.Errorf("failed to open watermap file: %w", err)
+	}
+	defer file.Close()
+
+	// If file exists, proceed with normal loading
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return fmt.Errorf("failed to decode watermap: %w", err)
 	}
 
 	// Ensure the image is grayscale
@@ -308,16 +364,30 @@ func (tm *TerrainManager) LoadWatermap(coord string) error {
 	}
 
 	tm.watermaps[coord] = grayImg
-
 	return nil
 }
 
 // Loads a heightmap (coord.hgt.png) into the TerrainManager
 func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	filepath := MAPS_PATH + coord + HEIGHTMAP_EXTENSION
-	rawImg, err := loadMap(filepath)
+
+	// Try to open the file first
+	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to load file: %w", err)
+		if os.IsNotExist(err) {
+			// File doesn't exist, create an ocean heightmap instead
+			log.Printf("Heightmap file not found for %s, generating ocean tile", coord)
+			tm.heightmaps[coord] = tm.generateOceanHeightmap()
+			return nil
+		}
+		return fmt.Errorf("failed to open heightmap file: %w", err)
+	}
+	defer file.Close()
+
+	// If file exists, proceed with normal loading
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return fmt.Errorf("failed to decode heightmap: %w", err)
 	}
 
 	// Ensure the image is grayscale
@@ -327,7 +397,6 @@ func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	}
 
 	tm.heightmaps[coord] = grayImg
-
 	return nil
 }
 
