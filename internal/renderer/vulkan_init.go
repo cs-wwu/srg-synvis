@@ -449,7 +449,7 @@ func (app *Application) prepareDescriptorLayout() {
 				Binding:         DescriptorSetLayoutBinding0,
 				DescriptorType:  DescriptorTypeUniformBuffer,
 				DescriptorCount: 1,
-				StageFlags:      vk.ShaderStageFlags(ShaderStageVertexBit),
+				StageFlags:      vk.ShaderStageFlags(ShaderStageVertexBit | vk.ShaderStageFragmentBit),
 			}, {
 				Binding:         DescriptorSetLayoutBinding1,
 				DescriptorType:  DescriptorTypeCombinedImageSampler,
