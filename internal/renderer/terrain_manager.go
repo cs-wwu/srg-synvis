@@ -136,21 +136,45 @@ func (tm *TerrainManager) ClearChunks() {
 	}
 }
 
+func (tm *TerrainManager) LoadMultipleMaps(coords []string) error {
+	if len(coords) == 0 {
+		return nil
+	}
+
+	// Load the first map with clearing existing chunks
+	if err := tm.LoadMap(coords[0], true); err != nil {
+		log.Printf("Error loading map %s: %v", coords[0], err)
+		// Continue with other maps even if one fails
+	}
+
+	// Load additional maps without clearing
+	for i := 1; i < len(coords); i++ {
+		if err := tm.LoadMap(coords[i], false); err != nil {
+			log.Printf("Error loading map %s: %v", coords[i], err)
+			// Continue with other maps even if one fails
+		}
+	}
+
+	return nil
+}
+
 // LoadMap loads a heightmap and its associated watermap
-func (tm *TerrainManager) LoadMap(coord string) error {
+func (tm *TerrainManager) LoadMap(coord string, clearExisting bool) error {
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()
 
-	tm.ClearChunks()
-
-	// Load heightmap (will generate ocean if file doesn't exist)
-	if err := tm.LoadHeightmap(coord); err != nil {
-		return fmt.Errorf("failed to load heightmap: %w", err)
+	if clearExisting {
+		tm.ClearChunks()
 	}
 
-	// Load watermap (will generate ocean if file doesn't exist)
-	if err := tm.LoadWatermap(coord); err != nil {
-		return fmt.Errorf("failed to load watermap: %w", err)
+	// Skip heightmaps if already loaded
+	if _, exists := tm.heightmaps[coord]; !exists {
+		if err := tm.LoadHeightmap(coord); err != nil {
+			return err
+		}
+		if err := tm.LoadWatermap(coord); err != nil {
+			return err
+		}
 	}
 
 	// Generate chunks for this map
@@ -163,7 +187,7 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
-	log.Printf("Successfully loaded map: %s", coord)
+	log.Printf("Loaded map: %s", coord)
 	return nil
 }
 
@@ -235,27 +259,57 @@ func (tm *TerrainManager) FillPendingBuffers() {
 
 func (tm *TerrainManager) checkForUpdates() {
 	if tm.HasCrossedUpdateThreshold(tm.lastPosition) {
-		// Determine the current map based on camera position
-		currentMap := GetMapFromPosition(tm.lastPosition)
+		// Get current map and adjacent maps
+		mapsToLoad := GetAdjacentMaps(tm.lastPosition)
 
-		// Check if we need to load a new map
-		if _, exists := tm.heightmaps[currentMap]; !exists {
-			log.Printf("Camera moving to new map: %s", currentMap)
+		// Determine which maps need to be loaded and which can be unloaded
+		mapsToUnload := make([]string, 0)
+		mapsNeedingLoad := make([]string, 0)
 
-			// Unload old maps to free memory
-			for mapCoord := range tm.heightmaps {
-				log.Printf("Unloading map: %s", mapCoord)
-				tm.UnloadMaps(mapCoord)
-			}
-
-			// Load the new map - our updated LoadMap will handle missing files
-			err := tm.LoadMap(currentMap)
-			if err != nil {
-				log.Printf("Error loading map %s: %v", currentMap, err)
+		// Check which maps we need to load
+		for _, mapCoord := range mapsToLoad {
+			if _, exists := tm.heightmaps[mapCoord]; !exists {
+				mapsNeedingLoad = append(mapsNeedingLoad, mapCoord)
 			}
 		}
 
-		// Update buffers regardless of whether map changed
+		// Check which maps we need to unload
+		for loadedMap := range tm.heightmaps {
+			stillNeeded := false
+			for _, mapToKeep := range mapsToLoad {
+				if loadedMap == mapToKeep {
+					stillNeeded = true
+					break
+				}
+			}
+			if !stillNeeded {
+				mapsToUnload = append(mapsToUnload, loadedMap)
+			}
+		}
+
+		// Unload maps that are no longer needed
+		for _, mapCoord := range mapsToUnload {
+			log.Printf("Unloading map: %s", mapCoord)
+			tm.UnloadMaps(mapCoord)
+		}
+
+		// Load new maps if needed
+		if len(mapsNeedingLoad) > 0 {
+			log.Printf("Loading %d new maps", len(mapsNeedingLoad))
+
+			// Determine if we need to reload all maps or just add new ones
+			if len(tm.heightmaps) == 0 {
+				// No maps loaded, load everything
+				tm.LoadMultipleMaps(mapsToLoad)
+			} else {
+				// Some maps already loaded, just add new ones
+				for _, mapCoord := range mapsNeedingLoad {
+					tm.LoadMap(mapCoord, false)
+				}
+			}
+		}
+
+		// Update buffers and mark as updated
 		tm.FillPendingBuffers()
 		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
@@ -365,6 +419,24 @@ func (tm *TerrainManager) LoadWatermap(coord string) error {
 
 	tm.watermaps[coord] = grayImg
 	return nil
+}
+
+func GetAdjacentMaps(pos lin.Vec3) []string {
+	// Get current map coordinate
+	currentMap := CoordinateIntToMap(int(pos[0]), int(pos[2]))
+
+	// Get the base coordinates of the current map
+	mapX, mapZ := CoordinateMapToInt(currentMap)
+
+	// Create a slice to hold all map coordinates
+	maps := []string{
+		currentMap,
+		CoordinateIntToMap(mapX+MAP_LENGTH, mapZ),            // East
+		CoordinateIntToMap(mapX, mapZ+MAP_LENGTH),            // North
+		CoordinateIntToMap(mapX+MAP_LENGTH, mapZ+MAP_LENGTH), // Northeast
+	}
+
+	return maps
 }
 
 // Loads a heightmap (coord.hgt.png) into the TerrainManager
