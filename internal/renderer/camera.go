@@ -36,7 +36,7 @@ const (
 
 var (
 	START_CAMERA_UP    = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT = lin.Vec3{-0.5, -0.5, -0.7}
+	START_CAMERA_FRONT = lin.Vec3{0.75, -0.5, -0.75}
 	CAMERA_SPEED       = float32(10.0)
 	LOOK_SENSITIVITY   = float32(0.1)
 )

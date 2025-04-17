@@ -36,7 +36,7 @@ func parseFlags() models.AppConfig {
 	flag.BoolVar(&config.UseHat, "hat", false, "Enable Hat")
 	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
-	startPosString := flag.String("pos", "48.0,-123.0,1300", "Starting Camera Position (lat,lon,height) where height is in meters")
+	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
 	flag.Parse()
 
 	config.CameraStartPos = parsePosition(*startPosString)
@@ -55,7 +55,7 @@ func initGPS() error {
 // Defaults to 48.0, -123.0, 1300 on parsing error or no input
 func parsePosition(posString string) lin.Vec3 {
 	// Default position
-	pos := lin.Vec3{-442800, 162.11664, -172800}
+	pos := lin.Vec3{-441970, 700, -171900}
 
 	// Split the string by commas
 	parts := strings.Split(posString, ",")
