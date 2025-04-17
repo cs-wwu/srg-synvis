@@ -2,6 +2,15 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
+layout(std140, binding = 0) uniform UBO {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+    mat4 normalM;
+    vec3 lightDir;
+    float time;  // Add time uniform for wave animation
+} ubo;
+
 layout(binding = 1) uniform sampler2D texSampler;
 
 layout(location = 0) in vec3 fragColor;
@@ -18,7 +27,7 @@ void main() {
     vec4 texColor = texture(texSampler, fragTexCoord.xy);
     vec4 baseColor = texColor * vec4(fragColor, 1.0);
     
-    // Check if the height (y-coordinate) is greater than 0 (then it's water)
+    // Improved water rendering
     if (fragTexCoord.z > 0.5) {
         // Calculate depth for water color variation
         float waterDepth = 1.0 - fragColor.r * 0.5;  // Use lighting intensity for depth approximation
@@ -29,15 +38,14 @@ void main() {
         vec3 waterColor = mix(deepWater, shallowWater, waterDepth);
         
         // Add specular highlight for water surface
-        vec3 lightDir = normalize(ubo.lightDir);
         vec3 viewDir = normalize(-worldPos);
-        vec3 reflectDir = reflect(-lightDir, vec3(0.0, 1.0, 0.0));  // Assuming water surface normal is up
+        vec3 reflectDir = reflect(-ubo.lightDir, vec3(0.0, 1.0, 0.0));  // Assuming water surface normal is up
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
         vec3 specular = spec * vec3(1.0, 1.0, 1.0) * 0.3;  // White specular highlights
         
         // Add simple wave animation effect (subtle color variation)
         float wave = sin(worldPos.x * 0.05 + worldPos.z * 0.03 + ubo.time * 0.5) * 0.05;
-        waterColor += wave;
+        waterColor += vec3(wave);
         
         // Combine colors
         vec4 waterWithSpec = vec4(waterColor + specular, 0.95);  // Slightly transparent

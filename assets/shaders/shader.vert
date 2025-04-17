@@ -22,7 +22,7 @@ const float FOG_END = 6000.0;     // Match VIEW_DISTANCE in Go code
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragTexCoord;
 layout(location = 2) out vec3 worldPos;
-layout(location = 3) out float fogFactor;
+layout(location = 3) out float fogFactor; // New output for fog
 
 out gl_PerVertex {
     vec4 gl_Position;
