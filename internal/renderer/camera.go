@@ -215,8 +215,8 @@ func (c *Camera) TrySense(filename string) Mode {
 		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1])/HEIGHT_CONVERSION)
 		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
-		c.Yaw = c.Yaw - mag.D() // Substract the declination from yaw
-		// TODO inclinication + databackup?
+		c.Yaw = c.Yaw + mag.D() // Magnetic to true: add declination
+		// TODO databackup?
 
 		if !first {
 			c.Yaw, c.Roll, c.Pitch = sensors.Smoother64(c.Yaw, oldYaw, c.Roll, oldRoll, c.Pitch, oldPitch)
