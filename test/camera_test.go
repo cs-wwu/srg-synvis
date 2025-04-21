@@ -149,21 +149,17 @@ func TestSenseData(t *testing.T) {
 	}
 }
 
-// WMM tests if correct declination is found and applied
-// TODO: Ada fix
+// WMM tests if correct declination is found and applied to yaw
 func TestWMM(t *testing.T) {
+	// Initialize camera to 48.0, -123.0, 1300
 	c := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
 
 	c.TrySense("./fakehat2.py")
-	// check if bellingham declination is within actual range
-	// check that front vector is also updated corretly
-	// Should be roughly [-9.17, 0.0, -3.64]
+	// Check if starting coordinate declination is within actual range ~15.30
 	
-	/*
-	if !(equal(c.Front[0], -.917) && equal(c.Front[1], 0.0) && equal(c.Front[2], -.379)) {
-		t.Errorf("Expected front vector to be updated with declination, to [-.917, 0.0, -.379], was %f %f %f, roll was %f", c.Front[0], c.Front[1], c.Front[2], c.Roll)
+	if !(equal(float32(c.Yaw), -15.30)) {
+		t.Errorf("Expected yaw to be updated with declination to -15.30, was %f", c.Yaw)
 	}
-	*/
 }
 
 // GPS tests:
