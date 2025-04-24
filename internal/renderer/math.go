@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	lin "github.com/xlab/linmath"
 )
 
 // This file should be used for coordinate math and rendering math
@@ -161,6 +163,10 @@ func CoordinateGPSToFloat(coord string) (float32, float32) {
 func CoordinateGPSFloatToFloat(lat, lon float32) (float32, float32) {
 	x := float32(lon * 3600)
 	z := float32(-lat * 3600)
-	
+
 	return x, z
+}
+
+func GetMapFromPosition(pos lin.Vec3) string {
+	return CoordinateIntToMap(int(pos[0]), int(pos[2]))
 }

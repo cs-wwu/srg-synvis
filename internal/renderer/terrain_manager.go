@@ -4,10 +4,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"log"
 	"math"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,6 +18,8 @@ import (
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
+	"slices"
+
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -25,7 +29,9 @@ import (
 const (
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
-	MAX_IMAGE_MAPS      = 6
+	TEXTURE_EXTENSION   = ".osm.png"
+
+	MAX_IMAGE_MAPS = 4
 
 	TICKER_SPEED = time.Second / 30 // x times per second
 
@@ -77,6 +83,7 @@ type TerrainManager struct {
 
 	heightmaps    map[string]*image.Gray16
 	watermaps     map[string]*image.Gray
+	textures      map[string]*Texture
 	chunks        map[string]*Chunk
 	visibleChunks map[string]bool
 	orderedChunks []*Chunk
@@ -101,6 +108,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		heightmaps:    make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
+		textures:      make(map[string]*Texture, MAX_IMAGE_MAPS),
 		chunks:        make(map[string]*Chunk),
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
@@ -131,12 +139,36 @@ func (tm *TerrainManager) ClearChunks() {
 	}
 }
 
+func (tm *TerrainManager) LoadMultipleMaps(coords []string) error {
+	if len(coords) == 0 {
+		return nil
+	}
+
+	// Load the first map with clearing existing chunks
+	if err := tm.LoadMap(coords[0], true); err != nil {
+		log.Printf("Error loading map %s: %v", coords[0], err)
+		// Continue with other maps even if one fails
+	}
+
+	// Load additional maps without clearing
+	for i := 1; i < len(coords); i++ {
+		if err := tm.LoadMap(coords[i], false); err != nil {
+			log.Printf("Error loading map %s: %v", coords[i], err)
+			// Continue with other maps even if one fails
+		}
+	}
+
+	return nil
+}
+
 // LoadMap loads a heightmap and its associated watermap
-func (tm *TerrainManager) LoadMap(coord string) error {
+func (tm *TerrainManager) LoadMap(coord string, clearExisting bool) error {
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()
 
-	tm.ClearChunks()
+	if clearExisting {
+		tm.ClearChunks()
+	}
 
 	// Skip heightmaps if already loaded
 	if _, exists := tm.heightmaps[coord]; !exists {
@@ -150,26 +182,19 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 	// Generate chunks for this map
 	mapX, mapZ := CoordinateMapToInt(coord)
-	for x := 0; x < CHUNKS_PER_SIDE; x++ {
-		for z := 0; z < CHUNKS_PER_SIDE; z++ {
+	for x := range CHUNKS_PER_SIDE {
+		for z := range CHUNKS_PER_SIDE {
 			chunkX := mapX + x*CHUNK_SIZE
 			chunkZ := mapZ + z*CHUNK_SIZE
 			tm.LoadChunk(chunkX, chunkZ)
 		}
 	}
 
-	// Calculate LOD sizes for debugging
-	// sizes := make([]int, 4)
-	// for _, chunk := range tm.chunks {
-	// 	sizes[chunk.lodLevel]++
-	// }
-
-	// fmt.Printf("\n\nSizes: %v\n\n", sizes)
-
+	log.Printf("Loaded map: %s", coord)
 	return nil
 }
 
-func (tm *TerrainManager) HasCrossedThreshold(new lin.Vec3) bool {
+func (tm *TerrainManager) HasCrossedUpdateThreshold(new lin.Vec3) bool {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()
 
@@ -215,18 +240,30 @@ func (tm *TerrainManager) FillPendingBuffers() {
 	tm.pendingVertices = tm.pendingVertices[:0]
 	tm.pendingIndices = tm.pendingIndices[:0]
 
+	sort.Slice(tm.orderedChunks, func(i, j int) bool {
+		if tm.orderedChunks[i].Z != tm.orderedChunks[j].Z {
+			return tm.orderedChunks[i].Z < tm.orderedChunks[j].Z
+		}
+		return tm.orderedChunks[i].X < tm.orderedChunks[j].X
+	})
+
 	// Collect vertices and indices
 	vertexOffset := Index(0)
-	for _, chunk := range tm.orderedChunks {
+	for i, chunk := range tm.orderedChunks {
 		// Add vertices
 		tm.pendingVertices = append(tm.pendingVertices, chunk.vertices...)
 
+		// If this isn't the first chunk, add a primitive restart index
+		if i > 0 {
+			tm.pendingIndices = append(tm.pendingIndices, 0xFFFFFFFF) // Primitive restart index
+		}
+
 		// Add indices with offset
 		for _, idx := range chunk.indices {
-			// Add the vertex offset to the current index
 			newIndex := idx + Index(vertexOffset)
 			tm.pendingIndices = append(tm.pendingIndices, newIndex)
 		}
+
 		vertexOffset += Index(len(chunk.vertices))
 	}
 
@@ -236,12 +273,62 @@ func (tm *TerrainManager) FillPendingBuffers() {
 }
 
 func (tm *TerrainManager) checkForUpdates() {
-	if tm.HasCrossedThreshold(tm.lastPosition) {
-		// Load new chunks and update pending buffers
-		tm.LoadMap("n48w123") // Example coordinate
-		tm.FillPendingBuffers()
+	if tm.HasCrossedUpdateThreshold(tm.lastPosition) {
+		// Get current map and adjacent maps
+		mapsToLoad := GetAdjacentMaps(tm.lastPosition)
 
-		// Mark as updated so main thread knows to swap buffers
+		// Determine which maps need to be loaded and which can be unloaded
+		mapsToUnload := make([]string, 0)
+		mapsNeedingLoad := make([]string, 0)
+
+		// Check which maps we need to load
+		for _, mapCoord := range mapsToLoad {
+			if _, exists := tm.heightmaps[mapCoord]; !exists {
+				mapsNeedingLoad = append(mapsNeedingLoad, mapCoord)
+			}
+		}
+
+		// Check which maps we need to unload
+		for loadedMap := range tm.heightmaps {
+			stillNeeded := slices.Contains(mapsToLoad, loadedMap)
+			if !stillNeeded {
+				mapsToUnload = append(mapsToUnload, loadedMap)
+			}
+		}
+
+		// Unload maps that are no longer needed
+		for _, mapCoord := range mapsToUnload {
+			log.Printf("Unloading map: %s", mapCoord)
+			tm.UnloadMaps(mapCoord)
+		}
+
+		// Load new maps if needed
+		if len(mapsNeedingLoad) > 0 {
+			log.Printf("Loading %d new maps", len(mapsNeedingLoad))
+
+			// Determine if we need to reload all maps or just add new ones
+			if len(tm.heightmaps) == 0 {
+				// No maps loaded, load everything
+				tm.LoadMultipleMaps(mapsToLoad)
+			} else {
+				// Some maps already loaded, just add new ones
+				for _, mapCoord := range mapsNeedingLoad {
+					tm.LoadMap(mapCoord, false)
+				}
+			}
+		}
+
+		// Update LODs for all chunks
+		for _, chunk := range tm.chunks {
+			newLOD := tm.selectLODLevel(chunk.X, chunk.Z, tm.lastPosition)
+			if newLOD != chunk.lodLevel {
+				// LOD changed, reload the chunk
+				tm.LoadChunk(chunk.X, chunk.Z)
+			}
+		}
+
+		// Update buffers and mark as updated
+		tm.FillPendingBuffers()
 		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
 	}
@@ -284,12 +371,62 @@ func (tm *TerrainManager) InitBuffers() {
 	tm.pendingIndexMemory = pendingIndexBuf.Memory
 }
 
-// Loads a watermap (coord.swb.png) into the ChunkManager
+// generateOceanHeightmap creates a flat heightmap (all water)
+func (tm *TerrainManager) generateOceanHeightmap() *image.Gray16 {
+	// Create a new Gray16 image with the correct dimensions
+	img := image.NewGray16(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
+
+	// Fill with a constant elevation value slightly below sea level
+	// 32768 is the zero point (sea level) in our 16-bit heightmap
+	oceanLevel := uint16(32760) // Slightly below sea level
+
+	for y := 0; y <= MAP_LENGTH; y++ {
+		for x := 0; x <= MAP_LENGTH; x++ {
+			img.SetGray16(x, y, color.Gray16{Y: oceanLevel})
+		}
+	}
+
+	return img
+}
+
+// generateOceanWatermap creates a watermap with all water
+func (tm *TerrainManager) generateOceanWatermap() *image.Gray {
+	// Create a new Gray image with the correct dimensions
+	img := image.NewGray(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
+
+	// Fill with water value (255 represents water in our implementation)
+	waterValue := uint8(255)
+
+	for y := 0; y <= MAP_LENGTH; y++ {
+		for x := 0; x <= MAP_LENGTH; x++ {
+			img.SetGray(x, y, color.Gray{Y: waterValue})
+		}
+	}
+
+	return img
+}
+
+// Loads a watermap (coord.swb.png) into the TerrainManager
 func (tm *TerrainManager) LoadWatermap(coord string) error {
 	filepath := MAPS_PATH + coord + WATERMAP_EXTENSION
-	rawImg, err := loadMap(filepath)
+
+	// Try to open the file first
+	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to load file: %w", err)
+		if os.IsNotExist(err) {
+			// File doesn't exist, create an ocean watermap instead
+			log.Printf("Watermap file not found for %s, generating ocean tile", coord)
+			tm.watermaps[coord] = tm.generateOceanWatermap()
+			return nil
+		}
+		return fmt.Errorf("failed to open watermap file: %w", err)
+	}
+	defer file.Close()
+
+	// If file exists, proceed with normal loading
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return fmt.Errorf("failed to decode watermap: %w", err)
 	}
 
 	// Ensure the image is grayscale
@@ -299,16 +436,48 @@ func (tm *TerrainManager) LoadWatermap(coord string) error {
 	}
 
 	tm.watermaps[coord] = grayImg
-
 	return nil
 }
 
-// Loads a heightmap (coord.hgt.png) into the ChunkManager
+func GetAdjacentMaps(pos lin.Vec3) []string {
+	// Get current map coordinate
+	currentMap := CoordinateIntToMap(int(pos[0]), int(pos[2]))
+
+	// Get the base coordinates of the current map
+	mapX, mapZ := CoordinateMapToInt(currentMap)
+
+	// Create a slice to hold all map coordinates
+	maps := []string{
+		currentMap,
+		CoordinateIntToMap(mapX+MAP_LENGTH, mapZ),            // East
+		CoordinateIntToMap(mapX, mapZ+MAP_LENGTH),            // North
+		CoordinateIntToMap(mapX+MAP_LENGTH, mapZ+MAP_LENGTH), // Northeast
+	}
+
+	return maps
+}
+
+// Loads a heightmap (coord.hgt.png) into the TerrainManager
 func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	filepath := MAPS_PATH + coord + HEIGHTMAP_EXTENSION
-	rawImg, err := loadMap(filepath)
+
+	// Try to open the file first
+	file, err := os.Open(filepath)
 	if err != nil {
-		return fmt.Errorf("failed to load file: %w", err)
+		if os.IsNotExist(err) {
+			// File doesn't exist, create an ocean heightmap instead
+			log.Printf("Heightmap file not found for %s, generating ocean tile", coord)
+			tm.heightmaps[coord] = tm.generateOceanHeightmap()
+			return nil
+		}
+		return fmt.Errorf("failed to open heightmap file: %w", err)
+	}
+	defer file.Close()
+
+	// If file exists, proceed with normal loading
+	rawImg, err := png.Decode(file)
+	if err != nil {
+		return fmt.Errorf("failed to decode heightmap: %w", err)
 	}
 
 	// Ensure the image is grayscale
@@ -318,24 +487,73 @@ func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	}
 
 	tm.heightmaps[coord] = grayImg
-
 	return nil
 }
+
+// Loads a texture (coord.osm.png) into the TerrainManager
+// func (tm *TerrainManager) LoadTexture(coord string) error {
+// 	filepath := MAPS_PATH + coord + TEXTURE_EXTENSION
+// 	_, err := loadMap(filepath) // TODO: replace "_" with rawImg
+// 	if err != nil {
+// 		return fmt.Errorf("failed to load file: %w", err)
+// 	}
+// 	// Load and store the texture
+// 	// TODO load the texture into Vulkan with rawImg
+// 	// placeholder
+// 	texture := &Texture{}
+
+// 	// Store that texture in a usable state in the texture map
+// 	tm.textures[coord] = texture
+// 	return nil
+// }
 
 // Unloads both the water and heightmaps
 func (tm *TerrainManager) UnloadMaps(coord string) {
 	tm.unloadWatermap(coord)
 	tm.unloadHeightmap(coord)
+	tm.unloadTexture(coord)
+	tm.unloadChunks(coord)
 }
 
-// Unloads a watermap (coord) from the ChunkManager
+// Unloads a watermap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadWatermap(coord string) {
 	delete(tm.watermaps, coord)
 }
 
-// Unloads a heightmap (coord) from the ChunkManager
+// Unloads a heightmap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadHeightmap(coord string) {
 	delete(tm.heightmaps, coord)
+}
+
+// Unloads a texture (coord) from the TerrainManager
+func (tm *TerrainManager) unloadTexture(coord string) {
+	delete(tm.textures, coord) // TODO, problably will need to remove Vulkan stuff
+}
+
+func (tm *TerrainManager) unloadChunks(coord string) {
+	// Get map boundaries
+	mapX, mapZ := CoordinateMapToInt(coord)
+	mapEndX, mapEndZ := mapX+MAP_LENGTH, mapZ+MAP_LENGTH
+
+	// Remove chunks within this map's boundaries
+	chunksToRemove := []string{}
+	for chunkKey, chunk := range tm.chunks {
+		if chunk.X >= mapX && chunk.X < mapEndX &&
+			chunk.Z >= mapZ && chunk.Z < mapEndZ {
+			chunksToRemove = append(chunksToRemove, chunkKey)
+		}
+	}
+
+	// Delete chunks and rebuild orderedChunks
+	for _, key := range chunksToRemove {
+		delete(tm.chunks, key)
+	}
+
+	// Rebuild ordered chunks
+	tm.orderedChunks = tm.orderedChunks[:0]
+	for _, chunk := range tm.chunks {
+		tm.orderedChunks = append(tm.orderedChunks, chunk)
+	}
 }
 
 // Loads a map and returns a png
@@ -388,6 +606,9 @@ func (tm *TerrainManager) SwapBuffers() bool {
 	if !tm.updated.Load() {
 		return false
 	}
+
+	// Ensure device is idle before swapping buffers
+	vk.DeviceWaitIdle(*tm.device)
 
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()

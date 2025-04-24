@@ -4,6 +4,7 @@ package renderer
 import (
 	"fmt"
 	"log"
+	"math"
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
@@ -101,6 +102,8 @@ func (app *Application) NextFrame() {
 	// Get visible chunks count thread-safely
 	app.fpsCounter.Update(app.TerrainManager.GetVisibleChunks())
 	app.frameCount++
+
+	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
