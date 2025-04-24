@@ -17,12 +17,12 @@ import (
 	"github.com/ungerik/go3d/float64/vec3"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
+	"github.com/cs-wwu/srg-synvis/internal/sensors"
 
 	lin "github.com/xlab/linmath"
 )
 
 const (
-	BUF_SIZE          = 10
 	HEIGHT_CONVERSION = 60.0 / 1852.0
 	FPS               = 60 // Frames per second
 	SPR               = 2 // Seconds per 360 degree rotation
@@ -111,7 +111,7 @@ func (c *Camera) GetViewMatrix() lin.Mat4x4 {
 }
 
 // Connect to the gpsd service and get lat, lon, and alt with TPV report until closed
-// Run as one go thread separate from main
+// Run as one Go thread separate from main
 func (c *Camera) TryGps() error {
 	// Connect to gspd
 	gps, err := gpsd.Dial("localhost:2947")
@@ -121,15 +121,10 @@ func (c *Camera) TryGps() error {
 		return err
 	}
 
-	// Set up circular buffer in case of gps fix issues
-	var oldX [BUF_SIZE]float32
-	var oldY [BUF_SIZE]float32
-	var oldZ [BUF_SIZE]float32
-	oldX[0] = c.Pos[0]
-	oldY[0] = c.Pos[1]
-	oldZ[0] = c.Pos[2]
-	spot := 0
-	timer := 0
+	// Store previous data in case of gps fix issues
+	oldX := c.Pos[0]
+	oldY := c.Pos[1]
+	oldZ := c.Pos[2]
 	xdif := float32(0)
 	ydif := float32(0)
 	zdif := float32(0)
@@ -147,27 +142,22 @@ func (c *Camera) TryGps() error {
 		// if (report.Lat == 0 && report.Lon == 0) {
 		if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
 			log.Println("No fix, using prior data")
-			newX = oldX[spot] + xdif
-			newY = oldY[spot] + ydif
-			newZ = oldZ[spot] + zdif
-			timer--
-		}
-
-		// Log data in buffer
-		timer++
-		if timer == 10 {
-			timer = 0
-			xdif = oldX[spot] - newX
-			ydif = oldY[spot] - newY
-			zdif = oldZ[spot] - newZ
-			spot = (spot + 1) % BUF_SIZE
-			oldX[spot] = newX
-			oldZ[spot] = newZ
-			oldY[spot] = newY
+			newX = oldX + xdif
+			newY = oldY + ydif
+			newZ = oldZ + zdif
 		}
 
 		// Update position
+		newX, newY, newZ = sensors.Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
 		c.UpdatePos(newX, newZ, newY)
+
+		// Log data
+		xdif = oldX - newX
+		ydif = oldY - newY
+		zdif = oldZ - newZ
+		oldX = newX
+		oldY = newY
+		oldZ = newZ
 	}
 	gps.AddFilter("TPV", tpvFilter)
 
@@ -180,7 +170,7 @@ func (c *Camera) TryGps() error {
 }
 
 // Gets yaw, pitch and roll from the sense hat via a pipe and updates the front vector indefinitely
-// Run as one go thread separate from main
+// Run as one Go thread separate from main
 func (c *Camera) TrySense(filename string) Mode {
 	var md Mode
 	cmd := exec.Command("python3", filename)
@@ -198,6 +188,9 @@ func (c *Camera) TrySense(filename string) Mode {
 		return StartCommand
 	}
 
+	first := true
+	var oldYaw, oldRoll, oldPitch float64
+
 	// Read the output from the pipe
 	reader := bufio.NewReader(stdout)
 	for {
@@ -213,6 +206,8 @@ func (c *Camera) TrySense(filename string) Mode {
 			md = ParseInput
 			continue
 		}
+		
+		c.Pitch = -c.Pitch
 
 		// Account for magnetic world deviation
 
@@ -220,11 +215,21 @@ func (c *Camera) TrySense(filename string) Mode {
 		loc := egm96.NewLocationGeodetic(-float64(c.Pos[2])/3600, float64(c.Pos[0])/3600, float64(c.Pos[1])/HEIGHT_CONVERSION)
 		mag, _ := wmm.CalculateWMMMagneticField(loc, c.Decimal_year)
 		fmt.Printf("Declination at your location: %2.2f\n", mag.D())
-		c.Yaw = c.Yaw - mag.D() // Substract the declination from yaw
-		// TODO inclinication + databackup?
+		c.Yaw = c.Yaw + mag.D() // Magnetic to true: add declination
+		// TODO databackup?
+
+		if !first {
+			c.Yaw, c.Roll, c.Pitch = sensors.Smoother64(c.Yaw, oldYaw, c.Roll, oldRoll, c.Pitch, oldPitch)
+		}
+		first = false
 
 		// Rotate the camera based on the read Yaw, Roll, and Pitch
 		c.QuatRotateAbs()
+
+		// Log data
+		oldYaw = c.Yaw
+		oldRoll = c.Roll
+		oldPitch = c.Pitch
 	}
 
 	// Print the output
