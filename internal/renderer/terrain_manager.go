@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -239,18 +240,30 @@ func (tm *TerrainManager) FillPendingBuffers() {
 	tm.pendingVertices = tm.pendingVertices[:0]
 	tm.pendingIndices = tm.pendingIndices[:0]
 
+	sort.Slice(tm.orderedChunks, func(i, j int) bool {
+		if tm.orderedChunks[i].Z != tm.orderedChunks[j].Z {
+			return tm.orderedChunks[i].Z < tm.orderedChunks[j].Z
+		}
+		return tm.orderedChunks[i].X < tm.orderedChunks[j].X
+	})
+
 	// Collect vertices and indices
 	vertexOffset := Index(0)
-	for _, chunk := range tm.orderedChunks {
+	for i, chunk := range tm.orderedChunks {
 		// Add vertices
 		tm.pendingVertices = append(tm.pendingVertices, chunk.vertices...)
 
+		// If this isn't the first chunk, add a primitive restart index
+		if i > 0 {
+			tm.pendingIndices = append(tm.pendingIndices, 0xFFFFFFFF) // Primitive restart index
+		}
+
 		// Add indices with offset
 		for _, idx := range chunk.indices {
-			// Add the vertex offset to the current index
 			newIndex := idx + Index(vertexOffset)
 			tm.pendingIndices = append(tm.pendingIndices, newIndex)
 		}
+
 		vertexOffset += Index(len(chunk.vertices))
 	}
 
