@@ -157,8 +157,8 @@ func TestWMM(t *testing.T) {
 	c.TrySense("./fakehat2.py")
 	// Check if starting coordinate declination is within actual range ~15.30
 	
-	if !(equal(float32(c.Yaw), -15.30)) {
-		t.Errorf("Expected yaw to be updated with declination to -15.30, was %f", c.Yaw)
+	if !(equal(float32(c.Yaw), 15.30)) {
+		t.Errorf("Expected yaw to be updated with declination to 15.30, was %f", c.Yaw)
 	}
 }
 
