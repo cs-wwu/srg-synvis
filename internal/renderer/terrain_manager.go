@@ -594,6 +594,9 @@ func (tm *TerrainManager) SwapBuffers() bool {
 		return false
 	}
 
+	// Ensure device is idle before swapping buffers
+	vk.DeviceWaitIdle(*tm.device)
+
 	tm.chunkMutex.Lock()
 	defer tm.chunkMutex.Unlock()
 
