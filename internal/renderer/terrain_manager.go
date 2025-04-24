@@ -17,6 +17,8 @@ import (
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
+	"slices"
+
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -275,13 +277,7 @@ func (tm *TerrainManager) checkForUpdates() {
 
 		// Check which maps we need to unload
 		for loadedMap := range tm.heightmaps {
-			stillNeeded := false
-			for _, mapToKeep := range mapsToLoad {
-				if loadedMap == mapToKeep {
-					stillNeeded = true
-					break
-				}
-			}
+			stillNeeded := slices.Contains(mapsToLoad, loadedMap)
 			if !stillNeeded {
 				mapsToUnload = append(mapsToUnload, loadedMap)
 			}
@@ -306,6 +302,15 @@ func (tm *TerrainManager) checkForUpdates() {
 				for _, mapCoord := range mapsNeedingLoad {
 					tm.LoadMap(mapCoord, false)
 				}
+			}
+		}
+
+		// Update LODs for all chunks
+		for _, chunk := range tm.chunks {
+			newLOD := tm.selectLODLevel(chunk.X, chunk.Z, tm.lastPosition)
+			if newLOD != chunk.lodLevel {
+				// LOD changed, reload the chunk
+				tm.LoadChunk(chunk.X, chunk.Z)
 			}
 		}
 
@@ -494,6 +499,7 @@ func (tm *TerrainManager) UnloadMaps(coord string) {
 	tm.unloadWatermap(coord)
 	tm.unloadHeightmap(coord)
 	tm.unloadTexture(coord)
+	tm.unloadChunks(coord)
 }
 
 // Unloads a watermap (coord) from the TerrainManager
@@ -509,6 +515,32 @@ func (tm *TerrainManager) unloadHeightmap(coord string) {
 // Unloads a texture (coord) from the TerrainManager
 func (tm *TerrainManager) unloadTexture(coord string) {
 	delete(tm.textures, coord) // TODO, problably will need to remove Vulkan stuff
+}
+
+func (tm *TerrainManager) unloadChunks(coord string) {
+	// Get map boundaries
+	mapX, mapZ := CoordinateMapToInt(coord)
+	mapEndX, mapEndZ := mapX+MAP_LENGTH, mapZ+MAP_LENGTH
+
+	// Remove chunks within this map's boundaries
+	chunksToRemove := []string{}
+	for chunkKey, chunk := range tm.chunks {
+		if chunk.X >= mapX && chunk.X < mapEndX &&
+			chunk.Z >= mapZ && chunk.Z < mapEndZ {
+			chunksToRemove = append(chunksToRemove, chunkKey)
+		}
+	}
+
+	// Delete chunks and rebuild orderedChunks
+	for _, key := range chunksToRemove {
+		delete(tm.chunks, key)
+	}
+
+	// Rebuild ordered chunks
+	tm.orderedChunks = tm.orderedChunks[:0]
+	for _, chunk := range tm.chunks {
+		tm.orderedChunks = append(tm.orderedChunks, chunk)
+	}
 }
 
 // Loads a map and returns a png
