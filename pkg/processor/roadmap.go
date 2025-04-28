@@ -42,6 +42,10 @@ var widths = map[string]float64{
 	"primary":   4,
 	"secondary": 2,
 	"tertiary":  1,
+	// add railway types
+	"rail":       3,
+	"light_rail": 2,
+	"tram":       1,
 }
 
 // Creates an array of roads: [road#][point#][x, y]
@@ -105,6 +109,139 @@ func DrawLine(start, end Point, width float64, img *image.RGBA, color color.Colo
 	DrawFilledPolygon(img, corners, color)
 }
 
+// DrawDashedLine draws a dashed line for railways
+// Parameters:
+//   - start: starting point of the line
+//   - end: ending point of the line
+//   - width: width of the line in pixels
+//   - img: img to be drawn too
+//   - color: color to draw line
+//   - dashLength: length of each dash
+//   - gapLength: length of gap between dashes
+//
+// Return:
+//   - updates img with the line drawn between two points
+//
+// DrawDashedLine draws a dashed line between two points
+func DrawDashedLine(start, end Point, width float64, img *image.RGBA, color color.Color, dashLength, gapLength float64) {
+	// Calculate total length and direction
+	dx := end.X - start.X
+	dy := end.Y - start.Y
+	length := math.Sqrt(dx*dx + dy*dy)
+
+	// Early return if points are too close
+	if length < 1 {
+		return
+	}
+
+	// Normalize direction
+	dx /= length
+	dy /= length
+
+	// Calculate number of complete dash+gap segments that fit
+	segmentLength := dashLength + gapLength
+	numSegments := int(length / segmentLength)
+
+	// Draw each dash segment
+	currentPoint := start
+	for _ = range numSegments {
+		// Calculate dash start point
+		dashStart := Point{
+			X: currentPoint.X,
+			Y: currentPoint.Y,
+		}
+
+		// Calculate dash end point
+		dashEnd := Point{
+			X: currentPoint.X + dx*dashLength,
+			Y: currentPoint.Y + dy*dashLength,
+		}
+
+		// Draw the dash
+		DrawLine(dashStart, dashEnd, width, img, color)
+
+		// Move to start of next segment
+		currentPoint = Point{
+			X: currentPoint.X + dx*segmentLength,
+			Y: currentPoint.Y + dy*segmentLength,
+		}
+	}
+
+	// Draw final partial segment if there's space remaining
+	remainingLength := length - float64(numSegments)*segmentLength
+	if remainingLength > 0 {
+		dashLength := math.Min(dashLength, remainingLength)
+		finalDashEnd := Point{
+			X: currentPoint.X + dx*dashLength,
+			Y: currentPoint.Y + dy*dashLength,
+		}
+
+		DrawLine(currentPoint, finalDashEnd, width, img, color)
+	}
+}
+
+// DrawCrossties draws railway crossties (perpendicular hash marks)
+func DrawCrossties(start, end Point, width float64, img *image.RGBA, color color.Color, spacing float64) {
+	// Calculate direction and length
+	dx := end.X - start.X
+	dy := end.Y - start.Y
+	length := math.Sqrt(dx*dx + dy*dy)
+
+	// Early return if points are too close
+	if length < 1 {
+		return
+	}
+
+	// Normalize direction
+	dx /= length
+	dy /= length
+
+	// Calculate perpendicular direction for crossties
+	perpX := -dy
+	perpY := dx
+
+	// Calculate number of crossties
+	numCrossties := int(length / spacing)
+	crosstieLength := width * 1.5 // Make crossties 1.5x the width of the line
+
+	// First draw the main line
+	DrawLine(start, end, width/2, img, color) // Draw thinner main line
+
+	// Then draw the crossties
+	for i := range numCrossties {
+		// Calculate position along the line
+		position := float64(i) * spacing
+		if position > length {
+			break
+		}
+
+		// Calculate center point of crosstie
+		centerX := start.X + dx*position
+		centerY := start.Y + dy*position
+
+		// Calculate crosstie endpoints
+		crosstieStart := Point{
+			X: centerX + perpX*(crosstieLength/2),
+			Y: centerY + perpY*(crosstieLength/2),
+		}
+
+		crosstieEnd := Point{
+			X: centerX - perpX*(crosstieLength/2),
+			Y: centerY - perpY*(crosstieLength/2),
+		}
+
+		// Draw the crosstie
+		DrawLine(crosstieStart, crosstieEnd, width/2, img, color)
+	}
+}
+
+// DistanceBetweenPoints calculates the distance between two points
+func DistanceBetweenPoints(p1, p2 Point) float64 {
+	dx := p1.X - p2.X
+	dy := p1.Y - p2.Y
+	return math.Sqrt(dx*dx + dy*dy)
+}
+
 // drawFilledPolygon draws a filled polygon with the specified color
 func DrawFilledPolygon(img *image.RGBA, points []Point, c color.Color) {
 	// Find bounding box
@@ -159,6 +296,9 @@ func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 		`way["highway"="primary"]` + bounds +
 		`way["highway"="secondary"]` + bounds +
 		`way["highway"="tertiary"]` + bounds +
+		`way["railway"="rail"]` + bounds +
+		`way["railway"="light_rail"]` + bounds +
+		`way["railway"="tram"]` + bounds +
 		`);
 	(._;>;);
 	out body;
@@ -230,6 +370,40 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 	}
 }
 
+// DrawRailways draws railway lines with railway-specific styling
+func DrawRailways(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.RGBA, railType string) {
+	// Turn the lat/lon to an array of indexed points
+	railways := ConvertCoordsToPngIndex(ways, nodes, Scale, coords[0], coords[1])
+
+	// Define the brown color for railways
+	railwayColor := color.Gray{Y: 110} // Dark gray in grayscale image (appears brown-like)
+
+	// Connect all the points with hashed railway lines
+	for r := range railways {
+		railway := railways[r]
+		for p := 0; p < len(railway)-1; p++ {
+			p1 := railway[p]
+			p2 := railway[p+1]
+
+			// Use different styles based on railway type
+			switch railType {
+			case "rail":
+				// Standard railway with crossties
+				DrawCrossties(p1, p2, widths[railType], grayImage, railwayColor, 15)
+			case "light_rail":
+				// Light rail with more frequent crossties
+				DrawCrossties(p1, p2, widths[railType], grayImage, railwayColor, 10)
+			case "tram":
+				// Tram with shorter dashes
+				DrawDashedLine(p1, p2, widths[railType], grayImage, railwayColor, 6, 4)
+			default:
+				// Default drawing for unknown railway types
+				DrawLine(p1, p2, widths[railType]/2, grayImage, railwayColor)
+			}
+		}
+	}
+}
+
 // ParseHeightmapToCoords converts a heightmap string (e.g., "n48w123")
 // to a coordinate pair [lat, lon]
 func ParseHeightmapToCoords(heightmap string) ([]int, error) {
@@ -288,22 +462,45 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 
 		// Filter the data to keep only relevant highways
 		var motorways, trunks, primaries, secondaries, tertiaries []Element
+		var rails, lightRails, trams []Element
 		nodes := make(map[int64]Element)
 
 		for _, Element := range osmData.Elements {
-			// Sorts the roads based on type, and stores the nodes in a map for easy access by ID
-			if Element.Type == "way" && Element.Tags["highway"] == "motorway" {
-				motorways = append(motorways, Element)
-			} else if Element.Type == "way" && Element.Tags["highway"] == "trunk" {
-				trunks = append(trunks, Element)
-			} else if Element.Type == "way" && Element.Tags["highway"] == "primary" {
-				primaries = append(primaries, Element)
-			} else if Element.Type == "way" && Element.Tags["highway"] == "secondary" {
-				secondaries = append(secondaries, Element)
-			} else if Element.Type == "way" && Element.Tags["highway"] == "tertiary" {
-				tertiaries = append(tertiaries, Element)
-			} else if Element.Type == "node" {
+			// Store nodes for easy access by ID
+			if Element.Type == "node" {
 				nodes[Element.ID] = Element
+				continue
+			}
+
+			// Sort roads and railways by type
+			if Element.Type == "way" {
+				// Handle highways
+				if highway, exists := Element.Tags["highway"]; exists {
+					switch highway {
+					case "motorway":
+						motorways = append(motorways, Element)
+					case "trunk":
+						trunks = append(trunks, Element)
+					case "primary":
+						primaries = append(primaries, Element)
+					case "secondary":
+						secondaries = append(secondaries, Element)
+					case "tertiary":
+						tertiaries = append(tertiaries, Element)
+					}
+				}
+
+				// Handle railways
+				if railway, exists := Element.Tags["railway"]; exists {
+					switch railway {
+					case "rail":
+						rails = append(rails, Element)
+					case "light_rail":
+						lightRails = append(lightRails, Element)
+					case "tram":
+						trams = append(trams, Element)
+					}
+				}
 			}
 		}
 
@@ -321,6 +518,11 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
 		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary")
 		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary")
+
+		// Draw each set of railways
+		DrawRailways(rails, nodes, maps[i], grayImage, "rail")
+		DrawRailways(lightRails, nodes, maps[i], grayImage, "light_rail")
+		DrawRailways(trams, nodes, maps[i], grayImage, "tram")
 
 		bounds := CoordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
