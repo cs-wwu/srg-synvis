@@ -284,7 +284,7 @@ func IsPointInPolygon(x, y float64, points []Point) bool {
 }
 
 // Make an api request to overpass-api, process the data into and overpassResponse data type
-func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
+func MakeRoadApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
 	bounds := "(" + strconv.Itoa(lat) + "," + strconv.Itoa(lon) + "," + strconv.Itoa(lat+1) + "," + strconv.Itoa(lon+1) + ");"
@@ -455,7 +455,7 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 	}
 
 	for i := range maps {
-		osmData, err := MakeApiRequest(apiURL, maps[i])
+		osmData, err := MakeRoadApiRequest(apiURL, maps[i])
 		if err != nil {
 			return err
 		}
