@@ -18,9 +18,9 @@ func MakeAirApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	query := `
 	[out:json];
 	(
-		way["aeroway"="runway"]` + bounds +
+		way["aeroway"="hangar"]` + bounds +
 		`way["aeroway"="terminal"]` + bounds +
-		`way["aeroway"="aerodrome"]` + bounds +
+		`way["aeroway"="tower"]` + bounds +
 		`);
 	(._;>;);
 	out body;
@@ -49,6 +49,7 @@ func MakeAirApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 }
 
 // StoreAirData stores aeroway data into an array and returns the array
+// TODO
 func StoreAirData(ways []Element, nodes map[int64]Element, coords []int, airType string) [][]Point {
 
 	airBuf := [][]Point{}
@@ -73,7 +74,7 @@ func GenerateAirData(maps [][]int, apiURL string) error {
 		}
 
 		// Filter the data to keep only relevant airport information
-		var runway, terminal, aerodrome []Element
+		var hangars, terminals, towers []Element
 		nodes := make(map[int64]Element)
 
 		for _, Element := range osmData.Elements {
@@ -83,29 +84,29 @@ func GenerateAirData(maps [][]int, apiURL string) error {
 				continue
 			}
 
-			// Sort roads and railways by type
+			// Sort aeroways by type
+			// TODO: area instead of way?
 			if Element.Type == "way" {
 				// Handle highways
 				if airport, exists := Element.Tags["aeroway"]; exists {
 					switch airport {
-					case "runway":
-						runway = append(runway, Element)
+					case "hangar":
+						hangars = append(hangars, Element)
 					case "terminal":
-						terminal = append(terminal, Element)
-					case "aerodrome":
-						aerodrome = append(aerodrome, Element)
+						terminals = append(terminals, Element)
+					case "tower":
+						towers = append(towers, Element)
 					}
-
 				}
 			}
 		}
 
 		// Store each airport data type into a buffer
-		runwayBuf := StoreAirData(runway, nodes, maps[i], "runway")
-		termBuf := StoreAirData(terminal, nodes, maps[i], "terminal")
-		areoBuf := StoreAirData(aerodrome, nodes, maps[i], "aerodrome")
+		hangarBuf := StoreAirData(hangars, nodes, maps[i], "hangar")
+		termBuf := StoreAirData(terminals, nodes, maps[i], "terminal")
+		towerBuf := StoreAirData(towers, nodes, maps[i], "tower")
 
-		fmt.Println(runwayBuf, termBuf, areoBuf)
+		fmt.Println(hangarBuf, termBuf, towerBuf)
 	}
 
 	return nil

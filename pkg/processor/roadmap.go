@@ -46,6 +46,10 @@ var widths = map[string]float64{
 	"rail":       3,
 	"light_rail": 2,
 	"tram":       1,
+	// add aeroway types
+	"runway":   6,
+	"airstrip": 5,
+	"taxiway":  2,
 }
 
 // Creates an array of roads: [road#][point#][x, y]
@@ -299,6 +303,9 @@ func MakeRoadApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 		`way["railway"="rail"]` + bounds +
 		`way["railway"="light_rail"]` + bounds +
 		`way["railway"="tram"]` + bounds +
+		`way["aeroway"="runway"]` + bounds +
+		`way["aeroway"="airstrip"]` + bounds +
+		`way["aeroway"="taxiway"]` + bounds +
 		`);
 	(._;>;);
 	out body;
@@ -463,6 +470,7 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		// Filter the data to keep only relevant highways
 		var motorways, trunks, primaries, secondaries, tertiaries []Element
 		var rails, lightRails, trams []Element
+		var runways, airstrips, taxiways []Element
 		nodes := make(map[int64]Element)
 
 		for _, Element := range osmData.Elements {
@@ -490,6 +498,18 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 					}
 				}
 
+				if aeroway, exists := Element.Tags["aeroway"]; exists {
+					switch aeroway {
+					case "runway":
+						runways = append(runways, Element)
+					case "airstrip":
+						airstrips = append(airstrips, Element)
+					case "taxiway":
+						taxiways = append(taxiways, Element)
+					}
+
+				}
+
 				// Handle railways
 				if railway, exists := Element.Tags["railway"]; exists {
 					switch railway {
@@ -512,7 +532,7 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 			}
 		}
 
-		// Draw each set of roads
+		// // Draw each set of roads
 		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway")
 		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk")
 		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
@@ -524,9 +544,15 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		DrawRailways(lightRails, nodes, maps[i], grayImage, "light_rail")
 		DrawRailways(trams, nodes, maps[i], grayImage, "tram")
 
+		// Draw 2D airport data
+		DrawRoads(runways, nodes, maps[i], grayImage, "runway")
+		DrawRoads(airstrips, nodes, maps[i], grayImage, "airstrip")
+		DrawRoads(taxiways, nodes, maps[i], grayImage, "taxiway")
+
 		bounds := CoordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
 		pngFile, err := os.Create(pngFilepath)
+		fmt.Println("created png", pngFilepath)
 		if err != nil {
 			return fmt.Errorf("failed to create %s: %w", pngFilepath, err)
 		}
