@@ -92,8 +92,8 @@ func TestDrawLine(t *testing.T) {
 	start := processor.Point{X: 1, Y: 8}
 	end := processor.Point{X: 10, Y: 8}
 	width := 4.0
-	baseImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
-	testImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
+	baseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	corners := []processor.Point{
 		{X: 1, Y: 10},
 		{X: 1, Y: 6},
@@ -131,8 +131,8 @@ func TestDrawFilledPolygon(t *testing.T) {
 		{X: 11, Y: 11},
 	}
 
-	baseImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
-	testImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
+	baseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
 
 	for y := 0; y <= 100; y++ {
 		for x := 0; x <= 100; x++ {
@@ -379,8 +379,8 @@ func TestDrawRoads(t *testing.T) {
 	lat := 48
 	lon := -122
 	roads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
-	baseImage := image.NewAlpha16(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
-	testImage := image.NewAlpha16(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	baseImage := image.NewRGBA(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	testImage := image.NewRGBA(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
 
 	// Connect all the points
 	for r := range roads {
