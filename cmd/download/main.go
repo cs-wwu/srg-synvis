@@ -365,5 +365,7 @@ func main() {
 
 	if cfg.useOSM {
 		// TODO: Download OSM data
+		maps := [][]int{{47, -123}}
+		processor.GenerateOsmPng(maps, "assets/textures/osm/", processor.OSMURL)
 	}
 }

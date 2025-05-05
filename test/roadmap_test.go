@@ -92,8 +92,8 @@ func TestDrawLine(t *testing.T) {
 	start := processor.Point{X: 1, Y: 8}
 	end := processor.Point{X: 10, Y: 8}
 	width := 4.0
-	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
-	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	baseImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
+	testImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
 	corners := []processor.Point{
 		{X: 1, Y: 10},
 		{X: 1, Y: 6},
@@ -101,15 +101,21 @@ func TestDrawLine(t *testing.T) {
 		{X: 10, Y: 10},
 	}
 
+	for y := 0; y <= 100; y++ {
+		for x := 0; x <= 100; x++ {
+			baseImage.Set(x, y, color.Transparent)
+		}
+	}
+
 	for y := 6; y <= 10; y++ {
 		for x := 1; x <= 10; x++ {
 			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
-				baseImage.Set(x, y, color.White)
+				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
-	processor.DrawLine(start, end, width, testImage, color.White)
+	processor.DrawLine(start, end, width, testImage, color.Opaque)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {
@@ -125,17 +131,23 @@ func TestDrawFilledPolygon(t *testing.T) {
 		{X: 11, Y: 11},
 	}
 
-	baseImage := image.NewGray(image.Rect(0, 0, 100, 100))
-	testImage := image.NewGray(image.Rect(0, 0, 100, 100))
+	baseImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
+	testImage := image.NewAlpha16(image.Rect(0, 0, 100, 100))
+
+	for y := 0; y <= 100; y++ {
+		for x := 0; x <= 100; x++ {
+			baseImage.Set(x, y, color.Transparent)
+		}
+	}
 	for y := 1; y <= 11; y++ {
 		for x := 1; x <= 11; x++ {
 			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
-				baseImage.Set(x, y, color.White)
+				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
-	processor.DrawFilledPolygon(testImage, corners, color.White)
+	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {
@@ -367,8 +379,8 @@ func TestDrawRoads(t *testing.T) {
 	lat := 48
 	lon := -122
 	roads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
-	baseImage := image.NewGray(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
-	testImage := image.NewGray(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	baseImage := image.NewAlpha16(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	testImage := image.NewAlpha16(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
 
 	// Connect all the points
 	for r := range roads {
@@ -376,7 +388,7 @@ func TestDrawRoads(t *testing.T) {
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			processor.DrawLine(p1, p2, 8, baseImage, color.Black)
+			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
 		}
 	}
 
