@@ -76,7 +76,7 @@ type Point struct {
 //
 // Return:
 //   - updates img with the line drawn between two points
-func DrawLine(start, end Point, width float64, img *image.Gray, color color.Color) {
+func DrawLine(start, end Point, width float64, img *image.Alpha16, color color.Color) {
 	// Calculate line parameters
 	dx := end.X - start.X
 	dy := end.Y - start.Y
@@ -105,7 +105,7 @@ func DrawLine(start, end Point, width float64, img *image.Gray, color color.Colo
 }
 
 // drawFilledPolygon draws a filled polygon with the specified color
-func DrawFilledPolygon(img *image.Gray, points []Point, c color.Color) {
+func DrawFilledPolygon(img *image.Alpha16, points []Point, c color.Color) {
 	// Find bounding box
 	minX := points[0].X
 	minY := points[0].Y
@@ -214,7 +214,7 @@ func CoordToString(lat, lon int) string {
 	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
 }
 
-func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.Gray, roadType string) {
+func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.Alpha16, roadType string) {
 	// Turn the lat/lon to an arry of 3600 indexed float32
 	roads := ConvertCoordsToPngIndex(ways, nodes, Scale, coords[0], coords[1])
 
@@ -224,7 +224,7 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			DrawLine(p1, p2, widths[roadType], grayImage, color.Black)
+			DrawLine(p1, p2, widths[roadType], grayImage, color.Transparent)
 		}
 	}
 }
@@ -263,10 +263,10 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 		}
 
 		// Generate an all white PNG
-		grayImage := image.NewGray(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
+		grayImage := image.NewAlpha16(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
 		for x := 0; x < ImgLength*Scale; x++ {
 			for y := 0; y < ImgLength*Scale; y++ {
-				grayImage.SetGray(x, y, color.Gray{Y: 255})
+				grayImage.Set(x, y, color.Transparent)
 			}
 		}
 
