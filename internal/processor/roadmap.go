@@ -224,7 +224,7 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			DrawLine(p1, p2, widths[roadType], grayImage, color.Transparent)
+			DrawLine(p1, p2, widths[roadType], grayImage, color.Opaque)
 		}
 	}
 }

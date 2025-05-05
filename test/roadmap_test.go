@@ -147,7 +147,7 @@ func TestDrawFilledPolygon(t *testing.T) {
 		}
 	}
 
-	processor.DrawFilledPolygon(testImage, corners, color.White)
+	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {
@@ -388,7 +388,7 @@ func TestDrawRoads(t *testing.T) {
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
-			processor.DrawLine(p1, p2, 8, baseImage, color.Black)
+			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
 		}
 	}
 
