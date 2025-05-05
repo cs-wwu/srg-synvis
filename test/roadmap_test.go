@@ -107,14 +107,22 @@ func TestDrawLine(t *testing.T) {
 		}
 	}
 
+	for y := 0; y <= 100; y++ {
+		for x := 0; x <= 100; x++ {
+			baseImage.Set(x, y, color.Transparent)
+		}
+	}
+
 	for y := 6; y <= 10; y++ {
 		for x := 1; x <= 10; x++ {
 			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
+				baseImage.Set(x, y, color.Opaque)
 				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
+	processor.DrawLine(start, end, width, testImage, color.Opaque)
 	processor.DrawLine(start, end, width, testImage, color.Opaque)
 
 	for p := range baseImage.Pix {
@@ -143,10 +151,12 @@ func TestDrawFilledPolygon(t *testing.T) {
 		for x := 1; x <= 11; x++ {
 			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
 				baseImage.Set(x, y, color.Opaque)
+				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
+	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
 	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
 
 	for p := range baseImage.Pix {
@@ -388,6 +398,7 @@ func TestDrawRoads(t *testing.T) {
 		for p := 0; p < len(road)-1; p++ {
 			p1 := road[p]
 			p2 := road[p+1]
+			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
 			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
 		}
 	}

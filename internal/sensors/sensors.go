@@ -1,5 +1,9 @@
 package sensors
 
+// import (
+// 	"github.com/cs-wwu/srg-synvis/internal/renderer"
+// )
+
 const (
 	DAMP = 0.9
 )
@@ -17,7 +21,14 @@ Location: 48.733438333 -122.487201667
 
 */
 
-func Smoother(new1, old1, new2, old2, new3, old3 float64) (float64, float64, float64) {
+func Smoother32(new1, old1, new2, old2, new3, old3 float32) (float32, float32, float32) {
+	new1 = new1*DAMP + (1-DAMP)*old1
+	new2 = new2*DAMP + (1-DAMP)*old2
+	new3 = new3*DAMP + (1-DAMP)*old3
+	return new1, new2, new3
+}
+
+func Smoother64(new1, old1, new2, old2, new3, old3 float64) (float64, float64, float64) {
 	new1 = new1*DAMP + (1-DAMP)*old1
 	new2 = new2*DAMP + (1-DAMP)*old2
 	new3 = new3*DAMP + (1-DAMP)*old3

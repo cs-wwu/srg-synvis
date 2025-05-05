@@ -45,6 +45,7 @@ srg-synvis/
 ```
 
 - [ ] Simplify chunk logic
+- [ ] Add multiple and dynamic map loading
 - [ ] Add capacity to render 4 maps at once
   - [ ] Find max memory based on LODs and distance
   - [ ] Increase memory capacity
