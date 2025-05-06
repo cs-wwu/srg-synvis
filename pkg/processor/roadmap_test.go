@@ -401,7 +401,7 @@ func TestDrawRoads(t *testing.T) {
 	}
 
 	coords := []int{lat, lon}
-	DrawRoads(highways, nodes, coords, testImage, "motorway")
+	DrawRoads(highways, nodes, coords, testImage, "motorway", color.Black)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {

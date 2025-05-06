@@ -362,7 +362,7 @@ func CoordToString(lat, lon int) string {
 	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
 }
 
-func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.RGBA, roadType string) {
+func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage *image.RGBA, roadType string, color color.Color) {
 	// Turn the lat/lon to an arry of 3600 indexed float32
 	roads := ConvertCoordsToPngIndex(ways, nodes, Scale, coords[0], coords[1])
 
@@ -372,7 +372,7 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 		for p := range len(road) - 1 {
 			p1 := road[p]
 			p2 := road[p+1]
-			DrawLine(p1, p2, widths[roadType], grayImage, color.Opaque)
+			DrawLine(p1, p2, widths[roadType], grayImage, color)
 		}
 	}
 }
@@ -532,12 +532,15 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 			}
 		}
 
+		roadColor := color.Black
+		aeroColor := color.Gray{Y: 160} // Light gray color
+
 		// // Draw each set of roads
-		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway")
-		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk")
-		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
-		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary")
-		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary")
+		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway", roadColor)
+		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk", roadColor)
+		DrawRoads(primaries, nodes, maps[i], grayImage, "primary", roadColor)
+		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary", roadColor)
+		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary", roadColor)
 
 		// Draw each set of railways
 		DrawRailways(rails, nodes, maps[i], grayImage, "rail")
@@ -545,9 +548,9 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		DrawRailways(trams, nodes, maps[i], grayImage, "tram")
 
 		// Draw 2D airport data
-		DrawRoads(runways, nodes, maps[i], grayImage, "runway")
-		DrawRoads(airstrips, nodes, maps[i], grayImage, "airstrip")
-		DrawRoads(taxiways, nodes, maps[i], grayImage, "taxiway")
+		DrawRoads(runways, nodes, maps[i], grayImage, "runway", aeroColor)
+		DrawRoads(airstrips, nodes, maps[i], grayImage, "airstrip", aeroColor)
+		DrawRoads(taxiways, nodes, maps[i], grayImage, "taxiway", aeroColor)
 
 		bounds := CoordToString(maps[i][0], maps[i][1])
 		pngFilepath := targetDir + bounds + ".osm.png"
