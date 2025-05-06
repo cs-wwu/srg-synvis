@@ -225,7 +225,6 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 			p1 := road[p]
 			p2 := road[p+1]
 			DrawLine(p1, p2, widths[roadType], grayImage, color.Opaque)
-			DrawLine(p1, p2, widths[roadType], grayImage, color.Opaque)
 		}
 	}
 }
@@ -267,7 +266,6 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 		grayImage := image.NewRGBA(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
 		for x := 0; x < ImgLength*Scale; x++ {
 			for y := 0; y < ImgLength*Scale; y++ {
-				grayImage.Set(x, y, color.Transparent)
 				grayImage.Set(x, y, color.Transparent)
 			}
 		}
