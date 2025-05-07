@@ -534,7 +534,7 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 			}
 		}
 
-		// // Draw each set of roads
+		// Draw each set of roads
 		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway")
 		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk")
 		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")

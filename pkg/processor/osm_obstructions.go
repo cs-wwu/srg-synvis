@@ -54,7 +54,6 @@ func MakeAirApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 }
 
 // StoreAirData stores aeroway data into an array and returns the array
-// TODO
 func StoreAirData(ways []Element, nodes map[int64]Element, coords []int, airType string) [][]OSMPoint {
 
 	airBuf := [][]OSMPoint{}
@@ -73,9 +72,9 @@ func StoreAirData(ways []Element, nodes map[int64]Element, coords []int, airType
 					if ele, err := strconv.ParseFloat(height, 64); err == nil {
 						point.Height = ele
 					}
-				}
 
-				wayPoints = append(wayPoints, point)
+					wayPoints = append(wayPoints, point)
+				}
 			}
 		}
 		if len(wayPoints) > 0 {
