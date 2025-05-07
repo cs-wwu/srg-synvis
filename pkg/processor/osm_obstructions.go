@@ -4,11 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
 )
+
+type OSMPoint struct {
+	Lat    float64
+	Lon    float64
+	Height float64
+}
 
 // Make an api request to overpass-api, process the data into and overpassResponse data type
 func MakeAirApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
@@ -50,12 +55,33 @@ func MakeAirApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 
 // StoreAirData stores aeroway data into an array and returns the array
 // TODO
-func StoreAirData(ways []Element, nodes map[int64]Element, coords []int, airType string) [][]Point {
+func StoreAirData(ways []Element, nodes map[int64]Element, coords []int, airType string) [][]OSMPoint {
 
-	airBuf := [][]Point{}
+	airBuf := [][]OSMPoint{}
 
-	node := nodes[ways[0].Nodes[0]]
-	log.Printf("%f", node.Lat)
+	for _, way := range ways {
+		wayPoints := []OSMPoint{}
+		for _, nodeID := range way.Nodes {
+			if node, exists := nodes[nodeID]; exists {
+				point := OSMPoint{
+					Lat:    node.Lat,
+					Lon:    node.Lon,
+					Height: 0,
+				}
+
+				if height, exists := node.Tags["ele"]; exists {
+					if ele, err := strconv.ParseFloat(height, 64); err == nil {
+						point.Height = ele
+					}
+				}
+
+				wayPoints = append(wayPoints, point)
+			}
+		}
+		if len(wayPoints) > 0 {
+			airBuf = append(airBuf, wayPoints)
+		}
+	}
 
 	return airBuf
 }

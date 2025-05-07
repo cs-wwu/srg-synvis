@@ -536,7 +536,7 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		aeroColor := color.Gray{Y: 160} // Light gray color
 
 		// // Draw each set of roads
-		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway", roadColor)
+		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway", color.RGBA(0, 0, 1))
 		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk", roadColor)
 		DrawRoads(primaries, nodes, maps[i], grayImage, "primary", roadColor)
 		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary", roadColor)
