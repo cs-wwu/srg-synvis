@@ -64,7 +64,11 @@ void main() {
     } else {
         // TERRAIN RENDERING - preserve original appearance
         vec4 texColor = texture(texSampler, fragTexCoord.xy);
-        baseColor = texColor * vec4(fragColor, 1.0);
+        if (texColor[3] < 1.0) {
+            baseColor = vec4(0.0, 1.0, 0.0, 1.0);
+        } else {
+            baseColor = texColor * vec4(fragColor, 1.0);
+        }
     }
     
     // Get sky gradient color - use more vibrant colors
