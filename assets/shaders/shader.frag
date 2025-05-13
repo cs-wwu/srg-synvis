@@ -65,7 +65,7 @@ void main() {
         // TERRAIN RENDERING - preserve original appearance
         vec4 texColor = texture(texSampler, fragTexCoord.xy);
         if (texColor[3] < 1.0) {
-            baseColor = vec4(0.13, 0.55, 0.13, 1.0); // Grass/forest green
+            baseColor = vec4(0.13, 0.55, 0.13, 1.0) * vec4(fragColor, 1.0); // Grass/forest green
         } else {
             baseColor = texColor * vec4(fragColor, 1.0);
         }
