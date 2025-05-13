@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -29,7 +30,7 @@ type OverpassResponse struct {
 
 const (
 	ImgLength = 3600
-	Scale     = 1.5
+	Scale     = 1.0
 	OSMURL    = "http://overpass-api.de/api/interpreter"
 )
 
@@ -162,7 +163,7 @@ func MakeApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	(._;>;);
 	out body;
 	`
-
+	log.Printf("Posting request to osm...\n")
 	var osmData OverpassResponse
 	resp, err := http.Post(apiUrl, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
