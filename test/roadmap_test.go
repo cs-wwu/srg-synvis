@@ -399,7 +399,6 @@ func TestDrawRoads(t *testing.T) {
 			p1 := road[p]
 			p2 := road[p+1]
 			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
-			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
 		}
 	}
 
