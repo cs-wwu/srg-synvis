@@ -403,7 +403,7 @@ func (c *Camera) QuatRotateRel(yaw, pitch, roll float64) {
 	qRight := vec3.T{float64(c.Right[0]), float64(c.Right[1]), float64(c.Right[2])}
 
 	// Calculate the rotation quaternions for each component
-	qYaw := quat.FromAxisAngle(&qUp, -yaw)
+	qYaw := quat.FromAxisAngle(&Q_START_CAMERA_UP, -yaw)
 	qRoll := quat.FromAxisAngle(&qFront, -roll)
 	qPitch := quat.FromAxisAngle(&qRight, pitch)
 

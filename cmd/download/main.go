@@ -75,7 +75,7 @@ func parseFlags() *Config {
 	cfg := &Config{}
 
 	// Data source flags
-	flag.BoolVar(&cfg.useNASA, "nasa", true, "Download NASA elevation data")
+	flag.BoolVar(&cfg.useNASA, "nasa", false, "Download NASA elevation data")
 	flag.BoolVar(&cfg.useOSM, "osm", false, "Download OpenStreetMap data")
 	flag.BoolVar(&cfg.useFAA, "faa", false, "Download FAA airport/navigation data")
 
@@ -97,7 +97,7 @@ func parseFlags() *Config {
 func validateConfig(cfg *Config) error {
 	// Check if at least one data source is selected
 	if !cfg.useNASA && !cfg.useOSM && !cfg.useFAA {
-		return fmt.Errorf("at least one data source must be selected (--nasa, --osm, or --faa)")
+		return fmt.Errorf("at least one data source must be selected (-nasa, -osm, or -faa)")
 	}
 
 	// Check if exactly one region selection method is used
@@ -113,10 +113,10 @@ func validateConfig(cfg *Config) error {
 	}
 
 	if regionMethods == 0 {
-		return fmt.Errorf("must specify region using --region, --bbox, or --preset")
+		return fmt.Errorf("must specify region using -region, -bbox, or -preset")
 	}
 	if regionMethods > 1 {
-		return fmt.Errorf("can only use one region selection method (--region, --bbox, or --preset)")
+		return fmt.Errorf("can only use one region selection method (-region, -bbox, or -preset)")
 	}
 
 	// Validate preset name if used
@@ -366,6 +366,8 @@ func main() {
 	if cfg.useOSM {
 		// TODO: Download OSM data
 		maps := [][]int{{47, -123}}
-		processor.GenerateOsmPng(maps, "assets/textures/osm/", processor.OSMURL)
+		processor.GenerateOsmPng(maps, "assets/textures/", processor.OSMURL)
 	}
+
+	log.Printf("Finished Downloading\n")
 }
