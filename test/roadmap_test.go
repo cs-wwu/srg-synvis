@@ -117,7 +117,6 @@ func TestDrawLine(t *testing.T) {
 		for x := 1; x <= 10; x++ {
 			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
 				baseImage.Set(x, y, color.Opaque)
-				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
