@@ -6,60 +6,31 @@ These are the internal system TODOs.
 
 ### Cooper
 
-Refactor:
+Some of these changes will likely require a large amount of low-level changes
+to the core engine. E.g., More than one map being loaded, not swapping entire
+buffers when loading new chunks, etc. This may require new buffer management
+strategies, or a better solution than the current pending/active buffer swap
+solution (specifically for Chunk loading). I'm still not sure how to
+implement the dynamic texture swapping.
 
-```shell
-srg-synvis/
-├── assets/                # Static assets like shaders, textures, and maps
-├── cmd/                   # Application entry points
-│   ├── download/          # Data download and processing tool
-│   └── svs/               # Main SVS application
-├── internal/              # Internal packages
-│   ├── platform/          # Platform-specific code
-│   │   ├── types/         # Fundamental platform types
-│   │   ├── gpu/           # GPU interface definitions
-│   │   └── vulkan/        # Vulkan implementation
-│   ├── render/            # Rendering system
-│   │   ├── pipeline/      # Render pipeline management
-│   │   ├── mesh/          # Mesh generation and management
-│   │   └── scene/         # Scene management
-│   ├── terrain/           # Terrain system
-│   │   ├── generator/     # Terrain generation
-│   │   ├── chunk/         # Chunk management
-│   │   └── cache/         # Terrain data caching
-│   ├── engine/            # Core engine functionality
-│   │   ├── camera/        # Camera management
-│   │   ├── input/         # Input handling
-│   │   └── config/        # Engine configuration
-│   └── data/              # Data processing
-│       ├── heightmap/     # Height data processing
-│       ├── watermap/      # Water data processing
-│       └── roadmap/       # Road data processing
-├── pkg/                   # Public packages
-│   ├── api/               # External API interfaces
-│   └── wmm/               # World Magnetic Model
-└── test/                  # Testing directory
-    ├── mocks/             # Mock implementations
-    ├── unit/              # Unit tests
-    └── integration/       # Integration tests
-```
+- [ ] Fix background colors
+  - [ ] Horizon fog
+  - [ ] Blue sky
+  - [ ] Better vertex colors? E.g.,
+    - [ ] Gray on steep surface
+    - [ ] Better randomized green colors
+- [ ] Fix texture striping on some devices
+  - [ ] Better road colorings? (Kyle/Katria)
+- [ ] Dynamic texture loading, can swap in and out of buffers
+- [ ] Better Dynamic Chunk Loading
+  - [ ] Remove loading based on map
+  - [ ] Load each image into memory
+  - [ ] Only load chunks in a ring around the player
+- [ ] Fix chunk boundaries (with stitching/skirts)
+- [ ] Re-implement frustum culling based upon performance
 
-- [ ] Simplify chunk logic
-- [ ] Add multiple and dynamic map loading
-- [ ] Add capacity to render 4 maps at once
-  - [ ] Find max memory based on LODs and distance
-  - [ ] Increase memory capacity
-  - [ ] If map do not exist, load water square (stitch to corners)
-  - [ ] Add LOD stitching
-  - [ ] Add dynamic map loading
-- [ ] Add dynamic texture loading per map (kyle/roads)
-  - [ ] Fix texture striping
-- [ ] Simplify frustum logic
-  - [ ] Move frustum culling from app to TerrainManager
-  - [ ] Test performance difference
-- [ ] Change Camera to use Quaternions (sensors?)
+### Longterm
 
-### Anyone
-
-- [ ] Move `asche` changes to a custom pullable public branch
-  - [ ] UI Application in `asche`
+- [ ] Refactor project
+  - [ ] Separate inputs into separate files
+  - [ ] More distinctly define "Debug" mode vs "Prod" mode

@@ -230,13 +230,57 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 	}
 }
 
-func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
-	if maps == nil || targetDir == "" {
+// ParseHeightmapToCoords converts a heightmap string (e.g., "n48w123")
+// to a coordinate pair [lat, lon]
+func ParseHeightmapToCoords(heightmap string) ([]int, error) {
+    // Check if the string format is valid
+    if len(heightmap) != 7 {
+        return nil, fmt.Errorf("invalid heightmap format: %s", heightmap)
+    }
+    
+    // Extract direction characters and numeric values
+    latDir := heightmap[0]
+    lonDir := heightmap[3]
+    
+    lat, err := strconv.Atoi(heightmap[1:3])
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse latitude: %w", err)
+    }
+    
+    lon, err := strconv.Atoi(heightmap[4:7])
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse longitude: %w", err)
+    }
+    
+    // Apply the correct sign based on direction
+    if latDir == 's' {
+        lat = -lat
+    }
+    
+    if lonDir == 'w' {
+        lon = -lon
+    }
+    
+    return []int{lat, lon}, nil
+}
+
+func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error {
+	if heightmaps == nil || targetDir == "" {
 		return fmt.Errorf("no maps or targetDir specified")
 	}
 
-	for i := range maps {
+    maps := make([][]int, 0, len(heightmaps))
+    for _, heightmap := range heightmaps {
+        // Convert the heightmap string to a coordinate pair
+        coords, err := ParseHeightmapToCoords(heightmap)
+        if err != nil {
+            log.Printf("Warning: skipping invalid heightmap %s: %v", heightmap, err)
+            continue
+        }
+        maps = append(maps, coords)
+    }
 
+	for i := range maps {
 		osmData, err := MakeApiRequest(apiURL, maps[i])
 		if err != nil {
 			return err
@@ -265,8 +309,8 @@ func GenerateOsmPng(maps [][]int, targetDir string, apiURL string) error {
 
 		// Generate an all white PNG
 		grayImage := image.NewRGBA(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
-		for x := 0; x < ImgLength*Scale; x++ {
-			for y := 0; y < ImgLength*Scale; y++ {
+		for x := range ImgLength * int(Scale) {
+			for y := range ImgLength * int(Scale) {
 				grayImage.Set(x, y, color.Transparent)
 			}
 		}
