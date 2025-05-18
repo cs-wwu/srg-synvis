@@ -3,6 +3,8 @@ package processor
 import (
 	"bufio"
 	"fmt"
+	pb "github.com/cs-wwu/srg-synvis/assets/obs"
+	"google.golang.org/protobuf/proto"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,6 +38,27 @@ import (
 // 	BLDG_TWR
 //  RIG
 // )
+
+const (
+	latDegStart = 35
+	latDegEnd   = 37
+	latMinStart = 38
+	latMinEnd   = 40
+	latSecStart = 41
+	latSecEnd   = 46
+
+	lonDegStart = 48
+	lonDegEnd   = 51
+	lonMinStart = 52
+	lonMinEnd   = 54
+	lonSecStart = 55
+	lonSecEnd   = 60
+
+	hgtStart = 84
+	hgtEnd   = 89
+	eleStart = 90
+	eleEnd   = 95
+)
 
 type FAAPoint struct {
 	Lat    float64
@@ -75,20 +98,20 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 			continue
 		}
 
-		latDeg := strings.TrimSpace(line[35:37])
-		latMin := strings.TrimSpace(line[38:40])
-		latSec := strings.TrimSpace(line[41:46])
-		latHem := strings.TrimSpace(line[46:47])
+		latDeg := strings.TrimSpace(line[latDegStart:latDegEnd])
+		latMin := strings.TrimSpace(line[latMinStart:latMinEnd])
+		latSec := strings.TrimSpace(line[latSecStart:latSecEnd])
+		latHem := strings.TrimSpace(line[latSecEnd : latSecEnd+1])
 
-		lonDeg := strings.TrimSpace(line[48:51])
-		lonMin := strings.TrimSpace(line[52:54])
-		lonSec := strings.TrimSpace(line[55:60])
-		lonHem := strings.TrimSpace(line[60:61])
+		lonDeg := strings.TrimSpace(line[lonDegStart:lonDegEnd])
+		lonMin := strings.TrimSpace(line[lonMinStart:lonMinEnd])
+		lonSec := strings.TrimSpace(line[lonSecStart:lonSecEnd])
+		lonHem := strings.TrimSpace(line[lonSecEnd : lonSecEnd+1])
 
 		// TODO: decide if want obstacle type
 		// ObsType := strings.TrimSpace(line[63:81])
-		heightStr := strings.TrimSpace(line[84:89])
-		eleStr := strings.TrimSpace(line[90:95])
+		heightStr := strings.TrimSpace(line[hgtStart:hgtEnd])
+		eleStr := strings.TrimSpace(line[eleStart:eleEnd])
 
 		latDegVal, err1 := strconv.Atoi(latDeg)
 		latMinVal, err2 := strconv.Atoi(latMin)
@@ -142,29 +165,42 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 	return nil
 }
 
-func writeResultsToFiles(squareBuffers map[string]*ObsSquare) error {
+func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
 	outputDir := "assets/obs"
 
-	for key, square := range squareBuffers {
-		filePath := filepath.Join(outputDir, fmt.Sprintf("square_%s.csv", key))
-		file, err := os.Create(filePath)
-		if err != nil {
-			return fmt.Errorf("error creating file %s: %v", filePath, err)
-		}
+	allData := &pb.DOFData{
+		Squares: make([]*pb.CoordSquare, 0, len(squareBuffers)),
+	}
 
-		writer := bufio.NewWriter(file)
+	for _, square := range squareBuffers {
+		pbSquare := &pb.CoordSquare{
+			LatDeg:       int32(square.LatDeg),
+			LonDeg:       int32(square.LonDeg),
+			Obstructions: make([]*pb.FAAPoint, 0, len(square.Records)),
+		}
 
 		for _, obs := range square.Records {
-			_, err := writer.WriteString(fmt.Sprintf("%.6f,%.6f,%.2f\n",
-				obs.Lat, obs.Lon, obs.Height))
-			if err != nil {
-				file.Close()
-				return fmt.Errorf("error writing record: %v", err)
+			pbObs := &pb.FAAPoint{
+				Lat:    obs.Lat,
+				Lon:    obs.Lon,
+				Height: obs.Height,
 			}
+			pbSquare.Obstructions = append(pbSquare.Obstructions, pbObs)
 		}
 
-		writer.Flush()
-		file.Close()
+		allData.Squares = append(allData.Squares, pbSquare)
+
+	}
+
+	// Save all data to a single protobuf file
+	allDataBytes, err := proto.Marshal(allData)
+	if err != nil {
+		return fmt.Errorf("error marshaling all data: %v", err)
+	}
+
+	allDataFilePath := filepath.Join(outputDir, "all_dof_data.pb")
+	if err := os.WriteFile(allDataFilePath, allDataBytes, 0644); err != nil {
+		return fmt.Errorf("error writing all data file: %v", err)
 	}
 
 	return nil
@@ -180,7 +216,7 @@ func GenerateObsData() {
 		fmt.Println("Error parsing file", err)
 	}
 
-	err = writeResultsToFiles(squareBuffers)
+	err = saveToProtobufs(squareBuffers)
 	if err != nil {
 		fmt.Printf("Error writing results: %v\n", err)
 	}

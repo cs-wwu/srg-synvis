@@ -7,6 +7,7 @@ require (
 	github.com/vulkan-go/vulkan v0.0.0-20221209234627-c0a353ae26c8
 	github.com/xlab/closer v1.1.0
 	github.com/udhos/gwob v1.0.0
+	google.golang.org/protobuf v1.33.0
 )
 
 require (
