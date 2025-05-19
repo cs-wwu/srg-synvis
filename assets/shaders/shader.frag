@@ -11,6 +11,7 @@ layout(std140, binding = 0) uniform UBO {
     mat4 normalM;
     vec3 lightDir;
     float time;
+    vec3 cameraPos;
 } ubo;
 
 layout(location = 0) in vec3 fragColor;
@@ -21,9 +22,7 @@ layout(location = 4) in vec3 fragNormal;
 
 layout(location = 0) out vec4 outColor;
 
-// ---------- IMPROVED NOISE FUNCTIONS ----------
-
-// Better hash function for 2D -> 1D
+// Better hash function for more randomness
 float hash21(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1031, 0.1030));
     p3 += dot(p3, p3.yzx + 19.19);
@@ -102,7 +101,31 @@ float fresnel(vec3 normal, vec3 viewDir, float bias, float scale, float power) {
     return bias + scale * pow(1.0 - NdotV, power);
 }
 
+// Very simple terrain height warning function
+// Only shows warning when terrain is at or near camera height
+float getTerrainWarningOpacity(float terrainHeight, float cameraHeight) {
+    // Height difference between terrain and camera
+    float heightDiff = terrainHeight - cameraHeight;
+    
+    // Only show warning when terrain is at or above camera,
+    // with a small transition zone (20 units) below camera height
+    float transitionZone = -20.0;
+    
+    if (heightDiff >= 0.0) {
+        // Terrain is at or above camera - full warning
+        return 0.8;  // 80% opacity for warning
+    }
+    else if (heightDiff >= transitionZone) {
+        // Transition zone - fade in warning as terrain gets closer
+        return 0.8 * (1.0 - (heightDiff / transitionZone));
+    }
+    
+    // Normal terrain - no warning
+    return 0.0;
+}
+
 void main() {
+    // Process terrain or water
     vec4 baseColor;
     vec3 normNormal = normalize(fragNormal);
     float steepness = abs(normNormal.y);
@@ -156,8 +179,6 @@ void main() {
         
         // Add soft specular highlight
         vec3 specular = spec * vec3(1.0, 1.0, 0.95) * 0.3;
-        
-        // No foam! Removed foam calculation entirely
         
         // Final water color
         baseColor = vec4(waterColor + specular, 0.9 + waveSum * 0.5);
@@ -221,6 +242,15 @@ void main() {
             
             // Add subtle warm tint to south-facing rocks, cool tint to north-facing
             terrainColor += vec3(southness * 0.05, southness * 0.03, -southness * 0.05) * (1.0 - slopeFactor * 2.0);
+        }
+        
+        // Apply warning coloring based on height relative to camera position - SIMPLIFIED
+        float warningOpacity = getTerrainWarningOpacity(worldPos.y, ubo.cameraPos.y);
+        
+        // Add red warning overlay only when terrain is at or near camera height
+        if (warningOpacity > 0.0) {
+            vec3 warningColor = vec3(1.0, 0.0, 0.0); // Pure red warning
+            terrainColor = mix(terrainColor, warningColor, warningOpacity);
         }
         
         // Use texture if available

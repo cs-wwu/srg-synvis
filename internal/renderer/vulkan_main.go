@@ -117,6 +117,9 @@ func (app *Application) NextFrame() {
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
 
+	// Set camera position in UBO for terrain height warnings
+	app.ubo.CameraPos = *app.camera.Pos // Add this line to update camera position in UBO
+
 	// Update the view frustum and visible chunks periodically
 	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
 

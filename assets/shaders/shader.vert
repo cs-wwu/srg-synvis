@@ -9,6 +9,7 @@ layout(std140, binding = 0) uniform UBO {
     mat4 normalM;
     vec3 lightDir;
     float time;
+    vec3 cameraPos;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
