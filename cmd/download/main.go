@@ -364,9 +364,9 @@ func main() {
 	}
 
 	if cfg.useOSM {
-		// TODO: Download OSM data
-		maps := [][]int{{47, -123}}
-		processor.GenerateOsmPng(maps, "assets/textures/", processor.OSMURL)
+		if err := processor.GenerateOsmPng(heightmaps, "assets/textures/", processor.OSMURL); err != nil {
+			log.Printf("Failed to download OSM data: %v", err)
+		}
 	}
 
 	log.Printf("Finished Downloading\n")
