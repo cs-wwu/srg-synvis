@@ -35,6 +35,7 @@ type UniformBufferObject struct {
 	NormalM    lin.Mat4x4 // for lighting
 	LightDir   lin.Vec3   // Need to initialize this as
 	Time       float32
+	CameraPos  lin.Vec3   // camera position for height warnings
 }
 
 // creating a byte slice array of size UniformBufferObject

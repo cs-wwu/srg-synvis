@@ -85,12 +85,20 @@ func (app *Application) VulkanContextCleanup() error {
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
+
+	// Skybox resources
+	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
+	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
+	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
+	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.DestroyPipeline(dev, app.skyboxPipeline, nil)
+
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
 	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
 
-	for i := 0; i < len(app.textures); i++ {
+	for i := range app.textures {
 		app.textures[i].Destroy(dev)
 	}
 
@@ -108,6 +116,9 @@ func (app *Application) NextFrame() {
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.GetViewMatrix()
+
+	// Set camera position in UBO for terrain height warnings
+	app.ubo.CameraPos = *app.camera.Pos // Add this line to update camera position in UBO
 
 	// Update the view frustum and visible chunks periodically
 	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
@@ -161,7 +172,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
-	clearValues[0].SetColor([]float32{0.2, 0.2, 0.2, 0.2})
+	clearValues[0].SetColor([]float32{0.0, 0.0, 0.0, 1.0}) // Black background as fallback
 
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
@@ -175,10 +186,6 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		PClearValues:    clearValues,
 	}, vk.SubpassContentsInline)
 
-	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
-	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
-
 	vk.CmdSetViewport(cmd, 0, 1, []vk.Viewport{{
 		Width:    float32(app.width),
 		Height:   float32(app.height),
@@ -191,18 +198,35 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		Extent: vk.Extent2D{Width: app.width, Height: app.height},
 	}})
 
+	// FIRST DRAW THE SKYBOX
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.skyboxPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	// Bind skybox buffers
+	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.skyboxVertexBuffer}, []vk.DeviceSize{0})
+	vk.CmdBindIndexBuffer(cmd, app.skyboxIndexBuffer, 0, vk.IndexTypeUint32)
+
+	// Draw skybox
+	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
+
+	// THEN DRAW THE TERRAIN (as before)
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
 	// Get current active buffers and bind them
 	activeVertex, activeIndex := app.TerrainManager.GetActiveBuffers()
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{activeVertex}, []vk.DeviceSize{0})
 	vk.CmdBindIndexBuffer(cmd, activeIndex, 0, vk.IndexTypeUint32)
 
-	// Draw using indirect buffer
+	// Draw terrain
 	vk.CmdDrawIndexed(cmd,
-		app.TerrainManager.getActiveIndices(), // indexCount
-		1,                                     // instanceCount
-		0,                                     // firstIndex
-		0,                                     // vertexOffset
-		0,                                     // firstInstance
+		app.TerrainManager.getActiveIndices(),
+		1,
+		0,
+		0,
+		0,
 	)
 
 	vk.CmdEndRenderPass(cmd)
