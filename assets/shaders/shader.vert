@@ -15,7 +15,7 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 
-const float AMBIENT = 0.15;       // Increased ambient light
+const float AMBIENT = 0.15;       // Ambient light intensity
 const float FOG_START = 3600.0;   // Start fog at this distance
 const float FOG_END = 6000.0;     // End of fog at this distance
 
@@ -39,12 +39,12 @@ void main()
     vec3 worldNormal = normalize(mat3(ubo.normalM) * inNormal);
     fragNormal = worldNormal;
     
-    // Enhanced lighting model with directional light
+    // Calculate lighting based on surface normal and light direction
     vec3 lightDir = normalize(ubo.lightDir);
     float diffuse = max(dot(worldNormal, lightDir), 0.0);
     float intense = AMBIENT + diffuse * 0.85;
     
-    // Height-based fog adjustment
+    // Calculate fog factors based on distance and height
     float distance = length(viewPosition.xyz);
     float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
     
