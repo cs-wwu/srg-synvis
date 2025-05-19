@@ -21,94 +21,166 @@ layout(location = 4) in vec3 fragNormal;
 
 layout(location = 0) out vec4 outColor;
 
-// Better hash function for more randomness
-float hash(vec2 p) {
-    p = 50.0 * fract(p * 0.3183099);
-    return fract(p.x * p.y * (p.x + p.y));
+// ---------- IMPROVED NOISE FUNCTIONS ----------
+
+// Better hash function for 2D -> 1D
+float hash21(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1031, 0.1030));
+    p3 += dot(p3, p3.yzx + 19.19);
+    return fract((p3.x + p3.y) * p3.z);
 }
 
-// Simple noise - adjusted for finer detail
-float noise(vec2 p) {
+// Gradient noise with better mixing
+float gnoise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
     
-    float n00 = hash(i);
-    float n01 = hash(i + vec2(0.0, 1.0));
-    float n10 = hash(i + vec2(1.0, 0.0));
-    float n11 = hash(i + vec2(1.0, 1.0));
+    // Cubic Hermite curve for smoother interpolation
+    vec2 u = f * f * (3.0 - 2.0 * f);
     
-    return mix(mix(n00, n10, f.x), mix(n01, n11, f.x), f.y);
+    // Four corners
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    
+    // Mixing
+    float x1 = mix(a, b, u.x);
+    float x2 = mix(c, d, u.x);
+    
+    return mix(x1, x2, u.y);
 }
 
-// Fine-scale noise for terrain detail
-float detailNoise(vec2 p) {
-    return noise(p * 0.3);
+// Fractional Brownian Motion with multiple octaves - for terrain
+float fbm(vec2 p, int octaves) {
+    float value = 0.0;
+    float amplitude = 0.5;
+    float frequency = 1.0;
+    // Rotate coordinates for each octave to reduce directional artifacts
+    mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+    
+    for (int i = 0; i < octaves; i++) {
+        value += amplitude * gnoise(p * frequency);
+        // Rotate coordinates to break up patterns
+        p = rot * p;
+        frequency *= 2.17; // Not a power of 2 to reduce patterns
+        amplitude *= 0.5;
+    }
+    
+    return value;
 }
 
+// SIMPLIFIED water wave function with gentler movements
+float waveHeight(vec2 position, float time) {
+    // Reduced number of waves with lower frequencies for smoother motion
+    float wave1 = sin(position.x * 0.023 + position.y * 0.031 + time * 0.4) * 0.03;
+    float wave2 = sin(position.x * 0.02 - position.y * 0.027 + time * 0.3) * 0.02;
+    
+    // Very gentle third wave component for just a bit more complexity
+    float wave3 = sin(position.x * 0.013 + position.y * 0.019 + time * 0.2) * 0.01;
+    
+    // Minimal noise - just enough to break perfect uniformity
+    float noiseVal = gnoise(position * 0.03 + time * 0.05) * 0.01;
+    
+    return wave1 + wave2 + wave3 + noiseVal;
+}
+
+// Calculate sky color based on view direction
 vec4 getSkyColor(vec3 viewDir) {
-    // Rich blue zenith
-    vec3 zenithColor = vec3(0.1, 0.3, 0.8);  
-    // Light blue horizon
+    vec3 zenithColor = vec3(0.1, 0.3, 0.8);
     vec3 horizonColor = vec3(0.7, 0.85, 1.0);
     
-    // Calculate upward direction factor
     float upFactor = max(0.0, viewDir.y);
-    
-    // Apply non-linear gradient
     float skyGradient = pow(upFactor, 0.4);
     
     return vec4(mix(horizonColor, zenithColor, skyGradient), 1.0);
 }
 
+// Simpler fresnel effect calculation
+float fresnel(vec3 normal, vec3 viewDir, float bias, float scale, float power) {
+    float NdotV = max(0.0, dot(normal, viewDir));
+    return bias + scale * pow(1.0 - NdotV, power);
+}
+
 void main() {
-    // Process terrain or water
     vec4 baseColor;
-    
-    // Calculate steepness based on the Y component of the normal
-    // A value of 0 means the surface is vertical, 1 means it's flat
     vec3 normNormal = normalize(fragNormal);
     float steepness = abs(normNormal.y);
     
     if (fragTexCoord.z > 0.5) {
-        // Water rendering
+        // SIMPLIFIED WATER RENDERING
         float waterDepth = 1.0 - fragColor.r * 0.5;
         
-        vec3 deepWater = vec3(0.0, 0.05, 0.2);      
-        vec3 shallowWater = vec3(0.0, 0.4, 0.8);
-        vec3 waterColor = mix(deepWater, shallowWater, waterDepth);
+        // Enhanced water color palette
+        vec3 deepWater = vec3(0.0, 0.05, 0.15);
+        vec3 midWater = vec3(0.0, 0.15, 0.35);
+        vec3 shallowWater = vec3(0.1, 0.5, 0.8);
         
-        // Add specular reflection to water
+        // Smoother depth color transition
+        vec3 waterColor;
+        if (waterDepth < 0.3) {
+            waterColor = mix(shallowWater, midWater, waterDepth / 0.3);
+        } else {
+            waterColor = mix(midWater, deepWater, (waterDepth - 0.3) / 0.7);
+        }
+        
+        // Gentler wave calculation
+        float waveSum = waveHeight(worldPos.xz, ubo.time);
+        
+        // Apply subtle color variation based on wave height
+        waterColor = mix(waterColor, waterColor * 1.1, waveSum * 3.0 + 0.5);
+        
+        // Simpler lighting 
         vec3 lightDir = normalize(ubo.lightDir);
         vec3 viewDir = normalize(-worldPos);
-        vec3 reflectDir = reflect(-lightDir, vec3(0.0, 1.0, 0.0));
+        
+        // Simplified wave normal - much gentler
+        vec3 waveNormal = normalize(vec3(
+            sin(worldPos.x * 0.02 + worldPos.z * 0.03 + ubo.time * 0.3) * 0.1,
+            0.9, // Stronger Y component for more stable reflections
+            sin(worldPos.z * 0.02 + worldPos.x * 0.01 + ubo.time * 0.2) * 0.1
+        ));
+        
+        // Specular highlights with smoother normal
+        vec3 reflectDir = reflect(-lightDir, waveNormal);
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
-        vec3 specular = spec * vec3(1.0, 1.0, 1.0) * 0.3;
         
-        // Wave animation
-        float wave1 = sin(worldPos.x * 0.05 + worldPos.z * 0.03 + ubo.time * 1.0) * 0.05;
-        waterColor += wave1;
+        // Gentler fresnel effect
+        float fresnelFactor = fresnel(waveNormal, viewDir, 0.05, 0.5, 3.0);
         
-        baseColor = vec4(waterColor + specular, 0.95);
+        // Sky reflection
+        vec3 skyReflection = getSkyColor(reflect(-viewDir, waveNormal)).xyz;
+        
+        // Combine with reduced fresnel influence
+        waterColor = mix(waterColor, skyReflection, fresnelFactor * 0.4);
+        
+        // Add soft specular highlight
+        vec3 specular = spec * vec3(1.0, 1.0, 0.95) * 0.3;
+        
+        // No foam! Removed foam calculation entirely
+        
+        // Final water color
+        baseColor = vec4(waterColor + specular, 0.9 + waveSum * 0.5);
     } else {
-        // Render terrain with varied green forest, gray rock, and white snow
+        // TERRAIN RENDERING - Using the improved noise functions
         vec4 texColor = texture(texSampler, fragTexCoord.xy);
         
-        // Define colors for different terrain types
+        // Base green palette - vibrant but natural greens
         vec3 green1 = vec3(0.05, 0.40, 0.05); // Darker green
         vec3 green2 = vec3(0.10, 0.50, 0.10); // Medium green
         vec3 green3 = vec3(0.16, 0.55, 0.12); // Lighter green
         vec3 green4 = vec3(0.20, 0.60, 0.15); // Bright green
         vec3 green5 = vec3(0.13, 0.45, 0.08); // Another medium variation
         
+        // Rock and snow colors
         vec3 rockColor = vec3(0.65, 0.63, 0.60); // Light gray rock
         vec3 snowColor = vec3(0.9, 0.9, 0.95);   // Snow
         
-        // Generate fine noise values at different frequencies
-        float n1 = detailNoise(worldPos.xz);
-        float n2 = detailNoise(worldPos.xz * 1.7 + vec2(42.5, 13.2));
-        float n3 = detailNoise(worldPos.xz * 2.3 + vec2(11.9, 78.6));
-        float n4 = detailNoise(worldPos.xz * 3.1 + vec2(87.2, 33.4));
+        // Use better noise functions for terrain
+        float n1 = fbm(worldPos.xz * 0.01, 3);
+        float n2 = fbm(worldPos.xz * 0.02 + vec2(42.5, 13.2), 3);
+        float n3 = fbm(worldPos.xz * 0.04 + vec2(11.9, 78.6), 2);
+        float n4 = fbm(worldPos.xz * 0.08 + vec2(87.2, 33.4), 2);
         
         // Create a random green color using weighted noise
         float greenSelector = n1 * 0.5 + n2 * 0.3 + n3 * 0.15 + n4 * 0.05;
@@ -127,12 +199,11 @@ void main() {
             forestColor = green4;
         }
         
-        // Add small-scale variation
-        float detailVar = detailNoise(worldPos.xz * 5.0) * 0.1 - 0.05;
+        // Add small-scale variation with better noise
+        float detailVar = fbm(worldPos.xz * 0.3, 2) * 0.1 - 0.05;
         forestColor = forestColor * (1.0 + detailVar);
         
         // Calculate mix factor for rock/forest based on steepness
-        // Lower slopeFactor values (steeper terrain) will show more rock
         float slopeFactor = smoothstep(0.0, 0.5, steepness); // Steeper threshold for rock
         vec3 terrainColor = mix(rockColor, forestColor, slopeFactor);
         
@@ -156,7 +227,6 @@ void main() {
         if (texColor.a > 0.5) {
             baseColor = texColor * vec4(fragColor, 1.0); 
         } else {
-            // Apply lighting from vertex shader
             baseColor = vec4(terrainColor * fragColor, 1.0);
         }
     }
