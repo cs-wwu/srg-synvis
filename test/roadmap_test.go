@@ -21,7 +21,7 @@ func TestNoMaps(t *testing.T) {
 }
 
 func TestEmptyString(t *testing.T) {
-	maps := [][]int{{0, 0}}
+	maps := []string{"n01e001"}
 	err := processor.GenerateOsmPng(maps, "", processor.OSMURL)
 	if err == nil {
 		t.Errorf("ran on targetDir='', wanted err, got nil")
