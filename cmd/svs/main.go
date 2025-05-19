@@ -36,7 +36,7 @@ func parseFlags() models.AppConfig {
 	flag.BoolVar(&config.UseHat, "hat", false, "Enable Hat")
 	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
-	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
+	startPosString := flag.String("pos", "48.5,-122.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
 	flag.Parse()
 
 	config.CameraStartPos = parsePosition(*startPosString)
