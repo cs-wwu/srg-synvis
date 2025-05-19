@@ -29,6 +29,14 @@ type Application struct {
 	renderPass     vk.RenderPass
 	pipeline       vk.Pipeline
 
+	// Skybox resources
+	skyboxPipeline     vk.Pipeline
+	skyboxVertexBuffer vk.Buffer
+	skyboxVertexMemory vk.DeviceMemory
+	skyboxIndexBuffer  vk.Buffer
+	skyboxIndexMemory  vk.DeviceMemory
+	skyboxIndexCount   uint32
+
 	frameCount int
 
 	ubo UniformBufferObject

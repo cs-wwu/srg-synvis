@@ -2,12 +2,14 @@ package renderer
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"unsafe"
 
@@ -515,6 +517,185 @@ func (app *Application) prepareRenderPass() {
 	app.renderPass = renderPass
 }
 
+func (app *Application) prepareSkyboxCube() {
+	// Create cube vertices
+	vertices := []float32{
+		// Positions
+		-1.0, 1.0, -1.0, // Front top left
+		-1.0, -1.0, -1.0, // Front bottom left
+		1.0, -1.0, -1.0, // Front bottom right
+		1.0, 1.0, -1.0, // Front top right
+		-1.0, 1.0, 1.0, // Back top left
+		-1.0, -1.0, 1.0, // Back bottom left
+		1.0, -1.0, 1.0, // Back bottom right
+		1.0, 1.0, 1.0, // Back top right
+	}
+
+	// Indices for the cube faces
+	indices := []uint32{
+		// Front face
+		0, 1, 2, 0, 2, 3,
+		// Right face
+		3, 2, 6, 3, 6, 7,
+		// Back face
+		7, 6, 5, 7, 5, 4,
+		// Left face
+		4, 5, 1, 4, 1, 0,
+		// Top face
+		4, 0, 3, 4, 3, 7,
+		// Bottom face
+		1, 5, 6, 1, 6, 2,
+	}
+
+	// Create vertex buffer
+	vertexBuffer := as.CreateBuffer(app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		convertFloatSliceToBytes(vertices),
+		vk.BufferUsageVertexBufferBit)
+	app.skyboxVertexBuffer = vertexBuffer.Buffer
+	app.skyboxVertexMemory = vertexBuffer.Memory
+
+	// Create index buffer
+	indexBuffer := as.CreateBuffer(app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		convertUint32SliceToBytes(indices),
+		vk.BufferUsageIndexBufferBit)
+	app.skyboxIndexBuffer = indexBuffer.Buffer
+	app.skyboxIndexMemory = indexBuffer.Memory
+
+	app.skyboxIndexCount = uint32(len(indices))
+}
+
+// Helper functions to convert slices to bytes
+func convertFloatSliceToBytes(slice []float32) []byte {
+	byteLen := len(slice) * 4
+	bytes := make([]byte, byteLen)
+	for i, v := range slice {
+		binary.LittleEndian.PutUint32(bytes[i*4:], math.Float32bits(v))
+	}
+	return bytes
+}
+
+func convertUint32SliceToBytes(slice []uint32) []byte {
+	byteLen := len(slice) * 4
+	bytes := make([]byte, byteLen)
+	for i, v := range slice {
+		binary.LittleEndian.PutUint32(bytes[i*4:], v)
+	}
+	return bytes
+}
+
+func (app *Application) prepareSkyboxPipeline() {
+	dev := app.Context().Device()
+
+	// Load skybox shaders
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/skybox.vert.spv"))
+	OrPanic(err)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/skybox.frag.spv"))
+	OrPanic(err)
+
+	// Pipeline is similar to main pipeline, with key differences
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout, // Reuse existing layout
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		// Vertex input for skybox cube
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    12, // 3 floats * 4 bytes = 12 bytes per vertex
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 1,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{{
+				Binding:  0,
+				Location: 0,
+				Format:   vk.FormatR32g32b32Sfloat,
+				Offset:   0,
+			}},
+		},
+
+		// Use triangles for the cube
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeFrontBit), // Cull front faces since we're inside the cube
+			FrontFace:   vk.FrontFaceClockwise,
+			LineWidth:   1.0,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask: 0xF,
+				BlendEnable:    vk.False,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		// Key difference: depth test but don't write depth
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.False, // Don't write to depth buffer
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.False,
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	// Create the pipeline
+	skyboxPipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, skyboxPipeline)
+	OrPanic(as.NewError(ret))
+	app.skyboxPipeline = skyboxPipeline[0]
+
+	// Clean up shader modules
+	vk.DestroyShaderModule(dev, vs, nil)
+	vk.DestroyShaderModule(dev, fs, nil)
+}
+
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
@@ -542,19 +723,19 @@ func (app *Application) preparePipeline() {
 		{
 			Binding:  0,
 			Location: 0,
-			Format:   FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
-			Format:   FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
 		},
 		{
 			Binding:  0,
 			Location: 2,
-			Format:   FormatR32g32b32Sfloat,
+			Format:   vk.FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
 		},
 	}
@@ -760,6 +941,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
 	app.preparePipeline()
+	app.prepareSkyboxCube()
+	app.prepareSkyboxPipeline()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()

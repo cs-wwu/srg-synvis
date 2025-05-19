@@ -17,38 +17,44 @@ layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec3 fragTexCoord;
 layout(location = 2) in vec3 worldPos;
 layout(location = 3) in float fogFactor;
+layout(location = 4) in vec3 fragNormal;
 
 layout(location = 0) out vec4 outColor;
 
-// Improved sky gradient colors
-vec4 getSkyColor(float height) {
-    // Sky zenith and horizon colors
-    vec3 zenithColor = vec3(0.2, 0.4, 0.8);     // Deeper blue at zenith
-    vec3 horizonColor = vec3(0.7, 0.85, 1.0);   // Light blue at horizon
+// Enhanced sky gradient function
+vec4 getSkyColor(vec3 viewDir) {
+    // Deeper, more vibrant blue for zenith
+    vec3 zenithColor = vec3(0.1, 0.3, 0.8);  
+    // Lighter blue with a hint of haze for horizon
+    vec3 horizonColor = vec3(0.7, 0.85, 1.0);
     
-    // Calculate height factor (0 at horizon, 1 at zenith) 
-    // with smoother gradient around horizon
-    float skyFactor = smoothstep(0.0, 1.0, height * 2.0);
+    // Calculate upward direction factor (how much we're looking up)
+    float upFactor = max(0.0, viewDir.y);
     
-    // Create sky gradient
-    return vec4(mix(horizonColor, zenithColor, skyFactor), 1.0);
+    // Apply non-linear gradient for more dramatic effect
+    float skyGradient = pow(upFactor, 0.4);
+    
+    // Create the gradient
+    return vec4(mix(horizonColor, zenithColor, skyGradient), 1.0);
 }
 
 void main() {
     // Process terrain or water
     vec4 baseColor;
     
+    // Get terrain steepness from normal (closer to 0 for steep surfaces)
+    float steepness = max(0.0, fragNormal.y);
+    
     if (fragTexCoord.z > 0.5) {
         // WATER RENDERING
-        // Calculate depth for water color variation
         float waterDepth = 1.0 - fragColor.r * 0.5;
         
-        // Create deep to shallow water gradient
-        vec3 deepWater = vec3(0.0, 0.05, 0.2);      // Deep water color
-        vec3 shallowWater = vec3(0.0, 0.4, 0.8);    // Shallow water color
+        // Better water color gradient - deeper blue
+        vec3 deepWater = vec3(0.0, 0.05, 0.2);      
+        vec3 shallowWater = vec3(0.0, 0.4, 0.8);
         vec3 waterColor = mix(deepWater, shallowWater, waterDepth);
         
-        // Add specular highlight for water surface only
+        // Improved specular for water
         vec3 lightDir = normalize(ubo.lightDir);
         vec3 viewDir = normalize(-worldPos);
         vec3 reflectDir = reflect(-lightDir, vec3(0.0, 1.0, 0.0));
@@ -59,32 +65,44 @@ void main() {
         float wave = sin(worldPos.x * 0.05 + worldPos.z * 0.03 + ubo.time * 1.0) * 0.05;
         waterColor += wave;
         
-        // Combine colors for water only
         baseColor = vec4(waterColor + specular, 0.95);
     } else {
-        // TERRAIN RENDERING - preserve original appearance
+        // TERRAIN RENDERING
         vec4 texColor = texture(texSampler, fragTexCoord.xy);
-        if (texColor[3] < 1.0) {
-            baseColor = vec4(0.13, 0.55, 0.13, 1.0) * vec4(fragColor, 1.0); // Grass/forest green
+        
+        // Basic terrain color implementation
+        vec3 grassColor = vec3(0.13, 0.55, 0.13); // Base green
+        vec3 rockColor = vec3(0.6, 0.6, 0.6);     // Gray for steep surfaces
+        vec3 snowColor = vec3(0.9, 0.9, 0.95);    // White/light gray for high areas
+        
+        // Mix based on steepness - more gray on steep slopes
+        vec3 terrainColor = mix(rockColor, grassColor, steepness);
+        
+        // Add height-based coloring (higher = more snow/lighter)
+        float heightFactor = smoothstep(800.0, 2000.0, worldPos.y);
+        terrainColor = mix(terrainColor, snowColor, heightFactor);
+        
+        // Add some randomness to the color
+        float noise = fract(sin(dot(fragTexCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) * 0.1 - 0.05;
+        terrainColor += vec3(noise);
+        
+        if (texColor.a > 0.5) {
+            baseColor = texColor * vec4(fragColor, 1.0); 
         } else {
-            baseColor = texColor * vec4(fragColor, 1.0);
+            baseColor = vec4(terrainColor * fragColor, 1.0);
         }
     }
     
-    // Get sky gradient color - use more vibrant colors
-    vec3 zenithColor = vec3(0.1, 0.3, 0.8);     // Deeper blue at zenith
-    vec3 horizonColor = vec3(0.7, 0.85, 1.0);   // Light blue at horizon
-    
-    // Calculate view direction in world space
+    // Calculate view direction for sky/fog
     vec3 viewDir = normalize(worldPos);
-    // Convert to "upness" factor - how much we're looking up
-    float upFactor = max(0.0, viewDir.y);
     
-    // Create sky gradient - force stronger gradient transition
-    vec4 skyColor = vec4(mix(horizonColor, zenithColor, upFactor), 1.0);
+    // Get enhanced sky color
+    vec4 skyColor = getSkyColor(viewDir);
     
-    // Make sure fog is applied correctly
-    // At fogFactor = 0 (far away), use pure sky color
-    // At fogFactor = 1 (nearby), use pure terrain/water color
-    outColor = mix(skyColor, baseColor, fogFactor);
+    // Enhanced fog calculation with height factor
+    float heightFogFactor = smoothstep(500.0, 2000.0, worldPos.y);
+    float enhancedFogFactor = fogFactor * (1.0 - heightFogFactor * 0.3);
+    
+    // Final blending of terrain/water with sky
+    outColor = mix(skyColor, baseColor, enhancedFogFactor);
 }
