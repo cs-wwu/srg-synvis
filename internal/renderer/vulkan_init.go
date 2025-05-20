@@ -170,7 +170,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	usage vk.ImageUsageFlagBits, memoryProps vk.MemoryPropertyFlagBits) *Texture {
 
 	dev := app.Context().Device()
-	_, width, height, err := loadTextureData(path)
+	_, width, height, _, err := loadTextureData(path)
 	if err != nil {
 		OrPanic(err)
 	}
@@ -225,19 +225,19 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		}, &layout)
 		layout.Deref()
 
-		data, _, _, err := loadTextureData(path)
+		data, width, height, sourceStride, err := loadTextureData(path)
 		OrPanic(err)
 		if len(data) > 0 {
 			var pData unsafe.Pointer
-			ret = vk.MapMemory(dev, tex.mem, 0, vk.DeviceSize(len(data)), 0, &pData)
+			ret = vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
 			if IsError(ret) {
 				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
 				return tex
 			}
-			n := vk.Memcopy(pData, data)
-			if n != len(data) {
-				log.Printf("vulkan warning: failed to copy data, %d != %d", n, len(data))
-			}
+
+			// Use row-by-row copy to respect GPU memory layout
+			copyTextureData(pData, data, width, height, sourceStride, int(layout.RowPitch))
+
 			vk.UnmapMemory(dev, tex.mem)
 		}
 	}
@@ -985,12 +985,12 @@ func FileToBytes(filename string) []byte {
 	return data
 }
 
-// Modified function to handle stride and alignment properly
-func loadTextureData(name string) ([]byte, int, int, error) {
+// Handle stride and alignment properly
+func loadTextureData(name string) ([]byte, int, int, int, error) {
 	data := FileToBytes(name)
 	img, err := png.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, 0, err
 	}
 
 	bounds := img.Bounds()
@@ -999,11 +999,29 @@ func loadTextureData(name string) ([]byte, int, int, error) {
 	// Create RGBA image with standard stride
 	newImg := image.NewRGBA(bounds)
 
-	// Don't modify stride - let Go handle the default, which is reliable
-	// The default stride is width * 4 bytes
-
 	// Draw the image
 	draw.Draw(newImg, newImg.Bounds(), img, image.Point{}, draw.Src)
 
-	return []byte(newImg.Pix), width, height, nil
+	// Return the stride (bytes per row) as well
+	return []byte(newImg.Pix), width, height, newImg.Stride, nil
+}
+
+// copyTextureData copies texture data row by row, respecting the GPU's expected memory layout
+func copyTextureData(dst unsafe.Pointer, src []byte, width, height, sourceStride, destStride int) {
+	// For each row in the image
+	for row := 0; row < height; row++ {
+		// Calculate source and destination row pointers
+		srcOffset := row * sourceStride
+		dstOffset := row * destStride
+
+		// Convert destination offset to unsafe.Pointer
+		dstRow := unsafe.Pointer(uintptr(dst) + uintptr(dstOffset))
+
+		// Copy a single row (width * 4 bytes for RGBA)
+		bytesPerPixel := 4
+		rowSize := width * bytesPerPixel
+
+		// Use the Vulkan provided Memcopy for the row data
+		vk.Memcopy(dstRow, src[srcOffset:srcOffset+rowSize])
+	}
 }
