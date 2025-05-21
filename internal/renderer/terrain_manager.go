@@ -12,6 +12,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/core/memory"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
@@ -27,7 +28,7 @@ const (
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 	TEXTURE_EXTENSION   = ".osm.png"
 
-	MAX_IMAGE_MAPS = 4
+	MAX_IMAGE_MAPS = 1
 
 	TICKER_SPEED = time.Second / 30 // x times per second
 
@@ -52,6 +53,7 @@ const (
 )
 
 var firstRun = true
+var LODBucketPercentages = []float32{0.25, 0.25, 0.25, 0.25}
 
 // A single TerrainManager to manage load/unloading images and chunks
 type TerrainManager struct {
@@ -75,6 +77,8 @@ type TerrainManager struct {
 	chunks        map[string]*Chunk
 	orderedChunks []*Chunk
 
+	bucketAllocator *memory.BucketAllocator
+
 	shutdown chan struct{}
 }
 
@@ -82,16 +86,52 @@ func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
 	tm.lastPosition = pos
 }
 
+func calculateLODChunkSizes() []vk.DeviceSize {
+	numLODLevels := len(LODBucketPercentages) // Should correspond to LOD_0 to LOD_3
+	lodChunkSizes := make([]vk.DeviceSize, numLODLevels)
+
+	for lod := range numLODLevels {
+		stride := 1
+		if lod > 0 {
+			stride = 1 << uint(lod)
+		}
+
+		vps := CHUNK_SIZE / stride // verticesPerSide
+
+		// Calculate number of vertices based on chunk.go's calculateChunkVertices
+		numVertices := vps * vps
+		currentVertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
+
+		// Calculate number of indices based on chunk.go's calculateChunkIndices logic
+		numIndices := 0
+		if vps > 1 { // Chunks with 1 vertex per side (or less) have no indices
+			numStrips := vps - 1
+			numIndices = numStrips * vps * 2 // Main strip indices
+			if numStrips > 1 {               // If more than one strip, add degenerate triangles
+				numIndices += (numStrips - 1) * 2
+			}
+		}
+		currentIndexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(IndexSize)
+
+		lodChunkSizes[lod] = currentVertexDataSize + currentIndexDataSize
+	}
+	return lodChunkSizes
+}
+
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
+	lodChunkSizes := calculateLODChunkSizes()
+	bucketAllocator := memory.NewBucketAllocator(device, memProps, LODBucketPercentages, lodChunkSizes)
+
 	tm := &TerrainManager{
-		device:        device,
-		memProps:      memProps,
-		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
-		heightmaps:    make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
-		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
-		chunks:        make(map[string]*Chunk),
-		orderedChunks: make([]*Chunk, 0),
-		shutdown:      make(chan struct{}),
+		device:          device,
+		memProps:        memProps,
+		bucketAllocator: bucketAllocator, // Assign the initialized allocator
+		lastPosition:    lin.Vec3{0.0, 0.0, 0.0},
+		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
+		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
+		chunks:          make(map[string]*Chunk),
+		orderedChunks:   make([]*Chunk, 0),
+		shutdown:        make(chan struct{}),
 	}
 
 	tm.InitBuffers()

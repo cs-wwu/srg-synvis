@@ -15,8 +15,8 @@ import (
 type BucketAllocator struct {
 	totalMemory vk.DeviceSize
 	buckets     []MemoryBucket
-	device      vk.Device
-	memProps    vk.PhysicalDeviceMemoryProperties
+	device      *vk.Device
+	memProps    *vk.PhysicalDeviceMemoryProperties
 
 	// Thread safety
 	mu sync.RWMutex
@@ -40,7 +40,7 @@ type MemoryBucket struct {
 }
 
 // NewBucketAllocator creates a new fixed-size chunk pool allocator.
-func NewBucketAllocator(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties, percentages []float32, chunkSizes []vk.DeviceSize) *BucketAllocator {
+func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, percentages []float32, chunkSizes []vk.DeviceSize) *BucketAllocator {
 	// Validate input
 	if len(percentages) == 0 || len(percentages) != len(chunkSizes) {
 		panic("percentages and chunkSizes must be non-empty and of equal length")
@@ -56,6 +56,7 @@ func NewBucketAllocator(device vk.Device, memProps vk.PhysicalDeviceMemoryProper
 	// Find largest device-local heap
 	totalMemory := vk.DeviceSize(0)
 	for i := uint32(0); i < memProps.MemoryHeapCount; i++ {
+		memProps.MemoryHeaps[i].Deref()
 		heap := memProps.MemoryHeaps[i]
 		if heap.Flags&vk.MemoryHeapFlags(vk.MemoryHeapDeviceLocalBit) != 0 && heap.Size > totalMemory {
 			totalMemory = heap.Size
@@ -177,8 +178,8 @@ func (a *BucketAllocator) Destroy() {
 
 	for i := range a.buckets {
 		bucket := &a.buckets[i]
-		vk.FreeMemory(a.device, bucket.memory, nil)
-		vk.DestroyBuffer(a.device, bucket.buffer, nil)
+		vk.FreeMemory(*a.device, bucket.memory, nil)
+		vk.DestroyBuffer(*a.device, bucket.buffer, nil)
 	}
 }
 
@@ -205,10 +206,10 @@ func (a *BucketAllocator) Stats() AllocatorStats {
 }
 
 // Helper function to create buffer and allocate memory.
-func createBufferAndMemory(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties, size vk.DeviceSize) (vk.Buffer, vk.DeviceMemory) {
+func createBufferAndMemory(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, size vk.DeviceSize) (vk.Buffer, vk.DeviceMemory) {
 	// Create buffer (no initial data, just reserve space)
 	var buffer vk.Buffer
-	ret := vk.CreateBuffer(device, &vk.BufferCreateInfo{
+	ret := vk.CreateBuffer(*device, &vk.BufferCreateInfo{
 		SType: vk.StructureTypeBufferCreateInfo,
 		Size:  size,
 		Usage: vk.BufferUsageFlags(vk.BufferUsageVertexBufferBit | vk.BufferUsageIndexBufferBit),
@@ -219,7 +220,7 @@ func createBufferAndMemory(device vk.Device, memProps vk.PhysicalDeviceMemoryPro
 
 	// Get memory requirements
 	var memReqs vk.MemoryRequirements
-	vk.GetBufferMemoryRequirements(device, buffer, &memReqs)
+	vk.GetBufferMemoryRequirements(*device, buffer, &memReqs)
 	memReqs.Deref()
 
 	// Find suitable memory type
@@ -227,21 +228,21 @@ func createBufferAndMemory(device vk.Device, memProps vk.PhysicalDeviceMemoryPro
 
 	// Allocate memory
 	var memory vk.DeviceMemory
-	ret = vk.AllocateMemory(device, &vk.MemoryAllocateInfo{
+	ret = vk.AllocateMemory(*device, &vk.MemoryAllocateInfo{
 		SType:           vk.StructureTypeMemoryAllocateInfo,
 		AllocationSize:  memReqs.Size,
 		MemoryTypeIndex: memTypeIndex,
 	}, nil, &memory)
 	if ret != vk.Success {
-		vk.DestroyBuffer(device, buffer, nil)
+		vk.DestroyBuffer(*device, buffer, nil)
 		panic(fmt.Sprintf("failed to allocate memory: %d", ret))
 	}
 
 	// Bind buffer to memory
-	ret = vk.BindBufferMemory(device, buffer, memory, 0)
+	ret = vk.BindBufferMemory(*device, buffer, memory, 0)
 	if ret != vk.Success {
-		vk.DestroyBuffer(device, buffer, nil)
-		vk.FreeMemory(device, memory, nil)
+		vk.DestroyBuffer(*device, buffer, nil)
+		vk.FreeMemory(*device, memory, nil)
 		panic(fmt.Sprintf("failed to bind buffer memory: %d", ret))
 	}
 
@@ -249,8 +250,9 @@ func createBufferAndMemory(device vk.Device, memProps vk.PhysicalDeviceMemoryPro
 }
 
 // Helper function to find suitable memory type.
-func findMemoryType(memProps vk.PhysicalDeviceMemoryProperties, typeFilter uint32, properties vk.MemoryPropertyFlagBits) uint32 {
+func findMemoryType(memProps *vk.PhysicalDeviceMemoryProperties, typeFilter uint32, properties vk.MemoryPropertyFlagBits) uint32 {
 	for i := uint32(0); i < memProps.MemoryTypeCount; i++ {
+		memProps.MemoryTypes[i].Deref()
 		if (typeFilter&(1<<i)) != 0 && (memProps.MemoryTypes[i].PropertyFlags&vk.MemoryPropertyFlags(properties)) == vk.MemoryPropertyFlags(properties) {
 			return i
 		}
@@ -282,7 +284,7 @@ func (a *BucketAllocator) Upload(chunkID string, lodLevel int, data []byte) erro
 
 	// Map memory temporarily
 	var pData unsafe.Pointer
-	ret := vk.MapMemory(a.device, bucket.memory, offset, vk.DeviceSize(len(data)), 0, &pData)
+	ret := vk.MapMemory(*a.device, bucket.memory, offset, vk.DeviceSize(len(data)), 0, &pData)
 	if ret != vk.Success {
 		return fmt.Errorf("failed to map memory: %d", ret)
 	}
@@ -291,7 +293,7 @@ func (a *BucketAllocator) Upload(chunkID string, lodLevel int, data []byte) erro
 	vk.Memcopy(pData, data)
 
 	// Unmap memory
-	vk.UnmapMemory(a.device, bucket.memory)
+	vk.UnmapMemory(*a.device, bucket.memory)
 
 	return nil
 }
