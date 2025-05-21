@@ -10,9 +10,9 @@ import (
 	vk "github.com/vulkan-go/vulkan"
 )
 
-// FixedChunkPoolAllocator implements MemoryAllocator interface using a pool-based approach
+// BucketAllocator implements MemoryAllocator interface using a pool-based approach
 // for fixed-size terrain chunks, allowing memory reuse and efficient allocation.
-type FixedChunkPoolAllocator struct {
+type BucketAllocator struct {
 	totalMemory vk.DeviceSize
 	buckets     []MemoryBucket
 	device      vk.Device
@@ -39,8 +39,8 @@ type MemoryBucket struct {
 	mu sync.Mutex
 }
 
-// NewFixedChunkPoolAllocator creates a new fixed-size chunk pool allocator.
-func NewFixedChunkPoolAllocator(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties, percentages []float32, chunkSizes []vk.DeviceSize) *FixedChunkPoolAllocator {
+// NewBucketAllocator creates a new fixed-size chunk pool allocator.
+func NewBucketAllocator(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties, percentages []float32, chunkSizes []vk.DeviceSize) *BucketAllocator {
 	// Validate input
 	if len(percentages) == 0 || len(percentages) != len(chunkSizes) {
 		panic("percentages and chunkSizes must be non-empty and of equal length")
@@ -92,7 +92,7 @@ func NewFixedChunkPoolAllocator(device vk.Device, memProps vk.PhysicalDeviceMemo
 		}
 	}
 
-	return &FixedChunkPoolAllocator{
+	return &BucketAllocator{
 		totalMemory: budget,
 		buckets:     buckets,
 		device:      device,
@@ -102,7 +102,7 @@ func NewFixedChunkPoolAllocator(device vk.Device, memProps vk.PhysicalDeviceMemo
 
 // AllocateChunk allocates space for a chunk in the specified LOD bucket.
 // Returns (success, offset in buffer).
-func (a *FixedChunkPoolAllocator) AllocateChunk(chunkID string, chunkSize vk.DeviceSize, lodLevel int) (bool, vk.DeviceSize) {
+func (a *BucketAllocator) AllocateChunk(chunkID string, chunkSize vk.DeviceSize, lodLevel int) (bool, vk.DeviceSize) {
 	// Lock bucket for allocation
 	a.mu.RLock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
@@ -139,7 +139,7 @@ func (a *FixedChunkPoolAllocator) AllocateChunk(chunkID string, chunkSize vk.Dev
 }
 
 // FreeChunk releases a chunk allocation in a bucket (does not compact memory).
-func (a *FixedChunkPoolAllocator) FreeChunk(chunkID string, lodLevel int) bool {
+func (a *BucketAllocator) FreeChunk(chunkID string, lodLevel int) bool {
 	// Lock bucket for deallocation
 	a.mu.RLock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
@@ -171,7 +171,7 @@ func (a *FixedChunkPoolAllocator) FreeChunk(chunkID string, lodLevel int) bool {
 }
 
 // Destroy releases all Vulkan buffers and memory.
-func (a *FixedChunkPoolAllocator) Destroy() {
+func (a *BucketAllocator) Destroy() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
@@ -183,7 +183,7 @@ func (a *FixedChunkPoolAllocator) Destroy() {
 }
 
 // Stats returns memory usage statistics.
-func (a *FixedChunkPoolAllocator) Stats() AllocatorStats {
+func (a *BucketAllocator) Stats() AllocatorStats {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -259,7 +259,7 @@ func findMemoryType(memProps vk.PhysicalDeviceMemoryProperties, typeFilter uint3
 }
 
 // Upload uploads data to an allocated chunk.
-func (a *FixedChunkPoolAllocator) Upload(chunkID string, lodLevel int, data []byte) error {
+func (a *BucketAllocator) Upload(chunkID string, lodLevel int, data []byte) error {
 	a.mu.RLock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
 		a.mu.RUnlock()
@@ -297,7 +297,7 @@ func (a *FixedChunkPoolAllocator) Upload(chunkID string, lodLevel int, data []by
 }
 
 // GetAllocationInfo returns information about an allocated chunk.
-func (a *FixedChunkPoolAllocator) GetAllocationInfo(chunkID string, lodLevel int) (AllocationInfo, error) {
+func (a *BucketAllocator) GetAllocationInfo(chunkID string, lodLevel int) (AllocationInfo, error) {
 	a.mu.RLock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
 		a.mu.RUnlock()
@@ -326,7 +326,7 @@ func (a *FixedChunkPoolAllocator) GetAllocationInfo(chunkID string, lodLevel int
 }
 
 // GetDetailedStats returns detailed memory statistics.
-func (a *FixedChunkPoolAllocator) GetDetailedStats() string {
+func (a *BucketAllocator) GetDetailedStats() string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -370,7 +370,7 @@ func (a *FixedChunkPoolAllocator) GetDetailedStats() string {
 }
 
 // VisualizeMemoryMap generates a visual representation of memory allocation state.
-func (a *FixedChunkPoolAllocator) VisualizeMemoryMap() string {
+func (a *BucketAllocator) VisualizeMemoryMap() string {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
@@ -447,7 +447,7 @@ func (d *DefferedSlotStack) Add(chunkID string, lodLevel int) {
 }
 
 // ProcessAll frees all chunks in the deferred slot stack.
-func (d *DefferedSlotStack) ProcessAll(allocator *FixedChunkPoolAllocator) int {
+func (d *DefferedSlotStack) ProcessAll(allocator *BucketAllocator) int {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
