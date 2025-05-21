@@ -120,6 +120,12 @@ func calculateLODChunkSizes() []vk.DeviceSize {
 
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
 	lodChunkSizes := calculateLODChunkSizes()
+	fmt.Printf("LOD Chunk Sizes: ")
+	for _, size := range lodChunkSizes {
+		fmt.Printf("%.1fKB ", float32((size)/1024))
+	}
+	fmt.Println()
+	fmt.Printf("LOD Bucket Percentages: %v\n", LODBucketPercentages)
 	bucketAllocator := memory.NewBucketAllocator(device, memProps, LODBucketPercentages, lodChunkSizes)
 
 	tm := &TerrainManager{

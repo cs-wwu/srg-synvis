@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	vk "github.com/vulkan-go/vulkan"
@@ -42,6 +43,7 @@ type MemoryBucket struct {
 // NewBucketAllocator creates a new fixed-size chunk pool allocator.
 func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, percentages []float32, chunkSizes []vk.DeviceSize) *BucketAllocator {
 	// Validate input
+	now := time.Now()
 	if len(percentages) == 0 || len(percentages) != len(chunkSizes) {
 		panic("percentages and chunkSizes must be non-empty and of equal length")
 	}
@@ -66,6 +68,8 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 		panic("No device-local heap found")
 	}
 	budget := vk.DeviceSize(float64(totalMemory) * 0.7) // 70% safety margin
+	fmt.Printf("Total device-local memory: %.1fMB\n", float32(totalMemory)/(1024*1024))
+	fmt.Printf("Allocated memory budget: %.1fMB\n", float32(budget)/(1024*1024))
 
 	// Create buckets
 	buckets := make([]MemoryBucket, len(percentages))
@@ -74,7 +78,9 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 		slotCount := int(bucketSize / chunkSizes[i])
 
 		// Create buffer and allocate memory
+		internalNow := time.Now()
 		buffer, memory := createBufferAndMemory(device, memProps, bucketSize)
+		fmt.Printf(" bucket %d (%.2f%%) took: %s\n", i, perc, time.Since(internalNow))
 
 		// Initialize slot stack and bitset
 		freeList := NewFreeList(slotCount)
@@ -92,6 +98,10 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 			allocations: make(map[string]int),
 		}
 	}
+
+	fmt.Printf("Bucket allocator initialization took: %s\n", time.Since(now))
+	fmt.Printf("Total allocated memory: %.1fMB\n", float32(budget)/(1024*1024))
+	fmt.Printf("Total number of slots: %d\n", len(buckets)*len(chunkSizes))
 
 	return &BucketAllocator{
 		totalMemory: budget,
@@ -206,6 +216,8 @@ func (a *BucketAllocator) Stats() AllocatorStats {
 }
 
 // Helper function to create buffer and allocate memory.
+// TODO: this function takes ~120ms per bucket
+// Refactor to using single buffer, and subdiving it into the buckets myself
 func createBufferAndMemory(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, size vk.DeviceSize) (vk.Buffer, vk.DeviceMemory) {
 	// Create buffer (no initial data, just reserve space)
 	var buffer vk.Buffer
