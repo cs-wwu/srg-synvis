@@ -81,9 +81,6 @@ type TerrainManager struct {
 	chunks        map[string]*Chunk
 	orderedChunks []*Chunk
 
-	viewMatrix *lin.Mat4x4
-	projMatrix *lin.Mat4x4
-
 	shutdown chan struct{}
 }
 
@@ -102,8 +99,6 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:        make(map[string]*Chunk),
 		orderedChunks: make([]*Chunk, 0),
-		viewMatrix:    &lin.Mat4x4{},
-		projMatrix:    &lin.Mat4x4{},
 		shutdown:      make(chan struct{}),
 	}
 
@@ -229,7 +224,7 @@ func (tm *TerrainManager) FillActiveBuffers() {
 		vertexOffset += Index(len(chunk.vertices))
 	}
 
-	// Update pending buffers
+	// Update active buffers
 	tm.updateBuffer(tm.activeVertexMemory, tm.activeVertices)
 	tm.updateBuffer(tm.activeIndexMemory, tm.activeIndices)
 }
@@ -435,28 +430,6 @@ func (tm *TerrainManager) unloadChunks(coord string) {
 	}
 }
 
-// Loads a map and returns a png
-func loadMap(filepath string) (image.Image, error) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load map %v: %w", filepath, err)
-	}
-	defer file.Close()
-
-	rawImg, err := png.Decode(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode map %v: %w", filepath, err)
-	}
-
-	// Verify image size
-	width, height := rawImg.Bounds().Dx(), rawImg.Bounds().Dy()
-	if width != MAP_LENGTH+1 || height != MAP_LENGTH+1 {
-		return nil, fmt.Errorf("bad image bounds: (%d, %d)", width, height)
-	}
-
-	return rawImg, nil
-}
-
 func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data any) {
 	var bufferData []byte
 	switch v := data.(type) {
@@ -481,20 +454,6 @@ func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data any) {
 	vk.UnmapMemory(*tm.device, memory)
 }
 
-func (tm *TerrainManager) SwapBuffers() bool {
-	if !tm.updated.Load() {
-		return false
-	}
-
-	// Ensure device is idle before swapping buffers
-	vk.DeviceWaitIdle(*tm.device)
-
-	tm.chunkMutex.Lock()
-	defer tm.chunkMutex.Unlock()
-
-	return true
-}
-
 func (tm *TerrainManager) Destroy() {
 	// Signal shutdown
 	close(tm.shutdown)
@@ -504,14 +463,6 @@ func (tm *TerrainManager) Destroy() {
 	vk.DestroyBuffer(*tm.device, tm.activeIndexBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.activeVertexMemory, nil)
 	vk.FreeMemory(*tm.device, tm.activeIndexMemory, nil)
-}
-
-func (tm *TerrainManager) UpdateMatrices(view, proj *lin.Mat4x4) {
-	tm.chunkMutex.Lock()
-	defer tm.chunkMutex.Unlock()
-
-	*tm.viewMatrix = *view
-	*tm.projMatrix = *proj
 }
 
 // Returns active indicies with thread-safety

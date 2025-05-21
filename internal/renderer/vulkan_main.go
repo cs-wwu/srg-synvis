@@ -118,12 +118,6 @@ func (app *Application) NextFrame() {
 
 	// Set camera position in UBO for terrain height warnings
 	app.ubo.CameraPos = *app.camera.Pos // Add this line to update camera position in UBO
-
-	// Update the view frustum and visible chunks periodically
-	app.TerrainManager.UpdateMatrices(&app.ubo.View, &app.ubo.Projection)
-
-	// Update terrain position - TerrainManager handles updates in its own thread
-	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
 }
 
 // called every frame by asche
