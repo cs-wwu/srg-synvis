@@ -8,6 +8,7 @@ import (
 	"time"
 
 	lin "github.com/xlab/linmath"
+	"slices"
 )
 
 // TerrainGrid implements the GridSystem interface
@@ -183,9 +184,9 @@ func (g *TerrainGrid) UnregisterChunk(id string) bool {
 	}
 
 	// Remove from visible chunks if present
-	for i := 0; i < len(g.visibleChunks); i++ {
+	for i := range g.visibleChunks {
 		if g.visibleChunks[i].ID == id {
-			g.visibleChunks = append(g.visibleChunks[:i], g.visibleChunks[i+1:]...)
+			g.visibleChunks = slices.Delete(g.visibleChunks, i, i+1)
 			break
 		}
 	}

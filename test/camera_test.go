@@ -82,7 +82,7 @@ func (m *MockGPSD) handleConnection(conn net.Conn) {
 
 // SendTPV sends a full TPV report to all connected clients
 func (m *MockGPSD) SendTPV(lat, lon, alt float64, mode gpsd.Mode) {
-	tpv := map[string]interface{}{
+	tpv := map[string]any{
 		"class":  "TPV",
 		"device": "/dev/ttyACM0",
 		"mode":   mode,
@@ -141,9 +141,9 @@ func TestSenseData(t *testing.T) {
 	}
 
 	// test if sense works on good data
-    // test roll
-    fmt.Println("starting roll test")
-    testCamera.TrySense("./fakehat.py")
+	// test roll
+	fmt.Println("starting roll test")
+	testCamera.TrySense("./fakehat.py")
 	if !(equal(float32(testCamera.Roll), 0.263)) {
 		t.Errorf("Expected rollAngle to be 0.263, roll was %f", testCamera.Roll)
 	}
@@ -156,7 +156,7 @@ func TestWMM(t *testing.T) {
 
 	c.TrySense("./fakehat2.py")
 	// Check if starting coordinate declination is within actual range ~15.30
-	
+
 	if !(equal(float32(c.Yaw), 15.30)) {
 		t.Errorf("Expected yaw to be updated with declination to 15.30, was %f", c.Yaw)
 	}
@@ -240,17 +240,17 @@ func TestInitCamera(t *testing.T) {
 func QuatRot(t *testing.T) {
 	c := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
 
-	c.QuatRotateRel((math.Pi/2), 0, 0)
+	c.QuatRotateRel((math.Pi / 2), 0, 0)
 	if !equal(c.Front[0], 1.0) || !equal(c.Front[1], 0.0) || !equal(c.Front[2], 0.0) {
 		t.Errorf("Front vector is wrong, Front[%f, %f, %f]", c.Front[0], c.Front[1], c.Front[2])
 	}
-	
-	c.QuatRotateRel(0, (math.Pi/2), 0)
+
+	c.QuatRotateRel(0, (math.Pi / 2), 0)
 	if !equal(c.Front[0], 0) || !equal(c.Front[1], 1) || !equal(c.Front[2], 0) {
 		t.Errorf("Front vector is wrong, Front[%f, %f, %f]", c.Front[0], c.Front[1], c.Front[2])
 	}
-	
-	c.QuatRotateRel(0, 0, (math.Pi/2))
+
+	c.QuatRotateRel(0, 0, (math.Pi / 2))
 	if !(equal(c.Up[0], 0) && equal(c.Up[1], 0) && equal(c.Up[2], -1)) {
 		t.Errorf("Up vector is wrong, Up:[%f, %f, %f]", c.Up[0], c.Up[1], c.Up[2])
 	}
@@ -258,5 +258,5 @@ func QuatRot(t *testing.T) {
 
 // For floating point comparisons
 func equal(a, b float32) bool {
-	return math.Abs(float64(a) - float64(b)) <= 0.05
+	return math.Abs(float64(a)-float64(b)) <= 0.05
 }

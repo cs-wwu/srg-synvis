@@ -63,7 +63,7 @@ type ChunkInfo struct {
 	Status    ChunkStatus                // Current loading status
 	Priority  float32                    // For loading priority (higher = more important)
 	LastUsed  int64                      // Timestamp for LRU calculations
-	UserData  interface{}                // For terrain manager to store references
+	UserData  any                        // For terrain manager to store references
 
 	mu sync.RWMutex // For thread-safe updates to this chunk's properties
 }

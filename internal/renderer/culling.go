@@ -2,6 +2,7 @@ package renderer
 
 import (
 	lin "github.com/xlab/linmath"
+	"maps"
 )
 
 const (
@@ -106,9 +107,7 @@ func (tm *TerrainManager) updateVisibleChunks() {
 
 	// Store old visible chunks for comparison
 	oldVisibleChunks := make(map[string]bool, len(tm.visibleChunks))
-	for k, v := range tm.visibleChunks {
-		oldVisibleChunks[k] = v
-	}
+	maps.Copy(oldVisibleChunks, tm.visibleChunks)
 
 	// Clear the previous visible chunk map
 	for k := range tm.visibleChunks {

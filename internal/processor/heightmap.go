@@ -26,8 +26,8 @@ type ElevationPixels [length][length]uint16
 // Populate the elevations matrix with a data byte array
 func (elevations *Elevations) populate(data []byte) error {
 	reader := bytes.NewReader(data)
-	for i := 0; i < length; i++ {
-		for j := 0; j < length; j++ {
+	for i := range length {
+		for j := range length {
 			var value int16
 			err := binary.Read(reader, binary.BigEndian, &value)
 			if err != nil {
@@ -45,8 +45,8 @@ func (elevations *Elevations) populate(data []byte) error {
 //	e.g. -12345 will become 20424 since it is 20424 from -32768
 func (pixels *ElevationPixels) populate(elevations Elevations) error {
 	var minInt16 uint16 = uint16(math.Abs(math.MinInt16))
-	for i := 0; i < length; i++ {
-		for j := 0; j < length; j++ {
+	for i := range length {
+		for j := range length {
 			normalized := uint16(elevations[i][j]) + minInt16
 			pixels[i][j] = normalized
 		}
@@ -119,8 +119,8 @@ func HeightmapToPng(heightmapFilepath, pngFilepath string) error {
 
 	// Fill the grayImage with the normalized array (Pixels)
 	grayImage := image.NewGray16(image.Rect(0, 0, length, length))
-	for y := 0; y < length; y++ {
-		for x := 0; x < length; x++ {
+	for y := range length {
+		for x := range length {
 			grayValue := pixels[y][x]
 			grayImage.SetGray16(x, y, color.Gray16{Y: grayValue})
 		}

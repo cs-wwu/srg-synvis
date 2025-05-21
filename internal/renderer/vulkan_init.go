@@ -1009,7 +1009,7 @@ func loadTextureData(name string) ([]byte, int, int, int, error) {
 // copyTextureData copies texture data row by row, respecting the GPU's expected memory layout
 func copyTextureData(dst unsafe.Pointer, src []byte, width, height, sourceStride, destStride int) {
 	// For each row in the image
-	for row := 0; row < height; row++ {
+	for row := range height {
 		// Calculate source and destination row pointers
 		srcOffset := row * sourceStride
 		dstOffset := row * destStride

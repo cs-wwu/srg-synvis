@@ -578,7 +578,7 @@ func loadMap(filepath string) (image.Image, error) {
 	return rawImg, nil
 }
 
-func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data interface{}) {
+func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data any) {
 	var bufferData []byte
 	switch v := data.(type) {
 	case []Vertex:

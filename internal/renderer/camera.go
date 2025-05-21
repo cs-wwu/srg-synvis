@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cs-wwu/srg-synvis/internal/sensors"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
 	quat "github.com/ungerik/go3d/float64/quaternion"
 	"github.com/ungerik/go3d/float64/vec3"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
-	"github.com/cs-wwu/srg-synvis/internal/sensors"
 
 	lin "github.com/xlab/linmath"
 )
@@ -25,7 +25,7 @@ import (
 const (
 	HEIGHT_CONVERSION = 60.0 / 1852.0
 	FPS               = 60 // Frames per second
-	SPR               = 2 // Seconds per 360 degree rotation
+	SPR               = 2  // Seconds per 360 degree rotation
 )
 
 type Mode int
@@ -45,7 +45,7 @@ var (
 	Q_START_CAMERA_FRONT = vec3.T{0, 0, -1.0}
 	Q_START_CAMERA_RIGHT = vec3.Cross(&Q_START_CAMERA_UP, &Q_START_CAMERA_FRONT)
 	CAMERA_SPEED         = float32(10.0)
-	LOOK_SENSITIVITY     = float32((2 * math.Pi)/(SPR * FPS))
+	LOOK_SENSITIVITY     = float32((2 * math.Pi) / (SPR * FPS))
 )
 
 type Camera struct {
@@ -130,7 +130,7 @@ func (c *Camera) TryGps() error {
 	zdif := float32(0)
 
 	// Set up the TPV function that will run indefintely
-	tpvFilter := func(r interface{}) {
+	tpvFilter := func(r any) {
 		// Get gpsd data
 		report := r.(*gpsd.TPVReport)
 		log.Println("Location updated:", report.Lat, report.Lon, report.Alt)
@@ -206,7 +206,7 @@ func (c *Camera) TrySense(filename string) Mode {
 			md = ParseInput
 			continue
 		}
-		
+
 		c.Pitch = -c.Pitch
 
 		// Account for magnetic world deviation

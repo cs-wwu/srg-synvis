@@ -16,8 +16,8 @@ type Water [length][length]uint8
 // Fill the water array
 func (w *Water) populate(data []byte) error {
 	reader := bytes.NewReader(data)
-	for i := 0; i < length; i++ {
-		for j := 0; j < length; j++ {
+	for i := range length {
+		for j := range length {
 			var value uint8
 			err := binary.Read(reader, binary.BigEndian, &value)
 			if err != nil {
@@ -79,8 +79,8 @@ func WatermapToPng(waterFilepath, pngFilepath string) error {
 
 	// Fill the grayImage with the normalized array (Pixels)
 	grayImage := image.NewGray(image.Rect(0, 0, length, length))
-	for y := 0; y < length; y++ {
-		for x := 0; x < length; x++ {
+	for y := range length {
+		for x := range length {
 			grayValue := water[y][x]
 			grayImage.SetGray(x, y, color.Gray{Y: grayValue})
 		}

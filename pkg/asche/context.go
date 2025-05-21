@@ -74,7 +74,7 @@ func (c *context) preparePresent() {
 	c.imageAcquiredSemaphores = make([]vk.Semaphore, c.frameLag)
 	c.drawCompleteSemaphores = make([]vk.Semaphore, c.frameLag)
 	c.imageOwnershipSemaphores = make([]vk.Semaphore, c.frameLag)
-	for i := 0; i < c.frameLag; i++ {
+	for i := range c.frameLag {
 		ret := vk.CreateSemaphore(c.device, semaphoreCreateInfo, nil, &c.imageAcquiredSemaphores[i])
 		orPanic(NewError(ret))
 		ret = vk.CreateSemaphore(c.device, semaphoreCreateInfo, nil, &c.drawCompleteSemaphores[i])
@@ -95,14 +95,14 @@ func (c *context) destroy() {
 		return
 	}()
 
-	for i := 0; i < c.frameLag; i++ {
+	for i := range c.frameLag {
 		vk.DestroySemaphore(c.device, c.imageAcquiredSemaphores[i], nil)
 		vk.DestroySemaphore(c.device, c.drawCompleteSemaphores[i], nil)
 		if c.platform.HasSeparatePresentQueue() {
 			vk.DestroySemaphore(c.device, c.imageOwnershipSemaphores[i], nil)
 		}
 	}
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		c.swapchainImageResources[i].Destroy(c.device, c.cmdPool)
 	}
 	c.swapchainImageResources = nil
@@ -195,7 +195,7 @@ func (c *context) prepare(needCleanup bool) {
 	})
 	orPanic(NewError(ret))
 
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		var cmd = make([]vk.CommandBuffer, 1)
 		vk.AllocateCommandBuffers(c.device, &vk.CommandBufferAllocateInfo{
 			SType:              vk.StructureTypeCommandBufferAllocateInfo,
@@ -216,7 +216,7 @@ func (c *context) prepare(needCleanup bool) {
 		orPanic(NewError(ret))
 		c.presentCmdPool = cmdPool
 
-		for i := 0; i < len(c.swapchainImageResources); i++ {
+		for i := range c.swapchainImageResources {
 			var cmd = make([]vk.CommandBuffer, 1)
 			ret = vk.AllocateCommandBuffers(c.device, &vk.CommandBufferAllocateInfo{
 				SType:              vk.StructureTypeCommandBufferAllocateInfo,
@@ -232,7 +232,7 @@ func (c *context) prepare(needCleanup bool) {
 		}
 	}
 
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		var view vk.ImageView
 		ret = vk.CreateImageView(c.device, &vk.ImageViewCreateInfo{
 			SType:  vk.StructureTypeImageViewCreateInfo,
@@ -361,7 +361,7 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 		vk.CompositeAlphaPostMultipliedBit,
 		vk.CompositeAlphaInheritBit,
 	}
-	for i := 0; i < len(compositeAlphaFlags); i++ {
+	for i := range compositeAlphaFlags {
 		alphaFlags := vk.CompositeAlphaFlags(compositeAlphaFlags[i])
 		flagSupported := surfaceCapabilities.SupportedCompositeAlpha&alphaFlags != 0
 		if flagSupported {
@@ -410,11 +410,11 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 	swapchainImages := make([]vk.Image, imageCount)
 	ret = vk.GetSwapchainImages(c.device, c.swapchain, &imageCount, swapchainImages)
 	orPanic(NewError(ret))
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		c.swapchainImageResources[i].Destroy(c.device, c.cmdPool)
 	}
 	c.swapchainImageResources = make([]*SwapchainImageResources, 0, imageCount)
-	for i := 0; i < len(swapchainImages); i++ {
+	for i := range swapchainImages {
 		c.swapchainImageResources = append(c.swapchainImageResources, &SwapchainImageResources{
 			image: swapchainImages[i],
 		})

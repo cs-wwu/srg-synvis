@@ -123,7 +123,7 @@ func TestMathChunkPoolAllocatorThreadSafety(t *testing.T) {
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
 	N := 100
 	var wg sync.WaitGroup
-	for i := 0; i < N; i++ {
+	for i := range N {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -134,7 +134,7 @@ func TestMathChunkPoolAllocatorThreadSafety(t *testing.T) {
 	}
 	wg.Wait()
 	// All slots should be free
-	for i := 0; i < slotCounts[0]; i++ {
+	for i := range slotCounts[0] {
 		id := "chunk" + strconv.Itoa(i)
 		if alloc.FreeChunk(id, 0) {
 			t.Errorf("slot %d should already be free", i)

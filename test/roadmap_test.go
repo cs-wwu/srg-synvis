@@ -395,7 +395,7 @@ func TestDrawRoads(t *testing.T) {
 	// Connect all the points
 	for r := range roads {
 		road := roads[r]
-		for p := 0; p < len(road)-1; p++ {
+		for p := range len(road) - 1 {
 			p1 := road[p]
 			p2 := road[p+1]
 			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)

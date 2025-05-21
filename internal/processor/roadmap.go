@@ -135,7 +135,7 @@ func IsPointInPolygon(x, y float64, points []Point) bool {
 	inside := false
 	j := len(points) - 1
 
-	for i := 0; i < len(points); i++ {
+	for i := range points {
 		if ((points[i].Y > y) != (points[j].Y > y)) &&
 			(x < (points[j].X-points[i].X)*(y-points[i].Y)/(points[j].Y-points[i].Y)+points[i].X) {
 			inside = !inside
@@ -222,7 +222,7 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 	// Connect all the points
 	for r := range roads {
 		road := roads[r]
-		for p := 0; p < len(road)-1; p++ {
+		for p := range len(road) - 1 {
 			p1 := road[p]
 			p2 := road[p+1]
 			DrawLine(p1, p2, widths[roadType], grayImage, color.Opaque)
@@ -233,35 +233,35 @@ func DrawRoads(ways []Element, nodes map[int64]Element, coords []int, grayImage 
 // ParseHeightmapToCoords converts a heightmap string (e.g., "n48w123")
 // to a coordinate pair [lat, lon]
 func ParseHeightmapToCoords(heightmap string) ([]int, error) {
-    // Check if the string format is valid
-    if len(heightmap) != 7 {
-        return nil, fmt.Errorf("invalid heightmap format: %s", heightmap)
-    }
-    
-    // Extract direction characters and numeric values
-    latDir := heightmap[0]
-    lonDir := heightmap[3]
-    
-    lat, err := strconv.Atoi(heightmap[1:3])
-    if err != nil {
-        return nil, fmt.Errorf("failed to parse latitude: %w", err)
-    }
-    
-    lon, err := strconv.Atoi(heightmap[4:7])
-    if err != nil {
-        return nil, fmt.Errorf("failed to parse longitude: %w", err)
-    }
-    
-    // Apply the correct sign based on direction
-    if latDir == 's' {
-        lat = -lat
-    }
-    
-    if lonDir == 'w' {
-        lon = -lon
-    }
-    
-    return []int{lat, lon}, nil
+	// Check if the string format is valid
+	if len(heightmap) != 7 {
+		return nil, fmt.Errorf("invalid heightmap format: %s", heightmap)
+	}
+
+	// Extract direction characters and numeric values
+	latDir := heightmap[0]
+	lonDir := heightmap[3]
+
+	lat, err := strconv.Atoi(heightmap[1:3])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse latitude: %w", err)
+	}
+
+	lon, err := strconv.Atoi(heightmap[4:7])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse longitude: %w", err)
+	}
+
+	// Apply the correct sign based on direction
+	if latDir == 's' {
+		lat = -lat
+	}
+
+	if lonDir == 'w' {
+		lon = -lon
+	}
+
+	return []int{lat, lon}, nil
 }
 
 func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error {
@@ -269,16 +269,16 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 		return fmt.Errorf("no maps or targetDir specified")
 	}
 
-    maps := make([][]int, 0, len(heightmaps))
-    for _, heightmap := range heightmaps {
-        // Convert the heightmap string to a coordinate pair
-        coords, err := ParseHeightmapToCoords(heightmap)
-        if err != nil {
-            log.Printf("Warning: skipping invalid heightmap %s: %v", heightmap, err)
-            continue
-        }
-        maps = append(maps, coords)
-    }
+	maps := make([][]int, 0, len(heightmaps))
+	for _, heightmap := range heightmaps {
+		// Convert the heightmap string to a coordinate pair
+		coords, err := ParseHeightmapToCoords(heightmap)
+		if err != nil {
+			log.Printf("Warning: skipping invalid heightmap %s: %v", heightmap, err)
+			continue
+		}
+		maps = append(maps, coords)
+	}
 
 	for i := range maps {
 		osmData, err := MakeApiRequest(apiURL, maps[i])

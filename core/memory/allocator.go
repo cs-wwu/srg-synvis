@@ -389,7 +389,7 @@ func (a *FixedChunkPoolAllocator) VisualizeMemoryMap() string {
 		// Display a sample of the memory allocation (up to 120 slots)
 		displayLimit := min(bucket.slotCount, 120)
 
-		for j := 0; j < displayLimit; j++ {
+		for j := range displayLimit {
 			if bucket.bitset.IsSet(j) {
 				sb.WriteString("A")
 			} else {

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cs-wwu/srg-synvis/internal/renderer"
 	"github.com/cs-wwu/srg-synvis/internal/models"
+	"github.com/cs-wwu/srg-synvis/internal/renderer"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche" // local asche copy
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -255,7 +255,7 @@ func main() {
 	runMainLoop(app, window, platform, frameDelay)
 }
 
-func orPanic(err interface{}) {
+func orPanic(err any) {
 	switch v := err.(type) {
 	case error:
 		if v != nil {
