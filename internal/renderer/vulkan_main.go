@@ -167,8 +167,6 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	})
 	OrPanic(as.NewError(ret))
 
-	app.TerrainManager.SwapBuffers()
-
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
 	clearValues[0].SetColor([]float32{0.0, 0.0, 0.0, 1.0}) // Black background as fallback
