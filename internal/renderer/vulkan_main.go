@@ -108,7 +108,6 @@ func (app *Application) VulkanContextCleanup() error {
 
 func (app *Application) NextFrame() {
 	// Get visible chunks count thread-safely
-	app.fpsCounter.Update(app.TerrainManager.GetVisibleChunks())
 	app.frameCount++
 
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))

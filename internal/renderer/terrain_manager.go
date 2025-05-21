@@ -83,9 +83,7 @@ type TerrainManager struct {
 
 	heightmaps    map[string]*image.Gray16
 	watermaps     map[string]*image.Gray
-	textures      map[string]*Texture
 	chunks        map[string]*Chunk
-	visibleChunks map[string]bool
 	orderedChunks []*Chunk
 
 	viewMatrix *lin.Mat4x4
@@ -107,9 +105,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		lastPosition:  lin.Vec3{0.0, 0.0, 0.0},
 		heightmaps:    make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:     make(map[string]*image.Gray, MAX_IMAGE_MAPS),
-		textures:      make(map[string]*Texture, MAX_IMAGE_MAPS),
 		chunks:        make(map[string]*Chunk),
-		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
 		viewMatrix:    &lin.Mat4x4{},
 		projMatrix:    &lin.Mat4x4{},
@@ -130,11 +126,6 @@ func (tm *TerrainManager) ClearChunks() {
 
 	// Clear the ordered chunks slice
 	tm.orderedChunks = tm.orderedChunks[:0]
-
-	// Clear the visible chunks map
-	for k := range tm.visibleChunks {
-		delete(tm.visibleChunks, k)
-	}
 }
 
 func (tm *TerrainManager) LoadMultipleMaps(coords []string) error {
@@ -488,28 +479,10 @@ func (tm *TerrainManager) LoadHeightmap(coord string) error {
 	return nil
 }
 
-// Loads a texture (coord.osm.png) into the TerrainManager
-// func (tm *TerrainManager) LoadTexture(coord string) error {
-// 	filepath := MAPS_PATH + coord + TEXTURE_EXTENSION
-// 	_, err := loadMap(filepath) // TODO: replace "_" with rawImg
-// 	if err != nil {
-// 		return fmt.Errorf("failed to load file: %w", err)
-// 	}
-// 	// Load and store the texture
-// 	// TODO load the texture into Vulkan with rawImg
-// 	// placeholder
-// 	texture := &Texture{}
-
-// 	// Store that texture in a usable state in the texture map
-// 	tm.textures[coord] = texture
-// 	return nil
-// }
-
 // Unloads both the water and heightmaps
 func (tm *TerrainManager) UnloadMaps(coord string) {
 	tm.unloadWatermap(coord)
 	tm.unloadHeightmap(coord)
-	tm.unloadTexture(coord)
 	tm.unloadChunks(coord)
 }
 
@@ -521,11 +494,6 @@ func (tm *TerrainManager) unloadWatermap(coord string) {
 // Unloads a heightmap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadHeightmap(coord string) {
 	delete(tm.heightmaps, coord)
-}
-
-// Unloads a texture (coord) from the TerrainManager
-func (tm *TerrainManager) unloadTexture(coord string) {
-	delete(tm.textures, coord) // TODO, problably will need to remove Vulkan stuff
 }
 
 func (tm *TerrainManager) unloadChunks(coord string) {
@@ -662,11 +630,4 @@ func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
 	tm.chunkMutex.RLock()
 	defer tm.chunkMutex.RUnlock()
 	return tm.activeVertexBuffer, tm.activeIndexBuffer
-}
-
-// Returns the visible chunks with thread-safety
-func (tm *TerrainManager) GetVisibleChunks() int {
-	tm.chunkMutex.RLock()
-	defer tm.chunkMutex.RUnlock()
-	return len(tm.visibleChunks)
 }
