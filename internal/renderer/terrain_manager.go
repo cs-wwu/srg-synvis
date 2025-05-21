@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -33,7 +34,7 @@ const (
 )
 
 var firstRun = true
-var LODBucketPercentages = []float32{0.25, 0.25, 0.25, 0.25}
+var LODBucketPercentages = []float32{0.3, 0.25, 0.25, 0.2}
 
 // A single TerrainManager to manage load/unloading images and chunks
 type TerrainManager struct {
@@ -49,6 +50,7 @@ type TerrainManager struct {
 	orderedChunks []*Chunk
 
 	bucketAllocator *memory.BucketAllocator
+	terrainGrid     *spatial.TerrainGrid
 
 	shutdown chan struct{}
 }
@@ -99,10 +101,13 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 	fmt.Printf("LOD Bucket Percentages: %v\n", LODBucketPercentages)
 	bucketAllocator := memory.NewBucketAllocator(device, memProps, LODBucketPercentages, lodChunkSizes)
 
+	terrainGrid := spatial.NewTerrainGrid(CHUNK_SIZE, nil)
+
 	tm := &TerrainManager{
 		device:          device,
 		memProps:        memProps,
-		bucketAllocator: bucketAllocator, // Assign the initialized allocator
+		bucketAllocator: bucketAllocator,
+		terrainGrid:     terrainGrid,
 		lastPosition:    lin.Vec3{0.0, 0.0, 0.0},
 		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
@@ -203,9 +208,6 @@ func (tm *TerrainManager) GenerateTestLine() {
 
 		// Load the chunk with the forced LOD level
 		tm.LoadTestChunk(chunkX, chunkZ, LODLevel(forcedLODLevel), chunkKey, mapCoords)
-
-		log.Printf("Created test chunk %d at (%d, %d) with LOD %d",
-			i, chunkX, chunkZ, forcedLODLevel)
 	}
 
 	log.Printf("Finished generating test line with %d chunks", len(tm.chunks))
