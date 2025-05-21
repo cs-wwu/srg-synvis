@@ -10,8 +10,6 @@ import (
 	"math"
 	"os"
 	"sort"
-	"sync"
-	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -64,9 +62,6 @@ type TerrainManager struct {
 	activeVertices []Vertex
 	activeIndices  []Index
 
-	updated    atomic.Bool
-	chunkMutex sync.RWMutex
-
 	activeVertexBuffer vk.Buffer
 	activeIndexBuffer  vk.Buffer
 
@@ -85,9 +80,7 @@ type TerrainManager struct {
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
-	tm.chunkMutex.Lock()
 	tm.lastPosition = pos
-	tm.chunkMutex.Unlock()
 }
 
 func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
@@ -119,14 +112,7 @@ func (tm *TerrainManager) ClearChunks() {
 }
 
 // LoadMap loads a heightmap and its associated watermap
-func (tm *TerrainManager) LoadMap(coord string, clearExisting bool) error {
-	tm.chunkMutex.Lock()
-	defer tm.chunkMutex.Unlock()
-
-	if clearExisting {
-		tm.ClearChunks()
-	}
-
+func (tm *TerrainManager) LoadMap(coord string) error {
 	// Skip heightmaps if already loaded
 	if _, exists := tm.heightmaps[coord]; !exists {
 		if err := tm.LoadHeightmap(coord); err != nil {
@@ -152,9 +138,6 @@ func (tm *TerrainManager) LoadMap(coord string, clearExisting bool) error {
 }
 
 func (tm *TerrainManager) HasCrossedUpdateThreshold(new lin.Vec3) bool {
-	tm.chunkMutex.RLock()
-	defer tm.chunkMutex.RUnlock()
-
 	dx := math.Abs(float64(new[0] - tm.lastUpdatePos[0]))
 	dy := math.Abs(float64(new[1] - tm.lastUpdatePos[1]))
 	dz := math.Abs(float64(new[2] - tm.lastUpdatePos[2]))
@@ -236,7 +219,7 @@ func (tm *TerrainManager) checkForUpdates() {
 
 		// Load new maps if needed
 		log.Printf("Loading %s new maps", thisMap)
-		tm.LoadMap(thisMap, true)
+		tm.LoadMap(thisMap)
 
 		// Update LODs for all chunks
 		for _, chunk := range tm.chunks {
@@ -249,7 +232,6 @@ func (tm *TerrainManager) checkForUpdates() {
 
 		// Update buffers and mark as updated
 		tm.FillActiveBuffers()
-		tm.updated.Store(true)
 		tm.lastUpdatePos = tm.lastPosition
 		firstRun = false
 	}
@@ -391,7 +373,6 @@ func (tm *TerrainManager) LoadHeightmap(coord string) error {
 func (tm *TerrainManager) UnloadMaps(coord string) {
 	tm.unloadWatermap(coord)
 	tm.unloadHeightmap(coord)
-	tm.unloadChunks(coord)
 }
 
 // Unloads a watermap (coord) from the TerrainManager
@@ -402,32 +383,6 @@ func (tm *TerrainManager) unloadWatermap(coord string) {
 // Unloads a heightmap (coord) from the TerrainManager
 func (tm *TerrainManager) unloadHeightmap(coord string) {
 	delete(tm.heightmaps, coord)
-}
-
-func (tm *TerrainManager) unloadChunks(coord string) {
-	// Get map boundaries
-	mapX, mapZ := CoordinateMapToInt(coord)
-	mapEndX, mapEndZ := mapX+MAP_LENGTH, mapZ+MAP_LENGTH
-
-	// Remove chunks within this map's boundaries
-	chunksToRemove := []string{}
-	for chunkKey, chunk := range tm.chunks {
-		if chunk.X >= mapX && chunk.X < mapEndX &&
-			chunk.Z >= mapZ && chunk.Z < mapEndZ {
-			chunksToRemove = append(chunksToRemove, chunkKey)
-		}
-	}
-
-	// Delete chunks and rebuild orderedChunks
-	for _, key := range chunksToRemove {
-		delete(tm.chunks, key)
-	}
-
-	// Rebuild ordered chunks
-	tm.orderedChunks = tm.orderedChunks[:0]
-	for _, chunk := range tm.chunks {
-		tm.orderedChunks = append(tm.orderedChunks, chunk)
-	}
 }
 
 func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data any) {
@@ -467,14 +422,10 @@ func (tm *TerrainManager) Destroy() {
 
 // Returns active indicies with thread-safety
 func (tm *TerrainManager) getActiveIndices() uint32 {
-	tm.chunkMutex.RLock()
-	defer tm.chunkMutex.RUnlock()
 	return uint32(len(tm.activeIndices))
 }
 
 // GetActiveBuffers returns the currently active vertex and index buffers
 func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
-	tm.chunkMutex.RLock()
-	defer tm.chunkMutex.RUnlock()
 	return tm.activeVertexBuffer, tm.activeIndexBuffer
 }
