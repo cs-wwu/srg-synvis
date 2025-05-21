@@ -75,7 +75,7 @@ func NewFixedChunkPoolAllocator(device vk.Device, memProps vk.PhysicalDeviceMemo
 		// Create buffer and allocate memory
 		buffer, memory := createBufferAndMemory(device, memProps, bucketSize)
 
-		// Initialize free list and bitset
+		// Initialize slot stack and bitset
 		freeList := NewFreeList(slotCount)
 		bitset := NewBitset(slotCount)
 
@@ -161,7 +161,7 @@ func (a *FixedChunkPoolAllocator) FreeChunk(chunkID string, lodLevel int) bool {
 	// Mark slot as free
 	bucket.bitset.Set(slotIndex, 0)
 
-	// Add slot back to free list
+	// Add slot back to slot stack
 	bucket.slotStack.Push(slotIndex)
 
 	// Remove from active allocations
@@ -416,8 +416,8 @@ func (a *FixedChunkPoolAllocator) VisualizeMemoryMap() string {
 	return sb.String()
 }
 
-// DeferredFreeList tracks chunks to be deallocated in batch.
-type DeferredFreeList struct {
+// DefferedSlotStack tracks chunks to be deallocated in batch.
+type DefferedSlotStack struct {
 	chunks []struct {
 		chunkID  string
 		lodLevel int
@@ -425,9 +425,9 @@ type DeferredFreeList struct {
 	mu sync.Mutex
 }
 
-// NewDeferredFreeList creates a new deferred free list.
-func NewDeferredFreeList() *DeferredFreeList {
-	return &DeferredFreeList{
+// NewDefferedSlotStack creates a new deferred slot stack.
+func NewDefferedSlotStack() *DefferedSlotStack {
+	return &DefferedSlotStack{
 		chunks: make([]struct {
 			chunkID  string
 			lodLevel int
@@ -435,8 +435,8 @@ func NewDeferredFreeList() *DeferredFreeList {
 	}
 }
 
-// Add adds a chunk to the deferred free list.
-func (d *DeferredFreeList) Add(chunkID string, lodLevel int) {
+// Add adds a chunk to the deferred slot stack.
+func (d *DefferedSlotStack) Add(chunkID string, lodLevel int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -446,8 +446,8 @@ func (d *DeferredFreeList) Add(chunkID string, lodLevel int) {
 	}{chunkID, lodLevel})
 }
 
-// ProcessAll frees all chunks in the deferred free list.
-func (d *DeferredFreeList) ProcessAll(allocator *FixedChunkPoolAllocator) int {
+// ProcessAll frees all chunks in the deferred slot stack.
+func (d *DefferedSlotStack) ProcessAll(allocator *FixedChunkPoolAllocator) int {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -462,8 +462,8 @@ func (d *DeferredFreeList) ProcessAll(allocator *FixedChunkPoolAllocator) int {
 	return count
 }
 
-// Count returns the number of chunks in the deferred free list.
-func (d *DeferredFreeList) Count() int {
+// Count returns the number of chunks in the deferred slot stack.
+func (d *DefferedSlotStack) Count() int {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
