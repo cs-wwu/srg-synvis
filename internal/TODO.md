@@ -34,15 +34,15 @@ implement the dynamic texture swapping.
   - [ ] Separate inputs into separate files
   - [ ] More distinctly define "Debug" mode vs "Prod" mode
 
-# Terrain System Implementation Plan
+## Terrain System Implementation Plan
 
-## Overview
+### Overview
 
 This plan details how to implement a terrain memory management and rendering system using a Grid-based spatial system with a Bucket-based memory allocator. The architecture is designed to efficiently manage terrain chunks, support LOD transitions, enable chunk stitching, and optimize ocean rendering.
 
-## 1. Core Memory System
+### 1. Core Memory System
 
-### Memory Allocator
+#### Memory Allocator
 
 **Internal Workings:**
 
@@ -58,7 +58,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Request memory allocations
 - Release memory when no longer needed
 
-### Bucket Allocator
+#### Bucket Allocator
 
 **Internal Workings:**
 
@@ -75,7 +75,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Allocation returns offset into the appropriate bucket's memory
 - Track allocations by chunk ID for later reference
 
-### Memory Pools
+#### Memory Pools
 
 **Internal Workings:**
 
@@ -90,7 +90,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Provides raw memory access for uploading chunk data
 - Exposes buffer handles for rendering commands
 
-### Memory Manager
+#### Memory Manager
 
 **Internal Workings:**
 
@@ -107,7 +107,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Manage chunk transitions between LOD levels
 - Schedule evictions when memory is needed
 
-### Eviction Strategy
+#### Eviction Strategy
 
 **Internal Workings:**
 
@@ -122,9 +122,9 @@ This plan details how to implement a terrain memory management and rendering sys
 - Returns chunks that can be safely evicted
 - Updates chunk state when eviction occurs
 
-## 2. Spatial Management System
+### 2. Spatial Management System
 
-### Grid System
+#### Grid System
 
 **Internal Workings:**
 
@@ -140,7 +140,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Get chunks within a radius of a position
 - Iterate over all tracked chunks
 
-### Cell Lookup
+#### Cell Lookup
 
 **Internal Workings:**
 
@@ -155,7 +155,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Retrieve cell contents by key
 - Iterate over cells in a region
 
-### Neighbor Search
+#### Neighbor Search
 
 **Internal Workings:**
 
@@ -170,7 +170,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Get specific neighbor in a direction
 - Check if chunks are adjacent
 
-### Chunk Tracker
+#### Chunk Tracker
 
 **Internal Workings:**
 
@@ -186,7 +186,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Query chunks by various criteria
 - Check if specific chunks exist
 
-### Priority Calculator
+#### Priority Calculator
 
 **Internal Workings:**
 
@@ -201,9 +201,9 @@ This plan details how to implement a terrain memory management and rendering sys
 - Sort chunks by priority
 - Get top N priority chunks
 
-## 3. Rendering System
+### 3. Rendering System
 
-### Terrain Manager
+#### Terrain Manager
 
 **Internal Workings:**
 
@@ -220,7 +220,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Call Render() to draw the terrain
 - Access statistics and debug information
 
-### Chunk Renderer
+#### Chunk Renderer
 
 **Internal Workings:**
 
@@ -237,7 +237,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Generate draw commands for visible chunks
 - Apply rendering effects
 
-### Ocean Renderer
+#### Ocean Renderer
 
 **Internal Workings:**
 
@@ -252,7 +252,7 @@ This plan details how to implement a terrain memory management and rendering sys
 - Update ocean parameters (waves, color, etc.)
 - Generate draw commands for visible ocean areas
 
-### Stitching Helper
+#### Stitching Helper
 
 **Internal Workings:**
 
@@ -267,9 +267,9 @@ This plan details how to implement a terrain memory management and rendering sys
 - Apply stitching technique to chunk edges
 - Update stitching when LOD levels change
 
-## Implementation Sequence
+### Implementation Sequence
 
-### Phase 1: Core Memory System
+#### Phase 1: Core Memory System
 
 1. Implement Memory Allocator interface
 2. Build Bucket Allocator with percentage-based allocation
@@ -277,7 +277,7 @@ This plan details how to implement a terrain memory management and rendering sys
 4. Implement basic Memory Manager
 5. Add simple Eviction Strategy
 
-### Phase 2: Spatial Management System
+#### Phase 2: Spatial Management System
 
 1. Implement Grid System with cell-based storage
 2. Build Cell Lookup for efficient spatial queries
@@ -285,7 +285,7 @@ This plan details how to implement a terrain memory management and rendering sys
 4. Create Chunk Tracker to manage chunk states
 5. Implement Priority Calculator for chunk importance
 
-### Phase 3: Basic Rendering Integration
+#### Phase 3: Basic Rendering Integration
 
 1. Create simplified Terrain Manager
 2. Implement basic Chunk Renderer
@@ -293,16 +293,10 @@ This plan details how to implement a terrain memory management and rendering sys
 4. Add minimal ocean rendering
 5. Test basic functionality
 
-### Phase 4: Advanced Features
+#### Phase 4: Advanced Features
 
 1. Implement Stitching Helper
 2. Enhance Ocean Renderer with instancing
 3. Add multi-threaded chunk processing
 4. Implement advanced eviction strategies
 5. Optimize for performance
-
-## Usage Examples
-
-### Initializing the System
-
-1
