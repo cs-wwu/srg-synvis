@@ -88,7 +88,6 @@ type TerrainManager struct {
 	visibleChunks map[string]bool
 	orderedChunks []*Chunk
 
-	frustum    *Frustum
 	viewMatrix *lin.Mat4x4
 	projMatrix *lin.Mat4x4
 
@@ -112,7 +111,6 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		chunks:        make(map[string]*Chunk),
 		visibleChunks: make(map[string]bool),
 		orderedChunks: make([]*Chunk, 0),
-		frustum:       &Frustum{},
 		viewMatrix:    &lin.Mat4x4{},
 		projMatrix:    &lin.Mat4x4{},
 		shutdown:      make(chan struct{}),
