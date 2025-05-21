@@ -8,14 +8,9 @@ import (
 	"image/png"
 	"log"
 	"os"
-	"sort"
 	"time"
-	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
-
-	// as "github.com/vulkan-go/asche"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -30,26 +25,11 @@ const (
 
 	MAX_IMAGE_MAPS = 1
 
-	TICKER_SPEED = time.Second / 30 // x times per second
+	TICKER_SPEED = time.Second / 60 // x times per second
 
 	MAP_LENGTH      = 3600
 	CHUNKS_PER_SIDE = 20
-	CHUNKS_PER_MAP  = CHUNKS_PER_SIDE * CHUNKS_PER_SIDE
 	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
-
-	WORLD_WIDTH  = 360 * int(ARC_DEGREES_TO_SECONDS)
-	WORLD_HEIGHT = 180 * int(ARC_DEGREES_TO_SECONDS)
-
-	VERTICES_PER_CHUNK = (CHUNK_SIZE + 1) * (CHUNK_SIZE + 1)
-	INDICES_PER_CHUNK  = 2*CHUNK_SIZE*(CHUNK_SIZE-1) + 2*((CHUNK_SIZE-1)-1)
-
-	MAX_VERTICES = VERTICES_PER_CHUNK * CHUNKS_PER_MAP
-	MAX_INDICES  = INDICES_PER_CHUNK * CHUNKS_PER_MAP
-
-	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
-
-	LOD_LEVELS             = 3
-	LOD_DISTANCE_THRESHOLD = CHUNK_SIZE * 2
 )
 
 var firstRun = true
@@ -59,15 +39,6 @@ var LODBucketPercentages = []float32{0.25, 0.25, 0.25, 0.25}
 type TerrainManager struct {
 	device   *vk.Device
 	memProps *vk.PhysicalDeviceMemoryProperties
-
-	activeVertices []Vertex
-	activeIndices  []Index
-
-	activeVertexBuffer vk.Buffer
-	activeIndexBuffer  vk.Buffer
-
-	activeIndexMemory  vk.DeviceMemory
-	activeVertexMemory vk.DeviceMemory
 
 	lastPosition  lin.Vec3
 	lastUpdatePos lin.Vec3
@@ -140,7 +111,6 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		shutdown:        make(chan struct{}),
 	}
 
-	tm.InitBuffers()
 	go tm.updateLoop()
 	return tm
 }
@@ -170,51 +140,8 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 		}
 	}
 
-	// Generate chunks for this map
-	mapX, mapZ := CoordinateMapToInt(coord)
-	chunkX := mapX + CHUNK_SIZE*(CHUNKS_PER_SIDE/2)
-	chunkZ := mapZ + CHUNK_SIZE*(CHUNKS_PER_SIDE/2)
-	tm.LoadChunk(chunkX, chunkZ) // Load a single chunk
-
 	log.Printf("Loaded map: %s", coord)
 	return nil
-}
-
-func (tm *TerrainManager) FillActiveBuffers() {
-	// Clear pending data
-	tm.activeVertices = tm.activeVertices[:0]
-	tm.activeIndices = tm.activeIndices[:0]
-
-	sort.Slice(tm.orderedChunks, func(i, j int) bool {
-		if tm.orderedChunks[i].Z != tm.orderedChunks[j].Z {
-			return tm.orderedChunks[i].Z < tm.orderedChunks[j].Z
-		}
-		return tm.orderedChunks[i].X < tm.orderedChunks[j].X
-	})
-
-	// Collect vertices and indices
-	vertexOffset := Index(0)
-	for i, chunk := range tm.orderedChunks {
-		// Add vertices
-		tm.activeVertices = append(tm.activeVertices, chunk.vertices...)
-
-		// If this isn't the first chunk, add a primitive restart index
-		if i > 0 {
-			tm.activeIndices = append(tm.activeIndices, 0xFFFFFFFF) // Primitive restart index
-		}
-
-		// Add indices with offset
-		for _, idx := range chunk.indices {
-			newIndex := idx + Index(vertexOffset)
-			tm.activeIndices = append(tm.activeIndices, newIndex)
-		}
-
-		vertexOffset += Index(len(chunk.vertices))
-	}
-
-	// Update active buffers
-	tm.updateBuffer(tm.activeVertexMemory, tm.activeVertices)
-	tm.updateBuffer(tm.activeIndexMemory, tm.activeIndices)
 }
 
 func (tm *TerrainManager) GenerateTestLine() {
@@ -399,21 +326,6 @@ func (tm *TerrainManager) updateLoop() {
 
 }
 
-// Intializes the ChunkManager buffers
-func (tm *TerrainManager) InitBuffers() {
-	// Vertex buffers
-	vertexData := make([]byte, MAX_VERTICES*VertexSize)
-	activeVertexBuf := as.CreateBuffer(*tm.device, *tm.memProps, vertexData, BufferUsageVertexBufferBit)
-	tm.activeVertexBuffer = activeVertexBuf.Buffer
-	tm.activeVertexMemory = activeVertexBuf.Memory
-
-	// Index buffers
-	indexData := make([]byte, MAX_INDICES*IndexSize) // uint32 = 4 bytes
-	activeIndexBuf := as.CreateBuffer(*tm.device, *tm.memProps, indexData, BufferUsageIndexBufferBit)
-	tm.activeIndexBuffer = activeIndexBuf.Buffer
-	tm.activeIndexMemory = activeIndexBuf.Memory
-}
-
 // generateOceanHeightmap creates a flat heightmap (all water)
 func (tm *TerrainManager) generateOceanHeightmap() *image.Gray16 {
 	// Create a new Gray16 image with the correct dimensions
@@ -531,39 +443,10 @@ func (tm *TerrainManager) unloadHeightmap(coord string) {
 	delete(tm.heightmaps, coord)
 }
 
-func (tm *TerrainManager) updateBuffer(memory vk.DeviceMemory, data any) {
-	var bufferData []byte
-	switch v := data.(type) {
-	case []Vertex:
-		bufferData = make([]byte, len(v)*VertexSize)
-		for i, vertex := range v {
-			copy(bufferData[i*VertexSize:], vertex.Data())
-		}
-	case []Index:
-		bufferData = make([]byte, len(v)*4)
-		for i, index := range v {
-			binary.LittleEndian.PutUint32(bufferData[i*4:], uint32(index))
-		}
-	default:
-		log.Printf("Warning: Unknown buffer data type")
-		return
-	}
-
-	var pData unsafe.Pointer
-	vk.MapMemory(*tm.device, memory, 0, vk.DeviceSize(len(bufferData)), 0, &pData)
-	vk.Memcopy(pData, bufferData)
-	vk.UnmapMemory(*tm.device, memory)
-}
-
 func (tm *TerrainManager) Destroy() {
 	// Signal shutdown
 	close(tm.shutdown)
-
-	// Destroy buffers
-	vk.DestroyBuffer(*tm.device, tm.activeVertexBuffer, nil)
-	vk.DestroyBuffer(*tm.device, tm.activeIndexBuffer, nil)
-	vk.FreeMemory(*tm.device, tm.activeVertexMemory, nil)
-	vk.FreeMemory(*tm.device, tm.activeIndexMemory, nil)
+	tm.bucketAllocator.Destroy()
 }
 
 // RenderAllocatedChunks draws chunks directly from bucket allocator
@@ -606,14 +489,4 @@ func (tm *TerrainManager) RenderAllocatedChunks(cmdBuffer vk.CommandBuffer) {
 		// Draw indexed
 		vk.CmdDrawIndexed(cmdBuffer, uint32(len(chunk.indices)), 1, 0, 0, 0)
 	}
-}
-
-// Returns active indicies with thread-safety
-func (tm *TerrainManager) getActiveIndices() uint32 {
-	return uint32(len(tm.activeIndices))
-}
-
-// GetActiveBuffers returns the currently active vertex and index buffers
-func (tm *TerrainManager) GetActiveBuffers() (vk.Buffer, vk.Buffer) {
-	return tm.activeVertexBuffer, tm.activeIndexBuffer
 }

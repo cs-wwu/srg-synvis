@@ -10,6 +10,10 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
+const (
+	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
+)
+
 func ChunkKey(chunkX, chunkZ int) string {
 	return fmt.Sprintf("%d,%d", chunkX, chunkZ)
 }

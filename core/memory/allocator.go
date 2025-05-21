@@ -67,7 +67,7 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 	if totalMemory == 0 {
 		panic("No device-local heap found")
 	}
-	budget := vk.DeviceSize(float64(totalMemory) * 0.7) // 70% safety margin
+	budget := vk.DeviceSize(float64(totalMemory) * 0.5) // safety margin
 	fmt.Printf("Total device-local memory: %.1fMB\n", float32(totalMemory)/(1024*1024))
 	fmt.Printf("Allocated memory budget: %.1fMB\n", float32(budget)/(1024*1024))
 
@@ -216,8 +216,8 @@ func (a *BucketAllocator) Stats() AllocatorStats {
 }
 
 // Helper function to create buffer and allocate memory.
-// TODO: this function takes ~120ms per bucket
-// Refactor to using single buffer, and subdiving it into the buckets myself
+// TODO: this function takes ~120ms per bucket if needed,
+// refactor to using single buffer, and subdiving it into the buckets myself
 func createBufferAndMemory(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, size vk.DeviceSize) (vk.Buffer, vk.DeviceMemory) {
 	// Create buffer (no initial data, just reserve space)
 	var buffer vk.Buffer
@@ -236,7 +236,8 @@ func createBufferAndMemory(device *vk.Device, memProps *vk.PhysicalDeviceMemoryP
 	memReqs.Deref()
 
 	// Find suitable memory type
-	// TODO: Use a stagin buffer approach for performance if needed
+	// TODO: If performance is an issue, create a single staging buffer and
+	// use it for all allocations, then copy to the final buffer
 	memTypeIndex := findMemoryType(memProps, uint32(memReqs.MemoryTypeBits),
 		vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
 
