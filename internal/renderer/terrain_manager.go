@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"image/png"
 	"log"
-	"math"
 	"os"
 	"sort"
 	"time"
@@ -137,44 +136,6 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 	return nil
 }
 
-func (tm *TerrainManager) HasCrossedUpdateThreshold(new lin.Vec3) bool {
-	dx := math.Abs(float64(new[0] - tm.lastUpdatePos[0]))
-	dy := math.Abs(float64(new[1] - tm.lastUpdatePos[1]))
-	dz := math.Abs(float64(new[2] - tm.lastUpdatePos[2]))
-
-	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
-	return dist >= LOD_DISTANCE_THRESHOLD
-}
-
-func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3) LODLevel {
-	// Calculate chunk center position
-	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
-	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
-
-	// Calculate average height for chunk center (or use actual terrain height if available)
-	// For now, using camera Y directly since terrain height might be complex to calculate
-	chunkCenterY := float32(0.0) // This could be refined based on actual terrain height
-
-	// Calculate 3D distance
-	dx := chunkCenterX - cameraPos[0]
-	dy := chunkCenterY - cameraPos[1]
-	dz := chunkCenterZ - cameraPos[2]
-	dist3DSq := dx*dx + dy*dy + dz*dz
-
-	// Updated thresholds for 3D distance
-	// Square root of previous values to maintain similar visual transitions
-	switch {
-	case dist3DSq < 240_000: // ~490 units away (including height)
-		return LOD_0
-	case dist3DSq < 960_000: // ~980 units away
-		return LOD_1
-	case dist3DSq < 3_840_000: // ~1960 units away
-		return LOD_2
-	default:
-		return LOD_3
-	}
-}
-
 func (tm *TerrainManager) FillActiveBuffers() {
 	// Clear pending data
 	tm.activeVertices = tm.activeVertices[:0]
@@ -221,13 +182,8 @@ func (tm *TerrainManager) checkForUpdates() {
 		log.Printf("Loading %s new maps", thisMap)
 		tm.LoadMap(thisMap)
 
-		// Update LODs for all chunks
 		for _, chunk := range tm.chunks {
-			newLOD := tm.selectLODLevel(chunk.X, chunk.Z, tm.lastPosition)
-			if newLOD != chunk.lodLevel {
-				// LOD changed, reload the chunk
-				tm.LoadChunk(chunk.X, chunk.Z)
-			}
+			tm.LoadChunk(chunk.X, chunk.Z)
 		}
 
 		// Update buffers and mark as updated

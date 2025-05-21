@@ -174,30 +174,31 @@ func calculateChunkNormals(chunk *Chunk) {
 	chunk.vertices[lastIdx].Normal = chunk.vertices[lastIdx-1].Normal
 }
 
-func (chunk *Chunk) GetBoundingBox() (min, max lin.Vec3) {
-	if len(chunk.vertices) == 0 {
-		return lin.Vec3{}, lin.Vec3{}
+func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3) LODLevel {
+	// Calculate chunk center position
+	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
+	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
+
+	// Calculate average height for chunk center (or use actual terrain height if available)
+	// For now, using camera Y directly since terrain height might be complex to calculate
+	chunkCenterY := float32(0.0) // This could be refined based on actual terrain height
+
+	// Calculate 3D distance
+	dx := chunkCenterX - cameraPos[0]
+	dy := chunkCenterY - cameraPos[1]
+	dz := chunkCenterZ - cameraPos[2]
+	dist3DSq := dx*dx + dy*dy + dz*dz
+
+	// Updated thresholds for 3D distance
+	// Square root of previous values to maintain similar visual transitions
+	switch {
+	case dist3DSq < 240_000: // ~490 units away (including height)
+		return LOD_0
+	case dist3DSq < 960_000: // ~980 units away
+		return LOD_1
+	case dist3DSq < 3_840_000: // ~1960 units away
+		return LOD_2
+	default:
+		return LOD_3
 	}
-
-	min = lin.Vec3{
-		float32(chunk.X),
-		chunk.vertices[0].Position[1],
-		float32(chunk.Z),
-	}
-	max = min
-
-	for _, vertex := range chunk.vertices {
-		// Update Y bounds only (X and Z are determined by chunk boundaries)
-		if vertex.Position[1] < min[1] {
-			min[1] = vertex.Position[1]
-		}
-		if vertex.Position[1] > max[1] {
-			max[1] = vertex.Position[1]
-		}
-	}
-
-	max[0] = float32(chunk.X + CHUNK_SIZE)
-	max[2] = float32(chunk.Z + CHUNK_SIZE)
-
-	return min, max
 }
