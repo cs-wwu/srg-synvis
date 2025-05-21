@@ -10,6 +10,7 @@ import (
 
 type MathChunkPoolAllocator struct {
 	buckets []mathPoolBucket
+	mu      sync.Mutex // Add mutex for thread safety
 }
 type mathPoolBucket struct {
 	slotCount   int
@@ -34,6 +35,8 @@ func NewMathChunkPoolAllocator(slotCounts []int, chunkSizes []uint64) *MathChunk
 }
 
 func (a *MathChunkPoolAllocator) AllocateChunk(chunkID string, chunkSize uint64, lodLevel int) (bool, uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
 		return false, 0
 	}
@@ -51,6 +54,8 @@ func (a *MathChunkPoolAllocator) AllocateChunk(chunkID string, chunkSize uint64,
 }
 
 func (a *MathChunkPoolAllocator) FreeChunk(chunkID string, lodLevel int) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if lodLevel < 0 || lodLevel >= len(a.buckets) {
 		return false
 	}
