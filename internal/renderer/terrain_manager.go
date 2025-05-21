@@ -147,12 +147,14 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 
 // Clears all chunks in the terrain manager (chunks in buffers are left)
 func (tm *TerrainManager) ClearChunks() {
-	// Clear the chunks map
-	for k := range tm.chunks {
-		delete(tm.chunks, k)
+	for key, chunk := range tm.chunks {
+		if chunk.allocated {
+			// Free bucket allocations
+			tm.bucketAllocator.FreeChunk(chunk.vertexBufferId, int(chunk.lodLevel))
+			tm.bucketAllocator.FreeChunk(chunk.indexBufferId, int(chunk.lodLevel))
+		}
+		delete(tm.chunks, key)
 	}
-
-	// Clear the ordered chunks slice
 	tm.orderedChunks = tm.orderedChunks[:0]
 }
 
@@ -170,13 +172,9 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 
 	// Generate chunks for this map
 	mapX, mapZ := CoordinateMapToInt(coord)
-	for x := range CHUNKS_PER_SIDE {
-		for z := range CHUNKS_PER_SIDE {
-			chunkX := mapX + x*CHUNK_SIZE
-			chunkZ := mapZ + z*CHUNK_SIZE
-			tm.LoadChunk(chunkX, chunkZ)
-		}
-	}
+	chunkX := mapX + CHUNK_SIZE*(CHUNKS_PER_SIDE/2)
+	chunkZ := mapZ + CHUNK_SIZE*(CHUNKS_PER_SIDE/2)
+	tm.LoadChunk(chunkX, chunkZ) // Load a single chunk
 
 	log.Printf("Loaded map: %s", coord)
 	return nil
@@ -420,6 +418,44 @@ func (tm *TerrainManager) Destroy() {
 	vk.DestroyBuffer(*tm.device, tm.activeIndexBuffer, nil)
 	vk.FreeMemory(*tm.device, tm.activeVertexMemory, nil)
 	vk.FreeMemory(*tm.device, tm.activeIndexMemory, nil)
+}
+
+// RenderAllocatedChunks draws chunks directly from bucket allocator
+func (tm *TerrainManager) RenderAllocatedChunks(cmdBuffer vk.CommandBuffer) {
+	for _, chunk := range tm.orderedChunks {
+		// Skip chunks that weren't allocated with the bucket allocator
+		if !chunk.allocated {
+			continue
+		}
+
+		// Get vertex buffer information
+		vertexInfo, err := tm.bucketAllocator.GetAllocationInfo(
+			chunk.vertexBufferId, int(chunk.lodLevel))
+		if err != nil {
+			log.Printf("Failed to get vertex allocation info: %v", err)
+			continue
+		}
+
+		// Get index buffer information
+		indexInfo, err := tm.bucketAllocator.GetAllocationInfo(
+			chunk.indexBufferId, int(chunk.lodLevel))
+		if err != nil {
+			log.Printf("Failed to get index allocation info: %v", err)
+			continue
+		}
+
+		// Bind vertex buffer
+		vk.CmdBindVertexBuffers(cmdBuffer, 0, 1,
+			[]vk.Buffer{vertexInfo.Buffer},
+			[]vk.DeviceSize{vertexInfo.Offset})
+
+		// Bind index buffer
+		vk.CmdBindIndexBuffer(cmdBuffer, indexInfo.Buffer,
+			indexInfo.Offset, vk.IndexTypeUint32)
+
+		// Draw indexed
+		vk.CmdDrawIndexed(cmdBuffer, uint32(len(chunk.indices)), 1, 0, 0, 0)
+	}
 }
 
 // Returns active indicies with thread-safety

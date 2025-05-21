@@ -1,10 +1,12 @@
 package renderer
 
 import (
+	"encoding/binary"
 	"fmt"
 	"image"
 	"log"
 
+	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
@@ -27,6 +29,12 @@ type Chunk struct {
 	X        int // Global X Position of the top-left chunk corner
 	Z        int // Global Z Position of the top-left chunk corner
 	lodLevel LODLevel
+
+	allocated      bool
+	vertexOffset   vk.DeviceSize // Offset in buffer for vertices
+	indexOffset    vk.DeviceSize // Offset in buffer for indices
+	vertexBufferId string        // Buffer ID for vertices in allocator
+	indexBufferId  string        // Buffer ID for indices in allocator
 }
 
 // Loads a specific chunk into memory, x and z are the upper-left corner of
@@ -47,27 +55,89 @@ func (tm *TerrainManager) LoadChunk(chunkX, chunkZ int) {
 		return
 	}
 
-	lodlevel := tm.selectLODLevel(chunkX, chunkZ, tm.lastPosition)
+	lodLevel := tm.selectLODLevel(chunkX, chunkZ, tm.lastPosition)
 	chunkKey := ChunkKey(chunkX, chunkZ)
-	_, exists := tm.chunks[chunkKey]
+	existingChunk, exists := tm.chunks[chunkKey]
 
-	// Skip loading if it exists and the lodLevel's are the same
-	if exists && (lodlevel == tm.chunks[chunkKey].lodLevel) {
+	// Skip if already loaded with same LOD
+	if exists && existingChunk.lodLevel == lodLevel {
 		return
 	}
 
+	// Create new chunk
 	chunk := &Chunk{
 		X:        chunkX,
 		Z:        chunkZ,
-		lodLevel: lodlevel,
+		lodLevel: lodLevel,
 	}
 
+	// Calculate geometry
 	calculateChunkVertices(heightmap, watermap, chunk)
 	calculateChunkIndices(chunk)
 	calculateChunkNormals(chunk)
 
+	// Allocate vertex buffer
+	vertexId := fmt.Sprintf("%s_vertices", chunkKey)
+	vertexDataSize := vk.DeviceSize(len(chunk.vertices) * VertexSize)
+	success, vertexOffset := tm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, int(lodLevel))
+	if !success {
+		log.Printf("Failed to allocate vertex buffer for chunk %s", chunkKey)
+		return
+	}
+
+	// Allocate index buffer
+	indexId := fmt.Sprintf("%s_indices", chunkKey)
+	indexDataSize := vk.DeviceSize(len(chunk.indices) * IndexSize)
+	success, indexOffset := tm.bucketAllocator.AllocateChunk(indexId, indexDataSize, int(lodLevel))
+	if !success {
+		// Free the previously allocated vertex buffer
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
+		log.Printf("Failed to allocate index buffer for chunk %s", chunkKey)
+		return
+	}
+
+	// Prepare vertex data for upload
+	vertexData := make([]byte, len(chunk.vertices)*VertexSize)
+	for i, vertex := range chunk.vertices {
+		copy(vertexData[i*VertexSize:], vertex.Data())
+	}
+
+	// Prepare index data for upload
+	indexData := make([]byte, len(chunk.indices)*IndexSize)
+	for i, index := range chunk.indices {
+		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
+	}
+
+	// Upload vertex data
+	err := tm.bucketAllocator.Upload(vertexId, int(lodLevel), vertexData)
+	if err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
+		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
+		log.Printf("Failed to upload vertex data: %v", err)
+		return
+	}
+
+	// Upload index data
+	err = tm.bucketAllocator.Upload(indexId, int(lodLevel), indexData)
+	if err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
+		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
+		log.Printf("Failed to upload index data: %v", err)
+		return
+	}
+
+	// Update chunk with allocation information
+	chunk.allocated = true
+	chunk.vertexOffset = vertexOffset
+	chunk.indexOffset = indexOffset
+	chunk.vertexBufferId = vertexId
+	chunk.indexBufferId = indexId
+
+	// Store in terrain manager
 	tm.chunks[chunkKey] = chunk
 	tm.orderedChunks = append(tm.orderedChunks, chunk)
+
+	log.Printf("Loaded chunk %s using bucket allocator (LOD %d)", chunkKey, lodLevel)
 }
 
 // Calculate vertices and texcoords for a chunk

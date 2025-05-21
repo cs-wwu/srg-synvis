@@ -236,7 +236,9 @@ func createBufferAndMemory(device *vk.Device, memProps *vk.PhysicalDeviceMemoryP
 	memReqs.Deref()
 
 	// Find suitable memory type
-	memTypeIndex := findMemoryType(memProps, uint32(memReqs.MemoryTypeBits), vk.MemoryPropertyDeviceLocalBit)
+	// TODO: Use a stagin buffer approach for performance if needed
+	memTypeIndex := findMemoryType(memProps, uint32(memReqs.MemoryTypeBits),
+		vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit)
 
 	// Allocate memory
 	var memory vk.DeviceMemory
