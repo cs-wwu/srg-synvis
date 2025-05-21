@@ -231,7 +231,7 @@ func allocMemoryMapString(a *MathChunkPoolAllocator) string {
 	var sb strings.Builder
 	for i, bucket := range a.buckets {
 		sb.WriteString(fmt.Sprintf("Bucket %d: [", i))
-		for j := 0; j < bucket.slotCount; j++ {
+		for j := range bucket.slotCount {
 			if bucket.bitset.IsSet(j) {
 				sb.WriteString("A")
 			} else {
