@@ -217,23 +217,169 @@ func (tm *TerrainManager) FillActiveBuffers() {
 	tm.updateBuffer(tm.activeIndexMemory, tm.activeIndices)
 }
 
-func (tm *TerrainManager) checkForUpdates() {
-	if firstRun {
-		// Get current map and adjacent maps
-		thisMap := CoordinateIntToMap(int(tm.lastPosition[0]), int(tm.lastPosition[2]))
+func (tm *TerrainManager) GenerateTestLine() {
+	// Starting position based on the camera location
+	startX := int(tm.lastPosition[0])
+	startZ := int(tm.lastPosition[2])
 
-		// Load new maps if needed
-		log.Printf("Loading %s new maps", thisMap)
-		tm.LoadMap(thisMap)
+	// Clear any existing chunks
+	tm.ClearChunks()
 
-		for _, chunk := range tm.chunks {
-			tm.LoadChunk(chunk.X, chunk.Z)
+	// Get current map for heightmap/watermap access
+	baseMap := CoordinateIntToMap(startX, startZ)
+	if _, exists := tm.heightmaps[baseMap]; !exists {
+		// Load the base map if not already loaded
+		log.Printf("Loading base map: %s", baseMap)
+		if err := tm.LoadHeightmap(baseMap); err != nil {
+			log.Printf("Error loading heightmap: %v", err)
+			return
+		}
+		if err := tm.LoadWatermap(baseMap); err != nil {
+			log.Printf("Error loading watermap: %v", err)
+			return
+		}
+	}
+
+	// Generate a line of 20 chunks extending along Z axis
+	numChunks := 20
+	chunkSpacing := CHUNK_SIZE // Space chunks out to see them clearly
+
+	log.Printf("Generating test line of %d chunks starting at (%d, %d)", numChunks, startX, startZ)
+
+	// Create chunks at increasing distances
+	for i := range numChunks {
+		// Calculate position - create a line going away from camera
+		chunkX := startX
+		chunkZ := startZ + (i * chunkSpacing)
+
+		// Force different LOD levels for testing
+		forcedLODLevel := (i / 5) % 4 // 0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3
+
+		// Generate the chunk
+		mapCoords := CoordinateIntToMap(chunkX, chunkZ)
+		if _, exists := tm.heightmaps[mapCoords]; !exists {
+			// If we need a different map, load it
+			if err := tm.LoadHeightmap(mapCoords); err != nil {
+				log.Printf("Using base map for chunk %d: original map %s not found", i, mapCoords)
+				// Use base map instead
+				mapCoords = baseMap
+			} else {
+				// Also load the watermap
+				if err := tm.LoadWatermap(mapCoords); err != nil {
+					log.Printf("Error loading watermap: %v", err)
+				}
+			}
 		}
 
-		// Update buffers and mark as updated
-		tm.FillActiveBuffers()
+		// Create a unique key for this test chunk
+		chunkKey := fmt.Sprintf("test_chunk_%d", i)
+
+		// Load the chunk with the forced LOD level
+		tm.LoadTestChunk(chunkX, chunkZ, LODLevel(forcedLODLevel), chunkKey, mapCoords)
+
+		log.Printf("Created test chunk %d at (%d, %d) with LOD %d",
+			i, chunkX, chunkZ, forcedLODLevel)
+	}
+
+	log.Printf("Finished generating test line with %d chunks", len(tm.chunks))
+}
+
+// Add this specialized version of LoadChunk for testing specific LOD levels
+func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, chunkKey, mapCoords string) {
+	heightmap := tm.heightmaps[mapCoords]
+	watermap := tm.watermaps[mapCoords]
+
+	if heightmap == nil || watermap == nil {
+		log.Printf("Warning: Map(s) not loaded for coords %s", mapCoords)
+		return
+	}
+
+	// Create new chunk with forced LOD level
+	chunk := &Chunk{
+		X:        chunkX,
+		Z:        chunkZ,
+		lodLevel: forcedLOD,
+	}
+
+	// Calculate geometry
+	calculateChunkVertices(heightmap, watermap, chunk)
+	calculateChunkIndices(chunk)
+	calculateChunkNormals(chunk)
+
+	// Allocate vertex buffer
+	vertexId := fmt.Sprintf("%s_vertices", chunkKey)
+	vertexDataSize := vk.DeviceSize(len(chunk.vertices) * VertexSize)
+	success, vertexOffset := tm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, int(forcedLOD))
+	if !success {
+		log.Printf("Failed to allocate vertex buffer for chunk %s", chunkKey)
+		return
+	}
+
+	// Allocate index buffer
+	indexId := fmt.Sprintf("%s_indices", chunkKey)
+	indexDataSize := vk.DeviceSize(len(chunk.indices) * IndexSize)
+	success, indexOffset := tm.bucketAllocator.AllocateChunk(indexId, indexDataSize, int(forcedLOD))
+	if !success {
+		// Free the previously allocated vertex buffer
+		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
+		log.Printf("Failed to allocate index buffer for chunk %s", chunkKey)
+		return
+	}
+
+	// Prepare vertex data for upload
+	vertexData := make([]byte, len(chunk.vertices)*VertexSize)
+	for i, vertex := range chunk.vertices {
+		copy(vertexData[i*VertexSize:], vertex.Data())
+	}
+
+	// Prepare index data for upload
+	indexData := make([]byte, len(chunk.indices)*IndexSize)
+	for i, index := range chunk.indices {
+		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
+	}
+
+	// Upload vertex data
+	err := tm.bucketAllocator.Upload(vertexId, int(forcedLOD), vertexData)
+	if err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
+		tm.bucketAllocator.FreeChunk(indexId, int(forcedLOD))
+		log.Printf("Failed to upload vertex data: %v", err)
+		return
+	}
+
+	// Upload index data
+	err = tm.bucketAllocator.Upload(indexId, int(forcedLOD), indexData)
+	if err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
+		tm.bucketAllocator.FreeChunk(indexId, int(forcedLOD))
+		log.Printf("Failed to upload index data: %v", err)
+		return
+	}
+
+	// Update chunk with allocation information
+	chunk.allocated = true
+	chunk.vertexOffset = vertexOffset
+	chunk.indexOffset = indexOffset
+	chunk.vertexBufferId = vertexId
+	chunk.indexBufferId = indexId
+
+	// Store in terrain manager
+	tm.chunks[chunkKey] = chunk
+	tm.orderedChunks = append(tm.orderedChunks, chunk)
+}
+
+func (tm *TerrainManager) checkForUpdates() {
+	if firstRun {
+		// Generate the test line of chunks
+		tm.GenerateTestLine()
+
+		// Capture last position for update tracking
 		tm.lastUpdatePos = tm.lastPosition
 		firstRun = false
+
+		// Log memory usage after loading all chunks
+		log.Printf("Memory stats after loading all test chunks: %s",
+			tm.bucketAllocator.GetDetailedStats())
 	}
 }
 
@@ -422,6 +568,10 @@ func (tm *TerrainManager) Destroy() {
 
 // RenderAllocatedChunks draws chunks directly from bucket allocator
 func (tm *TerrainManager) RenderAllocatedChunks(cmdBuffer vk.CommandBuffer) {
+	if len(tm.orderedChunks) == 0 {
+		return
+	}
+
 	for _, chunk := range tm.orderedChunks {
 		// Skip chunks that weren't allocated with the bucket allocator
 		if !chunk.allocated {
