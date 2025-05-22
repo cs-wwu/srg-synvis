@@ -2,7 +2,6 @@ package camera
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -82,8 +81,6 @@ func NewCamera(config CameraConfig) Camera {
 	camera.inputProcessor = NewInputProcessor(camera)
 	camera.sensorManager = NewSensorManager(camera)
 	camera.motionHandler = NewMotionHandler(camera)
-
-	log.Printf("Initialized Camera at (%f, %f)\n", pos[0], pos[2])
 
 	// Start hardware integration if requested
 	if config.EnableGPS {

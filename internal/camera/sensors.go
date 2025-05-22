@@ -46,9 +46,6 @@ func (sm *SensorManager) StartGPS() error {
 	// Set up the TPV function that will run indefinitely
 	tpvFilter := func(r any) {
 		report := r.(*gpsd.TPVReport)
-		log.Printf("GPS Location updated: lat=%.6f, lon=%.6f, alt=%.1f",
-			report.Lat, report.Lon, report.Alt)
-
 		// Convert GPS coordinates to world coordinates
 		newY := float32(report.Alt) * HEIGHT_CONVERSION
 		newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
