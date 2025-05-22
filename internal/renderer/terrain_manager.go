@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -41,13 +42,13 @@ type TerrainManager struct {
 	device   *vk.Device
 	memProps *vk.PhysicalDeviceMemoryProperties
 
-	lastPosition  lin.Vec3
-	lastUpdatePos lin.Vec3
+	lastPosition  lin.Vec2
+	lastUpdatePos lin.Vec2
 
 	heightmaps    map[string]*image.Gray16
 	watermaps     map[string]*image.Gray
 	chunks        map[string]*Chunk
-	orderedChunks []*Chunk
+	chunkRegistry map[string]*spatial.ChunkInfo // chunk IDs to spatial
 
 	bucketAllocator *memory.BucketAllocator
 	terrainGrid     *spatial.TerrainGrid
@@ -56,7 +57,7 @@ type TerrainManager struct {
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
-	tm.lastPosition = pos
+	tm.lastPosition = lin.Vec2{pos[0], pos[2]}
 }
 
 func calculateLODChunkSizes() []vk.DeviceSize {
@@ -108,11 +109,11 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		memProps:        memProps,
 		bucketAllocator: bucketAllocator,
 		terrainGrid:     terrainGrid,
-		lastPosition:    lin.Vec3{0.0, 0.0, 0.0},
+		lastPosition:    lin.Vec2{0.0, 0.0},
 		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:          make(map[string]*Chunk),
-		orderedChunks:   make([]*Chunk, 0),
+		chunkRegistry:   make(map[string]*spatial.ChunkInfo), // New registry
 		shutdown:        make(chan struct{}),
 	}
 
@@ -129,8 +130,16 @@ func (tm *TerrainManager) ClearChunks() {
 			tm.bucketAllocator.FreeChunk(chunk.indexBufferId, int(chunk.lodLevel))
 		}
 		delete(tm.chunks, key)
+
+		// Remove from terrain grid if it exists in registry
+		if spatialChunk, exists := tm.chunkRegistry[key]; exists {
+			tm.terrainGrid.UnregisterChunk(spatialChunk.ID)
+			delete(tm.chunkRegistry, key)
+		}
 	}
-	tm.orderedChunks = tm.orderedChunks[:0]
+
+	// Clear the terrain grid
+	tm.terrainGrid.Clear()
 }
 
 // LoadMap loads a heightmap and its associated watermap
@@ -150,9 +159,9 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 }
 
 func (tm *TerrainManager) GenerateTestLine() {
-	// Starting position based on the camera location
+	// Starting position based on the camera location (2D)
 	startX := int(tm.lastPosition[0])
-	startZ := int(tm.lastPosition[2])
+	startZ := int(tm.lastPosition[1]) // Use Y component as Z
 
 	// Clear any existing chunks
 	tm.ClearChunks()
@@ -211,9 +220,10 @@ func (tm *TerrainManager) GenerateTestLine() {
 	}
 
 	log.Printf("Finished generating test line with %d chunks", len(tm.chunks))
+	log.Printf("Terrain grid now has %d chunks", tm.terrainGrid.Stats().TotalChunks)
 }
 
-// Add this specialized version of LoadChunk for testing specific LOD levels
+// Testing version of LoadChunk for testing specific LOD levels
 func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, chunkKey, mapCoords string) {
 	heightmap := tm.heightmaps[mapCoords]
 	watermap := tm.watermaps[mapCoords]
@@ -223,7 +233,7 @@ func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, 
 		return
 	}
 
-	// Create new chunk with forced LOD level
+	// Create new GPU chunk with forced LOD level
 	chunk := &Chunk{
 		X:        chunkX,
 		Z:        chunkZ,
@@ -292,9 +302,19 @@ func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, 
 	chunk.vertexBufferId = vertexId
 	chunk.indexBufferId = indexId
 
-	// Store in terrain manager
+	// Store GPU chunk in terrain manager
 	tm.chunks[chunkKey] = chunk
-	tm.orderedChunks = append(tm.orderedChunks, chunk)
+
+	// Register chunk in terrain grid (2D coordinates)
+	worldPos := lin.Vec2{float32(chunkX), float32(chunkZ)}
+	spatialChunk := tm.terrainGrid.RegisterChunk(worldPos, int(forcedLOD))
+	spatialChunk.Status = spatial.ChunkLoaded
+
+	// Store the reference to the spatial chunk
+	tm.chunkRegistry[chunkKey] = spatialChunk
+
+	// Store reference to GPU chunk in spatial chunk's UserData
+	spatialChunk.UserData = chunk
 }
 
 func (tm *TerrainManager) checkForUpdates() {
@@ -309,7 +329,32 @@ func (tm *TerrainManager) checkForUpdates() {
 		// Log memory usage after loading all chunks
 		log.Printf("Memory stats after loading all test chunks: %s",
 			tm.bucketAllocator.GetDetailedStats())
+
+		// Update terrain grid visibility with current camera position
+		tm.updateVisibility()
+
+		log.Printf("Terrain grid stats after loading all test chunks: %s",
+			tm.terrainGrid.GetDetailedStats())
+
+		log.Printf("Terrain grid visualization: %s", tm.terrainGrid.VisualizeGrid())
 	}
+}
+
+func (tm *TerrainManager) updateVisibility() {
+	// Create a simple frustum for testing (looking north with 90-degree FOV)
+	direction := float32(math.Pi / 2) // Looking north (positive Z)
+	fov := float32(math.Pi / 2)       // 90 degrees
+	near := float32(10.0)
+	far := float32(10000.0)
+
+	frustum := spatial.NewFrustumFromCamera(tm.lastPosition, direction, fov, near, far)
+
+	// Update visibility in terrain grid
+	tm.terrainGrid.UpdateVisibility(tm.lastPosition, frustum)
+
+	visibleChunks := tm.terrainGrid.GetVisibleChunks()
+	log.Printf("Terrain grid visibility update: %d/%d chunks visible",
+		len(visibleChunks), tm.terrainGrid.Stats().TotalChunks)
 }
 
 func (tm *TerrainManager) updateLoop() {
@@ -325,7 +370,6 @@ func (tm *TerrainManager) updateLoop() {
 			tm.checkForUpdates()
 		}
 	}
-
 }
 
 // generateOceanHeightmap creates a flat heightmap (all water)
@@ -453,13 +497,17 @@ func (tm *TerrainManager) Destroy() {
 
 // RenderAllocatedChunks draws chunks directly from bucket allocator
 func (tm *TerrainManager) RenderAllocatedChunks(cmdBuffer vk.CommandBuffer) {
-	if len(tm.orderedChunks) == 0 {
+	// Get visible chunks from terrain grid
+	visibleChunks := tm.terrainGrid.GetVisibleChunksSorted()
+
+	if len(visibleChunks) == 0 {
 		return
 	}
 
-	for _, chunk := range tm.orderedChunks {
-		// Skip chunks that weren't allocated with the bucket allocator
-		if !chunk.allocated {
+	for _, spatialChunk := range visibleChunks {
+		// Get GPU chunk from UserData
+		chunk, ok := spatialChunk.UserData.(*Chunk)
+		if !ok || chunk == nil || !chunk.allocated {
 			continue
 		}
 

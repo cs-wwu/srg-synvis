@@ -100,6 +100,8 @@ func (g *TerrainGrid) RegisterChunk(worldPos lin.Vec2, lodLevel int) *ChunkInfo 
 	// Update neighbor relationships
 	g.updateChunkNeighbors(chunk)
 
+	fmt.Printf("Registered chunk %s at %s\n", id, coord)
+
 	return chunk
 }
 

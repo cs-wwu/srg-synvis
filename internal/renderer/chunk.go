@@ -1,10 +1,8 @@
 package renderer
 
 import (
-	"encoding/binary"
 	"fmt"
 	"image"
-	"log"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -49,100 +47,6 @@ type Chunk struct {
 //	--------------------- ▲
 //	|      World        | 3600 * 180
 //	--------------------- ▼
-func (tm *TerrainManager) LoadChunk(chunkX, chunkZ int) {
-	mapCoords := CoordinateIntToMap(chunkX, chunkZ)
-	heightmap := tm.heightmaps[mapCoords]
-	watermap := tm.watermaps[mapCoords]
-
-	if heightmap == nil || watermap == nil {
-		log.Printf("Warning: Map(s) not loaded for coords %s (%d, %d)\n", mapCoords, chunkX, chunkZ)
-		return
-	}
-
-	lodLevel := tm.selectLODLevel(chunkX, chunkZ, tm.lastPosition)
-	chunkKey := ChunkKey(chunkX, chunkZ)
-	existingChunk, exists := tm.chunks[chunkKey]
-
-	// Skip if already loaded with same LOD
-	if exists && existingChunk.lodLevel == lodLevel {
-		return
-	}
-
-	// Create new chunk
-	chunk := &Chunk{
-		X:        chunkX,
-		Z:        chunkZ,
-		lodLevel: lodLevel,
-	}
-
-	// Calculate geometry
-	calculateChunkVertices(heightmap, watermap, chunk)
-	calculateChunkIndices(chunk)
-	calculateChunkNormals(chunk)
-
-	// Allocate vertex buffer
-	vertexId := fmt.Sprintf("%s_vertices", chunkKey)
-	vertexDataSize := vk.DeviceSize(len(chunk.vertices) * VertexSize)
-	success, vertexOffset := tm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, int(lodLevel))
-	if !success {
-		log.Printf("Failed to allocate vertex buffer for chunk %s", chunkKey)
-		return
-	}
-
-	// Allocate index buffer
-	indexId := fmt.Sprintf("%s_indices", chunkKey)
-	indexDataSize := vk.DeviceSize(len(chunk.indices) * IndexSize)
-	success, indexOffset := tm.bucketAllocator.AllocateChunk(indexId, indexDataSize, int(lodLevel))
-	if !success {
-		// Free the previously allocated vertex buffer
-		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
-		log.Printf("Failed to allocate index buffer for chunk %s", chunkKey)
-		return
-	}
-
-	// Prepare vertex data for upload
-	vertexData := make([]byte, len(chunk.vertices)*VertexSize)
-	for i, vertex := range chunk.vertices {
-		copy(vertexData[i*VertexSize:], vertex.Data())
-	}
-
-	// Prepare index data for upload
-	indexData := make([]byte, len(chunk.indices)*IndexSize)
-	for i, index := range chunk.indices {
-		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
-	}
-
-	// Upload vertex data
-	err := tm.bucketAllocator.Upload(vertexId, int(lodLevel), vertexData)
-	if err != nil {
-		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
-		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
-		log.Printf("Failed to upload vertex data: %v", err)
-		return
-	}
-
-	// Upload index data
-	err = tm.bucketAllocator.Upload(indexId, int(lodLevel), indexData)
-	if err != nil {
-		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
-		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
-		log.Printf("Failed to upload index data: %v", err)
-		return
-	}
-
-	// Update chunk with allocation information
-	chunk.allocated = true
-	chunk.vertexOffset = vertexOffset
-	chunk.indexOffset = indexOffset
-	chunk.vertexBufferId = vertexId
-	chunk.indexBufferId = indexId
-
-	// Store in terrain manager
-	tm.chunks[chunkKey] = chunk
-	tm.orderedChunks = append(tm.orderedChunks, chunk)
-
-	log.Printf("Loaded chunk %s using bucket allocator (LOD %d)", chunkKey, lodLevel)
-}
 
 // Calculate vertices and texcoords for a chunk
 func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
@@ -248,29 +152,24 @@ func calculateChunkNormals(chunk *Chunk) {
 	chunk.vertices[lastIdx].Normal = chunk.vertices[lastIdx-1].Normal
 }
 
-func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec3) LODLevel {
+func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec2) LODLevel {
 	// Calculate chunk center position
 	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
 	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
 
-	// Calculate average height for chunk center (or use actual terrain height if available)
-	// For now, using camera Y directly since terrain height might be complex to calculate
-	chunkCenterY := float32(0.0) // This could be refined based on actual terrain height
-
 	// Calculate 3D distance
 	dx := chunkCenterX - cameraPos[0]
-	dy := chunkCenterY - cameraPos[1]
-	dz := chunkCenterZ - cameraPos[2]
-	dist3DSq := dx*dx + dy*dy + dz*dz
+	dz := chunkCenterZ - cameraPos[1]
+	dist2DSq := dx*dx + +dz*dz
 
 	// Updated thresholds for 3D distance
 	// Square root of previous values to maintain similar visual transitions
 	switch {
-	case dist3DSq < 240_000: // ~490 units away (including height)
+	case dist2DSq < 490: // ~490 units away (including height)
 		return LOD_0
-	case dist3DSq < 960_000: // ~980 units away
+	case dist2DSq < 980: // ~980 units away
 		return LOD_1
-	case dist3DSq < 3_840_000: // ~1960 units away
+	case dist2DSq < 1960: // ~1960 units away
 		return LOD_2
 	default:
 		return LOD_3
