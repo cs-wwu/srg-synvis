@@ -23,6 +23,11 @@ type MockGPSD struct {
 	closed      bool
 }
 
+var (
+	startVec = lin.Vec3{-442800, 162.11664, -172800}
+	startDir = lin.Vec3{0, 0, -1}
+)
+
 // NewMockGPSD creates and starts a mock GPSD server
 func NewMockGPSD(t *testing.T) *MockGPSD {
 	listener, err := net.Listen("tcp", "localhost:2947")
@@ -131,7 +136,7 @@ func (m *MockGPSD) Close() {
 // Sensehat tests:
 // SenseData tests processing sensehat data correctly
 func TestSenseData(t *testing.T) {
-	testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	testCamera := renderer.NewCamera(false, startVec, startDir)
 
 	// test if sense fails on bad data
 	md := testCamera.TrySense("./badhat.py")
@@ -152,7 +157,7 @@ func TestSenseData(t *testing.T) {
 // WMM tests if correct declination is found and applied to yaw
 func TestWMM(t *testing.T) {
 	// Initialize camera to 48.0, -123.0, 1300
-	c := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	c := renderer.NewCamera(false, startVec, startDir)
 
 	c.TrySense("./fakehat2.py")
 	// Check if starting coordinate declination is within actual range ~15.30
@@ -165,7 +170,7 @@ func TestWMM(t *testing.T) {
 // GPS tests:
 // NoFix tests if TryGPS handles when the gps has no fix (position should not change)
 func NoFix(t *testing.T) {
-	testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	testCamera := renderer.NewCamera(false, startVec, startDir)
 
 	mock := NewMockGPSD(t)
 	defer mock.Close()
@@ -192,7 +197,7 @@ func NoFix(t *testing.T) {
 
 // WorkingGPS tests that data is correctly parsed and the position vector is updated
 func WorkingGPS(t *testing.T) {
-	testCamera := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	testCamera := renderer.NewCamera(false, startVec, startDir)
 
 	mock := NewMockGPSD(t)
 	defer mock.Close()
@@ -225,7 +230,7 @@ func WorkingGPS(t *testing.T) {
 // Camera tests:
 
 func TestInitCamera(t *testing.T) {
-	c := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	c := renderer.NewCamera(false, startVec, lin.Vec3{0, 0, -1})
 
 	// test pos
 	if c.Pos[0] != -442800 || c.Pos[1] != 162.11664 || c.Pos[2] != -172800 {
@@ -238,7 +243,7 @@ func TestInitCamera(t *testing.T) {
 }
 
 func QuatRot(t *testing.T) {
-	c := renderer.NewCamera(false, lin.Vec3{-442800, 162.11664, -172800})
+	c := renderer.NewCamera(false, startVec, startDir)
 
 	c.QuatRotateRel((math.Pi / 2), 0, 0)
 	if !equal(c.Front[0], 1.0) || !equal(c.Front[1], 0.0) || !equal(c.Front[2], 0.0) {

@@ -31,7 +31,7 @@ const (
 
 	MAP_LENGTH      = 3600
 	CHUNKS_PER_SIDE = 20
-	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE
+	CHUNK_SIZE      = MAP_LENGTH / CHUNKS_PER_SIDE // 180 allows for perfect multiples of 1 through 4
 )
 
 var firstRun = true

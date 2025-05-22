@@ -10,8 +10,11 @@ layout(std140, binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
-    float time;
     vec3 cameraPos;
+
+    float renderDistance;
+    float warningsDisabled;
+    float time;
 } ubo;
 
 layout(location = 0) in vec3 fragColor;
@@ -244,13 +247,15 @@ void main() {
             terrainColor += vec3(southness * 0.05, southness * 0.03, -southness * 0.05) * (1.0 - slopeFactor * 2.0);
         }
         
-        // Apply warning coloring based on height relative to camera position - SIMPLIFIED
-        float warningOpacity = getTerrainWarningOpacity(worldPos.y, ubo.cameraPos.y);
-        
-        // Add red warning overlay only when terrain is at or near camera height
-        if (warningOpacity > 0.0) {
-            vec3 warningColor = vec3(1.0, 0.0, 0.0); // Pure red warning
-            terrainColor = mix(terrainColor, warningColor, warningOpacity);
+        if (ubo.warningsDisabled > 0.5) {
+            // Apply warning coloring based on height relative to camera position
+            float warningOpacity = getTerrainWarningOpacity(worldPos.y, ubo.cameraPos.y);
+            
+            // Add red warning overlay only when terrain is at or near camera height
+            if (warningOpacity > 0.0) {
+                vec3 warningColor = vec3(1.0, 0.0, 0.0); // Pure red warning
+                terrainColor = mix(terrainColor, warningColor, warningOpacity);
+            }
         }
         
         // Use texture if available

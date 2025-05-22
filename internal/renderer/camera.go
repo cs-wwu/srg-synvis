@@ -40,7 +40,6 @@ const (
 
 var (
 	START_CAMERA_UP      = lin.Vec3{0.0, 1.0, 0.0}
-	START_CAMERA_FRONT   = lin.Vec3{0, 0, -1.0}
 	Q_START_CAMERA_UP    = vec3.T{0.0, 1.0, 0.0}
 	Q_START_CAMERA_FRONT = vec3.T{0, 0, -1.0}
 	Q_START_CAMERA_RIGHT = vec3.Cross(&Q_START_CAMERA_UP, &Q_START_CAMERA_FRONT)
@@ -69,14 +68,15 @@ type Camera struct {
 }
 
 // NewCamera creates and initializes a new Camera
-func NewCamera(hat bool, startPos lin.Vec3) *Camera {
+func NewCamera(hat bool, startPos, startDir lin.Vec3) *Camera {
 	today := time.Now()
 
 	pos := startPos
 	up := START_CAMERA_UP
 
 	// Calculate initial vectors based on identity rotation
-	front := START_CAMERA_FRONT
+	front := startDir
+	front.Norm(&front)
 	right := lin.Vec3{}
 	right.MultCross(&front, &up)
 	right.Norm(&right)

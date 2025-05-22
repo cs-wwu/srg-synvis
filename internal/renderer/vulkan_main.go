@@ -19,7 +19,7 @@ import (
 // This file is for initializing and handling the main vulkan necessities
 
 func NewApplication(cfg models.AppConfig) *Application {
-	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos)
+	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos, cfg.CameraStartDir)
 	if cfg.UseHat {
 		go camera.TrySense("./internal/sensors/hat.py")
 	}
@@ -30,10 +30,12 @@ func NewApplication(cfg models.AppConfig) *Application {
 
 	fpsCounter := NewFPSCounter()
 	app := &Application{
-		camera:     camera,
-		fpsCounter: fpsCounter,
-		Gps:        cfg.UseGPS,
-		Hat:        cfg.UseHat,
+		camera:          camera,
+		fpsCounter:      fpsCounter,
+		Gps:             cfg.UseGPS,
+		Hat:             cfg.UseHat,
+		renderDistance:  cfg.RenderDistance,
+		disableWarnings: cfg.DisableTerrainWarnings,
 	}
 
 	return app
@@ -147,6 +149,14 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
 
+	if app.frameCount%300 == 0 { // Every 5 seconds at 60fps
+		log.Printf("DEBUG: renderDistance in app = %.1f", app.renderDistance)
+		log.Printf("DEBUG: renderDistance in UBO = %.1f", app.ubo.RenderDistance)
+		log.Printf("DEBUG: camera pos = (%.1f, %.1f, %.1f)",
+			app.camera.Pos[0], app.camera.Pos[1], app.camera.Pos[2])
+		log.Printf("DEBUG: disable warnings = %t", app.disableWarnings)
+	}
+
 	return nil
 }
 
@@ -206,7 +216,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
- 	app.TerrainManager.RenderAllocatedChunks(cmd)
+	app.TerrainManager.RenderAllocatedChunks(cmd)
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

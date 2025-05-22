@@ -34,8 +34,14 @@ type UniformBufferObject struct {
 	Projection lin.Mat4x4 // camera to clip and screen space
 	NormalM    lin.Mat4x4 // for lighting
 	LightDir   lin.Vec3   // Need to initialize this as
-	Time       float32
-	CameraPos  lin.Vec3   // camera position for height warnings
+	_          float32    // padding to align to 16 bytes
+	CameraPos  lin.Vec3   // camera position for terrain warnings
+	_          float32    // padding to align to 16 bytes
+
+	RenderDistance         float32 // Maximum render distanceu
+	TerrainWarningsEnabled float32 // 1.0 = enabled, 0.0 = disabled
+	Time                   float32
+	_                      float32 // (Can remove in the future)
 }
 
 // creating a byte slice array of size UniformBufferObject
