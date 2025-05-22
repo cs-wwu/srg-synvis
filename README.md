@@ -22,6 +22,8 @@ go run ./cmd/svs
      Starting Camera Position (lat,lon,height) where height is in meters (default "48.5,-123.5,2600")
   -dir string
      Starting Camera Direction (x,y,z) - normalized automatically (default "0,0,-1")
+   -fov float
+      Field of view (degrees) (default 60)
   -render-distance float
      Maximum render distance in world units (default 5000)
   -disable-warnings

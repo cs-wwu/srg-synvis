@@ -12,6 +12,7 @@ type AppConfig struct {
 	MonitorNum int
 
 	// Camera settings
+	Fov           float32  // Field of view in Y direction
 	CameraStartPos lin.Vec3 // Starting position in world coordinates
 	CameraStartDir lin.Vec3 // Starting direction vector (normalized)
 

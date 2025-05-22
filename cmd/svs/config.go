@@ -25,12 +25,14 @@ func parseConfig() models.AppConfig {
 	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
 	// New flags
-	var renderDistance = flag.Float64("render-distance", 5000.0, "Maximum render distance in world units")
+	renderDistance := flag.Float64("render-distance", 5000.0, "Maximum render distance in world units")
 	flag.BoolVar(&config.DisableTerrainWarnings, "disable-warnings", false, "Disable terrain height warnings (red coloring)")
 
 	// Enhanced position flag
 	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
-	startDirString := flag.String("dir", "0,0,-1", "Starting Camera Direction (x,y,z) - normalized automatically")
+	startDirString := flag.String("dir", "0,0,-1", "Starting Camera Direction (x,y,z)")
+
+	fov := flag.Float64("fov", 60.0, "Field of view (degrees)")
 
 	flag.Parse()
 
@@ -38,6 +40,7 @@ func parseConfig() models.AppConfig {
 	config.CameraStartPos = parsePosition(*startPosString)
 	config.CameraStartDir = parseDirection(*startDirString)
 	config.RenderDistance = float32(*renderDistance)
+	config.Fov = float32(*fov)
 
 	// Validate configuration
 	validateConfig(&config)
@@ -121,6 +124,11 @@ func validateConfig(config *models.AppConfig) {
 
 	if config.RenderDistance > 20000.0 {
 		log.Printf("Warning: Render distance %v is very large, may cause performance issues", config.RenderDistance)
+	}
+
+	if config.Fov <= 0 || config.Fov > 180 {
+		log.Printf("Warning: Invalid FOV %v, using default 60.0", config.Fov)
+		config.Fov = 60.0
 	}
 
 	if config.DisableTerrainWarnings {

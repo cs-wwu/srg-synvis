@@ -45,6 +45,7 @@ type Application struct {
 	// config settings
 	renderDistance  float32
 	disableWarnings bool
+	fov             float32
 
 	camera         camera.Camera
 	TerrainManager *TerrainManager
@@ -56,10 +57,7 @@ type Application struct {
 }
 
 const (
-	FOV              = 60.0 // Field Of View in Degrees
-	CULLING_INTERVAL = 30   // Perform culling every x frames
-	MAPS_PATH        = "assets/maps/"
-
+	MAPS_PATH     = "assets/maps/"
 	WINDOW_HEIGHT = 480
 	WINDOW_WIDTH  = 800
 )
