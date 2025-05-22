@@ -15,13 +15,21 @@ import (
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera *CameraImpl
+	camera      *CameraImpl
+	testingMode bool // When true, skips smoothing for deterministic test results
+}
+
+// SetTestingMode enables or disables the testing mode
+// When testing mode is enabled, smoothing will be disabled for deterministic test results
+func (sm *SensorManager) SetTestingMode(enabled bool) {
+	sm.testingMode = enabled
 }
 
 // NewSensorManager creates a new sensor manager
 func NewSensorManager(camera *CameraImpl) *SensorManager {
 	return &SensorManager{
-		camera: camera,
+		camera:      camera,
+		testingMode: false,
 	}
 }
 
@@ -58,8 +66,10 @@ func (sm *SensorManager) StartGPS() error {
 			newZ = oldZ + zdif
 		}
 
-		// Apply smoothing to reduce GPS jitter
-		newX, newY, newZ = sensors.Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
+		// Apply smoothing to reduce GPS jitter (skip in testing mode)
+		if !sm.testingMode {
+			newX, newY, newZ = sensors.Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
+		}
 
 		// Update camera position
 		sm.camera.updatePosition(newX, newZ, newY)

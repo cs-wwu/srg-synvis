@@ -332,6 +332,9 @@ func TestGPSNoFix(t *testing.T) {
 
 	initialPos := cam.Position()
 
+	// Enable testing mode to skip smoothing for deterministic test results
+	impl.sensorManager.SetTestingMode(true)
+
 	// Start GPS in background
 	go impl.sensorManager.StartGPS()
 
@@ -356,6 +359,9 @@ func TestGPSValidFix(t *testing.T) {
 
 	mock := NewMockGPSD(t)
 	defer mock.Close()
+
+	// Enable testing mode to skip smoothing for deterministic test results
+	impl.sensorManager.SetTestingMode(true)
 
 	// Start GPS in background
 	done := make(chan bool)
