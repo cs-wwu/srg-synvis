@@ -13,6 +13,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 
 	vk "github.com/vulkan-go/vulkan"
@@ -53,6 +54,7 @@ type TerrainManager struct {
 
 	bucketAllocator *memory.BucketAllocator
 	terrainGrid     *spatial.TerrainGrid
+	assetManager    assets.AssetManager
 
 	debugMode bool
 	shutdown  chan struct{}
@@ -106,11 +108,14 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 
 	terrainGrid := spatial.NewTerrainGrid(CHUNK_SIZE, nil)
 
+	assetManager := assets.NewAssetManager("assets/maps/", 9) // TODO don't hardcode this
+
 	tm := &TerrainManager{
 		device:          device,
 		memProps:        memProps,
 		bucketAllocator: bucketAllocator,
 		terrainGrid:     terrainGrid,
+		assetManager:    assetManager,
 		lastPosition:    lin.Vec2{0.0, 0.0},
 		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
@@ -253,7 +258,7 @@ func (tm *TerrainManager) loadVisibleChunks(baseMap string) {
 	}
 }
 
-// Renamed and simplified: just loads GPU data
+// Loads GPU chunk data directly
 func (tm *TerrainManager) loadGPUChunk(chunkX, chunkZ int, lodLevel LODLevel, chunkKey, mapCoords string) bool {
 	heightmap := tm.heightmaps[mapCoords]
 	watermap := tm.watermaps[mapCoords]
@@ -353,6 +358,8 @@ func (tm *TerrainManager) checkForUpdates() {
 				tm.terrainGrid.GetDetailedStats())
 
 			log.Printf("Terrain grid visualization: %s", tm.terrainGrid.VisualizeGrid())
+
+			log.Printf("Asset manager stats: %s", tm.assetManager.Stats())
 		}
 	}
 }

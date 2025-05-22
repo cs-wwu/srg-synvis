@@ -135,6 +135,11 @@ func (am *assetManager) Stats() CacheStats {
 	}
 }
 
+func (cs CacheStats) String() string {
+	return fmt.Sprintf("Cache: %d/%d maps, %d MB, Ocean Tiles: %d\nHits: %d, Misses: %d, Evictions: %d",
+		cs.CurrentMaps, cs.MaxMaps, cs.TotalMemory/1024/1024, cs.CacheHits, cs.CacheMisses, cs.Evictions, cs.OceanTiles)
+}
+
 // SetMaxCached updates the maximum number of cached maps.
 func (am *assetManager) SetMaxCached(max int) {
 	if max < 1 {
