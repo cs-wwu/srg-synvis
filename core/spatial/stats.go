@@ -27,7 +27,6 @@ type GridStats struct {
 // GridBounds represents the extents of the grid
 type GridBounds struct {
 	MinX, MaxX int
-	MinY, MaxY int
 	MinZ, MaxZ int
 }
 
@@ -90,7 +89,6 @@ func (g *TerrainGrid) Stats() GridStats {
 	maxNeighbors := 0
 
 	minX, maxX := math.MaxInt32, math.MinInt32
-	minY, maxY := math.MaxInt32, math.MinInt32
 	minZ, maxZ := math.MaxInt32, math.MinInt32
 
 	for _, chunk := range g.chunks {
@@ -114,12 +112,6 @@ func (g *TerrainGrid) Stats() GridStats {
 		if chunk.GridCoord.X > maxX {
 			maxX = chunk.GridCoord.X
 		}
-		if chunk.GridCoord.Y < minY {
-			minY = chunk.GridCoord.Y
-		}
-		if chunk.GridCoord.Y > maxY {
-			maxY = chunk.GridCoord.Y
-		}
 		if chunk.GridCoord.Z < minZ {
 			minZ = chunk.GridCoord.Z
 		}
@@ -135,7 +127,6 @@ func (g *TerrainGrid) Stats() GridStats {
 
 	stats.GridBounds = GridBounds{
 		MinX: minX, MaxX: maxX,
-		MinY: minY, MaxY: maxY,
 		MinZ: minZ, MaxZ: maxZ,
 	}
 
@@ -188,9 +179,6 @@ func (g *TerrainGrid) GetDetailedStats() string {
 	sb.WriteString(fmt.Sprintf("  X: %d to %d (width: %d)\n",
 		stats.GridBounds.MinX, stats.GridBounds.MaxX,
 		stats.GridBounds.MaxX-stats.GridBounds.MinX+1))
-	sb.WriteString(fmt.Sprintf("  Y: %d to %d (height: %d)\n",
-		stats.GridBounds.MinY, stats.GridBounds.MaxY,
-		stats.GridBounds.MaxY-stats.GridBounds.MinY+1))
 	sb.WriteString(fmt.Sprintf("  Z: %d to %d (depth: %d)\n",
 		stats.GridBounds.MinZ, stats.GridBounds.MaxZ,
 		stats.GridBounds.MaxZ-stats.GridBounds.MinZ+1))
@@ -291,7 +279,7 @@ func (g *TerrainGrid) VisualizeGrid() string {
 
 		// Print grid cells
 		for x := minX; x <= maxX; x++ {
-			cell := GridCoord{X: x, Y: 0, Z: z}
+			cell := GridCoord{X: x, Z: z}
 			chunk := g.chunksByCoord[cell]
 
 			// Determine what symbol to display
@@ -376,8 +364,8 @@ func (g *TerrainGrid) VisualizeChunk(chunkID string) string {
 
 	// Basic info
 	sb.WriteString(fmt.Sprintf("Grid Coordinates: %v\n", chunk.GridCoord))
-	sb.WriteString(fmt.Sprintf("World Position: (%.1f, %.1f, %.1f)\n",
-		chunk.WorldPos[0], chunk.WorldPos[1], chunk.WorldPos[2]))
+	sb.WriteString(fmt.Sprintf("World Position: (%.1f, %.1f)\n",
+		chunk.WorldPos[0], chunk.WorldPos[1]))
 	sb.WriteString(fmt.Sprintf("LOD Level: %d\n", chunk.LODLevel))
 	sb.WriteString(fmt.Sprintf("Status: %s\n", chunkStatusString(chunk.Status)))
 	sb.WriteString(fmt.Sprintf("Distance from Camera: %.1f\n", chunk.Distance))
@@ -395,13 +383,6 @@ func (g *TerrainGrid) VisualizeChunk(chunkID string) string {
 	sb.WriteString("└───┼───┼───┘\n")
 	sb.WriteString(fmt.Sprintf("    │ %s │    \n", neighborSymbol(chunk.Neighbors[South])))
 	sb.WriteString("    └───┘    \n\n")
-
-	// Top/bottom neighbors if they exist
-	if chunk.Neighbors[Up] != nil || chunk.Neighbors[Down] != nil {
-		sb.WriteString(fmt.Sprintf("Up: %s    Down: %s\n\n",
-			neighborSymbol(chunk.Neighbors[Up]),
-			neighborSymbol(chunk.Neighbors[Down])))
-	}
 
 	// LOD transition info
 	sb.WriteString("LOD Transitions:\n")

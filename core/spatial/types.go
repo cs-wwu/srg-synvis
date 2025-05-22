@@ -10,12 +10,12 @@ import (
 
 // GridCoord represents discrete coordinates in the grid
 type GridCoord struct {
-	X, Y, Z int
+	X, Z int
 }
 
 // String returns a string representation of GridCoord
 func (c GridCoord) String() string {
-	return fmt.Sprintf("(%d,%d,%d)", c.X, c.Y, c.Z)
+	return fmt.Sprintf("(%d,%d)", c.X, c.Z)
 }
 
 // Direction enum for neighbor lookup
@@ -26,8 +26,6 @@ const (
 	East
 	South
 	West
-	Up
-	Down
 	DirectionCount // Total number of directions
 )
 
@@ -37,8 +35,6 @@ var DirectionNames = map[Direction]string{
 	East:  "East",
 	South: "South",
 	West:  "West",
-	Up:    "Up",
-	Down:  "Down",
 }
 
 // ChunkStatus represents the current state of a chunk
@@ -55,11 +51,11 @@ const (
 type ChunkInfo struct {
 	ID        string                     // Unique identifier
 	GridCoord GridCoord                  // Coordinates in the grid
-	WorldPos  lin.Vec3                   // World position (center of chunk)
+	WorldPos  lin.Vec2                   // World position (center of chunk)
 	LODLevel  int                        // Current LOD level (0 = highest detail)
-	Distance  float32                    // Distance from viewpoint
+	Distance  float32                    // Distance from viewpoint (2D)
 	InFrustum bool                       // Is in view frustum
-	Neighbors [DirectionCount]*ChunkInfo // Adjacent chunks (N,S,E,W,Up,Down)
+	Neighbors [DirectionCount]*ChunkInfo // Adjacent chunks (N,S,E,W)
 	Status    ChunkStatus                // Current loading status
 	Priority  float32                    // For loading priority (higher = more important)
 	LastUsed  int64                      // Timestamp for LRU calculations
@@ -110,15 +106,15 @@ func (s *DefaultLODStrategy) GetLODLevel(distance float32) int {
 	return level
 }
 
-// Frustum represents a view frustum for culling
+// Frustum represents a 2D view frustum for culling
 type Frustum struct {
-	Planes [6]FrustumPlane
+	Planes [4]FrustumPlane // Left, Right, Near, Far
 }
 
-// FrustumPlane represents a plane in the view frustum
+// FrustumPlane represents a plane in the 2D view frustum
 type FrustumPlane struct {
-	Normal lin.Vec3
-	D      float32
+	Normal lin.Vec2 // 2D normal vector
+	D      float32  // Distance from origin
 }
 
 // GridSystem is the interface for terrain grid management

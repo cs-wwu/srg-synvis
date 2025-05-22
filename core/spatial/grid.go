@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
-	lin "github.com/xlab/linmath"
 	"slices"
+
+	lin "github.com/xlab/linmath"
 )
 
 // TerrainGrid implements the GridSystem interface
@@ -20,7 +21,7 @@ type TerrainGrid struct {
 	lodStrategy   LODStrategy              // Strategy for LOD determination
 
 	// Internal state
-	lastCameraPos lin.Vec3
+	lastCameraPos lin.Vec2
 	lastUpdate    int64 // Timestamp of last update
 	nextChunkID   int   // For generating unique chunk IDs
 
@@ -45,26 +46,24 @@ func NewTerrainGrid(chunkSize float32, lodStrategy LODStrategy) *TerrainGrid {
 	}
 }
 
-// WorldToGrid converts world position to grid coordinates
-func (g *TerrainGrid) WorldToGrid(pos lin.Vec3) GridCoord {
+// WorldToGrid converts 2D world position to grid coordinates
+func (g *TerrainGrid) WorldToGrid(pos lin.Vec2) GridCoord {
 	return GridCoord{
 		X: int(math.Floor(float64(pos[0]) / float64(g.chunkSize))),
-		Y: int(math.Floor(float64(pos[1]) / float64(g.chunkSize))),
-		Z: int(math.Floor(float64(pos[2]) / float64(g.chunkSize))),
+		Z: int(math.Floor(float64(pos[1]) / float64(g.chunkSize))),
 	}
 }
 
-// GridToWorld converts grid coordinates to world position (center of chunk)
-func (g *TerrainGrid) GridToWorld(coord GridCoord) lin.Vec3 {
-	return lin.Vec3{
+// GridToWorld converts grid coordinates to 2D world position (center of chunk)
+func (g *TerrainGrid) GridToWorld(coord GridCoord) lin.Vec2 {
+	return lin.Vec2{
 		float32(coord.X)*g.chunkSize + g.chunkSize/2,
-		float32(coord.Y)*g.chunkSize + g.chunkSize/2,
 		float32(coord.Z)*g.chunkSize + g.chunkSize/2,
 	}
 }
 
-// RegisterChunk adds a new chunk at the given world position
-func (g *TerrainGrid) RegisterChunk(worldPos lin.Vec3, lodLevel int) *ChunkInfo {
+// RegisterChunk adds a new chunk at the given 2D world position
+func (g *TerrainGrid) RegisterChunk(worldPos lin.Vec2, lodLevel int) *ChunkInfo {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -106,23 +105,20 @@ func (g *TerrainGrid) RegisterChunk(worldPos lin.Vec3, lodLevel int) *ChunkInfo 
 
 // updateChunkNeighbors updates the neighbor relationships for a chunk
 func (g *TerrainGrid) updateChunkNeighbors(chunk *ChunkInfo) {
-	// Helper to get neighbors in each direction
+	// Helper to get neighbors in each of the 4 cardinal directions
 	directions := []struct {
-		dir        Direction
-		dx, dy, dz int
+		dir    Direction
+		dx, dz int
 	}{
-		{North, 0, 0, -1},
-		{East, 1, 0, 0},
-		{South, 0, 0, 1},
-		{West, -1, 0, 0},
-		{Up, 0, 1, 0},
-		{Down, 0, -1, 0},
+		{North, 0, -1},
+		{East, 1, 0},
+		{South, 0, 1},
+		{West, -1, 0},
 	}
 
 	for _, d := range directions {
 		neighborCoord := GridCoord{
 			X: chunk.GridCoord.X + d.dx,
-			Y: chunk.GridCoord.Y + d.dy,
 			Z: chunk.GridCoord.Z + d.dz,
 		}
 
@@ -149,10 +145,6 @@ func getOppositeDirection(dir Direction) Direction {
 		return West
 	case West:
 		return East
-	case Up:
-		return Down
-	case Down:
-		return Up
 	default:
 		return North // Fallback
 	}
@@ -203,7 +195,7 @@ func (g *TerrainGrid) GetChunkByID(id string) *ChunkInfo {
 }
 
 // GetChunkAt retrieves the chunk at the given world position
-func (g *TerrainGrid) GetChunkAt(worldPos lin.Vec3) *ChunkInfo {
+func (g *TerrainGrid) GetChunkAt(worldPos lin.Vec2) *ChunkInfo {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -212,7 +204,7 @@ func (g *TerrainGrid) GetChunkAt(worldPos lin.Vec3) *ChunkInfo {
 }
 
 // GetChunksInRadius returns all chunks within the specified radius
-func (g *TerrainGrid) GetChunksInRadius(center lin.Vec3, radius float32) []*ChunkInfo {
+func (g *TerrainGrid) GetChunksInRadius(center lin.Vec2, radius float32) []*ChunkInfo {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -220,11 +212,10 @@ func (g *TerrainGrid) GetChunksInRadius(center lin.Vec3, radius float32) []*Chun
 	radiusSqr := radius * radius
 
 	for _, chunk := range g.chunks {
-		// Calculate distance from center to center
+		// Calculate 2D distance from center to center
 		dx := chunk.WorldPos[0] - center[0]
-		dy := chunk.WorldPos[1] - center[1]
-		dz := chunk.WorldPos[2] - center[2]
-		distSqr := dx*dx + dy*dy + dz*dz
+		dz := chunk.WorldPos[1] - center[1]
+		distSqr := dx*dx + dz*dz
 
 		if distSqr <= radiusSqr {
 			results = append(results, chunk)
@@ -235,7 +226,7 @@ func (g *TerrainGrid) GetChunksInRadius(center lin.Vec3, radius float32) []*Chun
 }
 
 // GetChunksInRing returns all chunks within the specified ring (between inner and outer radius)
-func (g *TerrainGrid) GetChunksInRing(center lin.Vec3, innerRadius, outerRadius float32) []*ChunkInfo {
+func (g *TerrainGrid) GetChunksInRing(center lin.Vec2, innerRadius, outerRadius float32) []*ChunkInfo {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -244,11 +235,10 @@ func (g *TerrainGrid) GetChunksInRing(center lin.Vec3, innerRadius, outerRadius 
 	outerRadiusSqr := outerRadius * outerRadius
 
 	for _, chunk := range g.chunks {
-		// Calculate center-to-center distance
+		// Calculate 2D center-to-center distance
 		dx := chunk.WorldPos[0] - center[0]
-		dy := chunk.WorldPos[1] - center[1]
-		dz := chunk.WorldPos[2] - center[2]
-		distSqr := dx*dx + dy*dy + dz*dz
+		dz := chunk.WorldPos[1] - center[1]
+		distSqr := dx*dx + dz*dz
 
 		if distSqr >= innerRadiusSqr && distSqr <= outerRadiusSqr {
 			results = append(results, chunk)
@@ -258,7 +248,7 @@ func (g *TerrainGrid) GetChunksInRing(center lin.Vec3, innerRadius, outerRadius 
 	return results
 }
 
-// GetNeighbors returns all neighbors of the given chunk
+// GetNeighbors returns all neighbors of the given chunk (up to 4)
 func (g *TerrainGrid) GetNeighbors(chunk *ChunkInfo) []*ChunkInfo {
 	if chunk == nil {
 		return nil
@@ -290,16 +280,15 @@ func (g *TerrainGrid) GetNeighborInDirection(chunk *ChunkInfo, direction Directi
 }
 
 // calculateDistance computes the distance from a point to a chunk
-func calculateDistance(point lin.Vec3, chunk *ChunkInfo) float32 {
-	// Calculate center-to-center distance
+func calculateDistance(point lin.Vec2, chunk *ChunkInfo) float32 {
+	// Calculate 2D center-to-center distance
 	dx := chunk.WorldPos[0] - point[0]
-	dy := chunk.WorldPos[1] - point[1]
-	dz := chunk.WorldPos[2] - point[2]
-	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+	dz := chunk.WorldPos[1] - point[1]
+	return float32(math.Sqrt(float64(dx*dx + dz*dz)))
 }
 
 // UpdateVisibility updates chunk visibility based on camera position and view frustum
-func (g *TerrainGrid) UpdateVisibility(cameraPos lin.Vec3, viewFrustum Frustum) {
+func (g *TerrainGrid) UpdateVisibility(cameraPos lin.Vec2, viewFrustum Frustum) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
@@ -313,13 +302,11 @@ func (g *TerrainGrid) UpdateVisibility(cameraPos lin.Vec3, viewFrustum Frustum) 
 	for _, chunk := range g.chunks {
 		chunk.mu.Lock()
 
-		// Calculate distance
+		// Calculate 2D distance
 		chunk.Distance = calculateDistance(cameraPos, chunk)
+		chunk.InFrustum = IsChunkInFrustum(chunk, viewFrustum)
 
-		// Determine if in frustum
-		chunk.InFrustum = isChunkInFrustum(chunk, viewFrustum)
-
-		// Determine LOD level
+		// Determine LOD level based on 2D distance
 		chunk.LODLevel = g.lodStrategy.GetLODLevel(chunk.Distance)
 
 		// Calculate priority
