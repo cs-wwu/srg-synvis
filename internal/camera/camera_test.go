@@ -1,4 +1,4 @@
-package renderer
+package camera
 
 import (
 	"encoding/json"
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/stratoberry/go-gpsd"
 	lin "github.com/xlab/linmath"
 )
@@ -23,8 +24,13 @@ type MockGPSD struct {
 }
 
 var (
-	startVec = lin.Vec3{-442800, 162.11664, -172800}
-	startDir = lin.Vec3{0, 0, -1}
+	cameraCfg = CameraConfig{
+		StartPos:    lin.Vec3{-442800, 162.11664, -172800},
+		StartDir:    lin.Vec3{0, 0, -1},
+		DecimalYear: time.Now(),
+		EnableGPS:  false,
+		EnableHat:  false,
+	}
 )
 
 // NewMockGPSD creates and starts a mock GPSD server
@@ -216,7 +222,7 @@ func WorkingGPS(t *testing.T) {
 	mock.SendTPV(expectedLat, expectedLon, expectedAlt, gpsd.Mode3D)
 	time.Sleep(500 * time.Millisecond)
 
-	expectedX, expectedZ := CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
+	expectedX, expectedZ := coords.GPSToWorld(float32(expectedLat), float32(expectedLon))
 	expectedY := float32(expectedAlt) * HEIGHT_CONVERSION
 
 	pos := testCamera.Pos

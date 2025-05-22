@@ -1,9 +1,5 @@
 package sensors
 
-// import (
-// 	"github.com/cs-wwu/srg-synvis/internal/renderer"
-// )
-
 const (
 	DAMP = 0.9
 )

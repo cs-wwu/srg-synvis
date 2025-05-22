@@ -1,4 +1,4 @@
-package renderer
+package coords
 
 import (
 	"fmt"
@@ -56,7 +56,7 @@ const (
 //	0, 3600  -> "n00e000"
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
-func CoordinateIntToMap(x, z int) string {
+func WorldToMap(x, z int) string {
 	z = -z // Flip for vulkan
 	// Adjust coordinates to handle the overlap
 	lat := z / int(ARC_DEGREES_TO_SECONDS)
@@ -90,7 +90,7 @@ func CoordinateIntToMap(x, z int) string {
 //	"n00w001" -> -3600, 3600
 //	"n00e000" -> 0, 3600
 //	"s01e001" -> 3600, 0
-func CoordinateMapToInt(coord string) (x, z int) {
+func MapToWorld(coord string) (x, z int) {
 	if len(coord) != 7 {
 		return 0, 0 // Invalid coordinate format
 	}
@@ -118,7 +118,7 @@ func CoordinateMapToInt(coord string) (x, z int) {
 
 // Takes an x, z coordinate and returns the coorepsonding image pixel coord
 // Images start in the top-left, due to vulkan, need to flip z coordinate
-func CoordinateIntToPixel(x, z int) (int, int) {
+func WorldToPixel(x, z int) (int, int) {
 	// Handle longitude (x)
 	x %= int(ARC_DEGREES_TO_SECONDS)
 	if x < 0 {
@@ -134,12 +134,12 @@ func CoordinateIntToPixel(x, z int) (int, int) {
 }
 
 // Returns the x, z float as a gps readable value
-func CoordinateFloatToGPS(x, z float32) string {
+func WorldToGPS(x, z float32) string {
 	return fmt.Sprintf("%f, %f", -z/3600, x/3600)
 }
 
-// CoordinateGPSToFloat converts a GPS coordinate string to x, z float coordinates
-func CoordinateGPSToFloat(coord string) (float32, float32) {
+// GPSStringToWorld converts a GPS coordinate string to x, z float coordinates
+func GPSStringToWorld(coord string) (float32, float32) {
 	// Split the coordinate string into latitude and longitude
 	parts := strings.Split(coord, ",")
 	if len(parts) != 2 {
@@ -160,13 +160,21 @@ func CoordinateGPSToFloat(coord string) (float32, float32) {
 	return x, z
 }
 
-func CoordinateGPSFloatToFloat(lat, lon float32) (float32, float32) {
-	x := float32(lon * 3600)
-	z := float32(-lat * 3600)
+func GPSToWorld(lat, lon float32) (float32, float32) {
+	x := lon * 3600
+	z := -lat * 3600
 
 	return x, z
 }
 
+func WorldToGPSFloat(x, z float32) (float32, float32) {
+	// Convert to GPS coordinates
+	lat := -z / 3600.0
+	lon := x / 3600.0
+
+	return lat, lon
+}
+
 func GetMapFromPosition(pos lin.Vec3) string {
-	return CoordinateIntToMap(int(pos[0]), int(pos[2]))
+	return WorldToMap(int(pos[0]), int(pos[2]))
 }

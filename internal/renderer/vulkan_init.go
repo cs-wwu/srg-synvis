@@ -98,7 +98,7 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
 	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), aspectRatio, 0.1, app.renderDistance)
-	app.ubo.View = app.camera.GetViewMatrix()
+	app.ubo.View = app.camera.ViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
 
@@ -943,7 +943,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// Initialize TerrainManager
 	app.TerrainManager = NewTerrainManager(&dev, &memProps)
 	// Just update position - the terrain manager will handle loading in its own thread
-	app.TerrainManager.UpdateLastPosition(*app.camera.Pos)
+	app.TerrainManager.UpdateLastPosition(app.camera.Position())
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"github.com/cs-wwu/srg-synvis/internal/camera"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -45,7 +46,7 @@ type Application struct {
 	renderDistance  float32
 	disableWarnings bool
 
-	camera         *Camera
+	camera         camera.Camera
 	TerrainManager *TerrainManager
 	fpsCounter     *FPSCounter
 	WindowHandle   *glfw.Window

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
@@ -19,18 +21,26 @@ import (
 // This file is for initializing and handling the main vulkan necessities
 
 func NewApplication(cfg models.AppConfig) *Application {
-	camera := NewCamera(cfg.UseHat, cfg.CameraStartPos, cfg.CameraStartDir)
-	if cfg.UseHat {
-		go camera.TrySense("./internal/sensors/hat.py")
+	// Fixed typo: camerCfg -> cameraConfig
+	cameraConfig := camera.CameraConfig{
+		StartPos:    cfg.CameraStartPos,
+		StartDir:    cfg.CameraStartDir,
+		EnableGPS:   cfg.UseGPS,
+		EnableHat:   cfg.UseHat,
+		DecimalYear: time.Now(),
 	}
+	cam := camera.NewCamera(cameraConfig)
 
-	if cfg.UseGPS {
-		go camera.TryGps()
+	// Enable hardware if needed (moved here for cleaner initialization)
+	if cfg.UseHat {
+		if err := cam.EnableSensors("./internal/sensors/hat.py"); err != nil {
+			log.Printf("Warning: Failed to enable sensors: %v", err)
+		}
 	}
 
 	fpsCounter := NewFPSCounter()
 	app := &Application{
-		camera:          camera,
+		camera:          cam,
 		fpsCounter:      fpsCounter,
 		Gps:             cfg.UseGPS,
 		Hat:             cfg.UseHat,
@@ -116,10 +126,11 @@ func (app *Application) NextFrame() {
 
 	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.GetViewMatrix()
+	app.ubo.View = app.camera.ViewMatrix()
 
 	// Set camera position in UBO for terrain height warnings
-	app.ubo.CameraPos = *app.camera.Pos // Add this line to update camera position in UBO
+	cameraPos := app.camera.Position()
+	app.ubo.CameraPos = cameraPos
 }
 
 // called every frame by asche
@@ -148,15 +159,6 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	// New command buffer update logic
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
-
-	if app.frameCount%300 == 0 { // Every 5 seconds at 60fps
-		log.Printf("DEBUG: renderDistance in app = %.1f", app.renderDistance)
-		log.Printf("DEBUG: renderDistance in UBO = %.1f", app.ubo.RenderDistance)
-		log.Printf("DEBUG: camera pos = (%.1f, %.1f, %.1f)",
-			app.camera.Pos[0], app.camera.Pos[1], app.camera.Pos[2])
-		log.Printf("DEBUG: disable warnings = %t", app.disableWarnings)
-		log.Printf("DEBUG: fogStart would be = %.1f", app.ubo.RenderDistance-1500.0)
-	}
 
 	return nil
 }

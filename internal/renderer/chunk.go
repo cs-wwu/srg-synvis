@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 
+	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -61,7 +62,7 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 		worldZ := chunk.Z + (z * stride)
 		for x := range verticesPerSide {
 			worldX := chunk.X + (x * stride)
-			localX, localZ := CoordinateIntToPixel(worldX, worldZ)
+			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
 			height := float32(int(pixelValue) - 32768)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/coords"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -167,7 +168,7 @@ func (tm *TerrainManager) GenerateTestLine() {
 	tm.ClearChunks()
 
 	// Load heightmaps/watermaps first
-	baseMap := CoordinateIntToMap(startX, startZ)
+	baseMap := coords.WorldToMap(startX, startZ)
 	if _, exists := tm.heightmaps[baseMap]; !exists {
 		log.Printf("Loading base map: %s", baseMap)
 		if err := tm.LoadHeightmap(baseMap); err != nil {
