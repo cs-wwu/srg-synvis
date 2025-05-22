@@ -549,7 +549,7 @@ func TestThreadSafety(t *testing.T) {
 
 	// Goroutine 1: Keep updating position
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			newPos := lin.Vec3{float32(i), float32(i * 2), float32(i * 3)}
 			cam.SetPosition(newPos)
 			time.Sleep(time.Microsecond)
@@ -559,7 +559,7 @@ func TestThreadSafety(t *testing.T) {
 
 	// Goroutine 2: Keep reading position
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			_ = cam.Position()
 			time.Sleep(time.Microsecond)
 		}
@@ -568,7 +568,7 @@ func TestThreadSafety(t *testing.T) {
 
 	// Goroutine 3: Keep updating vectors
 	go func() {
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			impl.motionHandler.ApplyRelativeRotation(0.01, 0.01, 0.01)
 			time.Sleep(time.Microsecond * 2)
 		}
@@ -586,8 +586,7 @@ func TestThreadSafety(t *testing.T) {
 func BenchmarkPositionAccess(b *testing.B) {
 	cam := NewCamera(testConfig)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = cam.Position()
 	}
 }
@@ -595,8 +594,7 @@ func BenchmarkPositionAccess(b *testing.B) {
 func BenchmarkViewMatrixGeneration(b *testing.B) {
 	cam := NewCamera(testConfig)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = cam.ViewMatrix()
 	}
 }
@@ -605,8 +603,7 @@ func BenchmarkRelativeRotation(b *testing.B) {
 	cam := NewCamera(testConfig)
 	impl := getCameraImpl(cam)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		impl.motionHandler.ApplyRelativeRotation(0.01, 0.01, 0.01)
 	}
 }

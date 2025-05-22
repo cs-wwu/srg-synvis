@@ -215,11 +215,11 @@ func (tm *TextureManager) DestroyAll() {
 }
 
 // GetStats returns statistics about the texture manager
-func (tm *TextureManager) GetStats() map[string]interface{} {
+func (tm *TextureManager) GetStats() map[string]any {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 
-	stats := map[string]interface{}{
+	stats := map[string]any{
 		"TotalTextures": len(tm.textures),
 		"MaxTextures":   tm.maxTextures,
 		"TexturesInUse": 0,
