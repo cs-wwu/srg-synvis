@@ -131,6 +131,8 @@ srg-synvis/
 ├── pkg/...
 ```
 
-## Side Goal
+## Side Goals
 
-- [ ] Separate shader pipeline for Boris
+- [x] Separate shader pipeline for Boris
+- [x] Add camera turn param for Boris
+- [x] Add render distance while I'm at it.
