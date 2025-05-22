@@ -7,11 +7,13 @@ import (
 	"os/exec"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/cs-wwu/srg-synvis/internal/sensors"
+
 	"github.com/stratoberry/go-gpsd"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
 )
+
+const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
@@ -68,7 +70,7 @@ func (sm *SensorManager) StartGPS() error {
 
 		// Apply smoothing to reduce GPS jitter (skip in testing mode)
 		if !sm.testingMode {
-			newX, newY, newZ = sensors.Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
+			newX, newY, newZ = Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
 		}
 
 		// Update camera position
@@ -143,7 +145,7 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 
 		// Apply smoothing to reduce sensor noise
 		if !first {
-			yaw, roll, pitch = sensors.Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
+			yaw, roll, pitch = Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
 		}
 		first = false
 
@@ -236,4 +238,18 @@ func (sm *SensorManager) SetSensorData(data SensorData) {
 		sm.camera.setOrientation(data.Yaw, data.Pitch, data.Roll)
 		sm.camera.motionHandler.ApplyAbsoluteRotation(data.Yaw, data.Pitch, data.Roll)
 	}
+}
+
+func Smoother32(new1, old1, new2, old2, new3, old3 float32) (float32, float32, float32) {
+	new1 = new1*DAMP + (1-DAMP)*old1
+	new2 = new2*DAMP + (1-DAMP)*old2
+	new3 = new3*DAMP + (1-DAMP)*old3
+	return new1, new2, new3
+}
+
+func Smoother64(new1, old1, new2, old2, new3, old3 float64) (float64, float64, float64) {
+	new1 = new1*DAMP + (1-DAMP)*old1
+	new2 = new2*DAMP + (1-DAMP)*old2
+	new3 = new3*DAMP + (1-DAMP)*old3
+	return new1, new2, new3
 }

@@ -33,7 +33,7 @@ func NewApplication(cfg models.AppConfig) *Application {
 
 	// Enable hardware if needed (moved here for cleaner initialization)
 	if cfg.UseHat {
-		if err := cam.EnableSensors("./internal/sensors/hat.py"); err != nil {
+		if err := cam.EnableSensors("./internal/camera/hat.py"); err != nil {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
