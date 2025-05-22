@@ -113,7 +113,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
 		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:          make(map[string]*Chunk),
-		chunkRegistry:   make(map[string]*spatial.ChunkInfo), // New registry
+		chunkRegistry:   make(map[string]*spatial.ChunkInfo),
 		shutdown:        make(chan struct{}),
 	}
 
@@ -161,15 +161,14 @@ func (tm *TerrainManager) LoadMap(coord string) error {
 func (tm *TerrainManager) GenerateTestLine() {
 	// Starting position based on the camera location (2D)
 	startX := int(tm.lastPosition[0])
-	startZ := int(tm.lastPosition[1]) // Use Y component as Z
+	startZ := int(tm.lastPosition[1])
 
 	// Clear any existing chunks
 	tm.ClearChunks()
 
-	// Get current map for heightmap/watermap access
+	// Load heightmaps/watermaps first
 	baseMap := CoordinateIntToMap(startX, startZ)
 	if _, exists := tm.heightmaps[baseMap]; !exists {
-		// Load the base map if not already loaded
 		log.Printf("Loading base map: %s", baseMap)
 		if err := tm.LoadHeightmap(baseMap); err != nil {
 			log.Printf("Error loading heightmap: %v", err)
@@ -181,63 +180,84 @@ func (tm *TerrainManager) GenerateTestLine() {
 		}
 	}
 
-	// Generate a line of 20 chunks extending along Z axis
-	numChunks := 20
-	chunkSpacing := CHUNK_SIZE // Space chunks out to see them clearly
-
-	log.Printf("Generating test line of %d chunks starting at (%d, %d)", numChunks, startX, startZ)
-
-	// Create chunks at increasing distances
-	for i := range numChunks {
-		// Calculate position - create a line going away from camera
+	// Step 1: Register chunks in spatial grid (no GPU data yet)
+	log.Printf("Registering %d chunks in spatial grid...", 200)
+	for i := range 200 {
 		chunkX := startX
-		chunkZ := startZ + (i * chunkSpacing)
+		chunkZ := startZ + (i * CHUNK_SIZE)
+		worldPos := lin.Vec2{float32(chunkX), float32(chunkZ)}
 
-		// Force different LOD levels for testing
-		forcedLODLevel := (i / 5) % 4 // 0,0,0,0,0, 1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3
+		// Register with placeholder LOD - spatial system will calculate real LOD
+		spatialChunk := tm.terrainGrid.RegisterChunk(worldPos, 0)
+		spatialChunk.Status = spatial.ChunkUnloaded // Start as unloaded
 
-		// Generate the chunk
-		mapCoords := CoordinateIntToMap(chunkX, chunkZ)
-		if _, exists := tm.heightmaps[mapCoords]; !exists {
-			// If we need a different map, load it
-			if err := tm.LoadHeightmap(mapCoords); err != nil {
-				log.Printf("Using base map for chunk %d: original map %s not found", i, mapCoords)
-				// Use base map instead
-				mapCoords = baseMap
-			} else {
-				// Also load the watermap
-				if err := tm.LoadWatermap(mapCoords); err != nil {
-					log.Printf("Error loading watermap: %v", err)
-				}
+		chunkKey := fmt.Sprintf("test_chunk_%d", i)
+		tm.chunkRegistry[chunkKey] = spatialChunk
+	}
+
+	// Step 2: Update visibility - this calculates distances and LODs
+	log.Printf("Updating spatial grid visibility...")
+	tm.updateVisibility()
+
+	// Step 3: Load GPU data for visible chunks using their calculated LODs
+	log.Printf("Loading GPU data for visible chunks...")
+	tm.loadVisibleChunks(baseMap)
+
+	log.Printf("Finished terrain loading process")
+	log.Printf("Spatial grid: %d total, %d visible chunks",
+		tm.terrainGrid.Stats().TotalChunks,
+		len(tm.terrainGrid.GetVisibleChunks()))
+}
+
+// New method: Load GPU data only for visible chunks
+func (tm *TerrainManager) loadVisibleChunks(baseMap string) {
+	visibleChunks := tm.terrainGrid.GetVisibleChunks()
+
+	for _, spatialChunk := range visibleChunks {
+		// Find the corresponding chunk key
+		var chunkKey string
+		for key, registered := range tm.chunkRegistry {
+			if registered == spatialChunk {
+				chunkKey = key
+				break
 			}
 		}
 
-		// Create a unique key for this test chunk
-		chunkKey := fmt.Sprintf("test_chunk_%d", i)
+		if chunkKey == "" {
+			continue // Skip if we can't find the key
+		}
 
-		// Load the chunk with the forced LOD level
-		tm.LoadTestChunk(chunkX, chunkZ, LODLevel(forcedLODLevel), chunkKey, mapCoords)
+		// Extract world coordinates from spatial chunk
+		worldPos := spatialChunk.WorldPos
+		chunkX := int(worldPos[0])
+		chunkZ := int(worldPos[1])
+
+		// Use the LOD calculated by spatial system
+		calculatedLOD := spatialChunk.LODLevel
+
+		// Load GPU chunk using spatial system's LOD decision
+		if tm.loadGPUChunk(chunkX, chunkZ, LODLevel(calculatedLOD), chunkKey, baseMap) {
+			// Mark as loaded in spatial system
+			spatialChunk.Status = spatial.ChunkLoaded
+		}
 	}
-
-	log.Printf("Finished generating test line with %d chunks", len(tm.chunks))
-	log.Printf("Terrain grid now has %d chunks", tm.terrainGrid.Stats().TotalChunks)
 }
 
-// Testing version of LoadChunk for testing specific LOD levels
-func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, chunkKey, mapCoords string) {
+// Renamed and simplified: just loads GPU data
+func (tm *TerrainManager) loadGPUChunk(chunkX, chunkZ int, lodLevel LODLevel, chunkKey, mapCoords string) bool {
 	heightmap := tm.heightmaps[mapCoords]
 	watermap := tm.watermaps[mapCoords]
 
 	if heightmap == nil || watermap == nil {
 		log.Printf("Warning: Map(s) not loaded for coords %s", mapCoords)
-		return
+		return false
 	}
 
-	// Create new GPU chunk with forced LOD level
+	// Create GPU chunk
 	chunk := &Chunk{
 		X:        chunkX,
 		Z:        chunkZ,
-		lodLevel: forcedLOD,
+		lodLevel: lodLevel,
 	}
 
 	// Calculate geometry
@@ -245,76 +265,64 @@ func (tm *TerrainManager) LoadTestChunk(chunkX, chunkZ int, forcedLOD LODLevel, 
 	calculateChunkIndices(chunk)
 	calculateChunkNormals(chunk)
 
-	// Allocate vertex buffer
+	// Allocate buffers using spatial system's LOD
 	vertexId := fmt.Sprintf("%s_vertices", chunkKey)
 	vertexDataSize := vk.DeviceSize(len(chunk.vertices) * VertexSize)
-	success, vertexOffset := tm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, int(forcedLOD))
+	success, vertexOffset := tm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, int(lodLevel))
 	if !success {
 		log.Printf("Failed to allocate vertex buffer for chunk %s", chunkKey)
-		return
+		return false
 	}
 
-	// Allocate index buffer
 	indexId := fmt.Sprintf("%s_indices", chunkKey)
 	indexDataSize := vk.DeviceSize(len(chunk.indices) * IndexSize)
-	success, indexOffset := tm.bucketAllocator.AllocateChunk(indexId, indexDataSize, int(forcedLOD))
+	success, indexOffset := tm.bucketAllocator.AllocateChunk(indexId, indexDataSize, int(lodLevel))
 	if !success {
-		// Free the previously allocated vertex buffer
-		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
 		log.Printf("Failed to allocate index buffer for chunk %s", chunkKey)
-		return
+		return false
 	}
 
-	// Prepare vertex data for upload
+	// Upload data (same as before)
 	vertexData := make([]byte, len(chunk.vertices)*VertexSize)
 	for i, vertex := range chunk.vertices {
 		copy(vertexData[i*VertexSize:], vertex.Data())
 	}
 
-	// Prepare index data for upload
 	indexData := make([]byte, len(chunk.indices)*IndexSize)
 	for i, index := range chunk.indices {
 		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
 	}
 
-	// Upload vertex data
-	err := tm.bucketAllocator.Upload(vertexId, int(forcedLOD), vertexData)
-	if err != nil {
-		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
-		tm.bucketAllocator.FreeChunk(indexId, int(forcedLOD))
+	if err := tm.bucketAllocator.Upload(vertexId, int(lodLevel), vertexData); err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
+		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
 		log.Printf("Failed to upload vertex data: %v", err)
-		return
+		return false
 	}
 
-	// Upload index data
-	err = tm.bucketAllocator.Upload(indexId, int(forcedLOD), indexData)
-	if err != nil {
-		tm.bucketAllocator.FreeChunk(vertexId, int(forcedLOD))
-		tm.bucketAllocator.FreeChunk(indexId, int(forcedLOD))
+	if err := tm.bucketAllocator.Upload(indexId, int(lodLevel), indexData); err != nil {
+		tm.bucketAllocator.FreeChunk(vertexId, int(lodLevel))
+		tm.bucketAllocator.FreeChunk(indexId, int(lodLevel))
 		log.Printf("Failed to upload index data: %v", err)
-		return
+		return false
 	}
 
-	// Update chunk with allocation information
+	// Store GPU chunk data
 	chunk.allocated = true
 	chunk.vertexOffset = vertexOffset
 	chunk.indexOffset = indexOffset
 	chunk.vertexBufferId = vertexId
 	chunk.indexBufferId = indexId
 
-	// Store GPU chunk in terrain manager
 	tm.chunks[chunkKey] = chunk
 
-	// Register chunk in terrain grid (2D coordinates)
-	worldPos := lin.Vec2{float32(chunkX), float32(chunkZ)}
-	spatialChunk := tm.terrainGrid.RegisterChunk(worldPos, int(forcedLOD))
-	spatialChunk.Status = spatial.ChunkLoaded
+	// Link GPU chunk to spatial chunk
+	if spatialChunk, exists := tm.chunkRegistry[chunkKey]; exists {
+		spatialChunk.UserData = chunk
+	}
 
-	// Store the reference to the spatial chunk
-	tm.chunkRegistry[chunkKey] = spatialChunk
-
-	// Store reference to GPU chunk in spatial chunk's UserData
-	spatialChunk.UserData = chunk
+	return true
 }
 
 func (tm *TerrainManager) checkForUpdates() {
@@ -329,9 +337,6 @@ func (tm *TerrainManager) checkForUpdates() {
 		// Log memory usage after loading all chunks
 		log.Printf("Memory stats after loading all test chunks: %s",
 			tm.bucketAllocator.GetDetailedStats())
-
-		// Update terrain grid visibility with current camera position
-		tm.updateVisibility()
 
 		log.Printf("Terrain grid stats after loading all test chunks: %s",
 			tm.terrainGrid.GetDetailedStats())
