@@ -44,12 +44,12 @@ type Application struct {
 
 	// config settings
 	renderDistance  float32
-	disableWarnings bool
 	fov             float32
+	disableWarnings bool
+	debugMode       bool
 
 	camera         camera.Camera
 	TerrainManager *TerrainManager
-	fpsCounter     *FPSCounter
 	WindowHandle   *glfw.Window
 
 	Gps bool

@@ -31,8 +31,9 @@ func parseConfig() models.AppConfig {
 	// Enhanced position flag
 	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
 	startDirString := flag.String("dir", "0,0,-1", "Starting Camera Direction (x,y,z)")
-
 	fov := flag.Float64("fov", 60.0, "Field of view (degrees)")
+
+	flag.BoolVar(&config.DebugMode, "debug", false, "Enable debug mode")
 
 	flag.Parse()
 

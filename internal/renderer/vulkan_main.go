@@ -37,53 +37,16 @@ func NewApplication(cfg models.AppConfig) *Application {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
-
-	fpsCounter := NewFPSCounter()
 	app := &Application{
 		camera:          cam,
-		fpsCounter:      fpsCounter,
 		Gps:             cfg.UseGPS,
 		Hat:             cfg.UseHat,
 		renderDistance:  cfg.RenderDistance,
 		disableWarnings: cfg.DisableTerrainWarnings,
+		debugMode:       cfg.DebugMode,
 	}
 
 	return app
-}
-
-type FPSCounter struct {
-	frames   uint32
-	lastTime float64
-	fpsTime  float64
-	fps      float64
-}
-
-func NewFPSCounter() *FPSCounter {
-	return &FPSCounter{
-		lastTime: glfw.GetTime(),
-		fpsTime:  glfw.GetTime(),
-	}
-}
-
-// Update FPS counter and print
-func (fc *FPSCounter) Update(visibleChunks int) {
-	currentTime := glfw.GetTime()
-	fc.frames++
-
-	// Update FPS every second
-	if currentTime-fc.fpsTime >= 1.0 {
-		fc.fps = float64(fc.frames) / (currentTime - fc.fpsTime)
-		fc.frames = 0
-		fc.fpsTime = currentTime
-
-		// Clear line and print new FPS
-		fmt.Printf("\r\033[K") // Clear current line
-		fmt.Printf("FPS: %.1f | Frame Time: %.2fms | Visible Chunks: %d",
-			fc.fps,
-			1000.0/fc.fps,
-			visibleChunks,
-		)
-	}
 }
 
 func (app *Application) VulkanContextCleanup() error {

@@ -105,6 +105,7 @@ func (app *Application) initUBO() {
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
 	app.ubo.RenderDistance = app.renderDistance
+	log.Printf("vulkan: render distance: %f", app.renderDistance)
 
 	// Fix the logic to match shader expectations
 	if app.disableWarnings {
