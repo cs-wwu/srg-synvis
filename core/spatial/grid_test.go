@@ -169,9 +169,9 @@ func TestRadiusQueries(t *testing.T) {
 		expectedCount int
 	}{
 		{50.0, 1},   // Just the center chunk
-		{150.0, 9},  // Center + 8 adjacent (same as 3D case)
-		{220.0, 21}, // Center + 8 adjacent + 12 in next ring (adjusted for 2D)
-		{320.0, 25}, // All 25 chunks (adjusted for 2D)
+		{150.0, 9},  // Center + 8 adjacent
+		{220.0, 13}, // Center + 8 adjacent + 4 cardinal at distance 200
+		{300.0, 25}, // All 25 chunks
 	}
 
 	for i, test := range tests {
@@ -184,8 +184,8 @@ func TestRadiusQueries(t *testing.T) {
 
 	// Test ring query (adjusted for 2D)
 	ring := grid.GetChunksInRing(center, 120.0, 180.0)
-	if len(ring) != 8 {
-		t.Errorf("Expected 8 chunks in ring, got %d", len(ring))
+	if len(ring) != 4 {
+		t.Errorf("Expected 4 chunks in ring, got %d", len(ring))
 	}
 }
 
@@ -294,8 +294,8 @@ func TestFrustumCulling(t *testing.T) {
 	// Create chunks in a line along the Z axis
 	positions := []lin.Vec2{
 		{0, 100},    // Directly ahead
-		{100, 100},  // To the right
-		{-100, 100}, // To the left
+		{150, 100},  // Far to the right (should be outside 60° FOV)
+		{-150, 100}, // Far to the left (should be outside 60° FOV)
 		{0, -100},   // Behind
 	}
 
@@ -318,10 +318,10 @@ func TestFrustumCulling(t *testing.T) {
 		name     string
 		expected bool
 	}{
-		{0, "Ahead", true},   // Should be visible
-		{1, "Right", false},  // Outside FOV
-		{2, "Left", false},   // Outside FOV
-		{3, "Behind", false}, // Behind camera
+		{0, "Ahead", true},     // Should be visible
+		{1, "FarRight", false}, // Outside FOV (far to the right)
+		{2, "FarLeft", false},  // Outside FOV (far to the left)
+		{3, "Behind", false},   // Behind camera
 	}
 
 	for _, test := range tests {
