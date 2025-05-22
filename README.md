@@ -5,17 +5,27 @@ Synthetic Vision System (SVS) for Systems Research Group at WWU
 ## Running the Application
 
 ```bash
-go run cmd/svs/main.go
+go run ./cmd/svs
 ```
 
 ### Command Arguments
 
 ```bash
-go run cmd/svs/main.go
-  -gps                      Enable GPS
-  -hat                      Enable Hat
-  -pos     <"lat,lon,hgt">  Starting Camera Position (lat,lon,height) where height is in meters (default "48.0,-123.0,1300") 
-  -monitor <int>            Monitor selection (0 = windowed, 1 = primary monitor, etc.)
+go run ./cmd/svs
+  -gps
+     Enable GPS
+  -hat
+     Enable Hat
+  -monitor int
+     Monitor selection (0 = windowed, 1 = primary monitor, etc.)
+  -pos string
+     Starting Camera Position (lat,lon,height) where height is in meters (default "48.5,-123.5,2600")
+  -dir string
+     Starting Camera Direction (x,y,z) - normalized automatically (default "0,0,-1")
+  -render-distance float
+     Maximum render distance in world units (default 5000)
+  -disable-warnings
+     Disable terrain height warnings (red coloring)
 ```
 
 ### Download Tool
@@ -23,7 +33,7 @@ go run cmd/svs/main.go
 The Download api must have at least one "Download" selection (nasa/faa/osm)
 
 ```bash
-go run cmd/download/main.go
+go run ./cmd/download
   -nasa             Download NASA elevation data
   -faa              Download FAA airport/navigation data
   -osm              Download OpenStreetMap data
@@ -46,12 +56,19 @@ sudo ./install.sh
 
 1. Download the latest version of Go
 
-    ```bash
-    cd ~
-    wget https://go.dev/dl/go1.23.5.linux-arm64.tar.gz
-    sudo tar -xzf go1.23.5.linux-arm64.tar.gz
-    rm go1.23.5.linux-arm64.tar.gz
-    ```
+    1. Through apt
+
+        ```bash
+        sudo apt -y install golang-go
+        ```
+    2. Or manually
+
+        ```bash
+        cd ~
+        wget https://go.dev/dl/go1.24.2.linux-arm64.tar.gz
+        sudo tar -xzf go1.24.2.linux-arm64.tar.gz
+        rm go1.24.2.linux-arm64.tar.gz
+        ```
 
 2. Add the following to the bottom of your `~/.profile`
 
@@ -71,8 +88,10 @@ sudo ./install.sh
 4. Install Vulkan Libraries
 
     ```bash
-    sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev
+    sudo apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxrandr-dev
     ```
+
+    You may run into issues with the `vulkan-validationlayers-dev` package. If so, use the following package instead: `vulkan-utility-libraries-dev`.
 
 5. Run `vkcube` and `go run cmd/svs/main.go` to test installation
 

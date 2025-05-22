@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/sensors"
+
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/stratoberry/go-gpsd"
 	quat "github.com/ungerik/go3d/float64/quaternion"
