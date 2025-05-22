@@ -31,7 +31,7 @@ implement the dynamic texture swapping.
 
 # Terrain System Implementation TODO List
 
-## Phase 1: Core Memory System
+## Core Memory System
 
 - [x] Implement Memory Allocator interface
 - [x] Build Bucket Allocator with percentage-based allocation
@@ -39,7 +39,7 @@ implement the dynamic texture swapping.
 - [x] Implement basic Memory Manager
 - [x] Add simple Eviction Strategy
 
-## Phase 2: Spatial Management System
+## Spatial Management System
 
 - [x] Implement Grid System with cell-based storage
 - [x] Build Cell Lookup for efficient spatial queries
@@ -47,31 +47,90 @@ implement the dynamic texture swapping.
 - [x] Create Chunk Tracker to manage chunk states
 - [x] Implement Priority Calculator for chunk importance
 
-## Phase 3: Basic Rendering Integration
+## Basic Rendering Integration
 
-- [ ] Create simplified Terrain Manager
+- [x] Create simplified Terrain Manager
 - [ ] Implement basic Chunk Renderer
-- [ ] Integrate Memory System with Rendering
+- [x] Integrate Memory System with Rendering
 - [x] Implement Texture Manager
   - [x] Create texture loading/unloading functionality
   - [x] Implement LRU-based texture cache (max ~10 textures)
   - [ ] Add texture-to-chunk mapping system
-  - [ ] Integrate with asche for Vulkan operations
+  - [x] Integrate with asche for Vulkan operations
 - [ ] Add minimal ocean rendering
-- [ ] Test basic functionality
+- [x] Test basic functionality
 
-## Phase 4: Advanced Features
+## Chunk Streaming
 
-- [ ] Implement Stitching Helper
-- [ ] Enhance Ocean Renderer with instancing
-- [ ] Add multi-threaded chunk processing
-- [ ] Implement advanced eviction strategies
-- [ ] Optimize for performance
+- [ ] Decides WHICH assets to load (coordinates with Asset Manager)
+- [ ] Manages chunk lifecycle (unloaded → loading → ready → evicting)
+- [ ] Coordinates between TerrainGrid, BucketAllocator, AssetManager
+- [ ] Handles loading strategy and eviction policy
+- [ ] Multithreading and async coordination
 
-## Phase 5: Refinement and Optimization
+## Component Interfaces
 
-- [ ] Implement texture blending for terrain transitions
-- [ ] Add detail textures for close-up rendering
-- [ ] Implement texture LOD system (mipmaps)
-- [ ] Optimize texture memory usage
-- [ ] Add debugging and visualization tools for texture usage
+- [ ] Define StreamManager → TerrainGrid interface
+- [ ] Define StreamManager → BucketAllocator interface  
+- [ ] Define StreamManager → AssetLoader interface
+- [ ] Define StreamManager → AssetManager interface
+- [ ] Define TerrainRenderer → StreamManager interface
+- [ ] Define AssetManager interface (what raw data it provides)
+
+## Asset Manager
+
+- [ ] Load/decode heightmap and watermap files on demand
+- [ ] Cache raw image data (LRU eviction by file, not chunk)
+- [ ] Handle file I/O errors gracefully
+- [ ] No knowledge of chunks or GPU - just provides raw data
+
+## New Terrain Renderer
+
+- [ ] Pure rendering of chunks
+- [ ] Query StreamManager for "what should I draw?"
+- [ ] Bind appropriate textures per chunk
+- [ ] Handle LOD transitions/stitching
+
+## Memory Enhancement
+
+- [ ] Dynamically decide on size and bucket sizes based on GPU
+- [ ] Use a single buffer that is locally managed/split for faster allocation
+- [ ] Change to `allocator`
+  - [ ] Add capacity for a "models" folder for instanced rendering
+
+## Redo Chunk Calculations
+
+- [ ] Implement Stitching Helper or Redo Chunk calculations
+
+## New file structure
+
+```sh
+srg-synvis/
+├── cmd/...
+├── core/                    # Core systems (no dependencies on each other)
+│   ├── memory/
+│   ├── spatial/
+│   └── textures/
+├── internal/
+│   ├── assets/              # NEW - Pure file I/O
+│   │   ├── loader.go        # Raw heightmap/watermap loading
+│   │   └── cache.go         # LRU cache for raw image data
+│   ├── streaming/           # NEW - Coordination and strategy
+│   │   ├── manager.go       # Main StreamManager
+│   │   ├── strategy.go      # Loading/eviction strategies
+│   │   └── state.go         # Chunk state machine
+│   ├── renderer/            # SIMPLIFIED - Pure rendering
+│   │   ├── terrain.go       # New clean TerrainRenderer
+│   │   ├── chunk.go         # Chunk mesh generation
+│   │   ├── camera.go
+│   │   ├── vulkan_*.go      # Vulkan setup/management
+│   │   └── types.go
+│   ├── models/
+│   ├── processor/           # Maybe move to internal/assets?
+│   └── sensors/
+├── pkg/...
+```
+
+## Side Goal
+
+- [ ] Separate shader pipeline for Boris
