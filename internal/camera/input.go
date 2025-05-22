@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
@@ -136,7 +137,7 @@ func (ip *InputProcessor) processDebugInput(window *glfw.Window) {
 		yaw, pitch, roll := ip.camera.getOrientation()
 		if yaw != 0 || pitch != 0 || roll != 0 {
 			fmt.Printf("Orientation: Yaw=%.3f°, Pitch=%.3f°, Roll=%.3f°\n",
-				yaw*180/3.14159, pitch*180/3.14159, roll*180/3.14159)
+				yaw*180/math.Pi, pitch*180/math.Pi, roll*180/math.Pi)
 		}
 	}
 }
