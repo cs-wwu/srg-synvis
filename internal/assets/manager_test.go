@@ -256,8 +256,6 @@ func TestMemoryManagement(t *testing.T) {
 		float64(stats.TotalMemory) > float64(expectedMemory)*(1+tolerance) {
 		t.Errorf("Memory usage %d != expected %d", stats.TotalMemory, expectedMemory)
 	}
-
-	t.Logf("Stats: %+v", stats)
 }
 
 // Helper function to create test map files
