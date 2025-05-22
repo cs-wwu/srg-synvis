@@ -3,12 +3,8 @@ package renderer
 import (
 	"encoding/binary"
 	"fmt"
-	"image"
-	"image/color"
-	"image/png"
 	"log"
 	"math"
-	"os"
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
@@ -47,8 +43,6 @@ type TerrainManager struct {
 	lastPosition  lin.Vec2
 	lastUpdatePos lin.Vec2
 
-	heightmaps    map[string]*image.Gray16
-	watermaps     map[string]*image.Gray
 	chunks        map[string]*Chunk
 	chunkRegistry map[string]*spatial.ChunkInfo // chunk IDs to spatial
 
@@ -117,8 +111,6 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		terrainGrid:     terrainGrid,
 		assetManager:    assetManager,
 		lastPosition:    lin.Vec2{0.0, 0.0},
-		heightmaps:      make(map[string]*image.Gray16, MAX_IMAGE_MAPS),
-		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:          make(map[string]*Chunk),
 		chunkRegistry:   make(map[string]*spatial.ChunkInfo),
 		debugMode:       debugMode,
@@ -151,22 +143,6 @@ func (tm *TerrainManager) ClearChunks() {
 	tm.terrainGrid.Clear()
 }
 
-// LoadMap loads a heightmap and its associated watermap
-func (tm *TerrainManager) LoadMap(coord string) error {
-	// Skip heightmaps if already loaded
-	if _, exists := tm.heightmaps[coord]; !exists {
-		if err := tm.LoadHeightmap(coord); err != nil {
-			return err
-		}
-		if err := tm.LoadWatermap(coord); err != nil {
-			return err
-		}
-	}
-
-	log.Printf("Loaded map: %s", coord)
-	return nil
-}
-
 func (tm *TerrainManager) GenerateTestLine() {
 	// Starting position based on the camera location (2D)
 	startX := int(tm.lastPosition[0])
@@ -177,16 +153,9 @@ func (tm *TerrainManager) GenerateTestLine() {
 
 	// Load heightmaps/watermaps first
 	baseMap := coords.WorldToMap(startX, startZ)
-	if _, exists := tm.heightmaps[baseMap]; !exists {
-		log.Printf("Loading base map: %s", baseMap)
-		if err := tm.LoadHeightmap(baseMap); err != nil {
-			log.Printf("Error loading heightmap: %v", err)
-			return
-		}
-		if err := tm.LoadWatermap(baseMap); err != nil {
-			log.Printf("Error loading watermap: %v", err)
-			return
-		}
+	if _, err := tm.assetManager.LoadMapData(baseMap); err != nil {
+		log.Printf("Failed to load map data for %s: %v", baseMap, err)
+		return
 	}
 
 	// Step 1: Register chunks in spatial grid (no GPU data yet)
@@ -260,11 +229,9 @@ func (tm *TerrainManager) loadVisibleChunks(baseMap string) {
 
 // Loads GPU chunk data directly
 func (tm *TerrainManager) loadGPUChunk(chunkX, chunkZ int, lodLevel LODLevel, chunkKey, mapCoords string) bool {
-	heightmap := tm.heightmaps[mapCoords]
-	watermap := tm.watermaps[mapCoords]
-
-	if heightmap == nil || watermap == nil {
-		log.Printf("Warning: Map(s) not loaded for coords %s", mapCoords)
+	mapData, err := tm.assetManager.LoadMapData(mapCoords)
+	if err != nil {
+		log.Printf("Failed to get map data for %s: %v", mapCoords, err)
 		return false
 	}
 
@@ -276,7 +243,7 @@ func (tm *TerrainManager) loadGPUChunk(chunkX, chunkZ int, lodLevel LODLevel, ch
 	}
 
 	// Calculate geometry
-	calculateChunkVertices(heightmap, watermap, chunk)
+	calculateChunkVertices(mapData.Heightmap, mapData.Watermap, chunk)
 	calculateChunkIndices(chunk)
 	calculateChunkNormals(chunk)
 
@@ -397,123 +364,6 @@ func (tm *TerrainManager) updateLoop() {
 			tm.checkForUpdates()
 		}
 	}
-}
-
-// generateOceanHeightmap creates a flat heightmap (all water)
-func (tm *TerrainManager) generateOceanHeightmap() *image.Gray16 {
-	// Create a new Gray16 image with the correct dimensions
-	img := image.NewGray16(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
-
-	// Fill with a constant elevation value slightly below sea level
-	// 32768 is the zero point (sea level) in our 16-bit heightmap
-	oceanLevel := uint16(32760) // Slightly below sea level
-
-	for y := 0; y <= MAP_LENGTH; y++ {
-		for x := 0; x <= MAP_LENGTH; x++ {
-			img.SetGray16(x, y, color.Gray16{Y: oceanLevel})
-		}
-	}
-
-	return img
-}
-
-// generateOceanWatermap creates a watermap with all water
-func (tm *TerrainManager) generateOceanWatermap() *image.Gray {
-	// Create a new Gray image with the correct dimensions
-	img := image.NewGray(image.Rect(0, 0, MAP_LENGTH+1, MAP_LENGTH+1))
-
-	// Fill with water value (255 represents water in our implementation)
-	waterValue := uint8(255)
-
-	for y := 0; y <= MAP_LENGTH; y++ {
-		for x := 0; x <= MAP_LENGTH; x++ {
-			img.SetGray(x, y, color.Gray{Y: waterValue})
-		}
-	}
-
-	return img
-}
-
-// Loads a watermap (coord.swb.png) into the TerrainManager
-func (tm *TerrainManager) LoadWatermap(coord string) error {
-	filepath := MAPS_PATH + coord + WATERMAP_EXTENSION
-
-	// Try to open the file first
-	file, err := os.Open(filepath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// File doesn't exist, create an ocean watermap instead
-			log.Printf("Watermap file not found for %s, generating ocean tile", coord)
-			tm.watermaps[coord] = tm.generateOceanWatermap()
-			return nil
-		}
-		return fmt.Errorf("failed to open watermap file: %w", err)
-	}
-	defer file.Close()
-
-	// If file exists, proceed with normal loading
-	rawImg, err := png.Decode(file)
-	if err != nil {
-		return fmt.Errorf("failed to decode watermap: %w", err)
-	}
-
-	// Ensure the image is grayscale
-	grayImg, ok := rawImg.(*image.Gray)
-	if !ok {
-		return fmt.Errorf("watermap is not in 8-bit grayscale format")
-	}
-
-	tm.watermaps[coord] = grayImg
-	return nil
-}
-
-// Loads a heightmap (coord.hgt.png) into the TerrainManager
-func (tm *TerrainManager) LoadHeightmap(coord string) error {
-	filepath := MAPS_PATH + coord + HEIGHTMAP_EXTENSION
-
-	// Try to open the file first
-	file, err := os.Open(filepath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// File doesn't exist, create an ocean heightmap instead
-			log.Printf("Heightmap file not found for %s, generating ocean tile", coord)
-			tm.heightmaps[coord] = tm.generateOceanHeightmap()
-			return nil
-		}
-		return fmt.Errorf("failed to open heightmap file: %w", err)
-	}
-	defer file.Close()
-
-	// If file exists, proceed with normal loading
-	rawImg, err := png.Decode(file)
-	if err != nil {
-		return fmt.Errorf("failed to decode heightmap: %w", err)
-	}
-
-	// Ensure the image is grayscale
-	grayImg, ok := rawImg.(*image.Gray16)
-	if !ok {
-		return fmt.Errorf("heightmap is not in 16-bit grayscale format")
-	}
-
-	tm.heightmaps[coord] = grayImg
-	return nil
-}
-
-// Unloads both the water and heightmaps
-func (tm *TerrainManager) UnloadMaps(coord string) {
-	tm.unloadWatermap(coord)
-	tm.unloadHeightmap(coord)
-}
-
-// Unloads a watermap (coord) from the TerrainManager
-func (tm *TerrainManager) unloadWatermap(coord string) {
-	delete(tm.watermaps, coord)
-}
-
-// Unloads a heightmap (coord) from the TerrainManager
-func (tm *TerrainManager) unloadHeightmap(coord string) {
-	delete(tm.heightmaps, coord)
 }
 
 func (tm *TerrainManager) Destroy() {
