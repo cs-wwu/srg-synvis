@@ -138,6 +138,7 @@ srg-synvis/
 - [x] Separate shader pipeline for Boris
 - [x] Add camera turn param for Boris
 - [x] Add render distance while I'm at it.
+- [x] Add FOV as flag
 - [x] Take the camera out of the renderer
 - [x] Refactor the camera
   - [x] Input Interface
