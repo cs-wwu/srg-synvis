@@ -60,7 +60,7 @@ implement the dynamic texture swapping.
 - [ ] Add minimal ocean rendering
 - [x] Test basic functionality
 
-## Chunk Streaming
+## Stream Manager
 
 - [ ] Decides WHICH assets to load (coordinates with Asset Manager)
 - [ ] Manages chunk lifecycle (unloaded → loading → ready → evicting)
@@ -79,10 +79,10 @@ implement the dynamic texture swapping.
 
 ## Asset Manager
 
-- [ ] Load/decode heightmap and watermap files on demand
-- [ ] Cache raw image data (LRU eviction by file, not chunk)
-- [ ] Handle file I/O errors gracefully
-- [ ] No knowledge of chunks or GPU - just provides raw data
+- [x] Load/decode heightmap and watermap files on demand
+- [x] Cache raw image data (LRU eviction by file, not chunk)
+- [x] Handle file I/O errors gracefully
+- [x] No knowledge of chunks or GPU - just provides raw data
 
 ## New Terrain Renderer
 
