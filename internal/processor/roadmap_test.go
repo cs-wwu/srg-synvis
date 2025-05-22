@@ -1,4 +1,4 @@
-package test
+package processor
 
 import (
 	"errors"
@@ -9,12 +9,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/cs-wwu/srg-synvis/internal/processor"
 )
 
 func TestNoMaps(t *testing.T) {
-	err := processor.GenerateOsmPng(nil, "testdir", processor.OSMURL)
+	err := GenerateOsmPng(nil, "testdir", OSMURL)
 	if err == nil {
 		t.Errorf("ran on nil, wanted err, got nil")
 	}
@@ -22,34 +20,34 @@ func TestNoMaps(t *testing.T) {
 
 func TestEmptyString(t *testing.T) {
 	maps := []string{"n01e001"}
-	err := processor.GenerateOsmPng(maps, "", processor.OSMURL)
+	err := GenerateOsmPng(maps, "", OSMURL)
 	if err == nil {
 		t.Errorf("ran on targetDir='', wanted err, got nil")
 	}
 }
 
 func TestConvertCoordsToPngIndex(t *testing.T) {
-	highways := []processor.Element{}
-	testElement := processor.Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
+	highways := []Element{}
+	testElement := Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
 	highways = append(highways, testElement)
-	roads := [][]processor.Point{}
-	nodes := make(map[int64]processor.Element)
+	roads := [][]Point{}
+	nodes := make(map[int64]Element)
 	lat := 48
 	lon := -122
 	for i := range highways {
-		tempRoad := []processor.Point{}
+		tempRoad := []Point{}
 		for j := range highways[i].Nodes {
 			node := nodes[highways[i].Nodes[j]]
 			// Transforms the lat/lon into x/y coordinates
-			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (processor.Scale * processor.ImgLength))
-			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (processor.Scale * processor.ImgLength))
-			index := processor.Point{X: x, Y: y}
+			y := math.Round((1 - (math.Abs(node.Lat) - math.Abs(float64(lat)))) * (Scale * ImgLength))
+			x := math.Round((1 - (math.Abs(node.Lon) - math.Abs(float64(lon)+1))) * (Scale * ImgLength))
+			index := Point{X: x, Y: y}
 			tempRoad = append(tempRoad, index)
 		}
 		roads = append(roads, tempRoad)
 	}
 
-	testRoads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
+	testRoads := ConvertCoordsToPngIndex(highways, nodes, Scale, lat, lon)
 	for i := range roads {
 		for j := range roads[i] {
 			if roads[i][j] != testRoads[i][j] {
@@ -62,39 +60,39 @@ func TestConvertCoordsToPngIndex(t *testing.T) {
 }
 
 func TestCoordToString(t *testing.T) {
-	retA := processor.CoordToString(-49, -20)
+	retA := CoordToString(-49, -20)
 	if retA != "s49w020" {
 		t.Errorf("ran on (-49, -20), wanted 's49w020', got %s", retA)
 	}
 
-	retB := processor.CoordToString(49, -20)
+	retB := CoordToString(49, -20)
 	if retB != "n49w020" {
 		t.Errorf("ran on (49, -20), wanted 'n49w020', got %s", retB)
 	}
 
-	retC := processor.CoordToString(-49, 20)
+	retC := CoordToString(-49, 20)
 	if retC != "s49e020" {
 		t.Errorf("ran on (-49, 20), wanted 's49e020', got %s", retC)
 	}
 
-	retD := processor.CoordToString(49, 20)
+	retD := CoordToString(49, 20)
 	if retD != "n49e020" {
 		t.Errorf("ran on (49, 20), wanted 'n49e020', got %s", retD)
 	}
 
-	retE := processor.CoordToString(0, 0)
+	retE := CoordToString(0, 0)
 	if retE != "n00e000" {
 		t.Errorf("ran on (0, 0), wanted 'n00e000', got %s", retE)
 	}
 }
 
 func TestDrawLine(t *testing.T) {
-	start := processor.Point{X: 1, Y: 8}
-	end := processor.Point{X: 10, Y: 8}
+	start := Point{X: 1, Y: 8}
+	end := Point{X: 10, Y: 8}
 	width := 4.0
 	baseImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	testImage := image.NewRGBA(image.Rect(0, 0, 100, 100))
-	corners := []processor.Point{
+	corners := []Point{
 		{X: 1, Y: 10},
 		{X: 1, Y: 6},
 		{X: 10, Y: 6},
@@ -115,15 +113,15 @@ func TestDrawLine(t *testing.T) {
 
 	for y := 6; y <= 10; y++ {
 		for x := 1; x <= 10; x++ {
-			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
+			if IsPointInPolygon(float64(x), float64(y), corners) {
 				baseImage.Set(x, y, color.Opaque)
 				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
-	processor.DrawLine(start, end, width, testImage, color.Opaque)
-	processor.DrawLine(start, end, width, testImage, color.Opaque)
+	DrawLine(start, end, width, testImage, color.Opaque)
+	DrawLine(start, end, width, testImage, color.Opaque)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {
@@ -132,7 +130,7 @@ func TestDrawLine(t *testing.T) {
 	}
 }
 func TestDrawFilledPolygon(t *testing.T) {
-	corners := []processor.Point{
+	corners := []Point{
 		{X: 1, Y: 1},
 		{X: 11, Y: 1},
 		{X: 1, Y: 11},
@@ -149,15 +147,15 @@ func TestDrawFilledPolygon(t *testing.T) {
 	}
 	for y := 1; y <= 11; y++ {
 		for x := 1; x <= 11; x++ {
-			if processor.IsPointInPolygon(float64(x), float64(y), corners) {
+			if IsPointInPolygon(float64(x), float64(y), corners) {
 				baseImage.Set(x, y, color.Opaque)
 				baseImage.Set(x, y, color.Opaque)
 			}
 		}
 	}
 
-	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
-	processor.DrawFilledPolygon(testImage, corners, color.Opaque)
+	DrawFilledPolygon(testImage, corners, color.Opaque)
+	DrawFilledPolygon(testImage, corners, color.Opaque)
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {
@@ -339,7 +337,7 @@ func TestMakeApiRequest(t *testing.T) {
 			defer testServer.Close()
 
 			maps := []int{48, -123}
-			gotElements, gotErr := processor.MakeApiRequest(testServer.URL, maps)
+			gotElements, gotErr := MakeApiRequest(testServer.URL, maps)
 
 			if tc.wantErr != nil && gotErr == nil {
 				t.Errorf("wanted err: %e, got err: %e", tc.wantErr, gotErr)
@@ -353,44 +351,44 @@ func TestMakeApiRequest(t *testing.T) {
 	}
 }
 func TestIsPointInPolygon(t *testing.T) {
-	polygon := []processor.Point{{X: 0.0, Y: 0.0}, {X: 1.0, Y: 0.0}, {X: 1.0, Y: 1.0}, {X: 0.0, Y: 1.0}}
+	polygon := []Point{{X: 0.0, Y: 0.0}, {X: 1.0, Y: 0.0}, {X: 1.0, Y: 1.0}, {X: 0.0, Y: 1.0}}
 
-	retA := processor.IsPointInPolygon(-1, -1, polygon)
+	retA := IsPointInPolygon(-1, -1, polygon)
 	if retA {
 		t.Errorf("ran on (-1, -1), wanted false, got true")
 	}
 
-	retB := processor.IsPointInPolygon(0, 0, polygon)
+	retB := IsPointInPolygon(0, 0, polygon)
 	if !retB {
 		t.Errorf("ran on (0, 0), wanted true, got false")
 	}
 
-	retC := processor.IsPointInPolygon(0.5, 0.5, polygon)
+	retC := IsPointInPolygon(0.5, 0.5, polygon)
 	if !retC {
 		t.Errorf("ran on (0.5, 0.5), wanted true, got false")
 	}
 
-	retD := processor.IsPointInPolygon(-1.0, 0.5, polygon)
+	retD := IsPointInPolygon(-1.0, 0.5, polygon)
 	if retD {
 		t.Errorf("ran on (-1.0, 0.5), wanted false, got true")
 	}
 
-	retF := processor.IsPointInPolygon(-1.0, 1.0, polygon)
+	retF := IsPointInPolygon(-1.0, 1.0, polygon)
 	if retF {
 		t.Errorf("ran on (-1.0, 1.0), wanted false got true")
 	}
 }
 
 func TestDrawRoads(t *testing.T) {
-	highways := []processor.Element{}
-	testElement := processor.Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
+	highways := []Element{}
+	testElement := Element{ID: 1, Type: "way", Lat: 48.9855963, Lon: -122.734034, Nodes: []int64{1}}
 	highways = append(highways, testElement)
-	nodes := make(map[int64]processor.Element)
+	nodes := make(map[int64]Element)
 	lat := 48
 	lon := -122
-	roads := processor.ConvertCoordsToPngIndex(highways, nodes, processor.Scale, lat, lon)
-	baseImage := image.NewRGBA(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
-	testImage := image.NewRGBA(image.Rect(0, 0, processor.Scale*processor.ImgLength, processor.Scale*processor.ImgLength))
+	roads := ConvertCoordsToPngIndex(highways, nodes, Scale, lat, lon)
+	baseImage := image.NewRGBA(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
+	testImage := image.NewRGBA(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
 
 	// Connect all the points
 	for r := range roads {
@@ -398,13 +396,13 @@ func TestDrawRoads(t *testing.T) {
 		for p := range len(road) - 1 {
 			p1 := road[p]
 			p2 := road[p+1]
-			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
-			processor.DrawLine(p1, p2, 8, baseImage, color.Opaque)
+			DrawLine(p1, p2, 8, baseImage, color.Opaque)
+			DrawLine(p1, p2, 8, baseImage, color.Opaque)
 		}
 	}
 
 	coords := []int{lat, lon}
-	processor.DrawRoads(highways, nodes, coords, testImage, "motorway")
+	DrawRoads(highways, nodes, coords, testImage, "motorway")
 
 	for p := range baseImage.Pix {
 		if baseImage.Pix[p] != testImage.Pix[p] {

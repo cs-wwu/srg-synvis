@@ -1,4 +1,4 @@
-package test
+package renderer
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cs-wwu/srg-synvis/internal/renderer"
 	"github.com/stratoberry/go-gpsd"
 	lin "github.com/xlab/linmath"
 )
@@ -136,19 +135,19 @@ func (m *MockGPSD) Close() {
 // Sensehat tests:
 // SenseData tests processing sensehat data correctly
 func TestSenseData(t *testing.T) {
-	testCamera := renderer.NewCamera(false, startVec, startDir)
+	testCamera := NewCamera(false, startVec, startDir)
 
 	// test if sense fails on bad data
-	md := testCamera.TrySense("./badhat.py")
+	md := testCamera.TrySense("../../test/badhat.py")
 	// want to send [0.596, 0.263] to sense hat and see if that breaks it
-	if md != renderer.ParseInput {
-		t.Errorf("Ran with bad input, expected renderer.ParseInput mode")
+	if md != ParseInput {
+		t.Errorf("Ran with bad input, expected ParseInput mode")
 	}
 
 	// test if sense works on good data
 	// test roll
 	fmt.Println("starting roll test")
-	testCamera.TrySense("./fakehat.py")
+	testCamera.TrySense("../../test/fakehat.py")
 	if !(equal(float32(testCamera.Roll), 0.263)) {
 		t.Errorf("Expected rollAngle to be 0.263, roll was %f", testCamera.Roll)
 	}
@@ -157,9 +156,9 @@ func TestSenseData(t *testing.T) {
 // WMM tests if correct declination is found and applied to yaw
 func TestWMM(t *testing.T) {
 	// Initialize camera to 48.0, -123.0, 1300
-	c := renderer.NewCamera(false, startVec, startDir)
+	c := NewCamera(false, startVec, startDir)
 
-	c.TrySense("./fakehat2.py")
+	c.TrySense("../../test/fakehat2.py")
 	// Check if starting coordinate declination is within actual range ~15.30
 
 	if !(equal(float32(c.Yaw), 15.30)) {
@@ -170,7 +169,7 @@ func TestWMM(t *testing.T) {
 // GPS tests:
 // NoFix tests if TryGPS handles when the gps has no fix (position should not change)
 func NoFix(t *testing.T) {
-	testCamera := renderer.NewCamera(false, startVec, startDir)
+	testCamera := NewCamera(false, startVec, startDir)
 
 	mock := NewMockGPSD(t)
 	defer mock.Close()
@@ -197,7 +196,7 @@ func NoFix(t *testing.T) {
 
 // WorkingGPS tests that data is correctly parsed and the position vector is updated
 func WorkingGPS(t *testing.T) {
-	testCamera := renderer.NewCamera(false, startVec, startDir)
+	testCamera := NewCamera(false, startVec, startDir)
 
 	mock := NewMockGPSD(t)
 	defer mock.Close()
@@ -217,8 +216,8 @@ func WorkingGPS(t *testing.T) {
 	mock.SendTPV(expectedLat, expectedLon, expectedAlt, gpsd.Mode3D)
 	time.Sleep(500 * time.Millisecond)
 
-	expectedX, expectedZ := renderer.CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
-	expectedY := float32(expectedAlt) * renderer.HEIGHT_CONVERSION
+	expectedX, expectedZ := CoordinateGPSFloatToFloat(float32(expectedLat), float32(expectedLon))
+	expectedY := float32(expectedAlt) * HEIGHT_CONVERSION
 
 	pos := testCamera.Pos
 	if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
@@ -230,7 +229,7 @@ func WorkingGPS(t *testing.T) {
 // Camera tests:
 
 func TestInitCamera(t *testing.T) {
-	c := renderer.NewCamera(false, startVec, lin.Vec3{0, 0, -1})
+	c := NewCamera(false, startVec, lin.Vec3{0, 0, -1})
 
 	// test pos
 	if c.Pos[0] != -442800 || c.Pos[1] != 162.11664 || c.Pos[2] != -172800 {
@@ -243,7 +242,7 @@ func TestInitCamera(t *testing.T) {
 }
 
 func QuatRot(t *testing.T) {
-	c := renderer.NewCamera(false, startVec, startDir)
+	c := NewCamera(false, startVec, startDir)
 
 	c.QuatRotateRel((math.Pi / 2), 0, 0)
 	if !equal(c.Front[0], 1.0) || !equal(c.Front[1], 0.0) || !equal(c.Front[2], 0.0) {
