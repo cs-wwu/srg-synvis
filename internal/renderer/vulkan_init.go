@@ -942,7 +942,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize TerrainManager
-	app.TerrainManager = NewTerrainManager(&dev, &memProps)
+	app.TerrainManager = NewTerrainManager(&dev, &memProps, app.debugMode)
+	log.Printf("vulkan: terrain manager initialized")
 	// Just update position - the terrain manager will handle loading in its own thread
 	app.TerrainManager.UpdateLastPosition(app.camera.Position())
 

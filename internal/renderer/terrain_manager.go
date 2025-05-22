@@ -54,7 +54,8 @@ type TerrainManager struct {
 	bucketAllocator *memory.BucketAllocator
 	terrainGrid     *spatial.TerrainGrid
 
-	shutdown chan struct{}
+	debugMode bool
+	shutdown  chan struct{}
 }
 
 func (tm *TerrainManager) UpdateLastPosition(pos lin.Vec3) {
@@ -93,7 +94,7 @@ func calculateLODChunkSizes() []vk.DeviceSize {
 	return lodChunkSizes
 }
 
-func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *TerrainManager {
+func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, debugMode bool) *TerrainManager {
 	lodChunkSizes := calculateLODChunkSizes()
 	fmt.Printf("LOD Chunk Sizes: ")
 	for _, size := range lodChunkSizes {
@@ -115,9 +116,11 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 		watermaps:       make(map[string]*image.Gray, MAX_IMAGE_MAPS),
 		chunks:          make(map[string]*Chunk),
 		chunkRegistry:   make(map[string]*spatial.ChunkInfo),
+		debugMode:       debugMode,
 		shutdown:        make(chan struct{}),
 	}
 
+	log.Printf("TerrainManager intialized, starting update loop.")
 	go tm.updateLoop()
 	return tm
 }
@@ -197,17 +200,23 @@ func (tm *TerrainManager) GenerateTestLine() {
 	}
 
 	// Step 2: Update visibility - this calculates distances and LODs
-	log.Printf("Updating spatial grid visibility...")
+	if tm.debugMode {
+		log.Printf("Updating spatial grid visibility...")
+	}
 	tm.updateVisibility()
 
 	// Step 3: Load GPU data for visible chunks using their calculated LODs
-	log.Printf("Loading GPU data for visible chunks...")
+	if tm.debugMode {
+		log.Printf("Loading GPU data for visible chunks...")
+	}
 	tm.loadVisibleChunks(baseMap)
 
-	log.Printf("Finished terrain loading process")
-	log.Printf("Spatial grid: %d total, %d visible chunks",
-		tm.terrainGrid.Stats().TotalChunks,
-		len(tm.terrainGrid.GetVisibleChunks()))
+	if tm.debugMode {
+		log.Printf("Finished terrain loading process")
+		log.Printf("Spatial grid: %d total, %d visible chunks",
+			tm.terrainGrid.Stats().TotalChunks,
+			len(tm.terrainGrid.GetVisibleChunks()))
+	}
 }
 
 // New method: Load GPU data only for visible chunks
@@ -335,14 +344,16 @@ func (tm *TerrainManager) checkForUpdates() {
 		tm.lastUpdatePos = tm.lastPosition
 		firstRun = false
 
-		// Log memory usage after loading all chunks
-		log.Printf("Memory stats after loading all test chunks: %s",
-			tm.bucketAllocator.GetDetailedStats())
+		if tm.debugMode {
+			// Log memory usage after loading all chunks
+			log.Printf("Memory stats after loading all test chunks: %s",
+				tm.bucketAllocator.GetDetailedStats())
 
-		log.Printf("Terrain grid stats after loading all test chunks: %s",
-			tm.terrainGrid.GetDetailedStats())
+			log.Printf("Terrain grid stats after loading all test chunks: %s",
+				tm.terrainGrid.GetDetailedStats())
 
-		log.Printf("Terrain grid visualization: %s", tm.terrainGrid.VisualizeGrid())
+			log.Printf("Terrain grid visualization: %s", tm.terrainGrid.VisualizeGrid())
+		}
 	}
 }
 
@@ -359,8 +370,11 @@ func (tm *TerrainManager) updateVisibility() {
 	tm.terrainGrid.UpdateVisibility(tm.lastPosition, frustum)
 
 	visibleChunks := tm.terrainGrid.GetVisibleChunks()
-	log.Printf("Terrain grid visibility update: %d/%d chunks visible",
-		len(visibleChunks), tm.terrainGrid.Stats().TotalChunks)
+
+	if tm.debugMode {
+		log.Printf("Terrain grid visibility update: %d/%d chunks visible",
+			len(visibleChunks), tm.terrainGrid.Stats().TotalChunks)
+	}
 }
 
 func (tm *TerrainManager) updateLoop() {
