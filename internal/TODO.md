@@ -119,10 +119,12 @@ srg-synvis/
 │   │   ├── manager.go       # Main StreamManager
 │   │   ├── strategy.go      # Loading/eviction strategies
 │   │   └── state.go         # Chunk state machine
+│   ├── Camera/              # Camera refactor
+│   │   ├── camstuff.go      # Loading/eviction strategies
+│   │   └── camera.go
 │   ├── renderer/            # SIMPLIFIED - Pure rendering
 │   │   ├── terrain.go       # New clean TerrainRenderer
 │   │   ├── chunk.go         # Chunk mesh generation
-│   │   ├── camera.go
 │   │   ├── vulkan_*.go      # Vulkan setup/management
 │   │   └── types.go
 │   ├── models/
@@ -136,3 +138,9 @@ srg-synvis/
 - [x] Separate shader pipeline for Boris
 - [x] Add camera turn param for Boris
 - [x] Add render distance while I'm at it.
+- [x] Take the camera out of the renderer
+- [x] Refactor the camera
+  - [x] Input Interface
+  - [x] Sensors Interface
+  - [x] Motion Interface
+  - [x] Enhance testing suite
