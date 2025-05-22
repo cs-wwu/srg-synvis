@@ -44,6 +44,7 @@ func NewApplication(cfg models.AppConfig) *Application {
 		renderDistance:  cfg.RenderDistance,
 		disableWarnings: cfg.DisableTerrainWarnings,
 		debugMode:       cfg.DebugMode,
+		fov:             cfg.Fov,
 	}
 
 	return app
