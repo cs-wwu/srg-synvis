@@ -85,9 +85,10 @@ func (mh *MotionHandler) ApplyRelativeRotation(yaw, pitch, roll float64) {
 
 	// Convert back to linmath vectors and update camera
 	newFront := lin.Vec3{float32(qFront[0]), float32(qFront[1]), float32(qFront[2])}
+	newRight := lin.Vec3{float32(qRight[0]), float32(qRight[1]), float32(qRight[2])}
 	newUp := lin.Vec3{float32(qUp[0]), float32(qUp[1]), float32(qUp[2])}
 
-	mh.camera.updateVectors(newFront, right, newUp)
+	mh.camera.updateVectors(newFront, newRight, newUp)
 }
 
 // SetOrientation sets absolute orientation angles and applies rotation
