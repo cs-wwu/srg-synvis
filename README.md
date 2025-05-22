@@ -61,6 +61,7 @@ sudo ./install.sh
         ```bash
         sudo apt -y install golang-go
         ```
+
     2. Or manually
 
         ```bash
