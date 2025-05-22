@@ -46,7 +46,7 @@ func (am *assetManager) loadFromDisk(coord string) (*MapData, error) {
 		Heightmap: heightmap,
 		Watermap:  watermap,
 		LoadedAt:  time.Now(),
-		Size:      calculateMapSize(heightmap, watermap),
+		Size:      calculateMapSize(heightmap),
 		IsOcean:   false,
 	}, nil
 }
@@ -162,7 +162,7 @@ func validateMapDimensions(heightmap *image.Gray16, watermap *image.Gray) error 
 }
 
 // calculateMapSize estimates memory usage for a map.
-func calculateMapSize(heightmap *image.Gray16, watermap *image.Gray) int64 {
+func calculateMapSize(heightmap *image.Gray16) int64 {
 	// Gray16: 2 bytes per pixel
 	// Gray: 1 byte per pixel
 	bounds := heightmap.Bounds()

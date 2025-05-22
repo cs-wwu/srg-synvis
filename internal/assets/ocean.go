@@ -29,7 +29,7 @@ func (am *assetManager) generateOceanTile(coord string) *MapData {
 		Heightmap: heightmap,
 		Watermap:  watermap,
 		LoadedAt:  time.Now(),
-		Size:      calculateMapSize(heightmap, watermap),
+		Size:      calculateMapSize(heightmap),
 		IsOcean:   true,
 	}
 }

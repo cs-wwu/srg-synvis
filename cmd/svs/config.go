@@ -127,7 +127,7 @@ func validateConfig(config *models.AppConfig) {
 		log.Printf("Warning: Render distance %v is very large, may cause performance issues", config.RenderDistance)
 	}
 
-	if config.Fov <= 0 || config.Fov > 180 {
+	if config.Fov <= 0 || config.Fov >= 180 {
 		log.Printf("Warning: Invalid FOV %v, using default 60.0", config.Fov)
 		config.Fov = 60.0
 	}

@@ -97,8 +97,7 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 // Initialize the Uniform Buffer Object
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
-	fovRadians := lin.DegreesToRadians(60.0)
-	app.ubo.Projection.Perspective(fovRadians, aspectRatio, 0.1, app.renderDistance)
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(app.fov), aspectRatio, 0.1, app.renderDistance)
 	app.ubo.View = app.camera.ViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
