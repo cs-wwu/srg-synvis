@@ -8,10 +8,9 @@ layout(std140, binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
-    vec3 cameraPos;
-
     float renderDistance;
-    float warningsDisabled;
+    vec3 cameraPos;
+    float disableWarnings;
     float time;
 } ubo;
 
@@ -48,19 +47,18 @@ void main()
     float intense = AMBIENT + diffuse * 0.85;
     
     // Calculate fog factors based on distance and height
-    float fogStart = 3500;  // e.g., 5000 - 1000 = 4000
-    float fogEnd = 5000;                 // e.g., 5000
+    float fogStart = ubo.renderDistance - FOG_OFFSET;  // e.g., 5000 - 1000 = 4000
 
     // Calculate fog factors based on distance and height
     float distance = length(viewPosition.xyz);
-    // float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
+    float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
 
     // Smoother fog transition using dynamic distances
-    fogFactor = 1.0 - clamp((distance - fogStart) / (fogEnd - fogStart), 0.0, 1.0);
+    fogFactor = 1.0 - clamp((distance - fogStart) / (ubo.renderDistance - fogStart), 0.0, 1.0);
     fogFactor = pow(fogFactor, 1.5);
 
     // Make fog more transparent at high elevations
-    // fogFactor = mix(fogFactor, 1.0, heightFactor * 0.3);
+    fogFactor = mix(fogFactor, 1.0, heightFactor * 0.3);
 
     fragColor = intense * vec3(1.0);
     fragTexCoord = inTexCoord.xyz;

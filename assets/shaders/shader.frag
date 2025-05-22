@@ -10,10 +10,9 @@ layout(std140, binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
-    vec3 cameraPos;
-
     float renderDistance;
-    float warningsDisabled;
+    vec3 cameraPos;
+    float disableWarnings;
     float time;
 } ubo;
 
@@ -247,7 +246,8 @@ void main() {
             terrainColor += vec3(southness * 0.05, southness * 0.03, -southness * 0.05) * (1.0 - slopeFactor * 2.0);
         }
         
-        if (ubo.warningsDisabled > 0.5) {
+        // Disable warnings is 1.0, run the code if disableWarnings is 0.0
+        if (ubo.disableWarnings < 0.5) {
             // Apply warning coloring based on height relative to camera position
             float warningOpacity = getTerrainWarningOpacity(worldPos.y, ubo.cameraPos.y);
             

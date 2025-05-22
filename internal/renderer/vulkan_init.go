@@ -97,17 +97,20 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 // Initialize the Uniform Buffer Object
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
-	// 45 FOV, Aspect 1.0, Near plane, Far Plane
 	app.ubo.Projection.Perspective(lin.DegreesToRadians(FOV), aspectRatio, 0.1, app.renderDistance)
 	app.ubo.View = app.camera.GetViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
+
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
 	app.ubo.RenderDistance = app.renderDistance
-	app.ubo.TerrainWarningsEnabled = 1.0
+
+	// Fix the logic to match shader expectations
 	if app.disableWarnings {
-		app.ubo.TerrainWarningsEnabled = 0.0
+		app.ubo.DisableWarnings = 1.0 // 1.0 = disabled
+	} else {
+		app.ubo.DisableWarnings = 0.0 // 0.0 = enabled
 	}
 }
 

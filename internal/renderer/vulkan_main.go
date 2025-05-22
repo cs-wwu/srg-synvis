@@ -155,6 +155,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 		log.Printf("DEBUG: camera pos = (%.1f, %.1f, %.1f)",
 			app.camera.Pos[0], app.camera.Pos[1], app.camera.Pos[2])
 		log.Printf("DEBUG: disable warnings = %t", app.disableWarnings)
+		log.Printf("DEBUG: fogStart would be = %.1f", app.ubo.RenderDistance-1500.0)
 	}
 
 	return nil

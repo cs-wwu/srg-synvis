@@ -2,15 +2,14 @@
 #extension GL_ARB_separate_shader_objects : enable
 
 layout(std140, binding = 0) uniform UBO {
-    mat4 model;
+     mat4 model;
     mat4 view;
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
-    vec3 cameraPos;
-
     float renderDistance;
-    float terrainWarningsEnabled;
+    vec3 cameraPos;
+    float disableWarnings;
     float time;
 } ubo;
 
