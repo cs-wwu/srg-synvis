@@ -500,21 +500,6 @@ func (sm *StreamManager) RenderChunks(cmdBuffer vk.CommandBuffer) {
 	}
 }
 
-// Legacy method support
-
-// LoadSomeTestChunks is now deprecated - use Start() instead
-func (sm *StreamManager) LoadSomeTestChunks() error {
-	if !sm.IsRunning() {
-		return fmt.Errorf("StreamManager not running - call Start() first")
-	}
-
-	// Initial camera position to trigger loading
-	sm.UpdateCameraPosition(lin.Vec3{sm.lastCameraPos[0], 0, sm.lastCameraPos[1]})
-
-	log.Printf("Background chunk loading initiated")
-	return nil
-}
-
 // Statistics and debugging
 
 // Stats returns information about the StreamManager state
