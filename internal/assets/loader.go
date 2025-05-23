@@ -86,8 +86,8 @@ func gray16PixToArray(img *image.Gray16) []uint16 {
 	pix := img.Pix
 	stride := img.Stride
 
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			// Each pixel is 2 bytes in big-endian format
 			offset := y*stride + x*2
 			// Convert big-endian bytes to uint16
@@ -121,7 +121,7 @@ func grayPixToArray(img *image.Gray) []uint8 {
 	pix := img.Pix
 	stride := img.Stride
 
-	for y := 0; y < height; y++ {
+	for y := range height {
 		// Copy entire row at once - faster than pixel by pixel
 		srcStart := y * stride
 		dstStart := y * width

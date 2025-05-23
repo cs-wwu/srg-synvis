@@ -128,7 +128,7 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 		LODLevel: LODLevel(spec.LODLevel),
 	}
 
-	// Calculate geometry using existing functions
+	// Calculate geometry using raw data
 	CalculateChunkVertices(mapData.HeightData, mapData.WaterData, chunk)
 	CalculateChunkIndices(chunk)
 	CalculateChunkNormals(chunk)
