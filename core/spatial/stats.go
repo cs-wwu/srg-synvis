@@ -2,208 +2,119 @@ package spatial
 
 import (
 	"fmt"
-	"math"
-	"sort"
 	"strings"
-	"time"
 )
 
-// GridStats holds statistics about the grid system
-type GridStats struct {
-	TotalChunks      int
-	VisibleChunks    int
-	LoadedChunks     int
-	PendingChunks    int
-	ChunksByLOD      []int // Count of chunks per LOD level
-	MaxNeighbors     int   // Maximum neighbors per chunk
-	AverageNeighbors float32
-	AverageDistance  float32
-	MinDistance      float32
-	MaxDistance      float32
-	GridBounds       GridBounds    // Extents of the grid
-	UpdateTime       time.Duration // Time since last visibility update
-}
-
-// GridBounds represents the extents of the grid
-type GridBounds struct {
-	MinX, MaxX int
-	MinZ, MaxZ int
-}
-
-// Stats returns statistics about the grid
-func (g *TerrainGrid) Stats() GridStats {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	stats := GridStats{
-		TotalChunks:   len(g.chunks),
-		VisibleChunks: len(g.visibleChunks),
-		MinDistance:   float32(math.MaxFloat32),
-		MaxDistance:   0,
-		UpdateTime:    time.Since(time.Unix(0, g.lastUpdate)),
-	}
-
-	// Count chunks by LOD level and status
-	maxLod := 0
-	totalDistance := float32(0)
-	chunksByStatus := make(map[ChunkStatus]int)
-
-	for _, chunk := range g.chunks {
-		// Track LOD levels
-		if chunk.LODLevel > maxLod {
-			maxLod = chunk.LODLevel
-		}
-
-		// Track distances
-		if chunk.Distance > stats.MaxDistance {
-			stats.MaxDistance = chunk.Distance
-		}
-		if chunk.Distance < stats.MinDistance && chunk.Distance > 0 {
-			stats.MinDistance = chunk.Distance
-		}
-		totalDistance += chunk.Distance
-
-		// Track statuses
-		chunksByStatus[chunk.Status]++
-	}
-
-	// Initialize LOD counts array
-	stats.ChunksByLOD = make([]int, maxLod+1)
-
-	// Fill LOD counts
-	for _, chunk := range g.chunks {
-		stats.ChunksByLOD[chunk.LODLevel]++
-	}
-
-	// Get counts by status
-	stats.LoadedChunks = chunksByStatus[ChunkLoaded]
-	stats.PendingChunks = chunksByStatus[ChunkLoading]
-
-	// Calculate average distance
-	if len(g.chunks) > 0 {
-		stats.AverageDistance = totalDistance / float32(len(g.chunks))
-	}
-
-	// Count neighbors and find the bounds
-	totalNeighbors := 0
-	maxNeighbors := 0
-
-	minX, maxX := math.MaxInt32, math.MinInt32
-	minZ, maxZ := math.MaxInt32, math.MinInt32
-
-	for _, chunk := range g.chunks {
-		// Count neighbors
-		neighborCount := 0
-		for _, neighbor := range chunk.Neighbors {
-			if neighbor != nil {
-				neighborCount++
-			}
-		}
-
-		totalNeighbors += neighborCount
-		if neighborCount > maxNeighbors {
-			maxNeighbors = neighborCount
-		}
-
-		// Track grid bounds
-		if chunk.GridCoord.X < minX {
-			minX = chunk.GridCoord.X
-		}
-		if chunk.GridCoord.X > maxX {
-			maxX = chunk.GridCoord.X
-		}
-		if chunk.GridCoord.Z < minZ {
-			minZ = chunk.GridCoord.Z
-		}
-		if chunk.GridCoord.Z > maxZ {
-			maxZ = chunk.GridCoord.Z
-		}
-	}
-
-	stats.MaxNeighbors = maxNeighbors
-	if len(g.chunks) > 0 {
-		stats.AverageNeighbors = float32(totalNeighbors) / float32(len(g.chunks))
-	}
-
-	stats.GridBounds = GridBounds{
-		MinX: minX, MaxX: maxX,
-		MinZ: minZ, MaxZ: maxZ,
-	}
-
-	return stats
-}
-
-// GetDetailedStats returns a detailed string representation of grid statistics
-func (g *TerrainGrid) GetDetailedStats() string {
-	stats := g.Stats()
+// GetDetailedStats returns a detailed string representation of chunk selection statistics
+func (cs *ChunkSelector) GetDetailedStats() string {
+	stats := cs.Stats()
 
 	var sb strings.Builder
 
-	sb.WriteString("Terrain Grid System Statistics:\n")
-	sb.WriteString("==============================\n\n")
+	sb.WriteString("Chunk Selection System Statistics:\n")
+	sb.WriteString("=================================\n\n")
 
 	// General information
-	sb.WriteString(fmt.Sprintf("Total Chunks: %d\n", stats.TotalChunks))
-	sb.WriteString(fmt.Sprintf("Visible Chunks: %d (%.1f%%)\n",
-		stats.VisibleChunks,
-		percentOrZero(stats.VisibleChunks, stats.TotalChunks)))
-	sb.WriteString(fmt.Sprintf("Loaded Chunks: %d (%.1f%%)\n",
-		stats.LoadedChunks,
-		percentOrZero(stats.LoadedChunks, stats.TotalChunks)))
-	sb.WriteString(fmt.Sprintf("Pending Chunks: %d (%.1f%%)\n",
-		stats.PendingChunks,
-		percentOrZero(stats.PendingChunks, stats.TotalChunks)))
-	sb.WriteString(fmt.Sprintf("Last Update: %v ago\n\n", stats.UpdateTime))
+	sb.WriteString(fmt.Sprintf("Desired Chunks: %d\n", stats.DesiredChunks))
+	sb.WriteString(fmt.Sprintf("Available Chunks: %d\n", stats.AvailableChunks))
+	sb.WriteString(fmt.Sprintf("Missing Chunks: %d\n", stats.MissingChunks))
+	sb.WriteString(fmt.Sprintf("Camera Position: (%.1f, %.1f)\n", stats.LastCameraPos[0], stats.LastCameraPos[1]))
+	sb.WriteString(fmt.Sprintf("Render Distance: %.1f\n\n", stats.LastRenderDist))
 
 	// LOD breakdown
+	cs.mu.RLock()
+	lodCounts := make(map[int]int)
+	lodMissing := make(map[int]int)
+
+	for _, spec := range cs.desiredChunks {
+		lodCounts[spec.LODLevel]++
+		if !cs.availableChunks[spec.GridCoord] {
+			lodMissing[spec.LODLevel]++
+		}
+	}
+	cs.mu.RUnlock()
+
 	sb.WriteString("LOD Distribution:\n")
-	for i, count := range stats.ChunksByLOD {
-		sb.WriteString(fmt.Sprintf("  LOD %d: %d chunks (%.1f%%)\n",
-			i, count, percentOrZero(count, stats.TotalChunks)))
+	maxLOD := 0
+	for lod := range lodCounts {
+		if lod > maxLOD {
+			maxLOD = lod
+		}
+	}
+
+	for lod := 0; lod <= maxLOD; lod++ {
+		total := lodCounts[lod]
+		missing := lodMissing[lod]
+		available := total - missing
+
+		if total > 0 {
+			sb.WriteString(fmt.Sprintf("  LOD %d: %d total (%d available, %d missing) - %.1f%% loaded\n",
+				lod, total, available, missing,
+				float32(available)/float32(total)*100.0))
+		}
 	}
 	sb.WriteString("\n")
 
-	// Distance information
-	sb.WriteString("Distance Stats:\n")
-	sb.WriteString(fmt.Sprintf("  Min Distance: %.1f\n", stats.MinDistance))
-	sb.WriteString(fmt.Sprintf("  Max Distance: %.1f\n", stats.MaxDistance))
-	sb.WriteString(fmt.Sprintf("  Average Distance: %.1f\n\n", stats.AverageDistance))
+	// Frustum breakdown
+	cs.mu.RLock()
+	inFrustumCount := 0
+	inFrustumMissing := 0
+	outFrustumCount := 0
+	outFrustumMissing := 0
 
-	// Neighbor information
-	sb.WriteString("Neighbor Stats:\n")
-	sb.WriteString(fmt.Sprintf("  Average Neighbors: %.1f\n", stats.AverageNeighbors))
-	sb.WriteString(fmt.Sprintf("  Max Neighbors: %d\n\n", stats.MaxNeighbors))
+	for _, spec := range cs.desiredChunks {
+		if spec.InFrustum {
+			inFrustumCount++
+			if !cs.availableChunks[spec.GridCoord] {
+				inFrustumMissing++
+			}
+		} else {
+			outFrustumCount++
+			if !cs.availableChunks[spec.GridCoord] {
+				outFrustumMissing++
+			}
+		}
+	}
+	cs.mu.RUnlock()
 
-	// Grid bounds
-	sb.WriteString("Grid Bounds:\n")
-	sb.WriteString(fmt.Sprintf("  X: %d to %d (width: %d)\n",
-		stats.GridBounds.MinX, stats.GridBounds.MaxX,
-		stats.GridBounds.MaxX-stats.GridBounds.MinX+1))
-	sb.WriteString(fmt.Sprintf("  Z: %d to %d (depth: %d)\n",
-		stats.GridBounds.MinZ, stats.GridBounds.MaxZ,
-		stats.GridBounds.MaxZ-stats.GridBounds.MinZ+1))
+	sb.WriteString("Frustum Distribution:\n")
+	if inFrustumCount > 0 {
+		sb.WriteString(fmt.Sprintf("  In Frustum: %d total (%d available, %d missing) - %.1f%% loaded\n",
+			inFrustumCount, inFrustumCount-inFrustumMissing, inFrustumMissing,
+			float32(inFrustumCount-inFrustumMissing)/float32(inFrustumCount)*100.0))
+	}
+	if outFrustumCount > 0 {
+		sb.WriteString(fmt.Sprintf("  Out of Frustum: %d total (%d available, %d missing) - %.1f%% loaded\n",
+			outFrustumCount, outFrustumCount-outFrustumMissing, outFrustumMissing,
+			float32(outFrustumCount-outFrustumMissing)/float32(outFrustumCount)*100.0))
+	}
 
 	return sb.String()
 }
 
-// VisualizeGrid generates a 2D top-down visualization of the grid
-func (g *TerrainGrid) VisualizeGrid() string {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+// VisualizeSelection generates a 2D top-down visualization of the chunk selection
+func (cs *ChunkSelector) VisualizeSelection() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
 
 	var sb strings.Builder
 
-	sb.WriteString("Grid Visualization (Top-Down View):\n")
-	sb.WriteString("=================================\n\n")
+	sb.WriteString("Chunk Selection Visualization (Top-Down View):\n")
+	sb.WriteString("============================================\n\n")
+
+	if len(cs.desiredChunks) == 0 {
+		sb.WriteString("No chunks selected\n")
+		return sb.String()
+	}
 
 	// Get the camera position's grid cell
-	cameraGridCoord := g.WorldToGrid(g.lastCameraPos)
+	cameraGridCoord := cs.WorldToGrid(cs.lastCameraPos)
 
-	// Find grid bounds for display
-	minX, maxX := math.MaxInt32, math.MinInt32
-	minZ, maxZ := math.MaxInt32, math.MinInt32
+	// Find bounds of desired chunks
+	minX, maxX := cameraGridCoord.X, cameraGridCoord.X
+	minZ, maxZ := cameraGridCoord.Z, cameraGridCoord.Z
 
-	for coord := range g.chunksByCoord {
+	for coord := range cs.desiredChunks {
 		if coord.X < minX {
 			minX = coord.X
 		}
@@ -216,20 +127,6 @@ func (g *TerrainGrid) VisualizeGrid() string {
 		if coord.Z > maxZ {
 			maxZ = coord.Z
 		}
-	}
-
-	// Expand bounds to include camera position
-	if cameraGridCoord.X < minX {
-		minX = cameraGridCoord.X
-	}
-	if cameraGridCoord.X > maxX {
-		maxX = cameraGridCoord.X
-	}
-	if cameraGridCoord.Z < minZ {
-		minZ = cameraGridCoord.Z
-	}
-	if cameraGridCoord.Z > maxZ {
-		maxZ = cameraGridCoord.Z
 	}
 
 	// Constrain size for display
@@ -279,45 +176,38 @@ func (g *TerrainGrid) VisualizeGrid() string {
 
 		// Print grid cells
 		for x := minX; x <= maxX; x++ {
-			cell := GridCoord{X: x, Z: z}
-			chunk := g.chunksByCoord[cell]
+			coord := GridCoord{X: x, Z: z}
 
-			// Determine what symbol to display
 			var symbol string
-
 			if x == cameraGridCoord.X && z == cameraGridCoord.Z {
 				// Camera position
 				symbol = "  C  "
-			} else if chunk == nil {
-				// Empty cell
-				symbol = "  .  "
-			} else {
-				// Base symbol based on chunk status
+			} else if spec, desired := cs.desiredChunks[coord]; desired {
+				// Chunk is desired
+				available := cs.availableChunks[coord]
+
 				var baseSymbol string
-				switch chunk.Status {
-				case ChunkLoaded:
-					if chunk.LODLevel <= 9 {
-						baseSymbol = fmt.Sprintf("  %d  ", chunk.LODLevel)
+				if available {
+					// Available chunk - show LOD level
+					if spec.LODLevel <= 9 {
+						baseSymbol = fmt.Sprintf("  %d  ", spec.LODLevel)
 					} else {
 						baseSymbol = "  +  "
 					}
-				case ChunkLoading:
-					baseSymbol = "  L  "
-				case ChunkUnloaded:
-					baseSymbol = "  U  "
-				case ChunkError:
-					baseSymbol = "  E  "
-				default:
-					baseSymbol = "  ?  "
+				} else {
+					// Missing chunk
+					baseSymbol = "  M  "
 				}
 
 				// Modify display for in-frustum chunks
-				if chunk.InFrustum {
-					// For in-frustum chunks, we'll use * as visual indicator
+				if spec.InFrustum {
 					symbol = fmt.Sprintf("*%s*", baseSymbol[1:4])
 				} else {
 					symbol = baseSymbol
 				}
+			} else {
+				// Not desired
+				symbol = "  .  "
 			}
 
 			sb.WriteString(symbol)
@@ -336,209 +226,169 @@ func (g *TerrainGrid) VisualizeGrid() string {
 	// Add legend
 	sb.WriteString("Legend:\n")
 	sb.WriteString("  C = Camera Position\n")
-	sb.WriteString("  . = Empty Cell\n")
-	sb.WriteString("  0-9 = Loaded Chunk (LOD Level)\n")
-	sb.WriteString("  + = Loaded Chunk (LOD > 9)\n")
-	sb.WriteString("  L = Loading Chunk\n")
-	sb.WriteString("  U = Unloaded Chunk\n")
-	sb.WriteString("  E = Error Loading Chunk\n")
+	sb.WriteString("  . = Not Desired\n")
+	sb.WriteString("  0-9 = Available Chunk (LOD Level)\n")
+	sb.WriteString("  + = Available Chunk (LOD > 9)\n")
+	sb.WriteString("  M = Missing Chunk (desired but not available)\n")
 	sb.WriteString("  * = In View Frustum (surrounds symbol)\n")
 
 	return sb.String()
 }
 
-// VisualizeChunk generates a detailed visualization of a specific chunk and its neighbors
-func (g *TerrainGrid) VisualizeChunk(chunkID string) string {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-
-	chunk, exists := g.chunks[chunkID]
-	if !exists {
-		return fmt.Sprintf("Chunk %s not found", chunkID)
-	}
+// VisualizePriorities generates a visualization of chunk priorities
+func (cs *ChunkSelector) VisualizePriorities() string {
+	missing := cs.GetMissingChunks()
 
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Chunk Visualization: %s\n", chunkID))
-	sb.WriteString("==================================\n\n")
+	sb.WriteString("Missing Chunk Priorities:\n")
+	sb.WriteString("========================\n\n")
 
-	// Basic info
-	sb.WriteString(fmt.Sprintf("Grid Coordinates: %v\n", chunk.GridCoord))
-	sb.WriteString(fmt.Sprintf("World Position: (%.1f, %.1f)\n",
-		chunk.WorldPos[0], chunk.WorldPos[1]))
-	sb.WriteString(fmt.Sprintf("LOD Level: %d\n", chunk.LODLevel))
-	sb.WriteString(fmt.Sprintf("Status: %s\n", chunkStatusString(chunk.Status)))
-	sb.WriteString(fmt.Sprintf("Distance from Camera: %.1f\n", chunk.Distance))
-	sb.WriteString(fmt.Sprintf("In Frustum: %v\n", chunk.InFrustum))
-	sb.WriteString(fmt.Sprintf("Priority: %.1f\n\n", chunk.Priority))
-
-	// Neighbor visualization
-	sb.WriteString("Neighbors:\n")
-	sb.WriteString("    ┌───┐    \n")
-	sb.WriteString(fmt.Sprintf("    │ %s │    \n", neighborSymbol(chunk.Neighbors[North])))
-	sb.WriteString("┌───┼───┼───┐\n")
-	sb.WriteString(fmt.Sprintf("│ %s │ C │ %s │\n",
-		neighborSymbol(chunk.Neighbors[West]),
-		neighborSymbol(chunk.Neighbors[East])))
-	sb.WriteString("└───┼───┼───┘\n")
-	sb.WriteString(fmt.Sprintf("    │ %s │    \n", neighborSymbol(chunk.Neighbors[South])))
-	sb.WriteString("    └───┘    \n\n")
-
-	// LOD transition info
-	sb.WriteString("LOD Transitions:\n")
-	hasLODMismatch := false
-	for dir, neighbor := range chunk.Neighbors {
-		if neighbor != nil && neighbor.LODLevel != chunk.LODLevel {
-			hasLODMismatch = true
-			sb.WriteString(fmt.Sprintf("  %s: LOD %d -> LOD %d (Δ%d)\n",
-				DirectionNames[Direction(dir)],
-				chunk.LODLevel,
-				neighbor.LODLevel,
-				neighbor.LODLevel-chunk.LODLevel))
-		}
+	if len(missing) == 0 {
+		sb.WriteString("No missing chunks\n")
+		return sb.String()
 	}
-	if !hasLODMismatch {
-		sb.WriteString("  None - all neighbors at same LOD level\n")
+
+	// Show top 10 missing chunks by priority
+	displayCount := min(len(missing), 10)
+
+	sb.WriteString("Top Priority Missing Chunks:\n")
+	for i := range displayCount {
+		spec := missing[i]
+		sb.WriteString(fmt.Sprintf("%2d. %8s - LOD:%d Dist:%.1f Priority:%.1f InFrustum:%v\n",
+			i+1, spec.GridCoord.String(), spec.LODLevel, spec.Distance,
+			spec.Priority, spec.InFrustum))
+	}
+
+	if len(missing) > displayCount {
+		sb.WriteString(fmt.Sprintf("... and %d more\n", len(missing)-displayCount))
 	}
 
 	return sb.String()
 }
 
-// VisualizeVisibility generates a visualization of chunk visibility and LOD levels
-func (g *TerrainGrid) VisualizeVisibility() string {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
+// VisualizeLoadingEfficiency shows loading efficiency metrics
+func (cs *ChunkSelector) VisualizeLoadingEfficiency() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
 
 	var sb strings.Builder
 
-	sb.WriteString("Visibility and LOD Distribution:\n")
-	sb.WriteString("==============================\n\n")
+	sb.WriteString("Loading Efficiency Analysis:\n")
+	sb.WriteString("===========================\n\n")
 
-	// Group chunks by distance for visualization
+	// Distance-based analysis
 	type distanceGroup struct {
 		minDist, maxDist float32
-		chunks           []*ChunkInfo
+		total, available int
 	}
 
 	groups := []distanceGroup{
-		{0, 100, []*ChunkInfo{}},
-		{100, 200, []*ChunkInfo{}},
-		{200, 400, []*ChunkInfo{}},
-		{400, 800, []*ChunkInfo{}},
-		{800, 1600, []*ChunkInfo{}},
-		{1600, float32(math.MaxFloat32), []*ChunkInfo{}},
+		{0, 100, 0, 0},
+		{100, 300, 0, 0},
+		{300, 600, 0, 0},
+		{600, 1000, 0, 0},
+		{1000, 2000, 0, 0},
+		{2000, 99999, 0, 0},
 	}
 
 	// Categorize chunks by distance
-	for _, chunk := range g.chunks {
+	for _, spec := range cs.desiredChunks {
+		available := cs.availableChunks[spec.GridCoord]
+
 		for i := range groups {
-			if chunk.Distance >= groups[i].minDist && chunk.Distance < groups[i].maxDist {
-				groups[i].chunks = append(groups[i].chunks, chunk)
+			if spec.Distance >= groups[i].minDist && spec.Distance < groups[i].maxDist {
+				groups[i].total++
+				if available {
+					groups[i].available++
+				}
 				break
 			}
 		}
 	}
 
-	// Display chunk distribution by distance and LOD
+	// Display efficiency by distance
+	sb.WriteString("Efficiency by Distance:\n")
 	for _, group := range groups {
-		if len(group.chunks) == 0 {
+		if group.total == 0 {
 			continue
 		}
 
-		// Count chunks by LOD and visibility
-		lodCounts := make(map[int]int)
-		lodVisible := make(map[int]int)
-
-		for _, chunk := range group.chunks {
-			lodCounts[chunk.LODLevel]++
-			if chunk.InFrustum {
-				lodVisible[chunk.LODLevel]++
-			}
-		}
-
-		// Sort LOD levels
-		lods := make([]int, 0, len(lodCounts))
-		for lod := range lodCounts {
-			lods = append(lods, lod)
-		}
-		sort.Ints(lods)
-
-		// Display headers
 		var rangeStr string
-		if group.maxDist == float32(math.MaxFloat32) {
+		if group.maxDist >= 99999 {
 			rangeStr = fmt.Sprintf("%.0f+", group.minDist)
 		} else {
 			rangeStr = fmt.Sprintf("%.0f-%.0f", group.minDist, group.maxDist)
 		}
 
-		sb.WriteString(fmt.Sprintf("Distance %s: %d chunks\n", rangeStr, len(group.chunks)))
+		efficiency := float32(group.available) / float32(group.total) * 100.0
 
-		// Display LOD distribution
-		for _, lod := range lods {
-			visible := lodVisible[lod]
-			total := lodCounts[lod]
+		// Create a simple bar graph
+		const maxBarWidth = 30
+		barWidth := int(efficiency / 100.0 * maxBarWidth)
+		bar := strings.Repeat("■", barWidth) + strings.Repeat("□", maxBarWidth-barWidth)
 
-			// Create a bar graph
-			const maxBarWidth = 40
-			barWidth := int(float64(total) / float64(len(group.chunks)) * maxBarWidth)
-			visibleWidth := int(float64(visible) / float64(len(group.chunks)) * maxBarWidth)
-
-			bar := strings.Repeat("■", visibleWidth) +
-				strings.Repeat("□", barWidth-visibleWidth)
-
-			sb.WriteString(fmt.Sprintf("  LOD %d: %s (%d total, %d visible)\n",
-				lod, bar, total, visible))
-		}
-		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("  %s: %s %.1f%% (%d/%d)\n",
+			rangeStr, bar, efficiency, group.available, group.total))
 	}
-
-	// Add legend
-	sb.WriteString("Legend:\n")
-	sb.WriteString("  ■ = Visible chunks\n")
-	sb.WriteString("  □ = Non-visible chunks\n")
 
 	return sb.String()
 }
 
-// Helper functions
+// AnalyzeNeighborCoverage analyzes how well chunks have loaded neighbors
+func (cs *ChunkSelector) AnalyzeNeighborCoverage() string {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
 
-// percentOrZero calculates the percentage or returns 0 if divisor is 0
-func percentOrZero(num, total int) float32 {
-	if total == 0 {
-		return 0
-	}
-	return float32(num) / float32(total) * 100
-}
+	var sb strings.Builder
 
-// getHighlightedSymbol returns a symbol that stands out (for in-frustum chunks)
-func getHighlightedSymbol(symbol string) string {
-	return fmt.Sprintf("[%s]", symbol)
-}
+	sb.WriteString("Neighbor Coverage Analysis:\n")
+	sb.WriteString("===========================\n\n")
 
-// neighborSymbol returns a symbol representing the neighbor's LOD
-func neighborSymbol(chunk *ChunkInfo) string {
-	if chunk == nil {
-		return " "
+	type neighborStats struct {
+		chunkCount         int
+		totalNeighbors     int
+		availableNeighbors int
 	}
 
-	if chunk.LODLevel <= 9 {
-		return fmt.Sprintf("%d", chunk.LODLevel)
-	}
-	return "+"
-}
+	stats := neighborStats{}
 
-// chunkStatusString returns a human-readable status string
-func chunkStatusString(status ChunkStatus) string {
-	switch status {
-	case ChunkUnloaded:
-		return "Unloaded"
-	case ChunkLoading:
-		return "Loading"
-	case ChunkLoaded:
-		return "Loaded"
-	case ChunkError:
-		return "Error"
-	default:
-		return "Unknown"
+	for coord := range cs.desiredChunks {
+		if !cs.availableChunks[coord] {
+			continue // Only analyze available chunks
+		}
+
+		stats.chunkCount++
+		neighbors := cs.GetNeighborCoords(coord)
+
+		for _, neighborCoord := range neighbors {
+			if _, desired := cs.desiredChunks[neighborCoord]; desired {
+				stats.totalNeighbors++
+				if cs.availableChunks[neighborCoord] {
+					stats.availableNeighbors++
+				}
+			}
+		}
 	}
+
+	if stats.chunkCount == 0 {
+		sb.WriteString("No available chunks to analyze\n")
+		return sb.String()
+	}
+
+	sb.WriteString(fmt.Sprintf("Available Chunks: %d\n", stats.chunkCount))
+	sb.WriteString(fmt.Sprintf("Total Desired Neighbors: %d\n", stats.totalNeighbors))
+	sb.WriteString(fmt.Sprintf("Available Neighbors: %d\n", stats.availableNeighbors))
+
+	if stats.totalNeighbors > 0 {
+		efficiency := float32(stats.availableNeighbors) / float32(stats.totalNeighbors) * 100.0
+		sb.WriteString(fmt.Sprintf("Neighbor Coverage: %.1f%%\n", efficiency))
+
+		avgNeighbors := float32(stats.totalNeighbors) / float32(stats.chunkCount)
+		avgAvailableNeighbors := float32(stats.availableNeighbors) / float32(stats.chunkCount)
+		sb.WriteString(fmt.Sprintf("Average Neighbors per Chunk: %.1f (%.1f available)\n",
+			avgNeighbors, avgAvailableNeighbors))
+	}
+
+	return sb.String()
 }

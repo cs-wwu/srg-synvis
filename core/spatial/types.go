@@ -3,7 +3,6 @@ package spatial
 import (
 	"fmt"
 	"math"
-	"sync"
 
 	lin "github.com/xlab/linmath"
 )
@@ -37,31 +36,30 @@ var DirectionNames = map[Direction]string{
 	West:  "West",
 }
 
-// ChunkStatus represents the current state of a chunk
-type ChunkStatus int
+// ChunkSpec represents a desired chunk specification
+type ChunkSpec struct {
+	GridCoord GridCoord // Grid coordinates
+	WorldPos  lin.Vec2  // World position (center of chunk)
+	Distance  float32   // Distance from camera
+	LODLevel  int       // Calculated LOD level
+	Priority  float32   // Loading priority (higher = more important)
+	InFrustum bool      // Whether chunk is in view frustum
+}
 
-const (
-	ChunkUnloaded ChunkStatus = iota
-	ChunkLoading
-	ChunkLoaded
-	ChunkError
-)
+// ChunkSelectorStats holds statistics about the chunk selection system
+type ChunkSelectorStats struct {
+	DesiredChunks   int      // Number of chunks that should exist
+	AvailableChunks int      // Number of chunks marked as available
+	MissingChunks   int      // Number of desired chunks that aren't available
+	LastCameraPos   lin.Vec2 // Last camera position used for selection
+	LastRenderDist  float32  // Last render distance used for selection
+}
 
-// ChunkInfo contains spatial and state information about a terrain chunk
+// ChunkInfo contains minimal information about a chunk for spatial queries
+// This is kept lightweight for frustum testing and similar operations
 type ChunkInfo struct {
-	ID        string                     // Unique identifier
-	GridCoord GridCoord                  // Coordinates in the grid
-	WorldPos  lin.Vec2                   // World position (center of chunk)
-	LODLevel  int                        // Current LOD level (0 = highest detail)
-	Distance  float32                    // Distance from viewpoint (2D)
-	InFrustum bool                       // Is in view frustum
-	Neighbors [DirectionCount]*ChunkInfo // Adjacent chunks (N,S,E,W)
-	Status    ChunkStatus                // Current loading status
-	Priority  float32                    // For loading priority (higher = more important)
-	LastUsed  int64                      // Timestamp for LRU calculations
-	UserData  any                        // For terrain manager to store references
-
-	mu sync.RWMutex // For thread-safe updates to this chunk's properties
+	GridCoord GridCoord // Grid coordinates
+	WorldPos  lin.Vec2  // World position (center of chunk)
 }
 
 // LODStrategy determines which LOD level to use based on distance
@@ -117,30 +115,28 @@ type FrustumPlane struct {
 	D      float32  // Distance from origin
 }
 
-// GridSystem is the interface for terrain grid management
-type GridSystem interface {
-	// Registration
-	RegisterChunk(worldPos lin.Vec3, size float32, lodLevel int) *ChunkInfo
-	UnregisterChunk(id string) bool
+// ChunkSelectionSystem is the interface for spatial chunk selection and state tracking
+type ChunkSelectionSystem interface {
+	// Core selection logic
+	UpdateSelection(cameraPos lin.Vec2, viewFrustum Frustum, renderDistance float32)
+	GetDesiredChunks() []ChunkSpec
+	GetMissingChunks() []ChunkSpec
+	GetHighestPriorityMissing() *ChunkSpec
 
-	// Retrieval
-	GetChunkByID(id string) *ChunkInfo
-	GetChunkAt(worldPos lin.Vec3) *ChunkInfo
-	GetChunksInRadius(center lin.Vec3, radius float32) []*ChunkInfo
-	GetChunksInRing(center lin.Vec3, innerRadius, outerRadius float32) []*ChunkInfo
+	// State tracking (StreamManager reports availability)
+	MarkChunkAvailable(coord GridCoord)
+	MarkChunkUnavailable(coord GridCoord)
+	IsChunkAvailable(coord GridCoord) bool
+	IsChunkDesired(coord GridCoord) bool
 
-	// Neighbor finding
-	GetNeighbors(chunk *ChunkInfo) []*ChunkInfo
-	GetNeighborInDirection(chunk *ChunkInfo, direction Direction) *ChunkInfo
-
-	// Update chunk states
-	UpdateVisibility(cameraPos lin.Vec3, viewFrustum Frustum)
-
-	// Get visible chunks
-	GetVisibleChunks() []*ChunkInfo
-	GetVisibleChunksSorted() []*ChunkInfo
+	// Spatial utilities
+	GetNeighborCoords(coord GridCoord) [4]GridCoord
+	CalculateLOD(coord GridCoord, cameraPos lin.Vec2) int
+	CalculatePriority(coord GridCoord, cameraPos lin.Vec2, inFrustum bool) float32
+	WorldToGrid(pos lin.Vec2) GridCoord
+	GridToWorld(coord GridCoord) lin.Vec2
 
 	// Utilities
+	Stats() ChunkSelectorStats
 	Clear()
-	Stats() GridStats
 }

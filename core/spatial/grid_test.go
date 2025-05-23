@@ -2,377 +2,461 @@ package spatial
 
 import (
 	"math"
-	"strings"
 	"testing"
 
 	lin "github.com/xlab/linmath"
 )
 
+const (
+	testChunkSize = 180.0
+	tolerance     = 0.001
+)
+
+func TestNewChunkSelector(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+	if cs == nil {
+		t.Fatal("NewChunkSelector returned nil")
+	}
+	if cs.chunkSize != testChunkSize {
+		t.Errorf("Expected chunk size %f, got %f", testChunkSize, cs.chunkSize)
+	}
+	if cs.lodStrategy == nil {
+		t.Error("Expected default LOD strategy to be created")
+	}
+}
+
 func TestWorldToGridConversion(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
+	cs := NewChunkSelector(testChunkSize, nil)
 
 	tests := []struct {
-		name     string
 		worldPos lin.Vec2
 		expected GridCoord
 	}{
-		{"Origin", lin.Vec2{0, 0}, GridCoord{0, 0}},
-		{"Positive", lin.Vec2{150, 350}, GridCoord{1, 3}},
-		{"Negative", lin.Vec2{-150, -350}, GridCoord{-2, -4}},
-		{"Edge", lin.Vec2{100, 100}, GridCoord{1, 1}},
-		{"Edge minus epsilon", lin.Vec2{99.9, 99.9}, GridCoord{0, 0}},
+		{lin.Vec2{0, 0}, GridCoord{0, 0}},
+		{lin.Vec2{180, 180}, GridCoord{1, 1}},
+		{lin.Vec2{-180, -180}, GridCoord{-1, -1}},
+		{lin.Vec2{90, 90}, GridCoord{0, 0}},     // Center of chunk 0,0
+		{lin.Vec2{270, 270}, GridCoord{1, 1}},   // Center of chunk 1,1
+		{lin.Vec2{-90, -90}, GridCoord{-1, -1}}, // Center of chunk -1,-1
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := grid.WorldToGrid(test.worldPos)
-			if result.X != test.expected.X || result.Z != test.expected.Z {
-				t.Errorf("WorldToGrid(%v) = %v, expected %v", test.worldPos, result, test.expected)
-			}
-		})
+		result := cs.WorldToGrid(test.worldPos)
+		if result != test.expected {
+			t.Errorf("WorldToGrid(%v) = %v, expected %v", test.worldPos, result, test.expected)
+		}
 	}
 }
 
 func TestGridToWorldConversion(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
+	cs := NewChunkSelector(testChunkSize, nil)
 
 	tests := []struct {
-		name      string
 		gridCoord GridCoord
 		expected  lin.Vec2
 	}{
-		{"Origin", GridCoord{0, 0}, lin.Vec2{50, 50}},
-		{"Positive", GridCoord{1, 3}, lin.Vec2{150, 350}},
-		{"Negative", GridCoord{-2, -4}, lin.Vec2{-150, -350}},
+		{GridCoord{0, 0}, lin.Vec2{90, 90}},     // Center of chunk 0,0
+		{GridCoord{1, 1}, lin.Vec2{270, 270}},   // Center of chunk 1,1
+		{GridCoord{-1, -1}, lin.Vec2{-90, -90}}, // Center of chunk -1,-1
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := grid.GridToWorld(test.gridCoord)
-			epsilon := float32(0.001)
-			if !vec2Equal(result, test.expected, epsilon) {
-				t.Errorf("GridToWorld(%v) = %v, expected %v", test.gridCoord, result, test.expected)
-			}
-		})
-	}
-}
-
-func TestChunkRegistration(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
-
-	// Register a chunk
-	pos := lin.Vec2{150, 350}
-	chunk := grid.RegisterChunk(pos, 0)
-
-	if chunk == nil {
-		t.Fatalf("RegisterChunk returned nil")
-	}
-
-	// Check chunk properties
-	if chunk.GridCoord.X != 1 || chunk.GridCoord.Z != 3 {
-		t.Errorf("Chunk has incorrect grid coord: %v", chunk.GridCoord)
-	}
-
-	if !vec2Equal(chunk.WorldPos, lin.Vec2{150, 350}, 0.001) {
-		t.Errorf("Chunk has incorrect world pos: %v", chunk.WorldPos)
-	}
-
-	// Check retrieval
-	retrieved := grid.GetChunkAt(pos)
-	if retrieved != chunk {
-		t.Errorf("GetChunkAt did not return the registered chunk")
-	}
-
-	byID := grid.GetChunkByID(chunk.ID)
-	if byID != chunk {
-		t.Errorf("GetChunkByID did not return the registered chunk")
-	}
-
-	// Unregister the chunk
-	if !grid.UnregisterChunk(chunk.ID) {
-		t.Errorf("UnregisterChunk returned false")
-	}
-
-	// Ensure it's gone
-	if grid.GetChunkByID(chunk.ID) != nil {
-		t.Errorf("Chunk still exists after unregistering")
-	}
-}
-
-func TestNeighborRelationships(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
-
-	// Create a 3x3 grid of chunks (2D grid)
-	chunks := make(map[GridCoord]*ChunkInfo)
-	for x := -1; x <= 1; x++ {
-		for z := -1; z <= 1; z++ {
-			pos := lin.Vec2{float32(x) * 100, float32(z) * 100}
-			chunk := grid.RegisterChunk(pos, 0)
-			coord := GridCoord{x, z}
-			chunks[coord] = chunk
+		result := cs.GridToWorld(test.gridCoord)
+		if math.Abs(float64(result[0]-test.expected[0])) > tolerance ||
+			math.Abs(float64(result[1]-test.expected[1])) > tolerance {
+			t.Errorf("GridToWorld(%v) = %v, expected %v", test.gridCoord, result, test.expected)
 		}
 	}
+}
 
-	// Check center chunk's neighbors
-	center := chunks[GridCoord{0, 0}]
+func TestRoundTripConversion(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	testPositions := []lin.Vec2{
+		{0, 0}, {100, 200}, {-150, 300}, {500, -400},
+	}
+
+	for _, pos := range testPositions {
+		coord := cs.WorldToGrid(pos)
+		backToWorld := cs.GridToWorld(coord)
+
+		// Should be within the same chunk
+		coordAgain := cs.WorldToGrid(backToWorld)
+		if coord != coordAgain {
+			t.Errorf("Round trip failed: %v -> %v -> %v -> %v", pos, coord, backToWorld, coordAgain)
+		}
+	}
+}
+
+func TestGetNeighborCoords(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	center := GridCoord{5, 10}
+	neighbors := cs.GetNeighborCoords(center)
+
+	expected := [4]GridCoord{
+		{5, 9},  // North
+		{6, 10}, // East
+		{5, 11}, // South
+		{4, 10}, // West
+	}
+
+	for i, expected := range expected {
+		if neighbors[i] != expected {
+			t.Errorf("Neighbor %d: got %v, expected %v", i, neighbors[i], expected)
+		}
+	}
+}
+
+func TestLODStrategy(t *testing.T) {
+	lodStrategy := NewDefaultLODStrategy(3, 500.0, 2.0)
+	cs := NewChunkSelector(testChunkSize, lodStrategy)
 
 	tests := []struct {
-		dir      Direction
-		expected GridCoord
+		distance    float32
+		expectedLOD int
 	}{
-		{North, GridCoord{0, -1}},
-		{East, GridCoord{1, 0}},
-		{South, GridCoord{0, 1}},
-		{West, GridCoord{-1, 0}},
+		{100, 0},   // Close distance -> highest detail
+		{500, 0},   // Base distance -> LOD 0
+		{1000, 1},  // 2x base distance -> LOD 1
+		{2000, 2},  // 4x base distance -> LOD 2
+		{10000, 2}, // Very far -> clamped to max LOD
 	}
 
-	for _, test := range tests {
-		t.Run(DirectionNames[test.dir], func(t *testing.T) {
-			neighbor := grid.GetNeighborInDirection(center, test.dir)
-			if neighbor == nil {
-				t.Fatalf("No neighbor found in direction %s", DirectionNames[test.dir])
-			}
-
-			expected := chunks[test.expected]
-			if neighbor != expected {
-				t.Errorf("Wrong neighbor in direction %s. Got %v, expected %v",
-					DirectionNames[test.dir], neighbor.GridCoord, expected.GridCoord)
-			}
-		})
-	}
-
-	// Check that the relationship is bidirectional
-	east := chunks[GridCoord{1, 0}]
-	westNeighbor := grid.GetNeighborInDirection(east, West)
-	if westNeighbor != center {
-		t.Errorf("Bidirectional neighbor relationship failed")
-	}
-}
-
-func TestRadiusQueries(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
-
-	// Create a 5x5 grid of chunks centered at (0,0)
-	for x := -2; x <= 2; x++ {
-		for z := -2; z <= 2; z++ {
-			// Use coordinates that will be at the center of each chunk
-			pos := lin.Vec2{float32(x)*100 + 50, float32(z)*100 + 50}
-			grid.RegisterChunk(pos, 0)
-		}
-	}
-
-	center := lin.Vec2{50, 50} // Center of center chunk
-
-	// Test with different radii (updated for 2D distances)
-	tests := []struct {
-		radius        float32
-		expectedCount int
-	}{
-		{50.0, 1},   // Just the center chunk
-		{150.0, 9},  // Center + 8 adjacent
-		{220.0, 13}, // Center + 8 adjacent + 4 cardinal at distance 200
-		{300.0, 25}, // All 25 chunks
-	}
-
-	for i, test := range tests {
-		chunks := grid.GetChunksInRadius(center, test.radius)
-		if len(chunks) != test.expectedCount {
-			t.Errorf("Test %d: Expected %d chunks within radius %.1f, got %d",
-				i, test.expectedCount, test.radius, len(chunks))
-		}
-	}
-
-	// Test ring query (adjusted for 2D)
-	ring := grid.GetChunksInRing(center, 120.0, 180.0)
-	if len(ring) != 4 {
-		t.Errorf("Expected 4 chunks in ring, got %d", len(ring))
-	}
-}
-
-func TestLODDetermination(t *testing.T) {
-	// Create a custom LOD strategy for testing
-	strategy := NewDefaultLODStrategy(3, 100.0, 2.0)
-	grid := NewTerrainGrid(100.0, strategy)
-
-	// Place chunks at specific 2D distances from (0,0)
-	positions := []lin.Vec2{
-		{50, 50},  // Center chunk
-		{50, 140}, // 90 units away from center (2D distance)
-		{50, 250}, // 200 units away from center
-		{50, 350}, // 300 units away from center
-		{50, 500}, // 450 units away from center
-	}
-
-	chunks := make([]*ChunkInfo, len(positions))
-	for i, pos := range positions {
-		chunks[i] = grid.RegisterChunk(pos, 0)
-	}
-
-	// Update visibility with camera at (50,50)
-	cameraPos := lin.Vec2{50, 50}
-	// Create a simple frustum for testing (looking north with wide FOV)
-	dummyFrustum := NewFrustumFromCamera(cameraPos, 0, math.Pi/2, 1.0, 1000.0)
-	grid.UpdateVisibility(cameraPos, dummyFrustum)
-
-	// Check LOD assignments
-	expectedLODs := []int{0, 0, 1, 1, 2}
-	for i, chunk := range chunks {
-		if chunk.LODLevel != expectedLODs[i] {
-			t.Errorf("Chunk at distance %.1f expected LOD %d, got %d",
-				chunk.Distance, expectedLODs[i], chunk.LODLevel)
-		}
-	}
-}
-
-func TestGridStatsAndVisualization(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
-
-	// Create a test grid with various chunk states
-	for x := -2; x <= 2; x++ {
-		for z := -2; z <= 2; z++ {
-			pos := lin.Vec2{float32(x)*100 + 50, float32(z)*100 + 50}
-			chunk := grid.RegisterChunk(pos, 0)
-
-			// Assign different LOD levels based on position
-			lodLevel := (abs(x) + abs(z)) / 2
-			chunk.LODLevel = lodLevel
-
-			// Set some chunks as visible
-			if abs(x) <= 1 && abs(z) <= 1 {
-				chunk.InFrustum = true
-			}
-
-			// Set different statuses
-			if x == 0 && z == 0 {
-				chunk.Status = ChunkLoaded
-			} else if abs(x) <= 1 && abs(z) <= 1 {
-				chunk.Status = ChunkLoading
-			}
-		}
-	}
-
-	// Test stats
-	stats := grid.Stats()
-	if stats.TotalChunks != 25 {
-		t.Errorf("Expected 25 total chunks, got %d", stats.TotalChunks)
-	}
-
-	// Test detailed stats output
-	detailedStats := grid.GetDetailedStats()
-	if !strings.Contains(detailedStats, "Total Chunks: 25") {
-		t.Errorf("Detailed stats should contain 'Total Chunks: 25'")
-	}
-
-	// Test grid visualization
-	gridViz := grid.VisualizeGrid()
-	t.Logf("Grid Visualization:\n%s", gridViz)
-	if !strings.Contains(gridViz, "Grid Visualization") {
-		t.Errorf("Grid visualization missing header")
-	}
-
-	// Get center chunk and test chunk visualization
-	centerChunk := grid.GetChunkAt(lin.Vec2{50, 50})
-	if centerChunk == nil {
-		t.Fatalf("Center chunk not found")
-	}
-
-	chunkViz := grid.VisualizeChunk(centerChunk.ID)
-	if !strings.Contains(chunkViz, "Chunk Visualization") {
-		t.Errorf("Chunk visualization missing header")
-	}
-
-	// Test visibility visualization
-	visViz := grid.VisualizeVisibility()
-	if !strings.Contains(visViz, "Visibility and LOD Distribution") {
-		t.Errorf("Visibility visualization missing header")
-	}
-}
-
-func TestFrustumCulling(t *testing.T) {
-	grid := NewTerrainGrid(100.0, nil)
-
-	// Create chunks in a line along the Z axis
-	positions := []lin.Vec2{
-		{0, 100},    // Directly ahead
-		{150, 100},  // Far to the right (should be outside 60° FOV)
-		{-150, 100}, // Far to the left (should be outside 60° FOV)
-		{0, -100},   // Behind
-	}
-
-	chunks := make([]*ChunkInfo, len(positions))
-	for i, pos := range positions {
-		chunks[i] = grid.RegisterChunk(pos, 0)
-	}
-
-	// Camera at origin looking north (positive Z direction)
 	cameraPos := lin.Vec2{0, 0}
-	direction := float32(math.Pi / 2) // 90 degrees (north)
-	fov := float32(math.Pi / 3)       // 60 degrees
-	frustum := NewFrustumFromCamera(cameraPos, direction, fov, 10.0, 500.0)
-
-	grid.UpdateVisibility(cameraPos, frustum)
-
-	// Check visibility
-	tests := []struct {
-		index    int
-		name     string
-		expected bool
-	}{
-		{0, "Ahead", true},     // Should be visible
-		{1, "FarRight", false}, // Outside FOV (far to the right)
-		{2, "FarLeft", false},  // Outside FOV (far to the left)
-		{3, "Behind", false},   // Behind camera
-	}
-
 	for _, test := range tests {
-		if chunks[test.index].InFrustum != test.expected {
-			t.Errorf("Chunk %s: expected InFrustum=%v, got %v",
-				test.name, test.expected, chunks[test.index].InFrustum)
+		// Position chunk at the test distance
+		coord := GridCoord{int(test.distance / testChunkSize), 0}
+		result := cs.CalculateLOD(coord, cameraPos)
+		if result != test.expectedLOD {
+			t.Errorf("CalculateLOD at distance %f: got LOD %d, expected %d", test.distance, result, test.expectedLOD)
 		}
 	}
 }
 
-func TestFrustumFromVectors(t *testing.T) {
-	// Test creating frustum from position and front vector
-	position := lin.Vec2{0, 0}
-	front := lin.Vec2{0, 1}     // Looking north
-	fov := float32(math.Pi / 3) // 60 degrees
+func TestPriorityCalculation(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+	cameraPos := lin.Vec2{0, 0}
 
-	frustum := NewFrustumFromVectors(position, front, fov, 1.0, 100.0)
+	// Test priority differences
+	closeCoord := GridCoord{0, 0} // At camera position
+	farCoord := GridCoord{10, 10} // Far from camera
 
-	// Test point inside frustum
-	pointInside := lin.Vec2{0, 50} // Directly ahead
-	if !IsPointInFrustum(pointInside, frustum) {
-		t.Errorf("Point directly ahead should be in frustum")
+	closePriorityInFrustum := cs.CalculatePriority(closeCoord, cameraPos, true)
+	closePriorityOutFrustum := cs.CalculatePriority(closeCoord, cameraPos, false)
+	farPriorityInFrustum := cs.CalculatePriority(farCoord, cameraPos, true)
+
+	// In-frustum should have higher priority than out-of-frustum
+	if closePriorityInFrustum <= closePriorityOutFrustum {
+		t.Error("In-frustum priority should be higher than out-of-frustum")
 	}
 
-	// Test point outside frustum (to the side)
-	pointOutside := lin.Vec2{100, 50} // Far to the right
-	if IsPointInFrustum(pointOutside, frustum) {
-		t.Errorf("Point far to the right should not be in frustum")
-	}
-
-	// Test point behind
-	pointBehind := lin.Vec2{0, -50} // Behind camera
-	if IsPointInFrustum(pointBehind, frustum) {
-		t.Errorf("Point behind camera should not be in frustum")
+	// Closer chunks should have higher priority
+	if farPriorityInFrustum >= closePriorityInFrustum {
+		t.Error("Closer chunks should have higher priority")
 	}
 }
 
-// Helper function to compare Vec2 values with epsilon
-func vec2Equal(a, b lin.Vec2, epsilon float32) bool {
-	for i := range 2 {
-		if float32(math.Abs(float64(a[i]-b[i]))) > epsilon {
-			return false
+func TestUpdateSelection(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Create a simple frustum that includes everything (for testing)
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(500)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	desired := cs.GetDesiredChunks()
+	if len(desired) == 0 {
+		t.Error("Expected some chunks to be selected")
+	}
+
+	// Check that all desired chunks are within render distance
+	for _, spec := range desired {
+		if spec.Distance > renderDistance {
+			t.Errorf("Chunk %v at distance %f exceeds render distance %f",
+				spec.GridCoord, spec.Distance, renderDistance)
 		}
 	}
-	return true
 }
 
-// Helper function to get absolute value of int
-func abs(x int) int {
-	if x < 0 {
-		return -x
+func TestChunkAvailabilityTracking(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	coord := GridCoord{1, 1}
+
+	// Initially should not be available
+	if cs.IsChunkAvailable(coord) {
+		t.Error("Chunk should not be available initially")
 	}
-	return x
+
+	// Mark as available
+	cs.MarkChunkAvailable(coord)
+	if !cs.IsChunkAvailable(coord) {
+		t.Error("Chunk should be available after marking")
+	}
+
+	// Mark as unavailable
+	cs.MarkChunkUnavailable(coord)
+	if cs.IsChunkAvailable(coord) {
+		t.Error("Chunk should not be available after unmarking")
+	}
+}
+
+func TestMissingChunks(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Set up a selection with some chunks
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(300)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	// Initially, all should be missing
+	missing := cs.GetMissingChunks()
+	desired := cs.GetDesiredChunks()
+
+	if len(missing) != len(desired) {
+		t.Errorf("Expected %d missing chunks, got %d", len(desired), len(missing))
+	}
+
+	// Mark some chunks as available
+	if len(desired) > 0 {
+		cs.MarkChunkAvailable(desired[0].GridCoord)
+
+		newMissing := cs.GetMissingChunks()
+		if len(newMissing) != len(desired)-1 {
+			t.Errorf("Expected %d missing chunks after marking one available, got %d",
+				len(desired)-1, len(newMissing))
+		}
+	}
+}
+
+func TestHighestPriorityMissing(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Set up selection
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(400)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	highest := cs.GetHighestPriorityMissing()
+	if highest == nil {
+		t.Error("Expected a highest priority chunk")
+		return
+	}
+
+	// Should be closest to camera (highest priority)
+	missing := cs.GetMissingChunks()
+	for _, chunk := range missing {
+		if chunk.Priority > highest.Priority {
+			t.Errorf("Found chunk with higher priority than 'highest': %f > %f",
+				chunk.Priority, highest.Priority)
+		}
+	}
+}
+
+func TestChunkDesiredStatus(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	coord := GridCoord{0, 0}
+
+	// Initially should not be desired
+	if cs.IsChunkDesired(coord) {
+		t.Error("Chunk should not be desired initially")
+	}
+
+	// After selection that includes this chunk, it should be desired
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{90, 90} // Center of chunk 0,0
+	renderDistance := float32(200)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	if !cs.IsChunkDesired(coord) {
+		t.Error("Chunk should be desired after selection")
+	}
+
+	// After moving camera far away, it should not be desired
+	farCameraPos := lin.Vec2{10000, 10000}
+	cs.UpdateSelection(farCameraPos, frustum, renderDistance)
+
+	if cs.IsChunkDesired(coord) {
+		t.Error("Chunk should not be desired after moving camera away")
+	}
+}
+
+func TestClear(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Set up some state
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(300)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	coord := GridCoord{1, 1}
+	cs.MarkChunkAvailable(coord)
+
+	// Verify state exists
+	if len(cs.GetDesiredChunks()) == 0 {
+		t.Error("Expected desired chunks before clear")
+	}
+
+	// Clear and verify everything is reset
+	cs.Clear()
+
+	if len(cs.GetDesiredChunks()) != 0 {
+		t.Error("Expected no desired chunks after clear")
+	}
+
+	if cs.IsChunkAvailable(coord) {
+		t.Error("Expected no available chunks after clear")
+	}
+
+	highest := cs.GetHighestPriorityMissing()
+	if highest != nil {
+		t.Error("Expected no missing chunks after clear")
+	}
+}
+
+func TestStats(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Initially should have empty stats
+	stats := cs.Stats()
+	if stats.DesiredChunks != 0 || stats.AvailableChunks != 0 || stats.MissingChunks != 0 {
+		t.Error("Expected empty stats initially")
+	}
+
+	// Set up some chunks
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(300)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	// Mark some as available
+	desired := cs.GetDesiredChunks()
+	if len(desired) > 1 {
+		cs.MarkChunkAvailable(desired[0].GridCoord)
+	}
+
+	// Check stats
+	stats = cs.Stats()
+	if stats.DesiredChunks != len(desired) {
+		t.Errorf("Expected %d desired chunks in stats, got %d", len(desired), stats.DesiredChunks)
+	}
+
+	if len(desired) > 1 && stats.AvailableChunks != 1 {
+		t.Errorf("Expected 1 available chunk in stats, got %d", stats.AvailableChunks)
+	}
+
+	expectedMissing := len(desired) - stats.AvailableChunks
+	if stats.MissingChunks != expectedMissing {
+		t.Errorf("Expected %d missing chunks in stats, got %d", expectedMissing, stats.MissingChunks)
+	}
+
+	t.Logf("Stats: %+v", stats)
+	t.Logf("Detailed stats: %s", cs.GetDetailedStats())
+	t.Logf("Visual Selection: %s", cs.VisualizeSelection())
+	t.Logf("Visual Priorities: %s", cs.VisualizePriorities())
+	t.Logf("Visual Loading Efficiency: %s", cs.VisualizeLoadingEfficiency())
+	t.Logf("Neighbor Coverage: %s", cs.AnalyzeNeighborCoverage())
+}
+
+func TestConcurrentAccess(t *testing.T) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	// Set up initial state
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(300)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	// Test concurrent read access
+	done := make(chan bool, 2)
+
+	go func() {
+		for range 100 {
+			cs.GetDesiredChunks()
+			cs.GetMissingChunks()
+			cs.Stats()
+		}
+		done <- true
+	}()
+
+	go func() {
+		for i := range 100 {
+			coord := GridCoord{i % 10, i % 10}
+			cs.MarkChunkAvailable(coord)
+			cs.IsChunkAvailable(coord)
+			cs.MarkChunkUnavailable(coord)
+		}
+		done <- true
+	}()
+
+	// Wait for both goroutines to complete
+	<-done
+	<-done
+
+	// If we get here without deadlocking, the test passes
+}
+
+// Helper function to create a simple frustum for testing
+func createTestFrustum() Frustum {
+	// Create a wide frustum that includes most chunks around origin
+	// 180 degrees wide
+	return Frustum{
+		Planes: [4]FrustumPlane{
+			// Left plane (normal points right)
+			{Normal: lin.Vec2{1, 0}, D: 5000},
+			// Right plane (normal points left)
+			{Normal: lin.Vec2{-1, 0}, D: 5000},
+			// Near plane (normal points away)
+			{Normal: lin.Vec2{0, 1}, D: 10},
+			// Far plane (normal points toward)
+			{Normal: lin.Vec2{0, -1}, D: 5000},
+		},
+	}
+}
+
+// Benchmark tests
+func BenchmarkUpdateSelection(b *testing.B) {
+	cs := NewChunkSelector(testChunkSize, nil)
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(1000)
+
+	for b.Loop() {
+		cs.UpdateSelection(cameraPos, frustum, renderDistance)
+	}
+}
+
+func BenchmarkGetMissingChunks(b *testing.B) {
+	cs := NewChunkSelector(testChunkSize, nil)
+	frustum := createTestFrustum()
+	cameraPos := lin.Vec2{0, 0}
+	renderDistance := float32(1000)
+
+	cs.UpdateSelection(cameraPos, frustum, renderDistance)
+
+	for b.Loop() {
+		cs.GetMissingChunks()
+	}
+}
+
+func BenchmarkMarkChunkAvailable(b *testing.B) {
+	cs := NewChunkSelector(testChunkSize, nil)
+
+	for i := 0; b.Loop(); i++ {
+		coord := GridCoord{i % 100, i % 100}
+		cs.MarkChunkAvailable(coord)
+	}
 }
