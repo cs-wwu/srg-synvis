@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cs-wwu/srg-synvis/core/containers"
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
@@ -80,8 +81,8 @@ type StreamManager struct {
 	renderMutex      sync.RWMutex
 
 	// Background processing
-	loadQueue  *models.PriorityQueue[LoadJob]
-	evictQueue *models.PriorityQueue[EvictJob]
+	loadQueue  *containers.PriorityQueue[LoadJob]
+	evictQueue *containers.PriorityQueue[EvictJob]
 
 	// Communication channels
 	cameraUpdates chan lin.Vec2
@@ -119,11 +120,11 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 	stateManager := streaming.NewChunkStateManager()
 
 	// Create priority queues
-	loadQueue := models.NewPriorityQueue(func(job LoadJob) float32 {
+	loadQueue := containers.NewPriorityQueue(func(job LoadJob) float32 {
 		return job.Priority
 	})
 
-	evictQueue := models.NewPriorityQueue(func(job EvictJob) float32 {
+	evictQueue := containers.NewPriorityQueue(func(job EvictJob) float32 {
 		// Lower priority = evict first, so negate
 		return -job.Priority
 	})
