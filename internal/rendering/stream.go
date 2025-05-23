@@ -60,7 +60,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 		[]float32{0.3, 0.25, 0.25, 0.2}, lodChunkSizes)
 
 	// Initialize AssetManager (same as before)
-	assetManager := assets.NewAssetManager(MAP_FOLDER, 27)
+	assetManager := assets.NewAssetManager(MAP_FOLDER, 50)
 
 	sm := &StreamManager{
 		chunkSelector:   chunkSelector,
@@ -95,7 +95,7 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 	log.Printf("ChunkSelector found %d desired chunks", len(desiredChunks))
 
 	// Load first few chunks for testing (limit to avoid overwhelming)
-	maxChunks := 4000
+	maxChunks := 20000
 	if len(desiredChunks) > maxChunks {
 		desiredChunks = desiredChunks[:maxChunks]
 	}
