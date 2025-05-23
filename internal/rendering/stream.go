@@ -55,7 +55,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 	chunkSelector := spatial.NewChunkSelector(CHUNK_SIZE, nil)
 
 	// Initialize BucketAllocator (same as before)
-	lodChunkSizes := calculateLODChunkSizes()
+	lodChunkSizes := CalculateLODChunkSizes()
 	bucketAllocator := memory.NewBucketAllocator(device, memProps,
 		[]float32{0.3, 0.25, 0.25, 0.2}, lodChunkSizes)
 
@@ -277,35 +277,4 @@ func (sm *StreamManager) Destroy() {
 	}
 
 	sm.bucketAllocator.Destroy()
-}
-
-// calculateLODChunkSizes calculates memory requirements for each LOD level
-func calculateLODChunkSizes() []vk.DeviceSize {
-	numLODLevels := 4 // LOD 0-3
-	lodChunkSizes := make([]vk.DeviceSize, numLODLevels)
-
-	for lod := range numLODLevels {
-		stride := 1
-		if lod > 0 {
-			stride = 1 << uint(lod)
-		}
-
-		vps := CHUNK_SIZE / stride
-		numVertices := vps * vps
-		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
-
-		// Calculate indices (same logic as existing chunk.go)
-		numIndices := 0
-		if vps > 1 {
-			numStrips := vps - 1
-			numIndices = numStrips * vps * 2
-			if numStrips > 1 {
-				numIndices += (numStrips - 1) * 2
-			}
-		}
-		indexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(IndexSize)
-
-		lodChunkSizes[lod] = vertexDataSize + indexDataSize
-	}
-	return lodChunkSizes
 }

@@ -50,14 +50,11 @@ implement the dynamic texture swapping.
 ## Basic Rendering Integration
 
 - [x] Create simplified Terrain Manager
-- [ ] Implement basic Chunk Renderer
 - [x] Integrate Memory System with Rendering
 - [x] Implement Texture Manager
   - [x] Create texture loading/unloading functionality
   - [x] Implement LRU-based texture cache (max ~10 textures)
-  - [ ] Add texture-to-chunk mapping system
   - [x] Integrate with asche for Vulkan operations
-- [ ] Add minimal ocean rendering
 - [x] Test basic functionality
 
 ## Stream Manager
@@ -97,10 +94,14 @@ implement the dynamic texture swapping.
 - [ ] Use a single buffer that is locally managed/split for faster allocation
 - [ ] Change to `allocator`
   - [ ] Add capacity for a "models" folder for instanced rendering
+  - [ ] Render Ocean chunk as instanced model
+- [ ] Do we still need to store vertices/indices after GPU upload?
+  - [ ] If not, we can shortcut when lowering LODs (use existing vertices/indices)
 
 ## Redo Chunk Calculations
 
-- [ ] Implement Stitching Helper or Redo Chunk calculations
+- [x] Implement Stitching Helper or Redo Chunk calculations
+- [ ] Fix Map edge calculations (wrapping around ambiguously because of `WorldToPixel`)
 
 ## New file structure
 

@@ -5,6 +5,7 @@ import (
 	"image"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
@@ -145,4 +146,35 @@ func CalculateChunkNormals(chunk *Chunk) {
 	// Handle bottom-right corner - use normal from vertex to the left
 	lastIdx := (verticesPerSide * verticesPerSide) - 1
 	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
+}
+
+// CalculateLODChunkSizes calculates memory requirements for each LOD level
+func CalculateLODChunkSizes() []vk.DeviceSize {
+	numLODLevels := 4 // LOD 0-3
+	lodChunkSizes := make([]vk.DeviceSize, numLODLevels)
+
+	for lod := range numLODLevels {
+		stride := 1
+		if lod > 0 {
+			stride = 1 << uint(lod)
+		}
+
+		vps := CHUNK_SIZE / stride
+		numVertices := vps * vps
+		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
+
+		// Calculate indices (same logic as existing chunk.go)
+		numIndices := 0
+		if vps > 1 {
+			numStrips := vps - 1
+			numIndices = numStrips * vps * 2
+			if numStrips > 1 {
+				numIndices += (numStrips - 1) * 2
+			}
+		}
+		indexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(IndexSize)
+
+		lodChunkSizes[lod] = vertexDataSize + indexDataSize
+	}
+	return lodChunkSizes
 }
