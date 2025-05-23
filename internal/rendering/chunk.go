@@ -5,7 +5,6 @@ import (
 	"image"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
@@ -33,12 +32,6 @@ type Chunk struct {
 	X        int // Global X Position of the top-left chunk corner
 	Z        int // Global Z Position of the top-left chunk corner
 	LODLevel LODLevel
-
-	allocated      bool
-	vertexOffset   vk.DeviceSize // Offset in buffer for vertices
-	indexOffset    vk.DeviceSize // Offset in buffer for indices
-	vertexBufferId string        // Buffer ID for vertices in allocator
-	indexBufferId  string        // Buffer ID for indices in allocator
 }
 
 // Loads a specific chunk into memory, x and z are the upper-left corner of

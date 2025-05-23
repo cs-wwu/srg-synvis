@@ -1,25 +1,26 @@
 package spatial
 
 import (
+	"math"
 	"sort"
 	"sync"
 
 	lin "github.com/xlab/linmath"
 )
 
-// ChunkSelector implements spatial chunk selection and basic state tracking
+// ChunkSelector implements spatial chunk selection with proper distance-based priority
 type ChunkSelector struct {
-	chunkSize   float32     // Size of each chunk in world units
-	lodStrategy LODStrategy // Strategy for LOD determination
+	chunkSize   float32
+	lodStrategy LODStrategy
 
 	// Current selection state
-	desiredChunks   map[GridCoord]ChunkSpec // What should exist
-	availableChunks map[GridCoord]bool      // What StreamManager says is available
+	desiredChunks   map[GridCoord]ChunkSpec
+	availableChunks map[GridCoord]bool
 
 	// Cache for performance
 	lastCameraPos      lin.Vec2
 	lastRenderDist     float32
-	missingChunks      []ChunkSpec // Cached list of missing chunks, sorted by priority
+	missingChunks      []ChunkSpec
 	missingChunksDirty bool
 
 	// Thread safety
@@ -29,7 +30,6 @@ type ChunkSelector struct {
 // NewChunkSelector creates a new chunk selection system
 func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector {
 	if lodStrategy == nil {
-		// Default LOD strategy: 3 levels, base distance of 500, multiplier of 2
 		lodStrategy = NewDefaultLODStrategy(3, 500.0, 2.0)
 	}
 
@@ -48,72 +48,101 @@ func (cs *ChunkSelector) UpdateSelection(cameraPos lin.Vec2, viewFrustum Frustum
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	// Clear previous selection
 	cs.desiredChunks = make(map[GridCoord]ChunkSpec)
 	cs.lastCameraPos = cameraPos
 	cs.lastRenderDist = renderDistance
 
-	// Calculate the grid bounds to check
-	radiusInChunks := int((renderDistance / cs.chunkSize) + 1)
+	// Calculate grid bounds in a smart way - start from camera and spiral outward
 	centerCoord := cs.WorldToGrid(cameraPos)
+	radiusInChunks := int((renderDistance / cs.chunkSize) + 1)
 
-	// Check all chunks within render distance
-	for x := centerCoord.X - radiusInChunks; x <= centerCoord.X+radiusInChunks; x++ {
-		for z := centerCoord.Z - radiusInChunks; z <= centerCoord.Z+radiusInChunks; z++ {
-			coord := GridCoord{X: x, Z: z}
-			worldPos := cs.GridToWorld(coord)
-
-			// Distance check
-			dx := worldPos[0] - cameraPos[0]
-			dz := worldPos[1] - cameraPos[1]
-			distance := dx*dx + dz*dz
-			if distance > renderDistance*renderDistance {
-				continue
-			}
-
-			// Create temporary chunk info for frustum test
-			chunkInfo := &ChunkInfo{
-				GridCoord: coord,
-				WorldPos:  worldPos,
-			}
-
-			// Frustum culling
-			inFrustum := IsChunkInFrustum(chunkInfo, viewFrustum)
-
-			// Calculate final properties
-			distance = float32(sqrt(float64(distance)))
-			lodLevel := cs.lodStrategy.GetLODLevel(distance)
-			priority := cs.CalculatePriority(coord, cameraPos, inFrustum)
-
-			// Add to desired chunks
-			cs.desiredChunks[coord] = ChunkSpec{
-				GridCoord: coord,
-				WorldPos:  worldPos,
-				Distance:  distance,
-				LODLevel:  lodLevel,
-				Priority:  priority,
-				InFrustum: inFrustum,
-			}
-		}
+	// Use spiral pattern to ensure closest chunks are processed first
+	for radius := 0; radius <= radiusInChunks; radius++ {
+		cs.addChunksAtRadius(centerCoord, radius, cameraPos, viewFrustum, renderDistance)
 	}
 
-	// Mark missing chunks list as dirty for recalculation
 	cs.missingChunksDirty = true
 }
 
-// GetDesiredChunks returns all chunks that should exist
-func (cs *ChunkSelector) GetDesiredChunks() []ChunkSpec {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
-
-	chunks := make([]ChunkSpec, 0, len(cs.desiredChunks))
-	for _, spec := range cs.desiredChunks {
-		chunks = append(chunks, spec)
+// addChunksAtRadius adds chunks at a specific distance from center
+func (cs *ChunkSelector) addChunksAtRadius(center GridCoord, radius int, cameraPos lin.Vec2, viewFrustum Frustum, renderDistance float32) {
+	if radius == 0 {
+		// Just the center chunk
+		cs.evaluateChunk(center, cameraPos, viewFrustum, renderDistance)
+		return
 	}
-	return chunks
+
+	// Walk around the perimeter of the square at this radius
+	for i := range radius*8 {
+		var coord GridCoord
+		side := i / (radius * 2)
+		offset := i % (radius * 2)
+
+		switch side {
+		case 0: // Top edge
+			coord = GridCoord{center.X - radius + offset, center.Z - radius}
+		case 1: // Right edge
+			coord = GridCoord{center.X + radius, center.Z - radius + offset}
+		case 2: // Bottom edge
+			coord = GridCoord{center.X + radius - offset, center.Z + radius}
+		case 3: // Left edge
+			coord = GridCoord{center.X - radius, center.Z + radius - offset}
+		}
+
+		cs.evaluateChunk(coord, cameraPos, viewFrustum, renderDistance)
+	}
 }
 
-// GetMissingChunks returns desired chunks that are not available, sorted by priority
+// evaluateChunk checks if a chunk should be included and calculates its properties
+func (cs *ChunkSelector) evaluateChunk(coord GridCoord, cameraPos lin.Vec2, viewFrustum Frustum, renderDistance float32) {
+	worldPos := cs.GridToWorld(coord)
+
+	// Distance check first (cheapest)
+	dx := worldPos[0] - cameraPos[0]
+	dz := worldPos[1] - cameraPos[1]
+	distanceSq := dx*dx + dz*dz
+	if distanceSq > renderDistance*renderDistance {
+		return
+	}
+
+	// Create chunk info for frustum test
+	chunkInfo := &ChunkInfo{
+		GridCoord: coord,
+		WorldPos:  worldPos,
+	}
+
+	// Frustum culling
+	inFrustum := IsChunkInFrustum(chunkInfo, viewFrustum)
+
+	distance := float32(math.Sqrt(float64(distanceSq)))
+	lodLevel := cs.lodStrategy.GetLODLevel(distance)
+	priority := cs.calculatePriorityByDistance(distance, inFrustum)
+
+	// Add to desired chunks
+	cs.desiredChunks[coord] = ChunkSpec{
+		GridCoord: coord,
+		WorldPos:  worldPos,
+		Distance:  distance,
+		LODLevel:  lodLevel,
+		Priority:  priority,
+		InFrustum: inFrustum,
+	}
+}
+
+// calculatePriorityByDistance creates priority based purely on distance with frustum bonus
+func (cs *ChunkSelector) calculatePriorityByDistance(distance float32, inFrustum bool) float32 {
+	// Base priority: closer = higher (inverse distance)
+	basePriority := 10000.0 / (distance + 1.0)
+
+	// Huge bonus for being in frustum
+	if inFrustum {
+		return basePriority * 10.0 // 10x multiplier for visible chunks
+	}
+
+	return basePriority
+}
+
+// GetMissingChunks returns desired chunks that are not available, sorted by priority (highest first)
 func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
@@ -123,7 +152,7 @@ func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
 	}
 
 	// Rebuild missing chunks list
-	cs.missingChunks = cs.missingChunks[:0] // Reset slice but keep capacity
+	cs.missingChunks = cs.missingChunks[:0]
 
 	for coord, spec := range cs.desiredChunks {
 		if !cs.availableChunks[coord] {
@@ -131,9 +160,17 @@ func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
 		}
 	}
 
-	// Sort by priority (highest first)
+	// Sort by priority (highest first), with distance as tiebreaker
 	sort.Slice(cs.missingChunks, func(i, j int) bool {
-		return cs.missingChunks[i].Priority > cs.missingChunks[j].Priority
+		a, b := cs.missingChunks[i], cs.missingChunks[j]
+
+		// Primary sort: priority (higher first)
+		if math.Abs(float64(a.Priority-b.Priority)) > 0.001 {
+			return a.Priority > b.Priority
+		}
+
+		// Tiebreaker: distance (closer first)
+		return a.Distance < b.Distance
 	})
 
 	cs.missingChunksDirty = false
@@ -147,6 +184,18 @@ func (cs *ChunkSelector) GetHighestPriorityMissing() *ChunkSpec {
 		return nil
 	}
 	return &missing[0]
+}
+
+// GetDesiredChunks returns all chunks that should exist
+func (cs *ChunkSelector) GetDesiredChunks() []ChunkSpec {
+	cs.mu.RLock()
+	defer cs.mu.RUnlock()
+
+	chunks := make([]ChunkSpec, 0, len(cs.desiredChunks))
+	for _, spec := range cs.desiredChunks {
+		chunks = append(chunks, spec)
+	}
+	return chunks
 }
 
 // MarkChunkAvailable marks a chunk as available (loaded by StreamManager)
@@ -197,8 +246,8 @@ func (cs *ChunkSelector) GetNeighborCoords(coord GridCoord) [4]GridCoord {
 // WorldToGrid converts 2D world position to grid coordinates
 func (cs *ChunkSelector) WorldToGrid(pos lin.Vec2) GridCoord {
 	return GridCoord{
-		X: int(floor(float64(pos[0]) / float64(cs.chunkSize))),
-		Z: int(floor(float64(pos[1]) / float64(cs.chunkSize))),
+		X: int(math.Floor(float64(pos[0]) / float64(cs.chunkSize))),
+		Z: int(math.Floor(float64(pos[1]) / float64(cs.chunkSize))),
 	}
 }
 
@@ -215,7 +264,7 @@ func (cs *ChunkSelector) CalculateLOD(coord GridCoord, cameraPos lin.Vec2) int {
 	worldPos := cs.GridToWorld(coord)
 	dx := worldPos[0] - cameraPos[0]
 	dz := worldPos[1] - cameraPos[1]
-	distance := float32(sqrt(float64(dx*dx + dz*dz)))
+	distance := float32(math.Sqrt(float64(dx*dx + dz*dz)))
 
 	return cs.lodStrategy.GetLODLevel(distance)
 }
@@ -225,18 +274,9 @@ func (cs *ChunkSelector) CalculatePriority(coord GridCoord, cameraPos lin.Vec2, 
 	worldPos := cs.GridToWorld(coord)
 	dx := worldPos[0] - cameraPos[0]
 	dz := worldPos[1] - cameraPos[1]
-	distance := float32(sqrt(float64(dx*dx + dz*dz)))
+	distance := float32(math.Sqrt(float64(dx*dx + dz*dz)))
 
-	var priority float32
-	if inFrustum {
-		// Higher priority for chunks in view
-		priority = 1000.0 / (distance + 1.0)
-	} else {
-		// Lower priority for chunks outside view
-		priority = 100.0 / (distance + 1.0)
-	}
-
-	return priority
+	return cs.calculatePriorityByDistance(distance, inFrustum)
 }
 
 // Stats returns statistics about the chunk selection system
@@ -275,29 +315,4 @@ func (cs *ChunkSelector) Clear() {
 	cs.availableChunks = make(map[GridCoord]bool)
 	cs.missingChunks = cs.missingChunks[:0]
 	cs.missingChunksDirty = true
-}
-
-// Helper functions for math operations
-func floor(x float64) float64 {
-	if x >= 0 {
-		return float64(int(x))
-	}
-	i := int(x)
-	if float64(i) == x {
-		return x
-	}
-	return float64(i - 1)
-}
-
-func sqrt(x float64) float64 {
-	if x == 0 || x == 1 {
-		return x
-	}
-
-	// Newton's method for square root
-	guess := x
-	for range 10 { // 10 iterations should be enough for float32 precision
-		guess = (guess + x/guess) / 2
-	}
-	return guess
 }
