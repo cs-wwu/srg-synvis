@@ -10,6 +10,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/models"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -20,7 +21,7 @@ const (
 	MAP_FOLDER = "assets/maps/"
 )
 
-// RenderableChunk represents a chunk ready for GPU
+// RenderableChunk represents a chunk ready for GPU rendering
 type RenderableChunk struct {
 	GridCoord      spatial.GridCoord
 	LODLevel       int
@@ -37,14 +38,15 @@ type StreamManager struct {
 	chunkSelector   *spatial.ChunkSelector
 	bucketAllocator *memory.BucketAllocator
 	assetManager    assets.AssetManager
+	stateManager    *streaming.ChunkStateManager
 
 	// Vulkan resources
 	device   *vk.Device
 	memProps *vk.PhysicalDeviceMemoryProperties
 
-	// State tracking
-	activeChunks  map[spatial.GridCoord]*RenderableChunk
-	lastCameraPos lin.Vec2
+	// Renderable chunks (only chunks in Ready state)
+	renderableChunks map[spatial.GridCoord]*RenderableChunk
+	lastCameraPos    lin.Vec2
 
 	cfg models.AppConfig
 }
@@ -60,19 +62,23 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 		[]float32{0.3, 0.25, 0.25, 0.2}, lodChunkSizes)
 
 	// Initialize AssetManager (same as before)
-	assetManager := assets.NewAssetManager(MAP_FOLDER, 50)
+	assetManager := assets.NewAssetManager(MAP_FOLDER, 27)
+
+	// Initialize ChunkStateManager
+	stateManager := streaming.NewChunkStateManager()
 
 	sm := &StreamManager{
-		chunkSelector:   chunkSelector,
-		bucketAllocator: bucketAllocator,
-		assetManager:    assetManager,
-		device:          device,
-		memProps:        memProps,
-		cfg:             cfg,
-		activeChunks:    make(map[spatial.GridCoord]*RenderableChunk),
+		chunkSelector:    chunkSelector,
+		bucketAllocator:  bucketAllocator,
+		assetManager:     assetManager,
+		stateManager:     stateManager,
+		device:           device,
+		memProps:         memProps,
+		cfg:              cfg,
+		renderableChunks: make(map[spatial.GridCoord]*RenderableChunk),
 	}
 
-	log.Printf("StreamManager initialized with ChunkSelector")
+	log.Printf("StreamManager initialized with ChunkStateManager")
 	return sm
 }
 
@@ -95,7 +101,7 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 	log.Printf("ChunkSelector found %d desired chunks", len(desiredChunks))
 
 	// Load first few chunks for testing (limit to avoid overwhelming)
-	maxChunks := 20000
+	maxChunks := 10000
 	if len(desiredChunks) > maxChunks {
 		desiredChunks = desiredChunks[:maxChunks]
 	}
@@ -108,7 +114,22 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 	loadedMaps := make(map[string]bool)
 
 	// Process each desired chunk
+	successCount := 0
 	for _, spec := range desiredChunks {
+		// Check if chunk is already loaded
+		currentState := sm.stateManager.GetChunkState(spec.GridCoord)
+		if currentState == streaming.StateReady {
+			sm.chunkSelector.MarkChunkAvailable(spec.GridCoord)
+			continue
+		}
+
+		// Queue the chunk for loading
+		err := sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateQueued, spec.Priority, spec.LODLevel)
+		if err != nil {
+			log.Printf("Failed to queue chunk %v: %v", spec.GridCoord, err)
+			continue
+		}
+
 		// Determine the correct map coordinate for this specific chunk
 		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
 
@@ -118,35 +139,46 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 			_, err := sm.assetManager.LoadMapData(chunkMapCoord)
 			if err != nil {
 				log.Printf("Failed to load map data for %s: %v", chunkMapCoord, err)
-				continue // Skip this chunk if we can't load its map data
+				// Mark chunk as failed (transition back to unloaded)
+				sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateUnloaded, spec.Priority, spec.LODLevel)
+				continue
 			}
 			loadedMaps[chunkMapCoord] = true
 		}
 
 		// Load the chunk with its correct map coordinate
-		err := sm.loadChunk(spec, chunkMapCoord)
+		err = sm.loadChunk(spec, chunkMapCoord)
 		if err != nil {
 			log.Printf("Failed to load chunk %v: %v", spec.GridCoord, err)
+			// Mark chunk as failed
+			sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateUnloaded, spec.Priority, spec.LODLevel)
 			continue
 		}
 
 		// Mark as available in ChunkSelector
 		sm.chunkSelector.MarkChunkAvailable(spec.GridCoord)
+		successCount++
 	}
 
-	log.Printf("Loaded map data for %d different map coordinates", len(loadedMaps))
+	log.Printf("Successfully loaded %d chunks from %d different map coordinates", successCount, len(loadedMaps))
 	return nil
 }
 
-// loadChunk handles the loading of a single chunk
+// loadChunk handles the loading of a single chunk with state management
 func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) error {
+	// Transition to loading state
+	err := sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateLoading, spec.Priority, spec.LODLevel)
+	if err != nil {
+		return fmt.Errorf("failed to transition to loading state: %w", err)
+	}
+
 	// Get map data
 	mapData, err := sm.assetManager.LoadMapData(mapCoord)
 	if err != nil {
 		return fmt.Errorf("failed to get map data: %w", err)
 	}
 
-	// Generate chunk using existing logic from  package
+	// Generate chunk using existing logic from package
 	chunk := &Chunk{
 		X:        int(spec.WorldPos[0] - CHUNK_SIZE/2), // Convert center pos to corner
 		Z:        int(spec.WorldPos[1] - CHUNK_SIZE/2),
@@ -210,16 +242,37 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 		IndexCount:     len(chunk.Indices),
 	}
 
-	sm.activeChunks[spec.GridCoord] = renderableChunk
+	// Store renderable chunk and transition to ready state
+	sm.renderableChunks[spec.GridCoord] = renderableChunk
+	err = sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateReady, spec.Priority, spec.LODLevel)
+	if err != nil {
+		// Clean up on state transition failure
+		delete(sm.renderableChunks, spec.GridCoord)
+		sm.bucketAllocator.FreeChunk(vertexId, spec.LODLevel)
+		sm.bucketAllocator.FreeChunk(indexId, spec.LODLevel)
+		return fmt.Errorf("failed to transition to ready state: %w", err)
+	}
+
+	// Touch the chunk to update its last used time
+	sm.stateManager.TouchChunk(spec.GridCoord)
+
 	return nil
 }
 
-// GetRenderableChunks returns all currently loaded chunks ready for
+// GetRenderableChunks returns all currently loaded chunks ready for rendering
 func (sm *StreamManager) GetRenderableChunks() []*RenderableChunk {
-	chunks := make([]*RenderableChunk, 0, len(sm.activeChunks))
-	for _, chunk := range sm.activeChunks {
-		chunks = append(chunks, chunk)
+	// Only return chunks that are in Ready state
+	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
+
+	chunks := make([]*RenderableChunk, 0, len(readyChunks))
+	for _, record := range readyChunks {
+		if renderableChunk, exists := sm.renderableChunks[record.GridCoord]; exists {
+			// Touch the chunk since it's being rendered
+			sm.stateManager.TouchChunk(record.GridCoord)
+			chunks = append(chunks, renderableChunk)
+		}
 	}
+
 	return chunks
 }
 
@@ -258,23 +311,132 @@ func (sm *StreamManager) RenderChunks(cmdBuffer vk.CommandBuffer) {
 	}
 }
 
+// EvictChunk removes a chunk from memory and transitions it to unloaded
+func (sm *StreamManager) EvictChunk(coord spatial.GridCoord) error {
+	// Get current state
+	currentState := sm.stateManager.GetChunkState(coord)
+	if currentState != streaming.StateReady {
+		return fmt.Errorf("can only evict ready chunks, chunk %v is in state %s", coord, currentState)
+	}
+
+	// Transition to evicting state
+	record := sm.stateManager.GetChunkRecord(coord)
+	if record == nil {
+		return fmt.Errorf("chunk record not found for %v", coord)
+	}
+
+	err := sm.stateManager.SetChunkState(coord, streaming.StateEvicting, record.Priority, record.LODLevel)
+	if err != nil {
+		return fmt.Errorf("failed to transition to evicting state: %w", err)
+	}
+
+	// Clean up renderable chunk
+	if renderableChunk, exists := sm.renderableChunks[coord]; exists {
+		// Free memory allocations
+		sm.bucketAllocator.FreeChunk(renderableChunk.VertexBufferId, renderableChunk.LODLevel)
+		sm.bucketAllocator.FreeChunk(renderableChunk.IndexBufferId, renderableChunk.LODLevel)
+
+		// Remove from renderable chunks
+		delete(sm.renderableChunks, coord)
+	}
+
+	// Mark as unavailable in ChunkSelector
+	sm.chunkSelector.MarkChunkUnavailable(coord)
+
+	// Transition to unloaded and remove from tracking
+	err = sm.stateManager.SetChunkState(coord, streaming.StateUnloaded, record.Priority, record.LODLevel)
+	if err != nil {
+		return fmt.Errorf("failed to transition to unloaded state: %w", err)
+	}
+
+	err = sm.stateManager.RemoveChunk(coord)
+	if err != nil {
+		return fmt.Errorf("failed to remove chunk from tracking: %w", err)
+	}
+
+	return nil
+}
+
 // Stats returns information about the StreamManager state
 func (sm *StreamManager) Stats() string {
 	chunkStats := sm.chunkSelector.Stats()
-	return fmt.Sprintf("StreamManager: %d active chunks, ChunkSelector: %d desired, %d missing",
-		len(sm.activeChunks), chunkStats.DesiredChunks, chunkStats.MissingChunks)
+	stateStats := sm.stateManager.GetStats()
+
+	stateStatsStr := ""
+	for state, count := range stateStats {
+		if stateStatsStr != "" {
+			stateStatsStr += ", "
+		}
+		stateStatsStr += fmt.Sprintf("%s:%d", state, count)
+	}
+
+	return fmt.Sprintf("StreamManager: %d renderable chunks, ChunkSelector: %d desired, %d missing, States: [%s]",
+		len(sm.renderableChunks), chunkStats.DesiredChunks, chunkStats.MissingChunks, stateStatsStr)
+}
+
+// GetDetailedStateStats returns detailed statistics about chunk states
+func (sm *StreamManager) GetDetailedStateStats() string {
+	stats := sm.stateManager.GetStats()
+	allChunks := sm.stateManager.GetAllChunks()
+
+	result := fmt.Sprintf("Chunk State Statistics (Total: %d chunks):\n", sm.stateManager.Count())
+	result += "=========================================\n"
+
+	for state := streaming.StateUnloaded; state <= streaming.StateEvicting; state++ {
+		count := stats[state]
+		result += fmt.Sprintf("  %s: %d chunks\n", state, count)
+	}
+
+	// Show some example chunks in each state
+	stateExamples := make(map[streaming.ChunkState][]*streaming.ChunkRecord)
+	for _, chunk := range allChunks {
+		stateExamples[chunk.State] = append(stateExamples[chunk.State], chunk)
+	}
+
+	result += "\nSample chunks by state:\n"
+	for state, chunks := range stateExamples {
+		if len(chunks) > 0 {
+			result += fmt.Sprintf("  %s: ", state)
+			maxShow := 3
+			for i, chunk := range chunks {
+				if i >= maxShow {
+					result += fmt.Sprintf("... (%d more)", len(chunks)-maxShow)
+					break
+				}
+				if i > 0 {
+					result += ", "
+				}
+				result += fmt.Sprintf("%v(LOD:%d,P:%.1f)", chunk.GridCoord, chunk.LODLevel, chunk.Priority)
+			}
+			result += "\n"
+		}
+	}
+
+	return result
 }
 
 // Destroy cleans up resources
 func (sm *StreamManager) Destroy() {
-	// Print some stats before destruction
 	if sm.cfg.DebugMode {
 		log.Printf("StreamManager stats: %s", sm.Stats())
 		log.Printf("Memory usage: %s", sm.bucketAllocator.GetDetailedStats())
 		log.Printf("Chunk Selector: %s", sm.chunkSelector.GetDetailedStats())
 		log.Printf("Visual: %s", sm.chunkSelector.VisualizeSelection())
 		log.Printf("AssetManager: %s", sm.assetManager.Stats())
+		log.Printf("Detailed State Stats:\n%s", sm.GetDetailedStateStats())
 	}
+
+	// Clean up all ready chunks before destroying allocator
+	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
+	for _, record := range readyChunks {
+		err := sm.EvictChunk(record.GridCoord)
+		if err != nil {
+			log.Printf("Failed to evict chunk %v during cleanup: %v", record.GridCoord, err)
+		}
+	}
+
+	// Clear state manager
+	sm.stateManager.Clear()
 
 	sm.bucketAllocator.Destroy()
 }
