@@ -13,7 +13,6 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
@@ -98,18 +97,18 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 // Initialize the Uniform Buffer Object
 func (app *Application) initUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(app.fov), aspectRatio, 0.1, app.renderDistance)
+	app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 0.1, app.cfg.RenderDistance)
 	app.ubo.View = app.camera.ViewMatrix()
 	app.ubo.Model.Identity()
 	app.ubo.Projection[1][1] *= -1
 
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
-	app.ubo.RenderDistance = app.renderDistance
-	log.Printf("vulkan: render distance: %f", app.renderDistance)
+	app.ubo.RenderDistance = app.cfg.RenderDistance
+	log.Printf("vulkan: render distance: %f", app.cfg.RenderDistance)
 
 	// Fix the logic to match shader expectations
-	if app.disableWarnings {
+	if app.cfg.DisableTerrainWarnings {
 		app.ubo.DisableWarnings = 1.0 // 1.0 = disabled
 	} else {
 		app.ubo.DisableWarnings = 0.0 // 0.0 = enabled
@@ -943,7 +942,11 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize StreamManager
-	app.StreamManager = streaming.NewStreamManager(&dev, &memProps)
+	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
+	err := app.StreamManager.LoadSomeTestChunks()
+	if err != nil {
+		log.Fatalf("vulkan: failed to load chunks: %v", err)
+	}
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

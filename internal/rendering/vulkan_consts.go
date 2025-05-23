@@ -2,7 +2,7 @@ package rendering
 
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
-	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	"github.com/cs-wwu/srg-synvis/internal/models"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -43,14 +43,10 @@ type Application struct {
 
 	ubo UniformBufferObject
 
-	// config settings
-	renderDistance  float32
-	fov             float32
-	disableWarnings bool
-	debugMode       bool
+	cfg models.AppConfig
 
 	camera        camera.Camera
-	StreamManager *streaming.StreamManager
+	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 
 	Gps bool

@@ -1,4 +1,4 @@
-package streaming
+package rendering
 
 import (
 	"encoding/binary"
@@ -9,7 +9,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/cs-wwu/srg-synvis/internal/rendering"
+	"github.com/cs-wwu/srg-synvis/internal/models"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -20,7 +20,7 @@ const (
 	MAP_FOLDER = "assets/maps/"
 )
 
-// RenderableChunk represents a chunk ready for GPU rendering
+// RenderableChunk represents a chunk ready for GPU
 type RenderableChunk struct {
 	GridCoord      spatial.GridCoord
 	LODLevel       int
@@ -45,10 +45,12 @@ type StreamManager struct {
 	// State tracking
 	activeChunks  map[spatial.GridCoord]*RenderableChunk
 	lastCameraPos lin.Vec2
+
+	cfg models.AppConfig
 }
 
 // NewStreamManager creates a new stream manager with all subsystems
-func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties) *StreamManager {
+func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProperties, cfg models.AppConfig) *StreamManager {
 	// Initialize ChunkSelector (replaces old TerrainGrid)
 	chunkSelector := spatial.NewChunkSelector(CHUNK_SIZE, nil)
 
@@ -66,6 +68,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 		assetManager:    assetManager,
 		device:          device,
 		memProps:        memProps,
+		cfg:             cfg,
 		activeChunks:    make(map[spatial.GridCoord]*RenderableChunk),
 	}
 
@@ -81,14 +84,11 @@ func (sm *StreamManager) UpdateCameraPosition(pos lin.Vec3) {
 // LoadSomeTestChunks loads a few chunks for testing (replaces GenerateTestLine)
 func (sm *StreamManager) LoadSomeTestChunks() error {
 	// Create a simple frustum for testing
-	direction := float32(1.5708) // 90 degrees, looking north
-	fov := float32(1.5708)       // 90 degree FOV
 	near := float32(10.0)
-	far := float32(2000.0)
-	frustum := spatial.NewFrustumFromCamera(sm.lastCameraPos, direction, fov, near, far)
+	frustum := spatial.NewFrustumFromCamera(sm.lastCameraPos, sm.cfg.CameraStartDir[1], sm.cfg.Fov, near, sm.cfg.RenderDistance)
 
 	// Update ChunkSelector with current camera state
-	sm.chunkSelector.UpdateSelection(sm.lastCameraPos, frustum, far)
+	sm.chunkSelector.UpdateSelection(sm.lastCameraPos, frustum, sm.cfg.RenderDistance)
 
 	// Get desired chunks
 	desiredChunks := sm.chunkSelector.GetDesiredChunks()
@@ -138,21 +138,21 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 		return fmt.Errorf("failed to get map data: %w", err)
 	}
 
-	// Generate chunk using existing logic from rendering package
-	chunk := &rendering.Chunk{
+	// Generate chunk using existing logic from  package
+	chunk := &Chunk{
 		X:        int(spec.WorldPos[0] - CHUNK_SIZE/2), // Convert center pos to corner
 		Z:        int(spec.WorldPos[1] - CHUNK_SIZE/2),
-		LODLevel: rendering.LODLevel(spec.LODLevel),
+		LODLevel: LODLevel(spec.LODLevel),
 	}
 
 	// Calculate geometry using existing functions
-	rendering.CalculateChunkVertices(mapData.Heightmap, mapData.Watermap, chunk)
-	rendering.CalculateChunkIndices(chunk)
-	rendering.CalculateChunkNormals(chunk)
+	CalculateChunkVertices(mapData.Heightmap, mapData.Watermap, chunk)
+	CalculateChunkIndices(chunk)
+	CalculateChunkNormals(chunk)
 
 	// Allocate vertex buffer
 	vertexId := fmt.Sprintf("chunk_%v_vertices", spec.GridCoord)
-	vertexDataSize := vk.DeviceSize(len(chunk.Vertices) * rendering.VertexSize)
+	vertexDataSize := vk.DeviceSize(len(chunk.Vertices) * VertexSize)
 	success, vertexOffset := sm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, spec.LODLevel)
 	if !success {
 		return fmt.Errorf("failed to allocate vertex buffer")
@@ -160,7 +160,7 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 
 	// Allocate index buffer
 	indexId := fmt.Sprintf("chunk_%v_indices", spec.GridCoord)
-	indexDataSize := vk.DeviceSize(len(chunk.Indices) * rendering.IndexSize)
+	indexDataSize := vk.DeviceSize(len(chunk.Indices) * IndexSize)
 	success, indexOffset := sm.bucketAllocator.AllocateChunk(indexId, indexDataSize, spec.LODLevel)
 	if !success {
 		sm.bucketAllocator.FreeChunk(vertexId, spec.LODLevel)
@@ -168,9 +168,9 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	}
 
 	// Upload vertex data
-	vertexData := make([]byte, len(chunk.Vertices)*rendering.VertexSize)
+	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
 	for i, vertex := range chunk.Vertices {
-		copy(vertexData[i*rendering.VertexSize:], vertex.Data())
+		copy(vertexData[i*VertexSize:], vertex.Data())
 	}
 
 	if err := sm.bucketAllocator.Upload(vertexId, spec.LODLevel, vertexData); err != nil {
@@ -180,9 +180,9 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	}
 
 	// Upload index data
-	indexData := make([]byte, len(chunk.Indices)*rendering.IndexSize)
+	indexData := make([]byte, len(chunk.Indices)*IndexSize)
 	for i, index := range chunk.Indices {
-		binary.LittleEndian.PutUint32(indexData[i*rendering.IndexSize:], uint32(index))
+		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
 	}
 
 	if err := sm.bucketAllocator.Upload(indexId, spec.LODLevel, indexData); err != nil {
@@ -206,7 +206,7 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	return nil
 }
 
-// GetRenderableChunks returns all currently loaded chunks ready for rendering
+// GetRenderableChunks returns all currently loaded chunks ready for
 func (sm *StreamManager) GetRenderableChunks() []*RenderableChunk {
 	chunks := make([]*RenderableChunk, 0, len(sm.activeChunks))
 	for _, chunk := range sm.activeChunks {
@@ -215,7 +215,7 @@ func (sm *StreamManager) GetRenderableChunks() []*RenderableChunk {
 	return chunks
 }
 
-// RenderChunks renders all loaded chunks (temporary - will be moved to Terrainrendering)
+// RenderChunks renders all loaded chunks (temporary - will be moved to Terrain)
 func (sm *StreamManager) RenderChunks(cmdBuffer vk.CommandBuffer) {
 	chunks := sm.GetRenderableChunks()
 	if len(chunks) == 0 {
@@ -259,6 +259,15 @@ func (sm *StreamManager) Stats() string {
 
 // Destroy cleans up resources
 func (sm *StreamManager) Destroy() {
+	// Print some stats before destruction
+	if sm.cfg.DebugMode {
+		log.Printf("StreamManager stats: %s", sm.Stats())
+		log.Printf("Memory usage: %s", sm.bucketAllocator.GetDetailedStats())
+		log.Printf("Chunk Selector: %s", sm.chunkSelector.GetDetailedStats())
+		log.Printf("Visual: %s", sm.chunkSelector.VisualizeSelection())
+		log.Printf("AssetManager: %s", sm.assetManager.Stats())
+	}
+
 	sm.bucketAllocator.Destroy()
 }
 
@@ -275,7 +284,7 @@ func calculateLODChunkSizes() []vk.DeviceSize {
 
 		vps := CHUNK_SIZE / stride
 		numVertices := vps * vps
-		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(rendering.VertexSize)
+		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
 
 		// Calculate indices (same logic as existing chunk.go)
 		numIndices := 0
@@ -286,7 +295,7 @@ func calculateLODChunkSizes() []vk.DeviceSize {
 				numIndices += (numStrips - 1) * 2
 			}
 		}
-		indexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(rendering.IndexSize)
+		indexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(IndexSize)
 
 		lodChunkSizes[lod] = vertexDataSize + indexDataSize
 	}

@@ -38,13 +38,10 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera:          cam,
-		Gps:             cfg.UseGPS,
-		Hat:             cfg.UseHat,
-		renderDistance:  cfg.RenderDistance,
-		disableWarnings: cfg.DisableTerrainWarnings,
-		debugMode:       cfg.DebugMode,
-		fov:             cfg.Fov,
+		camera: cam,
+		Gps:    cfg.UseGPS,
+		Hat:    cfg.UseHat,
+		cfg:    cfg,
 	}
 
 	return app

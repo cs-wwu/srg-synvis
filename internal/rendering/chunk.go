@@ -11,6 +11,7 @@ import (
 
 const (
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
+	MAP_LENGTH   = 3600
 )
 
 func ChunkKey(chunkX, chunkZ int) string {
@@ -151,28 +152,4 @@ func CalculateChunkNormals(chunk *Chunk) {
 	// Handle bottom-right corner - use normal from vertex to the left
 	lastIdx := (verticesPerSide * verticesPerSide) - 1
 	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
-}
-
-func (tm *TerrainManager) SelectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec2) LODLevel {
-	// Calculate chunk center position
-	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
-	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
-
-	// Calculate 3D distance
-	dx := chunkCenterX - cameraPos[0]
-	dz := chunkCenterZ - cameraPos[1]
-	dist2DSq := dx*dx + +dz*dz
-
-	// Updated thresholds for 3D distance
-	// Square root of previous values to maintain similar visual transitions
-	switch {
-	case dist2DSq < 490: // ~490 units away (including height)
-		return LOD_0
-	case dist2DSq < 980: // ~980 units away
-		return LOD_1
-	case dist2DSq < 1960: // ~1960 units away
-		return LOD_2
-	default:
-		return LOD_3
-	}
 }
