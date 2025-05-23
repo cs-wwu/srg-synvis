@@ -47,15 +47,15 @@ type Chunk struct {
 func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
 	stride := 1 << chunk.LODLevel // 1, 2, 4, or 8
-	verticesPerSide := (CHUNK_SIZE / stride)
+	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on north/west edges
 
 	// Allocate vertex array based on LOD level
 	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
 
 	for z := range verticesPerSide {
-		worldZ := chunk.Z + (z * stride)
+		worldZ := chunk.Z + (z * stride) - stride // Start one stride earlier (north)
 		for x := range verticesPerSide {
-			worldX := chunk.X + (x * stride)
+			worldX := chunk.X + (x * stride) - stride // Start one stride earlier (west)
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
@@ -78,7 +78,7 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 // Generate indices (triangle strip)
 func CalculateChunkIndices(chunk *Chunk) {
 	stride := 1 << chunk.LODLevel
-	verticesPerSide := (CHUNK_SIZE / stride)
+	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
 	numStrips := verticesPerSide - 1
 	verticesPerStrip := verticesPerSide * 2
 	degenerateVertices := (numStrips - 1) * 2
@@ -110,7 +110,7 @@ func CalculateChunkIndices(chunk *Chunk) {
 // Calculate normals for the chunk
 func CalculateChunkNormals(chunk *Chunk) {
 	stride := 1 << chunk.LODLevel
-	verticesPerSide := CHUNK_SIZE / stride
+	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
 
 	// For each vertex except the last row and column
 	for z := range verticesPerSide - 1 {

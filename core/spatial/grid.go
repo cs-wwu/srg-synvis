@@ -30,7 +30,7 @@ type ChunkSelector struct {
 // NewChunkSelector creates a new chunk selection system
 func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector {
 	if lodStrategy == nil {
-		lodStrategy = NewDefaultLODStrategy(3, 500.0, 2.0)
+		lodStrategy = NewDefaultLODStrategy(4, 500.0, 1.75)
 	}
 
 	return &ChunkSelector{
@@ -52,7 +52,7 @@ func (cs *ChunkSelector) UpdateSelection(cameraPos lin.Vec2, viewFrustum Frustum
 	cs.lastCameraPos = cameraPos
 	cs.lastRenderDist = renderDistance
 
-	// Calculate grid bounds in a smart way - start from camera and spiral outward
+	// Start from camera and spiral outward
 	centerCoord := cs.WorldToGrid(cameraPos)
 	radiusInChunks := int((renderDistance / cs.chunkSize) + 1)
 
@@ -73,7 +73,7 @@ func (cs *ChunkSelector) addChunksAtRadius(center GridCoord, radius int, cameraP
 	}
 
 	// Walk around the perimeter of the square at this radius
-	for i := range radius*8 {
+	for i := range radius * 8 {
 		var coord GridCoord
 		side := i / (radius * 2)
 		offset := i % (radius * 2)

@@ -60,7 +60,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 		[]float32{0.3, 0.25, 0.25, 0.2}, lodChunkSizes)
 
 	// Initialize AssetManager (same as before)
-	assetManager := assets.NewAssetManager(MAP_FOLDER, 9)
+	assetManager := assets.NewAssetManager(MAP_FOLDER, 27)
 
 	sm := &StreamManager{
 		chunkSelector:   chunkSelector,
@@ -95,28 +95,36 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 	log.Printf("ChunkSelector found %d desired chunks", len(desiredChunks))
 
 	// Load first few chunks for testing (limit to avoid overwhelming)
-	maxChunks := 5
+	maxChunks := 3000
 	if len(desiredChunks) > maxChunks {
 		desiredChunks = desiredChunks[:maxChunks]
 	}
 
-	// Determine base map coordinate for asset loading
 	if len(desiredChunks) == 0 {
 		return fmt.Errorf("no chunks to load")
 	}
 
-	baseMapCoord := coords.GetMapFromPosition(lin.Vec3{sm.lastCameraPos[0], 0, sm.lastCameraPos[1]})
-	log.Printf("Loading map data for: %s", baseMapCoord)
-
-	// Load map data
-	_, err := sm.assetManager.LoadMapData(baseMapCoord)
-	if err != nil {
-		return fmt.Errorf("failed to load map data: %w", err)
-	}
+	// Track which maps we've already loaded to avoid reloading
+	loadedMaps := make(map[string]bool)
 
 	// Process each desired chunk
 	for _, spec := range desiredChunks {
-		err := sm.loadChunk(spec, baseMapCoord)
+		// Determine the correct map coordinate for this specific chunk
+		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
+
+		// Load map data for this coordinate if we haven't already
+		if !loadedMaps[chunkMapCoord] {
+			log.Printf("Loading map data for: %s", chunkMapCoord)
+			_, err := sm.assetManager.LoadMapData(chunkMapCoord)
+			if err != nil {
+				log.Printf("Failed to load map data for %s: %v", chunkMapCoord, err)
+				continue // Skip this chunk if we can't load its map data
+			}
+			loadedMaps[chunkMapCoord] = true
+		}
+
+		// Load the chunk with its correct map coordinate
+		err := sm.loadChunk(spec, chunkMapCoord)
 		if err != nil {
 			log.Printf("Failed to load chunk %v: %v", spec.GridCoord, err)
 			continue
@@ -124,9 +132,9 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 
 		// Mark as available in ChunkSelector
 		sm.chunkSelector.MarkChunkAvailable(spec.GridCoord)
-		log.Printf("Successfully loaded chunk %v at LOD %d", spec.GridCoord, spec.LODLevel)
 	}
 
+	log.Printf("Loaded map data for %d different map coordinates", len(loadedMaps))
 	return nil
 }
 
