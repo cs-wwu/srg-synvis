@@ -30,18 +30,19 @@ func TestAssetManager(t *testing.T) {
 		}
 
 		// Check dimensions
-		if data.Heightmap.Bounds().Dx() != mapSize {
-			t.Errorf("Invalid heightmap width: %d", data.Heightmap.Bounds().Dx())
+		expectedPixels := mapSize * mapSize
+		if len(data.HeightData) != expectedPixels {
+			t.Errorf("Invalid heightmap size: expected %d, got %d", expectedPixels, len(data.HeightData))
 		}
 
 		// Check ocean elevation
-		sample := data.Heightmap.Gray16At(100, 100).Y
-		if sample != oceanElevation {
-			t.Errorf("Expected ocean elevation %d, got %d", oceanElevation, sample)
+		sample := data.HeightData[100*mapSize+100] // Convert 2D to 1D indexing
+		if sample != seaLevel {
+			t.Errorf("Expected ocean elevation %d, got %d", seaLevel, sample)
 		}
 
 		// Check water coverage
-		water := data.Watermap.GrayAt(100, 100).Y
+		water := data.WaterData[100*mapSize+100]
 		if water != fullWater {
 			t.Errorf("Expected full water %d, got %d", fullWater, water)
 		}
@@ -187,13 +188,13 @@ func TestLoadFromDisk(t *testing.T) {
 		t.Error("Expected real map, not ocean")
 	}
 
-	// Verify data
-	height := data.Heightmap.Gray16At(100, 100).Y
+	// Verify data using raw array access
+	height := data.HeightData[100*mapSize+100]
 	if height != 32768 {
 		t.Errorf("Expected height 32768, got %d", height)
 	}
 
-	water := data.Watermap.GrayAt(100, 100).Y
+	water := data.WaterData[100*mapSize+100]
 	if water != 255 {
 		t.Errorf("Expected water 255, got %d", water)
 	}
@@ -246,11 +247,11 @@ func TestMemoryManagement(t *testing.T) {
 		t.Error("Expected non-zero memory usage")
 	}
 
-	// The file in memroy should be about 3 heightmaps + 3 watermaps
-	// Each heightmap is 3601x3601 pixels, 16 bits per pixel
-	// Each watermap is 3601x3601 pixels, 8 bits per pixel
-	rawWatermapSize := 3601 * 3601
-	rawHeightmapSize := 3601 * 3601 * 2
+	// The file in memory should be about 3 heightmaps + 3 watermaps
+	// Each heightmap is 3601x3601 pixels, 16 bits per pixel (raw uint16 array)
+	// Each watermap is 3601x3601 pixels, 8 bits per pixel (raw uint8 array)
+	rawWatermapSize := mapSize * mapSize      // uint8 array
+	rawHeightmapSize := mapSize * mapSize * 2 // uint16 array = 2 bytes per element
 	expectedMemory := (3 * rawHeightmapSize) + (3 * rawWatermapSize)
 	tolerance := float64(0.1) // 10% tolerance
 
@@ -282,7 +283,7 @@ func createTestMapFiles(t *testing.T, dir, coord string) {
 			if x%2 == 0 && y%2 == 0 {
 				watermap.SetGray(x, y, color.Gray{Y: fullWater})
 			} else {
-				watermap.SetGray(x, y, color.Gray{Y: noWater})
+				watermap.SetGray(x, y, color.Gray{Y: 0}) // Use 0 for no water
 			}
 		}
 	}
