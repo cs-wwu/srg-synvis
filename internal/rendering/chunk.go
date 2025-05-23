@@ -52,12 +52,22 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 
 	// Allocate vertex array based on LOD level
 	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
+	firstZ := true
 
 	for z := range verticesPerSide {
 		worldZ := chunk.Z + (z * stride) - 1 // Start one vertex north (subtract a point)
+		firstX := true
+
 		for x := range verticesPerSide {
 			worldX := chunk.X + (x * stride) - 1 // Start one vertex west (subtract a point)
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
+
+			if firstZ && worldZ%3600 == -1 || worldZ%3600 == 1 {
+				localZ -= 3599
+			}
+			if firstX && worldX%3600 == -1 || worldX%3600 == 1 {
+				localX -= 3599
+			}
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
 			height := float32(int(pixelValue) - 32768) // normalize from 0-65535 to -32768 to 32767
@@ -72,11 +82,15 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 					float32(isWater),
 				},
 			}
+
+			firstX = false
 		}
+		firstZ = false
+
 	}
 }
 
-// Generate indices (triangle strip)
+// Generate indices (triangle strip)c
 func CalculateChunkIndices(chunk *Chunk) {
 	stride := 1 << chunk.LODLevel
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap

@@ -108,7 +108,7 @@ implement the dynamic texture swapping.
 ## Redo Chunk Calculations
 
 - [x] Implement Stitching Helper or Redo Chunk calculations
-- [ ] Fix Map edge calculations (wrapping around ambiguously because of `WorldToPixel`)
+- [x] Fix Map edge calculations (wrapping around ambiguously because of `WorldToPixel`)
 
 ## New file structure
 
