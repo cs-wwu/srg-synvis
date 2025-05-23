@@ -14,6 +14,8 @@ import (
 const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
+
+	METERS_TO_WORLD = 1852.0 / ARC_DEGREES_TO_MINUTES
 )
 
 func parseConfig() models.AppConfig {
@@ -25,7 +27,7 @@ func parseConfig() models.AppConfig {
 	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
 	// New flags
-	renderDistance := flag.Float64("render-distance", 5000.0, "Maximum render distance in world units")
+	renderDistance := flag.Float64("render-distance", 150.0, "Maximum render distance in kilometers")
 	flag.BoolVar(&config.DisableTerrainWarnings, "disable-warnings", false, "Disable terrain height warnings (red coloring)")
 
 	// Enhanced position flag
@@ -40,11 +42,18 @@ func parseConfig() models.AppConfig {
 	// Parse starting position
 	config.CameraStartPos = parsePosition(*startPosString)
 	config.CameraStartDir = parseDirection(*startDirString)
+	*renderDistance = (*renderDistance * 1000.0) / METERS_TO_WORLD
+
 	config.RenderDistance = float32(*renderDistance)
 	config.Fov = float32(*fov)
 
 	// Validate configuration
 	validateConfig(&config)
+
+	if config.DebugMode {
+		log.Println("Debug mode enabled")
+		log.Printf("%+v\n", config)
+	}
 
 	return config
 }
@@ -72,9 +81,9 @@ func parsePosition(posString string) lin.Vec3 {
 
 	// Convert to arcseconds (Vulkan logic)
 	return lin.Vec3{
-		float32(lon * ARC_DEGREES_TO_SECONDS),               // longitude to arcseconds
-		float32(height * (ARC_DEGREES_TO_MINUTES / 1852.0)), // meters to arcseconds
-		float32(-lat * ARC_DEGREES_TO_SECONDS),              // latitude to arcseconds (flipped for vulkan coords)
+		float32(lon * ARC_DEGREES_TO_SECONDS),             // longitude to arcseconds
+		float32(height * (ARC_DEGREES_TO_MINUTES / 1852)), // meters to arcseconds
+		float32(-lat * ARC_DEGREES_TO_SECONDS),            // latitude to arcseconds (flipped for vulkan coords)
 	}
 }
 
