@@ -21,13 +21,13 @@ import (
 )
 
 const (
-	CHUNK_SIZE = 120 // Same as before for compatibility
+	CHUNK_SIZE = 120
 	MAP_FOLDER = "assets/maps/"
 
 	// Worker configuration
-	DEFAULT_WORKERS        = 6
-	COORDINATOR_TICK       = 100 * time.Millisecond
-	CAMERA_UPDATE_DEBOUNCE = 50 * time.Millisecond
+	DEFAULT_WORKERS        = 3
+	COORDINATOR_TICK       = 50 * time.Millisecond
+	CAMERA_UPDATE_DEBOUNCE = 25 * time.Millisecond
 )
 
 // JobType represents the type of background job
