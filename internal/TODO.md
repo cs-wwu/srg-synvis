@@ -63,7 +63,7 @@ implement the dynamic texture swapping.
 - [x] Manages chunk lifecycle (unloaded → loading → ready → evicting)
 - [x] Coordinates between TerrainGrid, BucketAllocator, AssetManager
 - [x] Handles loading strategy and eviction policy
-- [ ] Multithreading and async coordination
+- [x] Multithreading and async coordination
 
 ## Component Interfaces
 
@@ -81,12 +81,19 @@ implement the dynamic texture swapping.
 - [x] Handle file I/O errors gracefully
 - [x] No knowledge of chunks or GPU - just provides raw data
 
-## New Terrain Renderer
+## Next Steps
 
-- [ ] Pure rendering of chunks
-- [ ] Query StreamManager for "what should I draw?"
-- [ ] Bind appropriate textures per chunk
-- [ ] Handle LOD transitions/stitching
+- [ ] Render only frustum-visible chunks
+- [ ] Implement dynamic loading of chunk LODs
+  - [ ] Chunk LODs should change as the camera moves
+
+## Texture Management
+
+- [ ] Implement texture streaming
+  - [ ] Load textures on demand
+  - [ ] Unload textures when not needed
+  - [ ] Use LRU cache for texture management
+- [ ] Implement texture atlas for terrain textures
 
 ## Memory Enhancement
 
