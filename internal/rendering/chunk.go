@@ -10,7 +10,7 @@ import (
 
 const (
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
-	MAP_LENGTH   = 3600
+	MAP_LENGTH   = 3601
 )
 
 func ChunkKey(chunkX, chunkZ int) string {
@@ -46,7 +46,7 @@ type Chunk struct {
 // Calculate vertices and texcoords for a chunk
 func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
-	stride := 1 << chunk.LODLevel // 1, 2, 4, or 8
+	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on north/west edges
 
 	// Allocate vertex array based on LOD level

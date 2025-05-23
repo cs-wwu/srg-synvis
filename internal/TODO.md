@@ -23,9 +23,9 @@ implement the dynamic texture swapping.
   
 ### Longterm
 
-- [ ] Refactor project
-  - [ ] Separate inputs into separate files
-  - [ ] More distinctly define "Debug" mode vs "Prod" mode
+- [x] Refactor project
+  - [x] Separate inputs into separate files
+  - [x] More distinctly define "Debug" mode vs "Prod" mode
 
 ### Core System Overhaul
 
@@ -62,20 +62,20 @@ implement the dynamic texture swapping.
 
 ## Stream Manager
 
-- [ ] Decides WHICH assets to load (coordinates with Asset Manager)
-- [ ] Manages chunk lifecycle (unloaded → loading → ready → evicting)
-- [ ] Coordinates between TerrainGrid, BucketAllocator, AssetManager
-- [ ] Handles loading strategy and eviction policy
+- [x] Decides WHICH assets to load (coordinates with Asset Manager)
+- [x] Manages chunk lifecycle (unloaded → loading → ready → evicting)
+- [x] Coordinates between TerrainGrid, BucketAllocator, AssetManager
+- [x] Handles loading strategy and eviction policy
 - [ ] Multithreading and async coordination
 
 ## Component Interfaces
 
-- [ ] Define StreamManager → TerrainGrid interface
-- [ ] Define StreamManager → BucketAllocator interface  
-- [ ] Define StreamManager → AssetLoader interface
-- [ ] Define StreamManager → AssetManager interface
-- [ ] Define TerrainRenderer → StreamManager interface
-- [ ] Define AssetManager interface (what raw data it provides)
+- [x] Define StreamManager → TerrainGrid interface
+- [x] Define StreamManager → BucketAllocator interface  
+- [x] Define StreamManager → AssetLoader interface
+- [x] Define StreamManager → AssetManager interface
+- [x] Define TerrainRenderer → StreamManager interface
+- [x] Define AssetManager interface (what raw data it provides)
 
 ## Asset Manager
 
