@@ -13,6 +13,7 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
@@ -941,11 +942,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Initialize TerrainManager
-	app.TerrainManager = NewTerrainManager(&dev, &memProps, app.debugMode)
-	log.Printf("vulkan: terrain manager initialized")
-	// Just update position - the terrain manager will handle loading in its own thread
-	app.TerrainManager.UpdateLastPosition(app.camera.Position())
+	// Initialize StreamManager
+	app.StreamManager = streaming.NewStreamManager(&dev, &memProps)
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

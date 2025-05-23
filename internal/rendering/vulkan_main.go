@@ -57,7 +57,7 @@ func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
 
-	app.TerrainManager.Destroy()
+	app.StreamManager.Destroy()
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
@@ -183,7 +183,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	app.TerrainManager.RenderAllocatedChunks(cmd)
+	app.StreamManager.RenderChunks(cmd)
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

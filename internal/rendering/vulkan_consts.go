@@ -2,6 +2,7 @@ package rendering
 
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -48,9 +49,9 @@ type Application struct {
 	disableWarnings bool
 	debugMode       bool
 
-	camera         camera.Camera
-	TerrainManager *TerrainManager
-	WindowHandle   *glfw.Window
+	camera        camera.Camera
+	StreamManager *streaming.StreamManager
+	WindowHandle  *glfw.Window
 
 	Gps bool
 	Hat bool

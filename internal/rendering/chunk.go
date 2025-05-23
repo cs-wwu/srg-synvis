@@ -27,11 +27,11 @@ const (
 )
 
 type Chunk struct {
-	vertices []Vertex
-	indices  []Index
+	Vertices []Vertex
+	Indices  []Index
 	X        int // Global X Position of the top-left chunk corner
 	Z        int // Global Z Position of the top-left chunk corner
-	lodLevel LODLevel
+	LODLevel LODLevel
 
 	allocated      bool
 	vertexOffset   vk.DeviceSize // Offset in buffer for vertices
@@ -50,13 +50,13 @@ type Chunk struct {
 //	--------------------- ▼
 
 // Calculate vertices and texcoords for a chunk
-func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
+func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
-	stride := 1 << chunk.lodLevel // 1, 2, 4, or 8
+	stride := 1 << chunk.LODLevel // 1, 2, 4, or 8
 	verticesPerSide := (CHUNK_SIZE / stride)
 
 	// Allocate vertex array based on LOD level
-	chunk.vertices = make([]Vertex, verticesPerSide*verticesPerSide)
+	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
 
 	for z := range verticesPerSide {
 		worldZ := chunk.Z + (z * stride)
@@ -69,7 +69,7 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			isWater := watermap.GrayAt(localX, localZ).Y
 
 			idx := z*verticesPerSide + x
-			chunk.vertices[idx] = Vertex{
+			chunk.Vertices[idx] = Vertex{
 				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
 				TexCoord: lin.Vec3{
 					float32(localX) / float32(MAP_LENGTH),
@@ -82,49 +82,49 @@ func calculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 }
 
 // Generate indices (triangle strip)
-func calculateChunkIndices(chunk *Chunk) {
-	stride := 1 << chunk.lodLevel
+func CalculateChunkIndices(chunk *Chunk) {
+	stride := 1 << chunk.LODLevel
 	verticesPerSide := (CHUNK_SIZE / stride)
 	numStrips := verticesPerSide - 1
 	verticesPerStrip := verticesPerSide * 2
 	degenerateVertices := (numStrips - 1) * 2
 
-	chunk.indices = make([]Index, (numStrips*verticesPerStrip)+degenerateVertices)
+	chunk.Indices = make([]Index, (numStrips*verticesPerStrip)+degenerateVertices)
 	indexPos := 0
 
 	for z := range verticesPerSide - 1 {
 		if z > 0 {
 			// Degenerate triangle to connect strips
-			chunk.indices[indexPos] = Index(z * verticesPerSide)
+			chunk.Indices[indexPos] = Index(z * verticesPerSide)
 			indexPos++
 		}
 
 		for x := range verticesPerSide {
-			chunk.indices[indexPos] = Index(z*verticesPerSide + x)
-			chunk.indices[indexPos+1] = Index((z+1)*verticesPerSide + x)
+			chunk.Indices[indexPos] = Index(z*verticesPerSide + x)
+			chunk.Indices[indexPos+1] = Index((z+1)*verticesPerSide + x)
 			indexPos += 2
 		}
 
 		if z < verticesPerSide-2 {
 			// Degenerate triangle for next strip
-			chunk.indices[indexPos] = Index((z+1)*verticesPerSide + (verticesPerSide - 1))
+			chunk.Indices[indexPos] = Index((z+1)*verticesPerSide + (verticesPerSide - 1))
 			indexPos++
 		}
 	}
 }
 
 // Calculate normals for the chunk
-func calculateChunkNormals(chunk *Chunk) {
-	stride := 1 << chunk.lodLevel
+func CalculateChunkNormals(chunk *Chunk) {
+	stride := 1 << chunk.LODLevel
 	verticesPerSide := CHUNK_SIZE / stride
 
 	// For each vertex except the last row and column
 	for z := range verticesPerSide - 1 {
 		for x := range verticesPerSide - 1 {
 			idx := z*verticesPerSide + x
-			current := chunk.vertices[idx].Position
-			right := chunk.vertices[idx+1].Position
-			down := chunk.vertices[idx+verticesPerSide].Position
+			current := chunk.Vertices[idx].Position
+			right := chunk.Vertices[idx+1].Position
+			down := chunk.Vertices[idx+verticesPerSide].Position
 
 			var normal, a, b lin.Vec3
 			a.Sub(&down, &current)
@@ -132,28 +132,28 @@ func calculateChunkNormals(chunk *Chunk) {
 			normal.MultCross(&a, &b)
 			normal.Norm(&normal)
 
-			chunk.vertices[idx].Normal = normal
+			chunk.Vertices[idx].Normal = normal
 		}
 	}
 
 	// Handle right edge - use the normal from the vertex to the left
 	for z := range verticesPerSide - 1 {
 		idx := z*verticesPerSide + (verticesPerSide - 1)
-		chunk.vertices[idx].Normal = chunk.vertices[idx-1].Normal
+		chunk.Vertices[idx].Normal = chunk.Vertices[idx-1].Normal
 	}
 
 	// Handle bottom edge - use the normal from the vertex above
 	for x := range verticesPerSide {
 		idx := (verticesPerSide-1)*verticesPerSide + x
-		chunk.vertices[idx].Normal = chunk.vertices[idx-verticesPerSide].Normal
+		chunk.Vertices[idx].Normal = chunk.Vertices[idx-verticesPerSide].Normal
 	}
 
 	// Handle bottom-right corner - use normal from vertex to the left
 	lastIdx := (verticesPerSide * verticesPerSide) - 1
-	chunk.vertices[lastIdx].Normal = chunk.vertices[lastIdx-1].Normal
+	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
 }
 
-func (tm *TerrainManager) selectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec2) LODLevel {
+func (tm *TerrainManager) SelectLODLevel(chunkX, chunkZ int, cameraPos lin.Vec2) LODLevel {
 	// Calculate chunk center position
 	chunkCenterX := float32(chunkX) + float32(CHUNK_SIZE)/2
 	chunkCenterZ := float32(chunkZ) + float32(CHUNK_SIZE)/2
