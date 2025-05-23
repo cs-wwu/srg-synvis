@@ -53,9 +53,9 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
 
 	for z := range verticesPerSide {
-		worldZ := chunk.Z + (z * stride) - stride // Start one vertex north (subtract stride)
+		worldZ := chunk.Z + (z * stride) - 1 // Start one vertex north (subtract a point)
 		for x := range verticesPerSide {
-			worldX := chunk.X + (x * stride) - stride // Start one vertex west (subtract stride)
+			worldX := chunk.X + (x * stride) - 1 // Start one vertex west (subtract a point)
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
