@@ -95,7 +95,7 @@ func (sm *StreamManager) LoadSomeTestChunks() error {
 	log.Printf("ChunkSelector found %d desired chunks", len(desiredChunks))
 
 	// Load first few chunks for testing (limit to avoid overwhelming)
-	maxChunks := 3000
+	maxChunks := 4000
 	if len(desiredChunks) > maxChunks {
 		desiredChunks = desiredChunks[:maxChunks]
 	}

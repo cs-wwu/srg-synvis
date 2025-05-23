@@ -47,7 +47,7 @@ type Chunk struct {
 func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
 	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
-	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on left/top edges
+	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on right/bottom edges
 
 	// Allocate vertex array based on LOD level
 	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
@@ -59,7 +59,7 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
 			pixelValue := heightmap.Gray16At(localX, localZ).Y
-			height := float32(int(pixelValue) - 32768)
+			height := float32(int(pixelValue) - 32768) // normalize from 0-65535 to -32768 to 32767
 			isWater := watermap.GrayAt(localX, localZ).Y
 
 			idx := z*verticesPerSide + x
