@@ -19,7 +19,7 @@ layout(location = 1) in vec3 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 
 const float AMBIENT = 0.15;       // Ambient light intensity
-const float FOG_OFFSET = 1500.0;   // How far to start the fog from the renderDistance
+const float FOG_OFFSET = 0.8;   // How far to start the fog from the renderDistance
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragTexCoord;
@@ -47,7 +47,7 @@ void main()
     float intense = AMBIENT + diffuse * 0.85;
     
     // Calculate fog factors based on distance and height
-    float fogStart = ubo.renderDistance - FOG_OFFSET;  // e.g., 5000 - 1000 = 4000
+    float fogStart = ubo.renderDistance * FOG_OFFSET;  // e.g., 5000 - 1000 = 4000
 
     // Calculate fog factors based on distance and height
     float distance = length(viewPosition.xyz);
