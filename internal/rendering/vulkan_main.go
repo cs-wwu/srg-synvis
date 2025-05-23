@@ -92,6 +92,9 @@ func (app *Application) NextFrame() {
 	// Set camera position in UBO for terrain height warnings
 	cameraPos := app.camera.Position()
 	app.ubo.CameraPos = cameraPos
+
+	// Update the camera position in the stream manager
+	app.StreamManager.UpdateCameraPosition(cameraPos)
 }
 
 // called every frame by asche
