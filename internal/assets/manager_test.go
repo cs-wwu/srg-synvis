@@ -3,6 +3,8 @@ package assets
 import (
 	"image"
 	"image/color"
+	"image/png"
+	"os"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -325,4 +327,28 @@ func BenchmarkConcurrentLoads(b *testing.B) {
 			i++
 		}
 	})
+}
+
+// saveGray16Image saves a 16-bit grayscale image as PNG.
+func saveGray16Image(path string, img *image.Gray16) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := png.Encoder{CompressionLevel: png.DefaultCompression}
+	return encoder.Encode(file, img)
+}
+
+// saveGrayImage saves an 8-bit grayscale image as PNG.
+func saveGrayImage(path string, img *image.Gray) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := png.Encoder{CompressionLevel: png.DefaultCompression}
+	return encoder.Encode(file, img)
 }

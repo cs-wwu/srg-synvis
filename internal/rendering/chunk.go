@@ -2,7 +2,6 @@ package rendering
 
 import (
 	"fmt"
-	"image"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
@@ -45,7 +44,7 @@ type Chunk struct {
 //	--------------------- ▼
 
 // Calculate vertices and texcoords for a chunk
-func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk *Chunk) {
+func CalculateChunkVertices(heightData []uint16, waterData []uint8, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
 	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on right/bottom edges
@@ -69,9 +68,10 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 				localX -= 3599
 			}
 
-			pixelValue := heightmap.Gray16At(localX, localZ).Y
+			// Direct array access - much faster than method image
+			pixelValue := heightData[localZ*MAP_LENGTH+localX]
 			height := float32(int(pixelValue) - 32768) // normalize from 0-65535 to -32768 to 32767
-			isWater := watermap.GrayAt(localX, localZ).Y
+			isWater := waterData[localZ*MAP_LENGTH+localX]
 
 			idx := z*verticesPerSide + x
 			chunk.Vertices[idx] = Vertex{
@@ -86,7 +86,6 @@ func CalculateChunkVertices(heightmap *image.Gray16, watermap *image.Gray, chunk
 			firstX = false
 		}
 		firstZ = false
-
 	}
 }
 

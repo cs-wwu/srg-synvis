@@ -129,7 +129,7 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	}
 
 	// Calculate geometry using existing functions
-	CalculateChunkVertices(mapData.Heightmap, mapData.Watermap, chunk)
+	CalculateChunkVertices(mapData.HeightData, mapData.WaterData, chunk)
 	CalculateChunkIndices(chunk)
 	CalculateChunkNormals(chunk)
 

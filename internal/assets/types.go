@@ -1,7 +1,6 @@
 package assets
 
 import (
-	"image"
 	"time"
 )
 
@@ -9,12 +8,12 @@ import (
 // Heightmaps and watermaps are always loaded and cached together as they
 // are always used together in the terrain system.
 type MapData struct {
-	Coord     string        // Map coordinate (e.g., "n48w123")
-	Heightmap *image.Gray16 // Elevation data (16-bit grayscale)
-	Watermap  *image.Gray   // Water mask (8-bit grayscale)
-	LoadedAt  time.Time     // When this data was loaded
-	Size      int64         // Approximate memory usage in bytes
-	IsOcean   bool          // True if this is a generated ocean tile
+	Coord      string    // Map coordinate (e.g., "n48w123")
+	HeightData []uint16  // 3601 * 3601 * 2 bytes of height data
+	WaterData  []uint8   // 3601 * 3601 bytes of water data
+	LoadedAt   time.Time // When this data was loaded
+	Size       int64     // Approximate memory usage in bytes
+	IsOcean    bool      // True if this is a generated ocean tile
 }
 
 // AssetManager handles loading and caching of map data for the terrain system.

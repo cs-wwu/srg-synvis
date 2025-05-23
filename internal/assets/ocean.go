@@ -1,8 +1,6 @@
 package assets
 
 import (
-	"image"
-	"image/color"
 	"time"
 )
 
@@ -11,57 +9,42 @@ const (
 	mapSize = 3601
 
 	// Sea level in 16-bit heightmap (32768 is zero/sea level)
-	seaLevel       = 32768
-	oceanElevation = 32760 // 8 units below sea level
+	seaLevel = uint16(32768)
 
-	// Water values
-	noWater   = 0
 	fullWater = 255
 )
 
 // generateOceanTile creates a flat ocean tile with all water.
 func (am *assetManager) generateOceanTile(coord string) *MapData {
-	heightmap := generateOceanHeightmap()
-	watermap := generateFullWatermap()
+	heightData := generateOceanHeight()
+	waterData := generateOceanWater()
 
 	return &MapData{
-		Coord:     coord,
-		Heightmap: heightmap,
-		Watermap:  watermap,
-		LoadedAt:  time.Now(),
-		Size:      calculateMapSize(heightmap),
-		IsOcean:   true,
+		Coord:      coord,
+		HeightData: heightData,
+		WaterData:  waterData,
+		LoadedAt:   time.Now(),
+		Size:       mapSize*mapSize*2 + mapSize*mapSize,
+		IsOcean:    true,
 	}
 }
 
-// generateOceanHeightmap creates a heightmap for ocean (flat, below sea level).
-func generateOceanHeightmap() *image.Gray16 {
-	img := image.NewGray16(image.Rect(0, 0, mapSize, mapSize))
-
-	// Set all pixels to ocean elevation
-	oceanColor := color.Gray16{Y: oceanElevation}
-	for y := range mapSize {
-		for x := range mapSize {
-			img.SetGray16(x, y, oceanColor)
-		}
+// generateOceanHeight creates the raw data for an ocean map
+func generateOceanHeight() []uint16 {
+	data := make([]uint16, mapSize*mapSize)
+	for i := range data {
+		data[i] = seaLevel
 	}
-
-	return img
+	return data
 }
 
 // generateFullWatermap creates a watermap with all water.
-func generateFullWatermap() *image.Gray {
-	img := image.NewGray(image.Rect(0, 0, mapSize, mapSize))
-
-	// Set all pixels to full water
-	waterColor := color.Gray{Y: fullWater}
-	for y := range mapSize {
-		for x := range mapSize {
-			img.SetGray(x, y, waterColor)
-		}
+func generateOceanWater() []uint8 {
+	data := make([]uint8, mapSize*mapSize)
+	for i := range data {
+		data[i] = fullWater
 	}
-
-	return img
+	return data
 }
 
 // Direction represents cardinal directions for coastal ocean generation.
