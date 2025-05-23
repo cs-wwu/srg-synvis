@@ -944,10 +944,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// Initialize StreamManager
 	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
 	app.StreamManager.UpdateCameraPosition(app.camera.Position())
-	err := app.StreamManager.LoadSomeTestChunks()
-	if err != nil {
-		log.Fatalf("vulkan: failed to load chunks: %v", err)
-	}
+	app.StreamManager.Start()
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

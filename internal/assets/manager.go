@@ -23,9 +23,6 @@ type assetManager struct {
 // maxMaps is the maximum number of maps to keep in memory (minimum 9 recommended).
 func NewAssetManager(basePath string, maxMaps int) AssetManager {
 	// Ensure basePath ends with separator
-	if basePath != "" && basePath[len(basePath)-1] != '/' {
-		basePath += "/"
-	}
 
 	return &assetManager{
 		basePath: basePath,

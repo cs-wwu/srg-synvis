@@ -54,6 +54,8 @@ func (app *Application) VulkanContextCleanup() error {
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
 
+	// Stop background workers before destroying resources
+	app.StreamManager.Stop()
 	app.StreamManager.Destroy()
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
@@ -93,7 +95,8 @@ func (app *Application) NextFrame() {
 	cameraPos := app.camera.Position()
 	app.ubo.CameraPos = cameraPos
 
-	// Update the camera position in the stream manager
+	// Update the camera position in the stream manager (non-blocking)
+	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 }
 

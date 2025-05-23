@@ -1,9 +1,13 @@
 package rendering
 
 import (
+	"container/heap"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"log"
+	"sync"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
@@ -19,7 +23,128 @@ import (
 const (
 	CHUNK_SIZE = 120 // Same as before for compatibility
 	MAP_FOLDER = "assets/maps/"
+
+	// Worker configuration
+	DEFAULT_WORKERS        = 6
+	COORDINATOR_TICK       = 100 * time.Millisecond
+	CAMERA_UPDATE_DEBOUNCE = 50 * time.Millisecond
 )
+
+// JobType represents the type of background job
+type JobType int
+
+const (
+	JobTypeLoad JobType = iota
+	JobTypeEvict
+)
+
+// LoadJob represents a chunk loading job
+type LoadJob struct {
+	Spec     spatial.ChunkSpec
+	MapCoord string
+	Priority float32
+	QueuedAt time.Time
+}
+
+// EvictJob represents a chunk eviction job
+type EvictJob struct {
+	Coord    spatial.GridCoord
+	Priority float32 // Lower priority chunks evicted first
+	QueuedAt time.Time
+}
+
+// PriorityQueue implements a generic priority queue for jobs
+type PriorityQueue[T any] struct {
+	items       []PriorityItem[T]
+	getPriority func(T) float32
+	mutex       sync.Mutex
+}
+
+type PriorityItem[T any] struct {
+	Value    T
+	Priority float32
+	Index    int
+}
+
+// NewPriorityQueue creates a new priority queue with higher priority items first
+func NewPriorityQueue[T any](getPriority func(T) float32) *PriorityQueue[T] {
+	pq := &PriorityQueue[T]{
+		items:       make([]PriorityItem[T], 0),
+		getPriority: getPriority,
+	}
+	heap.Init(pq)
+	return pq
+}
+
+func (pq *PriorityQueue[T]) Len() int { return len(pq.items) }
+
+func (pq *PriorityQueue[T]) Less(i, j int) bool {
+	// Higher priority first
+	return pq.items[i].Priority > pq.items[j].Priority
+}
+
+func (pq *PriorityQueue[T]) Swap(i, j int) {
+	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
+	pq.items[i].Index = i
+	pq.items[j].Index = j
+}
+
+func (pq *PriorityQueue[T]) Push(x interface{}) {
+	item := x.(PriorityItem[T])
+	item.Index = len(pq.items)
+	pq.items = append(pq.items, item)
+}
+
+func (pq *PriorityQueue[T]) Pop() interface{} {
+	old := pq.items
+	n := len(old)
+	item := old[n-1]
+	item.Index = -1
+	pq.items = old[0 : n-1]
+	return item
+}
+
+// Enqueue adds an item to the priority queue
+func (pq *PriorityQueue[T]) Enqueue(value T) {
+	pq.mutex.Lock()
+	defer pq.mutex.Unlock()
+
+	priority := pq.getPriority(value)
+	item := PriorityItem[T]{
+		Value:    value,
+		Priority: priority,
+	}
+	heap.Push(pq, item)
+}
+
+// Dequeue removes and returns the highest priority item
+func (pq *PriorityQueue[T]) Dequeue() (T, bool) {
+	pq.mutex.Lock()
+	defer pq.mutex.Unlock()
+
+	var zero T
+	if pq.Len() == 0 {
+		return zero, false
+	}
+
+	item := heap.Pop(pq).(PriorityItem[T])
+	return item.Value, true
+}
+
+// Size returns the number of items in the queue
+func (pq *PriorityQueue[T]) Size() int {
+	pq.mutex.Lock()
+	defer pq.mutex.Unlock()
+	return pq.Len()
+}
+
+// Clear removes all items from the queue
+func (pq *PriorityQueue[T]) Clear() {
+	pq.mutex.Lock()
+	defer pq.mutex.Unlock()
+	pq.items = pq.items[:0]
+	heap.Init(pq)
+}
 
 // RenderableChunk represents a chunk ready for GPU rendering
 type RenderableChunk struct {
@@ -46,7 +171,27 @@ type StreamManager struct {
 
 	// Renderable chunks (only chunks in Ready state)
 	renderableChunks map[spatial.GridCoord]*RenderableChunk
+	renderMutex      sync.RWMutex
+
+	// Background processing
+	loadQueue  *PriorityQueue[LoadJob]
+	evictQueue *PriorityQueue[EvictJob]
+
+	// Communication channels
+	cameraUpdates chan lin.Vec2
+	shutdown      chan struct{}
+
+	// Worker management
+	ctx        context.Context
+	cancel     context.CancelFunc
+	workerWg   sync.WaitGroup
+	numWorkers int
+
+	// State
 	lastCameraPos    lin.Vec2
+	lastCameraUpdate time.Time
+	isRunning        bool
+	runningMutex     sync.RWMutex
 
 	cfg models.AppConfig
 }
@@ -67,6 +212,16 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 	// Initialize ChunkStateManager
 	stateManager := streaming.NewChunkStateManager()
 
+	// Create priority queues
+	loadQueue := NewPriorityQueue(func(job LoadJob) float32 {
+		return job.Priority
+	})
+
+	evictQueue := NewPriorityQueue(func(job EvictJob) float32 {
+		// Lower priority = evict first, so negate
+		return -job.Priority
+	})
+
 	sm := &StreamManager{
 		chunkSelector:    chunkSelector,
 		bucketAllocator:  bucketAllocator,
@@ -76,102 +231,301 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 		memProps:         memProps,
 		cfg:              cfg,
 		renderableChunks: make(map[spatial.GridCoord]*RenderableChunk),
+		loadQueue:        loadQueue,
+		evictQueue:       evictQueue,
+		cameraUpdates:    make(chan lin.Vec2, 10), // Buffered channel
+		shutdown:         make(chan struct{}),
+		numWorkers:       DEFAULT_WORKERS,
 	}
 
-	log.Printf("StreamManager initialized with ChunkStateManager")
+	log.Printf("StreamManager initialized with background workers")
 	return sm
 }
 
-// UpdateCameraPosition updates the camera position for spatial queries
-func (sm *StreamManager) UpdateCameraPosition(pos lin.Vec3) {
-	sm.lastCameraPos = lin.Vec2{pos[0], pos[2]}
+// Start begins background processing
+func (sm *StreamManager) Start() {
+	sm.runningMutex.Lock()
+	defer sm.runningMutex.Unlock()
+
+	if sm.isRunning {
+		return
+	}
+
+	sm.ctx, sm.cancel = context.WithCancel(context.Background())
+	sm.isRunning = true
+
+	// Start coordinator
+	go sm.coordinatorLoop()
+
+	// Start worker pool
+	for i := 0; i < sm.numWorkers; i++ {
+		sm.workerWg.Add(1)
+		go sm.workerLoop(i)
+	}
+
+	log.Printf("StreamManager started with %d workers", sm.numWorkers)
 }
 
-// LoadSomeTestChunks loads a few chunks for testing (replaces GenerateTestLine)
-func (sm *StreamManager) LoadSomeTestChunks() error {
-	// Create a simple frustum for testing
+// Stop shuts down background processing
+func (sm *StreamManager) Stop() {
+	sm.runningMutex.Lock()
+	defer sm.runningMutex.Unlock()
+
+	if !sm.isRunning {
+		return
+	}
+
+	sm.isRunning = false
+	close(sm.shutdown)
+	sm.cancel()
+
+	// Wait for workers to finish
+	sm.workerWg.Wait()
+
+	// Clear queues
+	sm.loadQueue.Clear()
+	sm.evictQueue.Clear()
+
+	log.Printf("StreamManager stopped")
+}
+
+// IsRunning returns whether background processing is active
+func (sm *StreamManager) IsRunning() bool {
+	sm.runningMutex.RLock()
+	defer sm.runningMutex.RUnlock()
+	return sm.isRunning
+}
+
+// UpdateCameraPosition updates the camera position (non-blocking)
+func (sm *StreamManager) UpdateCameraPosition(pos lin.Vec3) {
+	newCameraPos := lin.Vec2{pos[0], pos[2]}
+
+	// Non-blocking send to channel
+	select {
+	case sm.cameraUpdates <- newCameraPos:
+	default:
+		// Channel full, skip this update (debouncing effect)
+	}
+}
+
+// coordinatorLoop is the main coordination loop
+func (sm *StreamManager) coordinatorLoop() {
+	ticker := time.NewTicker(COORDINATOR_TICK)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-sm.ctx.Done():
+			return
+		case <-sm.shutdown:
+			return
+		case newPos := <-sm.cameraUpdates:
+			sm.handleCameraUpdate(newPos)
+		case <-ticker.C:
+			sm.periodicUpdate()
+		}
+	}
+}
+
+// handleCameraUpdate processes camera position changes
+func (sm *StreamManager) handleCameraUpdate(newPos lin.Vec2) {
+	now := time.Now()
+
+	// Debounce rapid camera updates
+	if now.Sub(sm.lastCameraUpdate) < CAMERA_UPDATE_DEBOUNCE {
+		return
+	}
+
+	sm.lastCameraPos = newPos
+	sm.lastCameraUpdate = now
+
+	// Update chunk selection
+	sm.updateChunkSelection()
+}
+
+// periodicUpdate runs maintenance tasks
+func (sm *StreamManager) periodicUpdate() {
+	// Queue missing chunks for loading
+	sm.queueMissingChunks()
+
+	// Check for chunks that need eviction (when memory is getting full)
+	sm.checkMemoryPressure()
+}
+
+// updateChunkSelection updates which chunks should be loaded
+func (sm *StreamManager) updateChunkSelection() {
+	// Create frustum for current camera position
 	near := float32(10.0)
-	frustum := spatial.NewFrustumFromCamera(sm.lastCameraPos, sm.cfg.CameraStartDir[1], sm.cfg.Fov, near, sm.cfg.RenderDistance)
+	frustum := spatial.NewFrustumFromCamera(
+		sm.lastCameraPos,
+		sm.cfg.CameraStartDir[1],
+		sm.cfg.Fov,
+		near,
+		sm.cfg.RenderDistance,
+	)
 
-	// Update ChunkSelector with current camera state
+	// Update ChunkSelector
 	sm.chunkSelector.UpdateSelection(sm.lastCameraPos, frustum, sm.cfg.RenderDistance)
+}
 
-	// Get desired chunks
-	desiredChunks := sm.chunkSelector.GetDesiredChunks()
-	log.Printf("ChunkSelector found %d desired chunks", len(desiredChunks))
+// queueMissingChunks adds missing chunks to the load queue
+func (sm *StreamManager) queueMissingChunks() {
+	missingChunks := sm.chunkSelector.GetMissingChunks()
 
-	// Load first few chunks for testing (limit to avoid overwhelming)
-	maxChunks := 10000
-	if len(desiredChunks) > maxChunks {
-		desiredChunks = desiredChunks[:maxChunks]
-	}
-
-	if len(desiredChunks) == 0 {
-		return fmt.Errorf("no chunks to load")
-	}
-
-	// Track which maps we've already loaded to avoid reloading
-	loadedMaps := make(map[string]bool)
-
-	// Process each desired chunk
-	successCount := 0
-	for _, spec := range desiredChunks {
-		// Check if chunk is already loaded
+	for _, spec := range missingChunks {
+		// Check if already queued or loading
 		currentState := sm.stateManager.GetChunkState(spec.GridCoord)
-		if currentState == streaming.StateReady {
-			sm.chunkSelector.MarkChunkAvailable(spec.GridCoord)
+		if currentState != streaming.StateUnloaded {
 			continue
 		}
 
-		// Queue the chunk for loading
+		// Queue the chunk
 		err := sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateQueued, spec.Priority, spec.LODLevel)
 		if err != nil {
 			log.Printf("Failed to queue chunk %v: %v", spec.GridCoord, err)
 			continue
 		}
 
-		// Determine the correct map coordinate for this specific chunk
+		// Determine map coordinate
 		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
 
-		// Load map data for this coordinate if we haven't already
-		if !loadedMaps[chunkMapCoord] {
-			log.Printf("Loading map data for: %s", chunkMapCoord)
-			_, err := sm.assetManager.LoadMapData(chunkMapCoord)
-			if err != nil {
-				log.Printf("Failed to load map data for %s: %v", chunkMapCoord, err)
-				// Mark chunk as failed (transition back to unloaded)
-				sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateUnloaded, spec.Priority, spec.LODLevel)
-				continue
+		// Add to load queue
+		job := LoadJob{
+			Spec:     spec,
+			MapCoord: chunkMapCoord,
+			Priority: spec.Priority,
+			QueuedAt: time.Now(),
+		}
+
+		sm.loadQueue.Enqueue(job)
+	}
+}
+
+// checkMemoryPressure evicts chunks when memory usage is high
+func (sm *StreamManager) checkMemoryPressure() {
+	stats := sm.bucketAllocator.Stats()
+
+	// If memory usage > 85%, start evicting distant chunks
+	usagePercent := float32(stats.UsedSize) / float32(stats.TotalSize)
+	if usagePercent > 0.85 {
+		sm.queueDistantChunksForEviction()
+	}
+}
+
+// queueDistantChunksForEviction adds distant ready chunks to eviction queue
+func (sm *StreamManager) queueDistantChunksForEviction() {
+	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
+
+	// Find chunks to evict (furthest from camera first)
+	for _, record := range readyChunks {
+		// Calculate distance from current camera position
+		chunkWorldPos := sm.chunkSelector.GridToWorld(record.GridCoord)
+		dx := chunkWorldPos[0] - sm.lastCameraPos[0]
+		dz := chunkWorldPos[1] - sm.lastCameraPos[1]
+		distance := dx*dx + dz*dz // Use squared distance for efficiency
+
+		// If chunk is far and not in frustum, queue for eviction
+		if distance > sm.cfg.RenderDistance*sm.cfg.RenderDistance*0.5 {
+			job := EvictJob{
+				Coord:    record.GridCoord,
+				Priority: record.Priority,
+				QueuedAt: time.Now(),
 			}
-			loadedMaps[chunkMapCoord] = true
+			sm.evictQueue.Enqueue(job)
 		}
+	}
+}
 
-		// Load the chunk with its correct map coordinate
-		err = sm.loadChunk(spec, chunkMapCoord)
-		if err != nil {
-			log.Printf("Failed to load chunk %v: %v", spec.GridCoord, err)
-			// Mark chunk as failed
-			sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateUnloaded, spec.Priority, spec.LODLevel)
-			continue
+// workerLoop is the main worker thread loop
+func (sm *StreamManager) workerLoop(workerID int) {
+	defer sm.workerWg.Done()
+
+	log.Printf("Worker %d started", workerID)
+
+	for {
+		select {
+		case <-sm.ctx.Done():
+			log.Printf("Worker %d shutting down", workerID)
+			return
+		default:
+			// Try to get work
+			if sm.processNextJob(workerID) {
+				continue // Got work, immediately check for more
+			}
+
+			// No work available, wait a bit
+			time.Sleep(10 * time.Millisecond)
 		}
+	}
+}
 
-		// Mark as available in ChunkSelector
-		sm.chunkSelector.MarkChunkAvailable(spec.GridCoord)
-		successCount++
+// processNextJob processes the next available job
+func (sm *StreamManager) processNextJob(workerID int) bool {
+	// Prioritize load jobs over evict jobs
+	if loadJob, hasLoad := sm.loadQueue.Dequeue(); hasLoad {
+		sm.processLoadJob(workerID, loadJob)
+		return true
 	}
 
-	log.Printf("Successfully loaded %d chunks from %d different map coordinates", successCount, len(loadedMaps))
+	if evictJob, hasEvict := sm.evictQueue.Dequeue(); hasEvict {
+		sm.processEvictJob(workerID, evictJob)
+		return true
+	}
+
+	return false
+}
+
+// processLoadJob handles loading a chunk
+func (sm *StreamManager) processLoadJob(workerID int, job LoadJob) {
+	// Verify chunk is still in queued state
+	currentState := sm.stateManager.GetChunkState(job.Spec.GridCoord)
+	if currentState != streaming.StateQueued {
+		return // Chunk was cancelled or already processed
+	}
+
+	// Transition to loading
+	err := sm.stateManager.SetChunkState(job.Spec.GridCoord, streaming.StateLoading, job.Priority, job.Spec.LODLevel)
+	if err != nil {
+		log.Printf("Worker %d: Failed to transition chunk %v to loading: %v", workerID, job.Spec.GridCoord, err)
+		return
+	}
+
+	// Load the chunk
+	err = sm.loadChunk(job.Spec, job.MapCoord)
+	if err != nil {
+		log.Printf("Worker %d: Failed to load chunk %v: %v", workerID, job.Spec.GridCoord, err)
+		// Mark as failed
+		sm.stateManager.SetChunkState(job.Spec.GridCoord, streaming.StateUnloaded, job.Priority, job.Spec.LODLevel)
+		return
+	}
+
+	// Mark as available in ChunkSelector
+	sm.chunkSelector.MarkChunkAvailable(job.Spec.GridCoord)
+}
+
+// processEvictJob handles evicting a chunk
+func (sm *StreamManager) processEvictJob(workerID int, job EvictJob) {
+	err := sm.EvictChunk(job.Coord)
+	if err != nil {
+		log.Printf("Worker %d: Failed to evict chunk %v: %v", workerID, job.Coord, err)
+	}
+}
+
+// LoadSomeTestChunks is now deprecated - use Start() instead
+func (sm *StreamManager) LoadSomeTestChunks() error {
+	if !sm.IsRunning() {
+		return fmt.Errorf("StreamManager not running - call Start() first")
+	}
+
+	// Initial camera position to trigger loading
+	sm.UpdateCameraPosition(lin.Vec3{sm.lastCameraPos[0], 0, sm.lastCameraPos[1]})
+
+	log.Printf("Background chunk loading initiated")
 	return nil
 }
 
 // loadChunk handles the loading of a single chunk with state management
 func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) error {
-	// Transition to loading state
-	err := sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateLoading, spec.Priority, spec.LODLevel)
-	if err != nil {
-		return fmt.Errorf("failed to transition to loading state: %w", err)
-	}
-
 	// Get map data
 	mapData, err := sm.assetManager.LoadMapData(mapCoord)
 	if err != nil {
@@ -242,12 +596,18 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 		IndexCount:     len(chunk.Indices),
 	}
 
-	// Store renderable chunk and transition to ready state
+	// Store renderable chunk with thread safety
+	sm.renderMutex.Lock()
 	sm.renderableChunks[spec.GridCoord] = renderableChunk
+	sm.renderMutex.Unlock()
+
+	// Transition to ready state
 	err = sm.stateManager.SetChunkState(spec.GridCoord, streaming.StateReady, spec.Priority, spec.LODLevel)
 	if err != nil {
 		// Clean up on state transition failure
+		sm.renderMutex.Lock()
 		delete(sm.renderableChunks, spec.GridCoord)
+		sm.renderMutex.Unlock()
 		sm.bucketAllocator.FreeChunk(vertexId, spec.LODLevel)
 		sm.bucketAllocator.FreeChunk(indexId, spec.LODLevel)
 		return fmt.Errorf("failed to transition to ready state: %w", err)
@@ -259,8 +619,11 @@ func (sm *StreamManager) loadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	return nil
 }
 
-// GetRenderableChunks returns all currently loaded chunks ready for rendering
+// GetRenderableChunks returns all currently loaded chunks ready for rendering (thread-safe)
 func (sm *StreamManager) GetRenderableChunks() []*RenderableChunk {
+	sm.renderMutex.RLock()
+	defer sm.renderMutex.RUnlock()
+
 	// Only return chunks that are in Ready state
 	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
 
@@ -330,14 +693,18 @@ func (sm *StreamManager) EvictChunk(coord spatial.GridCoord) error {
 		return fmt.Errorf("failed to transition to evicting state: %w", err)
 	}
 
-	// Clean up renderable chunk
-	if renderableChunk, exists := sm.renderableChunks[coord]; exists {
+	// Clean up renderable chunk with thread safety
+	sm.renderMutex.Lock()
+	renderableChunk, exists := sm.renderableChunks[coord]
+	if exists {
+		delete(sm.renderableChunks, coord)
+	}
+	sm.renderMutex.Unlock()
+
+	if exists {
 		// Free memory allocations
 		sm.bucketAllocator.FreeChunk(renderableChunk.VertexBufferId, renderableChunk.LODLevel)
 		sm.bucketAllocator.FreeChunk(renderableChunk.IndexBufferId, renderableChunk.LODLevel)
-
-		// Remove from renderable chunks
-		delete(sm.renderableChunks, coord)
 	}
 
 	// Mark as unavailable in ChunkSelector
@@ -370,8 +737,15 @@ func (sm *StreamManager) Stats() string {
 		stateStatsStr += fmt.Sprintf("%s:%d", state, count)
 	}
 
-	return fmt.Sprintf("StreamManager: %d renderable chunks, ChunkSelector: %d desired, %d missing, States: [%s]",
-		len(sm.renderableChunks), chunkStats.DesiredChunks, chunkStats.MissingChunks, stateStatsStr)
+	loadQueueSize := sm.loadQueue.Size()
+	evictQueueSize := sm.evictQueue.Size()
+
+	sm.renderMutex.RLock()
+	renderableCount := len(sm.renderableChunks)
+	sm.renderMutex.RUnlock()
+
+	return fmt.Sprintf("StreamManager: %d renderable, %d load jobs, %d evict jobs, ChunkSelector: %d desired, %d missing, States: [%s]",
+		renderableCount, loadQueueSize, evictQueueSize, chunkStats.DesiredChunks, chunkStats.MissingChunks, stateStatsStr)
 }
 
 // GetDetailedStateStats returns detailed statistics about chunk states
@@ -386,6 +760,13 @@ func (sm *StreamManager) GetDetailedStateStats() string {
 		count := stats[state]
 		result += fmt.Sprintf("  %s: %d chunks\n", state, count)
 	}
+
+	// Add worker information
+	result += fmt.Sprintf("\nWorker Status:\n")
+	result += fmt.Sprintf("  Running: %v\n", sm.IsRunning())
+	result += fmt.Sprintf("  Workers: %d\n", sm.numWorkers)
+	result += fmt.Sprintf("  Load Queue: %d jobs\n", sm.loadQueue.Size())
+	result += fmt.Sprintf("  Evict Queue: %d jobs\n", sm.evictQueue.Size())
 
 	// Show some example chunks in each state
 	stateExamples := make(map[streaming.ChunkState][]*streaming.ChunkRecord)
@@ -417,6 +798,9 @@ func (sm *StreamManager) GetDetailedStateStats() string {
 
 // Destroy cleans up resources
 func (sm *StreamManager) Destroy() {
+	// Stop background processing first
+	sm.Stop()
+
 	if sm.cfg.DebugMode {
 		log.Printf("StreamManager stats: %s", sm.Stats())
 		log.Printf("Memory usage: %s", sm.bucketAllocator.GetDetailedStats())
