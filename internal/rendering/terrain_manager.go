@@ -1,4 +1,4 @@
-package renderer
+package rendering
 
 import (
 	"encoding/binary"
@@ -19,6 +19,7 @@ import (
 // This file should be used for chunk management, chunk rendering, etc.
 
 const (
+	MAP_FOLDER          = "assets/maps/"
 	WATERMAP_EXTENSION  = ".swb.png"
 	HEIGHTMAP_EXTENSION = ".hgt.png"
 	TEXTURE_EXTENSION   = ".osm.png"
@@ -102,7 +103,7 @@ func NewTerrainManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryPrope
 
 	terrainGrid := spatial.NewTerrainGrid(CHUNK_SIZE, nil)
 
-	assetManager := assets.NewAssetManager("assets/maps/", 9) // TODO don't hardcode this
+	assetManager := assets.NewAssetManager(MAP_FOLDER, 9)
 
 	tm := &TerrainManager{
 		device:          device,

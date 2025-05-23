@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
-	"github.com/cs-wwu/srg-synvis/internal/renderer"
+	"github.com/cs-wwu/srg-synvis/internal/rendering"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -27,7 +27,7 @@ func runApplication(config models.AppConfig) error {
 	defer closer.Close()
 
 	// Create application
-	app := renderer.NewApplication(config)
+	app := rendering.NewApplication(config)
 
 	// Set up window and monitor
 	monitor, videoMode := setupMonitor(config.MonitorNum)
@@ -84,7 +84,7 @@ func setupMonitor(monitorNum int) (*glfw.Monitor, *glfw.VidMode) {
 	return monitor, videoMode
 }
 
-func createWindow(app *renderer.Application, monitor *glfw.Monitor, videoMode *glfw.VidMode) *glfw.Window {
+func createWindow(app *rendering.Application, monitor *glfw.Monitor, videoMode *glfw.VidMode) *glfw.Window {
 	var windowWidth, windowHeight int
 	if monitor != nil {
 		windowWidth = videoMode.Width
@@ -128,7 +128,7 @@ func getRefreshRate(monitor *glfw.Monitor) (time.Duration, int) {
 	return time.Second / time.Duration(refreshRate), refreshRate
 }
 
-func runMainLoop(app *renderer.Application, window *glfw.Window, platform as.Platform, frameDelay time.Duration) {
+func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Platform, frameDelay time.Duration) {
 	doneC := make(chan struct{}, 2)
 	exitC := make(chan struct{}, 2)
 	defer closer.Bind(func() {

@@ -1,4 +1,4 @@
-package renderer
+package rendering
 
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"

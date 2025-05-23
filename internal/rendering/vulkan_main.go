@@ -1,5 +1,5 @@
 // Package renderer for the internal renderings of the svs application
-package renderer
+package rendering
 
 import (
 	"fmt"
