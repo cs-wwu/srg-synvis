@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	CHUNK_SIZE = 180 // Same as before for compatibility
+	CHUNK_SIZE = 120 // Same as before for compatibility
 	MAP_FOLDER = "assets/maps/"
 )
 

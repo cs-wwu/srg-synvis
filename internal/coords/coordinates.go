@@ -49,6 +49,8 @@ const (
 
 	ARC_SECONDS_TO_MINUTES = 1.0 / 60.0
 	ARC_SECONDS_TO_DEGREES = ARC_SECONDS_TO_MINUTES / 60.0
+
+	MAP_LENGTH = 3601 // Length of a map tile in arcseconds
 )
 
 // Takes X, Z float coordinates and returns the corresponding map coords e.g.
@@ -116,7 +118,8 @@ func MapToWorld(coord string) (x, z int) {
 	return x, z
 }
 
-// Takes an x, z coordinate and returns the coorepsonding image pixel coord
+// Takes an x, z coordinate and returns the corresponding pixel coordinates.
+// This wraps around the image as you move across the world.
 // Images start in the top-left, due to vulkan, need to flip z coordinate
 func WorldToPixel(x, z int) (int, int) {
 	// Handle longitude (x)
