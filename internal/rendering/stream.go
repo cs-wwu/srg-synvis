@@ -164,7 +164,7 @@ func (sm *StreamManager) Start() {
 	go sm.coordinatorLoop()
 
 	// Start worker pool
-	for i := 0; i < sm.numWorkers; i++ {
+	for i := range sm.numWorkers {
 		sm.workerWg.Add(1)
 		go sm.workerLoop(i)
 	}
