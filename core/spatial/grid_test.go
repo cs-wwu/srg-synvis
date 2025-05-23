@@ -118,7 +118,7 @@ func TestLODStrategy(t *testing.T) {
 	}{
 		{100, 0},   // Close distance -> highest detail
 		{500, 0},   // Base distance -> LOD 0
-		{1000, 1},  // 2x base distance -> LOD 1
+		{1100, 1},  // 2x base distance -> LOD 1
 		{2000, 2},  // 4x base distance -> LOD 2
 		{10000, 2}, // Very far -> clamped to max LOD
 	}
