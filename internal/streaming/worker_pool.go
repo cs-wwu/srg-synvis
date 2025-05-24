@@ -51,8 +51,8 @@ type WorkerPoolConfig struct {
 // DefaultWorkerPoolConfig returns sensible defaults
 func DefaultWorkerPoolConfig() WorkerPoolConfig {
 	return WorkerPoolConfig{
-		NumWorkers:  3,
-		WorkerSleep: 10 * time.Millisecond,
+		NumWorkers:  5,
+		WorkerSleep: 5 * time.Millisecond,
 	}
 }
 

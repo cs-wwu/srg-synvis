@@ -154,24 +154,29 @@ func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
 	// Rebuild missing chunks list
 	cs.missingChunks = cs.missingChunks[:0]
 
-	for coord, spec := range cs.desiredChunks {
-		if !cs.availableChunks[coord] {
-			cs.missingChunks = append(cs.missingChunks, spec)
-		}
+	// Convert map to slice first for deterministic iteration
+	allDesired := make([]ChunkSpec, 0, len(cs.desiredChunks))
+	for _, spec := range cs.desiredChunks {
+		allDesired = append(allDesired, spec)
 	}
 
-	// Sort by priority (highest first), with distance as tiebreaker
-	sort.Slice(cs.missingChunks, func(i, j int) bool {
-		a, b := cs.missingChunks[i], cs.missingChunks[j]
-
+	// Sort the desired chunks first by priority, then by distance for deterministic order
+	sort.Slice(allDesired, func(i, j int) bool {
+		a, b := allDesired[i], allDesired[j]
 		// Primary sort: priority (higher first)
 		if math.Abs(float64(a.Priority-b.Priority)) > 0.001 {
 			return a.Priority > b.Priority
 		}
-
 		// Tiebreaker: distance (closer first)
 		return a.Distance < b.Distance
 	})
+
+	// Now filter for missing chunks in deterministic order
+	for _, spec := range allDesired {
+		if !cs.availableChunks[spec.GridCoord] {
+			cs.missingChunks = append(cs.missingChunks, spec)
+		}
+	}
 
 	cs.missingChunksDirty = false
 	return cs.missingChunks
@@ -192,9 +197,23 @@ func (cs *ChunkSelector) GetDesiredChunks() []ChunkSpec {
 	defer cs.mu.RUnlock()
 
 	chunks := make([]ChunkSpec, 0, len(cs.desiredChunks))
+
+	// Convert map to slice for deterministic iteration
 	for _, spec := range cs.desiredChunks {
 		chunks = append(chunks, spec)
 	}
+
+	// Sort by priority then distance for consistent ordering
+	sort.Slice(chunks, func(i, j int) bool {
+		a, b := chunks[i], chunks[j]
+		// Primary sort: priority (higher first)
+		if math.Abs(float64(a.Priority-b.Priority)) > 0.001 {
+			return a.Priority > b.Priority
+		}
+		// Tiebreaker: distance (closer first)
+		return a.Distance < b.Distance
+	})
+
 	return chunks
 }
 
