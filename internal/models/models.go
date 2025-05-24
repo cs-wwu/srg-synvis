@@ -21,6 +21,7 @@ type AppConfig struct {
 	// Rendering settings
 	RenderDistance         float32 // Maximum render distance
 	DisableTerrainWarnings bool    // Disable terrain height warnings
+	DisableFog             bool    // Disable fog rendering
 
 	// Debug settings
 	DebugMode bool // Enable debug mode

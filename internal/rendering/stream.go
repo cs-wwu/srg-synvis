@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	CHUNK_SIZE = 120 // Same as before for compatibility
+	CHUNK_SIZE = 144 // Same as before for compatibility
 	MAP_FOLDER = "assets/maps/"
 
 	// Coordinator configuration
@@ -79,13 +79,13 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 	// Initialize ChunkSelector (replaces old TerrainGrid)
 	chunkSelector := spatial.NewChunkSelector(CHUNK_SIZE, nil)
 
-	// Initialize BucketAllocator (same as before)
+	// Initialize BucketAllocator
 	lodChunkSizes := CalculateLODChunkSizes()
 	bucketAllocator := memory.NewBucketAllocator(device, memProps,
-		[]float32{0.3, 0.25, 0.25, 0.2}, lodChunkSizes)
+		[]float32{0.3, 0.2, 0.2, 0.2, 0.1}, lodChunkSizes)
 
-	// Initialize AssetManager (same as before)
-	assetManager := assets.NewAssetManager(MAP_FOLDER, 27)
+	// Initialize AssetManage
+	assetManager := assets.NewAssetManager(MAP_FOLDER, 50)
 
 	// Initialize ChunkStateManager
 	stateManager := streaming.NewChunkStateManager()

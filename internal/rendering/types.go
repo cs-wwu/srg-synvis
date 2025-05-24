@@ -36,9 +36,9 @@ type UniformBufferObject struct {
 	LightDir        lin.Vec3   // Light direction
 	RenderDistance  float32    // Maximum render distance
 	CameraPos       lin.Vec3   // camera position for terrain warnings
-	DisableWarnings float32    // 1.0 = disabled, 0.0 = enabled (match shader)
 	Time            float32    // Animation time
-	_               float32    // Padding to 16-byte boundary
+	DisableWarnings float32    // 1.0 = disabled, 0.0 = enabled (match shader)
+	DisableFog      float32
 }
 
 // creating a byte slice array of size UniformBufferObject

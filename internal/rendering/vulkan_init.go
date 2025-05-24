@@ -113,6 +113,14 @@ func (app *Application) initUBO() {
 	} else {
 		app.ubo.DisableWarnings = 0.0 // 0.0 = enabled
 	}
+
+	if app.cfg.DisableFog {
+		app.ubo.DisableFog = 1.0 // 1.0 = disabled
+		log.Printf("Disabling fog\n")
+	} else {
+		log.Printf("Enabling fog\n")
+		app.ubo.DisableFog = 0.0 // 0.0 = enabled
+	}
 }
 
 // Prepare depth buffers

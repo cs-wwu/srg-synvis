@@ -30,7 +30,7 @@ type ChunkSelector struct {
 // NewChunkSelector creates a new chunk selection system
 func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector {
 	if lodStrategy == nil {
-		lodStrategy = NewDefaultLODStrategy(4, 500.0, 1.75)
+		lodStrategy = NewDefaultLODStrategy(5, 500.0, 1.75)
 	}
 
 	return &ChunkSelector{

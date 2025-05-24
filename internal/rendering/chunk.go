@@ -20,10 +20,12 @@ func ChunkKey(chunkX, chunkZ int) string {
 type LODLevel int
 
 const (
-	LOD_0 LODLevel = iota // Full detail (180x180)
-	LOD_1                 // Half detail (90x90)
-	LOD_2                 // Quarter detail (45x45)
-	LOD_3                 // Eighth detail (23x23)
+	LOD_0 LODLevel = iota // Full detail
+	LOD_1                 // Half detail
+	LOD_2                 // Quarter detail
+	LOD_3                 // Eighth detail
+	LOD_4                 // Sixteenth detail
+	LOD_COUNT
 )
 
 type Chunk struct {
@@ -163,7 +165,7 @@ func CalculateChunkNormals(chunk *Chunk) {
 
 // CalculateLODChunkSizes calculates memory requirements for each LOD level
 func CalculateLODChunkSizes() []vk.DeviceSize {
-	numLODLevels := 4 // LOD 0-3
+	numLODLevels := LOD_COUNT
 	lodChunkSizes := make([]vk.DeviceSize, numLODLevels)
 
 	for lod := range numLODLevels {
@@ -172,7 +174,7 @@ func CalculateLODChunkSizes() []vk.DeviceSize {
 			stride = 1 << uint(lod)
 		}
 
-		vps := CHUNK_SIZE / stride
+		vps := (CHUNK_SIZE / stride) + 1 // +1 for overlap
 		numVertices := vps * vps
 		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
 

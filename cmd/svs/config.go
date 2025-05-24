@@ -28,14 +28,15 @@ func parseConfig() models.AppConfig {
 
 	// New flags
 	renderDistance := flag.Float64("render-distance", 150.0, "Maximum render distance in kilometers")
-	flag.BoolVar(&config.DisableTerrainWarnings, "disable-warnings", false, "Disable terrain height warnings (red coloring)")
-
+	
 	// Enhanced position flag
 	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
 	startDirString := flag.String("dir", "0,0,-1", "Starting Camera Direction (x,y,z)")
 	fov := flag.Float64("fov", 60.0, "Field of view (degrees)")
-
+	
+	flag.BoolVar(&config.DisableTerrainWarnings, "disable-warnings", false, "Disable terrain height warnings (red coloring)")
 	flag.BoolVar(&config.DebugMode, "debug", false, "Enable debug mode")
+	flag.BoolVar(&config.DisableFog, "disable-fog", false, "Disables Fog")
 
 	flag.Parse()
 

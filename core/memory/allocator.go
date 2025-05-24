@@ -128,7 +128,7 @@ func (a *BucketAllocator) AllocateChunk(chunkID string, chunkSize vk.DeviceSize,
 
 	// Check if the chunk size is appropriate for this bucket
 	if chunkSize > bucket.chunkSize {
-		log.Printf("Warning: chunkSize > bucket.chunkSize, may cause fragmentation")
+		log.Printf("Chunk size %d exceeds bucket chunk size %d", chunkSize, bucket.chunkSize)
 	}
 
 	// Check if there's a free slot
