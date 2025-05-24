@@ -87,17 +87,6 @@ float waveHeight(vec2 position, float time) {
     return wave1 + wave2 + wave3 + noiseVal;
 }
 
-// Calculate sky color based on view direction
-vec4 getSkyColor(vec3 viewDir) {
-    vec3 zenithColor = vec3(0.1, 0.3, 0.8);
-    vec3 horizonColor = vec3(0.7, 0.85, 1.0);
-    
-    float upFactor = max(0.0, viewDir.y);
-    float skyGradient = pow(upFactor, 0.4);
-    
-    return vec4(mix(horizonColor, zenithColor, skyGradient), 1.0);
-}
-
 // Simpler fresnel effect calculation
 float fresnel(vec3 normal, vec3 viewDir, float bias, float scale, float power) {
     float NdotV = max(0.0, dot(normal, viewDir));
@@ -174,8 +163,9 @@ void main() {
         // Gentler fresnel effect
         float fresnelFactor = fresnel(waveNormal, viewDir, 0.05, 0.5, 3.0);
         
-        // Sky reflection
-        vec3 skyReflection = getSkyColor(reflect(-viewDir, waveNormal)).xyz;
+        // Sky reflection for water - use simple gradient
+        vec3 skyReflection = mix(vec3(0.8, 0.9, 0.95), vec3(0.05, 0.15, 0.5), 
+                                max(0.0, reflect(-viewDir, waveNormal).y));
         
         // Combine with reduced fresnel influence
         waterColor = mix(waterColor, skyReflection, fresnelFactor * 0.4);
@@ -267,16 +257,11 @@ void main() {
         }
     }
     
-    // Calculate view direction for sky/fog
-    vec3 viewDir = normalize(worldPos);
+    // Use consistent horizon/fog color for blending
+    // This should match the horizon color from the skybox
+    vec3 fogColor = vec3(0.8, 0.9, 0.95); // Same as skybox horizonColor
     
-    // Get enhanced sky color
-    vec4 skyColor = getSkyColor(viewDir);
-    
-    // Adjust fog based on height - higher terrain has less fog
-    float heightFogFactor = smoothstep(500.0, 2000.0, worldPos.y);
-    float enhancedFogFactor = fogFactor * (1.0 - heightFogFactor * 0.3);
-    
-    // Final blending of terrain/water with sky
-    outColor = mix(skyColor, baseColor, enhancedFogFactor);
+    // Final blending with fog using pre-calculated fog factor
+    // fogFactor: 1.0 = no fog (show baseColor), 0.0 = full fog (show fogColor)
+    outColor = mix(vec4(fogColor, 1.0), baseColor, fogFactor);
 }
