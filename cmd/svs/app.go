@@ -137,6 +137,10 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 		log.Println("Bye!")
 	})
 
+	if app.IsUncappedFPS() {
+		frameDelay = time.Millisecond
+	}
+
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 

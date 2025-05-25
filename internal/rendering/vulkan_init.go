@@ -22,6 +22,10 @@ import (
 
 // This file is for vulkan initialization
 
+func (app *Application) IsUncappedFPS() bool {
+	return app.cfg.UncapFPS
+}
+
 func (app *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
 	surfPtr, err := app.WindowHandle.CreateWindowSurface(instance, nil)
 	if err != nil {
