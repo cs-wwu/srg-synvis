@@ -332,7 +332,11 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 	}
 	// The FIFO present mode is guaranteed by the spec to be supported
 	// and to have no tearing.  It's a great default present mode to use.
-	swapchainPresentMode := vk.PresentModeFifo
+	swapchainPresentMode := vk.PresentModeFifo // default
+	if app, ok := c.app.(ApplicationPresentMode); ok {
+		// If the application provides a custom present mode, use it.
+		swapchainPresentMode = app.VulkanPresentMode()
+	}
 
 	// Determine the number of VkImage's to use in the swapchain.
 	// Ideally, we desire to own 1 image at a time, the rest of the images can either be rendered to and/or

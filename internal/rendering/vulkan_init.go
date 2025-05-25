@@ -49,10 +49,6 @@ func (app *Application) VulkanLayers() []string {
 	return validationLayers
 }
 
-func (app *Application) VulkanDebug() bool {
-	return false // if this is ever enabled to true, the app will crash (bug with asche/CGo)
-}
-
 func (app *Application) VulkanDeviceExtensions() []string {
 	return []string{
 		"VK_KHR_swapchain",
@@ -76,6 +72,13 @@ func (app *Application) VulkanInstanceExtensions() []string {
 		extensions = append(extensions, "VK_EXT_debug_report")
 	}
 	return extensions
+}
+
+func (app *Application) VulkanPresentMode() vk.PresentMode {
+	if app.cfg.UncapFPS {
+		return vk.PresentModeImmediate
+	}
+	return vk.PresentModeFifo
 }
 
 func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
