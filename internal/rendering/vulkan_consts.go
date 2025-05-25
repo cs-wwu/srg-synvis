@@ -51,6 +51,8 @@ type Application struct {
 
 	Gps bool
 	Hat bool
+
+	statsTracker *StatsTracker
 }
 
 const (

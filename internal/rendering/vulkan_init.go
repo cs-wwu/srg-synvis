@@ -78,7 +78,7 @@ func (app *Application) VulkanPresentMode() vk.PresentMode {
 	if app.cfg.UncapFPS {
 		return vk.PresentModeImmediate
 	}
-	return vk.PresentModeFifo
+	return vk.PresentModeMailbox
 }
 
 func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {

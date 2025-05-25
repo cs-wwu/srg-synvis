@@ -2,6 +2,10 @@ package asche
 
 import (
 	"errors"
+	"fmt"
+	"log"
+
+	"slices"
 
 	vk "github.com/vulkan-go/vulkan"
 )
@@ -33,6 +37,8 @@ type Context interface {
 	AcquireNextImage() (imageIndex int, outdated bool, err error)
 	// PresentImage
 	PresentImage(imageIdx int) (outdated bool, err error)
+	// PresentModeString returns a string representation of the current present mode.
+	PresentModeString() string
 }
 
 type ApplicationCommandPool interface {
@@ -63,6 +69,8 @@ type context struct {
 	imageOwnershipSemaphores []vk.Semaphore
 
 	frameIndex int
+
+	presentMode vk.PresentMode
 }
 
 func (c *context) preparePresent() {
@@ -330,13 +338,35 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 	} else {
 		swapchainSize = surfaceCapabilities.CurrentExtent
 	}
-	// The FIFO present mode is guaranteed by the spec to be supported
-	// and to have no tearing.  It's a great default present mode to use.
-	swapchainPresentMode := vk.PresentModeFifo // default
+
+	var presentModeCount uint32
+	ret = vk.GetPhysicalDeviceSurfacePresentModes(gpu, surface, &presentModeCount, nil)
+	orPanic(NewError(ret))
+	availableModes := make([]vk.PresentMode, presentModeCount)
+	ret = vk.GetPhysicalDeviceSurfacePresentModes(gpu, surface, &presentModeCount, availableModes)
+	orPanic(NewError(ret))
+
+	// Default to FIFO (guaranteed by spec)
+	swapchainPresentMode := vk.PresentModeFifo
+
+	// Check if app provides a preferred mode
 	if app, ok := c.app.(ApplicationPresentMode); ok {
-		// If the application provides a custom present mode, use it.
-		swapchainPresentMode = app.VulkanPresentMode()
+		requestedMode := app.VulkanPresentMode()
+
+		// Check if requested mode is supported
+		modeSupported := false
+		if slices.Contains(availableModes, requestedMode) {
+			modeSupported = true
+			swapchainPresentMode = requestedMode
+		}
+
+		if !modeSupported {
+			log.Printf("vulkan warning: requested present mode %v not supported, falling back to FIFO", requestedMode)
+			log.Printf("vulkan: available present modes: %v", availableModes)
+		}
 	}
+
+	c.presentMode = swapchainPresentMode
 
 	// Determine the number of VkImage's to use in the swapchain.
 	// Ideally, we desire to own 1 image at a time, the rest of the images can either be rendered to and/or
@@ -585,6 +615,21 @@ func (s *SwapchainImageResources) SetImageOwnership(graphicsQueueFamilyIndex, pr
 
 	ret = vk.EndCommandBuffer(s.graphicsToPresentCmd)
 	orPanic(NewError(ret))
+}
+
+func (c *context) PresentModeString() string {
+	switch c.presentMode {
+	case vk.PresentModeImmediate:
+		return "IMMEDIATE"
+	case vk.PresentModeMailbox:
+		return "MAILBOX"
+	case vk.PresentModeFifo:
+		return "FIFO"
+	case vk.PresentModeFifoRelaxed:
+		return "FIFO_RELAXED"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", c.presentMode)
+	}
 }
 
 func (s *SwapchainImageResources) SetUniformBuffer(buffer vk.Buffer, mem vk.DeviceMemory) {

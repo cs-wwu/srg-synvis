@@ -38,10 +38,15 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera: cam,
-		Gps:    cfg.UseGPS,
-		Hat:    cfg.UseHat,
-		cfg:    cfg,
+		camera:       cam,
+		Gps:          cfg.UseGPS,
+		Hat:          cfg.UseHat,
+		cfg:          cfg,
+		statsTracker: NewStatsTracker(1000, 5*time.Second),
+	}
+
+	if cfg.BenchmarkMode {
+		app.statsTracker.Enable()
 	}
 
 	return app
@@ -82,12 +87,12 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) NextFrame() {
-	// Get visible chunks count thread-safely
+	app.statsTracker.StartFrame()
+
 	app.frameCount++
 
+	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-
-	// Process Input and update the camera
 	app.camera.ProcessInput(app.WindowHandle)
 	app.ubo.View = app.camera.ViewMatrix()
 
@@ -98,12 +103,29 @@ func (app *Application) NextFrame() {
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
+
+	app.camera.ProcessInput(app.WindowHandle)
+	app.ubo.View = app.camera.ViewMatrix()
+	// Update system stats periodically
+	app.statsTracker.UpdateSystemStats(
+		app.cfg.DebugMode,                 // validation layers
+		app.Context().PresentModeString(), // or get from present mode
+		3,                                 // frame lag
+	)
+
+	// Report if needed
+	if app.statsTracker.ShouldReport() {
+		app.statsTracker.Report()
+	}
+
 }
 
 // called every frame by asche
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer
 func (app *Application) VulkanContextInvalidate(imageIdx int) error {
+	app.statsTracker.StartRender()
+
 	// Current UBO update logic
 	dev := app.Context().Device()
 	res := app.Context().SwapchainImageResources()[imageIdx]
@@ -127,6 +149,7 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	cmd := res.CommandBuffer()
 	app.updateCommandBuffer(res, cmd)
 
+	app.statsTracker.EndRender()
 	return nil
 }
 
@@ -185,6 +208,22 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	chunks := app.StreamManager.GetRenderableChunks()
+	vertexCount := 0
+	triangleCount := 0
+
+	for _, chunk := range chunks {
+		vertexCount += chunk.IndexCount // approximate
+		triangleCount += chunk.IndexCount / 3
+	}
+
+	app.statsTracker.UpdateRenderingStats(
+		vertexCount,
+		triangleCount,
+		len(chunks), // draw calls
+		len(chunks), // chunk count
+	)
 
 	app.StreamManager.RenderChunks(cmd)
 

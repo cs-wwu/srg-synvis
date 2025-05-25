@@ -38,6 +38,7 @@ func parseConfig() models.AppConfig {
 	flag.BoolVar(&config.DebugMode, "debug", false, "Enable debug mode")
 	flag.BoolVar(&config.DisableFog, "disable-fog", false, "Disables Fog")
 	flag.BoolVar(&config.UncapFPS, "uncap-fps", false, "Uncap FPS for performance testing")
+	flag.BoolVar(&config.BenchmarkMode, "benchmark", false, "Enable benchmark mode (stat tracking/printing)")
 
 	flag.Parse()
 

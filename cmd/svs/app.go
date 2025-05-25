@@ -86,13 +86,36 @@ func setupMonitor(monitorNum int) (*glfw.Monitor, *glfw.VidMode) {
 
 func createWindow(app *rendering.Application, monitor *glfw.Monitor, videoMode *glfw.VidMode) *glfw.Window {
 	var windowWidth, windowHeight int
+
+	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
+	glfw.WindowHint(glfw.Resizable, glfw.False)
+
 	if monitor != nil {
 		windowWidth = videoMode.Width
 		windowHeight = videoMode.Height
+
+		// Additional hints for exclusive fullscreen
+		glfw.WindowHint(glfw.RedBits, videoMode.RedBits)
+		glfw.WindowHint(glfw.GreenBits, videoMode.GreenBits)
+		glfw.WindowHint(glfw.BlueBits, videoMode.BlueBits)
+		glfw.WindowHint(glfw.RefreshRate, videoMode.RefreshRate)
+
+		// Ensure no decorations
+		glfw.WindowHint(glfw.Decorated, glfw.False)
+		glfw.WindowHint(glfw.Floating, glfw.True)
+
+		log.Printf("Creating fullscreen window: %dx%d@%dHz", windowWidth, windowHeight, videoMode.RefreshRate)
 	} else {
+		// Windowed mode
 		reqDim := app.VulkanSwapchainDimensions()
 		windowWidth = int(reqDim.Width)
 		windowHeight = int(reqDim.Height)
+
+		// Normal windowed decorations
+		glfw.WindowHint(glfw.Decorated, glfw.True)
+		glfw.WindowHint(glfw.Floating, glfw.False)
+
+		log.Printf("Creating windowed mode: %dx%d", windowWidth, windowHeight)
 	}
 
 	app.SetSwapchainDimensions(&as.SwapchainDimensions{
@@ -101,12 +124,19 @@ func createWindow(app *rendering.Application, monitor *glfw.Monitor, videoMode *
 		Format: vk.FormatB8g8r8a8Unorm,
 	})
 
-	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
-	glfw.WindowHint(glfw.Resizable, glfw.False)
-
 	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Vulkan SVS", monitor, nil)
 	if err != nil {
 		panic(err)
+	}
+
+	// Additional fullscreen setup
+	if monitor != nil {
+		// Force window to front and focus
+		window.Show()
+		window.Focus()
+
+		// Disable cursor in fullscreen
+		window.SetInputMode(glfw.CursorMode, glfw.CursorDisabled)
 	}
 
 	return window
