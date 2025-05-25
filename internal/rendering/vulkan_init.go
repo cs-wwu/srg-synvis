@@ -43,12 +43,14 @@ func (app *Application) VulkanLayers() []string {
 	validationLayers := []string{}
 	if app.cfg.DebugMode {
 		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
+	} else {
+		log.Println("vulkan: debug mode is off, not using validation layers")
 	}
 	return validationLayers
 }
 
 func (app *Application) VulkanDebug() bool {
-	return false // if this is ever enabled to true, the app will crash (bug with asche)
+	return false // if this is ever enabled to true, the app will crash (bug with asche/CGo)
 }
 
 func (app *Application) VulkanDeviceExtensions() []string {
