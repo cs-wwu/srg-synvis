@@ -36,20 +36,15 @@ func (app *Application) VulkanAppName() string {
 }
 
 func (app *Application) VulkanLayers() []string {
-	return []string{
-		// "VK_LAYER_GOOGLE_threading",
-		// "VK_LAYER_LUNARG_parameter_validation",
-		// "VK_LAYER_LUNARG_object_tracker",
-		// "VK_LAYER_LUNARG_core_validation",
-		// "VK_LAYER_LUNARG_api_dump",
-		// "VK_LAYER_LUNARG_swapchain",
-		// "VK_LAYER_GOOGLE_unique_objects",
-		"VK_LAYER_KHRONOS_validation", // TODO remove validation layers in prod
+	validationLayers := []string{}
+	if app.cfg.DebugMode {
+		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
 	}
+	return validationLayers
 }
 
 func (app *Application) VulkanDebug() bool {
-	return false // a.debugEnabled
+	return false // if this is ever enabled to true, the app will crash (bug with asche)
 }
 
 func (app *Application) VulkanDeviceExtensions() []string {
@@ -71,7 +66,9 @@ func (app *Application) SetSwapchainDimensions(dim *as.SwapchainDimensions) {
 
 func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
-	extensions = append(extensions, "VK_EXT_debug_report") // TODO: Remove if no debug
+	if app.cfg.DebugMode {
+		extensions = append(extensions, "VK_EXT_debug_report")
+	}
 	return extensions
 }
 
