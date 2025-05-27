@@ -78,17 +78,17 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
 
-    for i := range app.textures {
-        if app.textures[i] != nil {
-            app.textures[i].Destroy(dev)
-            app.textures[i] = nil
-        }
-    }
+	for i := range app.textures {
+		if app.textures[i] != nil {
+			app.textures[i].Destroy(dev)
+			app.textures[i] = nil
+		}
+	}
 
-    if app.depth != nil {
-        app.depth.Destroy(dev)
-        app.depth = nil
-    }
+	if app.depth != nil {
+		app.depth.Destroy(dev)
+		app.depth = nil
+	}
 
 	vk.DeviceWaitIdle(dev)
 
@@ -126,7 +126,6 @@ func (app *Application) NextFrame() {
 	if app.statsTracker.ShouldReport() {
 		app.statsTracker.Report()
 	}
-
 }
 
 // called every frame by asche

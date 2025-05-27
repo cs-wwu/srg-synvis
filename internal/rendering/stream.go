@@ -387,7 +387,7 @@ func (sm *StreamManager) periodicUpdate() {
 // updateChunkSelection updates which chunks should be loaded
 func (sm *StreamManager) updateChunkSelection() {
 	// Create frustum for current camera position
-	near := float32(10.0)
+	near := float32(1.0)
 	frustum := spatial.NewFrustumFromCamera(
 		sm.lastCameraPos,
 		sm.cfg.CameraStartDir[1],
