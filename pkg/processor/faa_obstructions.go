@@ -221,3 +221,48 @@ func GenerateObsData() {
 		fmt.Printf("Error writing results: %v\n", err)
 	}
 }
+
+// Load and parse the DOFData protobuf
+func loadDOFData(filename string) (*pb.DOFData, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	var dofData pb.DOFData
+	if err := proto.Unmarshal(data, &dofData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+	}
+	return &dofData, nil
+}
+
+// Find CoordSquare by lat/lon degrees
+func findCoordSquare(dofData *pb.DOFData, latDeg, lonDeg int32) *pb.CoordSquare {
+	for _, square := range dofData.Squares {
+		if square.LatDeg == latDeg && square.LonDeg == lonDeg {
+			return square
+		}
+	}
+	return nil
+}
+
+// Prints all the obstructions in a coordinate square, loaded from protobuf
+func PrintProtoSquare() {
+	dofData, err := loadDOFData("assets/obs/all_dof_data.pb")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	latDeg := int32(47)
+	lonDeg := int32(-123)
+
+	square := findCoordSquare(dofData, latDeg, lonDeg)
+	if square != nil {
+		fmt.Printf("Found %d obstructions\n", len(square.GetObstructions()))
+		for _, obs := range square.GetObstructions() {
+			fmt.Printf("Lat: %f, Lon: %f, Height: %f\n", obs.Lat, obs.Lon, obs.Height)
+		}
+	} else {
+		fmt.Println("No data for given coordinate square")
+	}
+}
