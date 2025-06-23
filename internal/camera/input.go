@@ -83,6 +83,13 @@ func (ip *InputProcessor) processMovementInput(window *glfw.Window) {
 		tmp.Scale(&up, speed)
 		ip.camera.subPosition(tmp)
 	}
+
+	// Toggle map mode
+	mapButtonPressed := window.GetKey(glfw.KeyM) == glfw.Press
+	if mapButtonPressed && !ip.camera.mapButtonPressed {
+		ip.camera.mapView = !ip.camera.mapView
+	}
+	ip.camera.mapButtonPressed = mapButtonPressed
 }
 
 // processViewInput handles camera rotation using arrow keys and Q/E for roll

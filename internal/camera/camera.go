@@ -39,7 +39,19 @@ type CameraImpl struct {
 	inputProcessor *InputProcessor
 	sensorManager  *SensorManager
 	motionHandler  *MotionHandler
+
+	mapView          bool
+	mapButtonPressed bool
 }
+
+var (
+	// A vector pointing up in the map view.
+	MAP_UP = lin.Vec3{0.0, 1.0, 0.0}
+	// The direction facing upwards on the screen in the map view.
+	MAP_NORTH = lin.Vec3{0.0, 0.0, -1.0}
+	// Distance above the plane to be in the map view.
+	MAP_OFFSET = float32(10.0)
+)
 
 // NewCamera creates and initializes a new Camera
 func NewCamera(config CameraConfig) Camera {
@@ -97,14 +109,24 @@ func (c *CameraImpl) Position() lin.Vec3 {
 	return *c.pos
 }
 
-// ViewMatrix returns the camera's view matrix
-func (c *CameraImpl) ViewMatrix() lin.Mat4x4 {
-	center := lin.Vec3{}
-	center.Add(c.pos, c.front)
+func (c *CameraImpl) MapView() bool {
+	return c.mapView
+}
 
-	result := lin.Mat4x4{}
-	result.LookAt(c.pos, &center, c.up)
-	return result
+// ViewMatrix returns the camera's view matrix
+func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
+	if c.mapView {
+		up := lin.Vec3{}
+		up.Scale(&MAP_UP, MAP_OFFSET)
+		eye := *c.pos
+		eye.Add(c.pos, &up)
+		result.LookAt(&eye, c.pos, &MAP_NORTH)
+	} else {
+		target := lin.Vec3{}
+		target.Add(c.pos, c.front)
+		result.LookAt(c.pos, &target, c.up)
+	}
+	return
 }
 
 // SetPosition sets the camera position
