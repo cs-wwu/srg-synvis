@@ -353,8 +353,8 @@ func (app *Application) prepareTextures() {
 			//  Must use staging buffer to copy linear texture to optimized
 			log.Println("vulkan warn: using staging buffers")
 
-            staging := app.prepareTextureImage(path, TextureImageTilingLinear, TextureImageUsageTransferSrcBit,
-                TextureMemoryPropertyHostVisibleBit|TextureMemoryPropertyHostCoherentBit)
+			staging := app.prepareTextureImage(path, TextureImageTilingLinear, TextureImageUsageTransferSrcBit,
+				TextureMemoryPropertyHostVisibleBit|TextureMemoryPropertyHostCoherentBit)
 			tex = app.prepareTextureImage(path, TextureImageTilingOptimal,
 				TextureImageUsageTransferDstBit|TextureImageUsageSampledBit, TextureMemoryPropertyDeviceLocalBit)
 
