@@ -61,7 +61,7 @@ func ValidationLayers() (names []string, err error) {
 func FindRequiredMemoryType(props vk.PhysicalDeviceMemoryProperties,
 	deviceRequirements, hostRequirements vk.MemoryPropertyFlagBits) (uint32, bool) {
 
-	for i := uint32(0); i < vk.MaxMemoryTypes; i++ {
+	for i := range uint32(vk.MaxMemoryTypes) {
 		if deviceRequirements&(vk.MemoryPropertyFlagBits(1)<<i) != 0 {
 			props.MemoryTypes[i].Deref()
 			flags := props.MemoryTypes[i].PropertyFlags
@@ -76,7 +76,7 @@ func FindRequiredMemoryType(props vk.PhysicalDeviceMemoryProperties,
 func FindRequiredMemoryTypeFallback(props vk.PhysicalDeviceMemoryProperties,
 	deviceRequirements, hostRequirements vk.MemoryPropertyFlagBits) (uint32, bool) {
 
-	for i := uint32(0); i < vk.MaxMemoryTypes; i++ {
+	for i := range uint32(vk.MaxMemoryTypes) {
 		if deviceRequirements&(vk.MemoryPropertyFlagBits(1)<<i) != 0 {
 			props.MemoryTypes[i].Deref()
 			flags := props.MemoryTypes[i].PropertyFlags
