@@ -102,12 +102,9 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 
 // Initialize the Uniform Buffer Object
 func (app *Application) initUBO() {
-	aspectRatio := float32(app.width) / float32(app.height)
-	app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
-	app.ubo.View = app.camera.ViewMatrix()
-	app.ubo.Model.Identity()
-	app.ubo.Projection[1][1] *= -1
+	app.updateUBO()
 
+	app.ubo.Model.Identity()
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
 	app.ubo.RenderDistance = app.cfg.RenderDistance
@@ -127,6 +124,33 @@ func (app *Application) initUBO() {
 		log.Printf("Enabling fog\n")
 		app.ubo.DisableFog = 0.0 // 0.0 = enabled
 	}
+}
+
+func (app *Application) updateUBO() {
+	aspectRatio := float32(app.width) / float32(app.height)
+
+	if app.camera.MapView() {
+		ortho := lin.Mat4x4{}
+
+		// TODO: Zoom? Currently, 1000x1000 points are visible in the map view.
+		view := float32(1000.0)
+		ortho.Ortho(view*aspectRatio, -view*aspectRatio, view, -view, 1000.0, -1000.0)
+
+		// Everything is negated here, so we need some correction.
+		// TODO(neil): Fix the coordinate system to not negate everything.
+		correction := lin.Mat4x4{
+			{1.0, 0.0, 0.0, 0.0},
+			{0.0, 1.0, 0.0, 0.0},
+			{0.0, 0.0, -1.0, 0.0},
+			{0.0, 0.0, 0.0, 1.0},
+		}
+		app.ubo.Projection.Mult(&correction, &ortho)
+		app.ubo.Projection[1][1] *= -1
+	} else {
+		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
+		app.ubo.Projection[1][1] *= -1
+	}
+	app.ubo.View = app.camera.ViewMatrix()
 }
 
 // Prepare depth buffers

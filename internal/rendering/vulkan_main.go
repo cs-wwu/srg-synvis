@@ -103,7 +103,7 @@ func (app *Application) NextFrame() {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
+	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
 	cameraPos := app.camera.Position()
@@ -114,7 +114,6 @@ func (app *Application) NextFrame() {
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 
 	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
