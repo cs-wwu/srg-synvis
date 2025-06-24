@@ -7,11 +7,11 @@ SHADER_OUTPUTS = $(SHADER_SOURCES:%=%.spv)
 GLSLC = glslc
 GO = go
 
-# Default target
-all: shaders
+.PHONY: run clean help
 
-# Compile shaders
-shaders: $(SHADER_OUTPUTS)
+# Run the program
+run: $(SHADER_OUTPUTS)
+	$(GO) run ./cmd/svs
 
 # Pattern rule for vertex shaders
 $(SHADER_DIR)/%.vert.spv: $(SHADER_DIR)/%.vert
@@ -24,23 +24,11 @@ $(SHADER_DIR)/%.frag.spv: $(SHADER_DIR)/%.frag
 # Clean built shader files
 clean:
 	rm -f $(SHADER_OUTPUTS)
-
-# Run the program
-run:
-	$(GO) run cmd/svs/main.go
-
-# Build and run
-build-run: shaders run
+	$(GO) clean
 
 # List all available targets
 help:
 	@echo "Available targets:"
-	@echo "  all        - Build shaders (default target)"
-	@echo "  shaders    - Compile all shaders to SPIR-V"
-	@echo "  clean      - Remove compiled shader files"
-	@echo "  run        - Run the program"
-	@echo "  build-run  - Compile shaders and run the program"
-	@echo "  help       - Show this help message"
-
-.PHONY: all shaders clean run build-run help
-
+	@echo "  run   - Build everything and run (default)"
+	@echo "  clean - Remove compiled shader files"
+	@echo "  help  - Show this help message"
