@@ -324,7 +324,6 @@ func TestMakeApiRequest(t *testing.T) {
 	// The post request returns the different data sets that are defined above this comment, those data sets
 	// also include expected return counts for testing purposes
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
