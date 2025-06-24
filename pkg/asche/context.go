@@ -2,6 +2,10 @@ package asche
 
 import (
 	"errors"
+	"fmt"
+	"log"
+
+	"slices"
 
 	vk "github.com/vulkan-go/vulkan"
 )
@@ -33,6 +37,8 @@ type Context interface {
 	AcquireNextImage() (imageIndex int, outdated bool, err error)
 	// PresentImage
 	PresentImage(imageIdx int) (outdated bool, err error)
+	// PresentModeString returns a string representation of the current present mode.
+	PresentModeString() string
 }
 
 type ApplicationCommandPool interface {
@@ -63,6 +69,8 @@ type context struct {
 	imageOwnershipSemaphores []vk.Semaphore
 
 	frameIndex int
+
+	presentMode vk.PresentMode
 }
 
 func (c *context) preparePresent() {
@@ -74,7 +82,7 @@ func (c *context) preparePresent() {
 	c.imageAcquiredSemaphores = make([]vk.Semaphore, c.frameLag)
 	c.drawCompleteSemaphores = make([]vk.Semaphore, c.frameLag)
 	c.imageOwnershipSemaphores = make([]vk.Semaphore, c.frameLag)
-	for i := 0; i < c.frameLag; i++ {
+	for i := range c.frameLag {
 		ret := vk.CreateSemaphore(c.device, semaphoreCreateInfo, nil, &c.imageAcquiredSemaphores[i])
 		orPanic(NewError(ret))
 		ret = vk.CreateSemaphore(c.device, semaphoreCreateInfo, nil, &c.drawCompleteSemaphores[i])
@@ -95,14 +103,14 @@ func (c *context) destroy() {
 		return
 	}()
 
-	for i := 0; i < c.frameLag; i++ {
+	for i := range c.frameLag {
 		vk.DestroySemaphore(c.device, c.imageAcquiredSemaphores[i], nil)
 		vk.DestroySemaphore(c.device, c.drawCompleteSemaphores[i], nil)
 		if c.platform.HasSeparatePresentQueue() {
 			vk.DestroySemaphore(c.device, c.imageOwnershipSemaphores[i], nil)
 		}
 	}
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		c.swapchainImageResources[i].Destroy(c.device, c.cmdPool)
 	}
 	c.swapchainImageResources = nil
@@ -195,7 +203,7 @@ func (c *context) prepare(needCleanup bool) {
 	})
 	orPanic(NewError(ret))
 
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		var cmd = make([]vk.CommandBuffer, 1)
 		vk.AllocateCommandBuffers(c.device, &vk.CommandBufferAllocateInfo{
 			SType:              vk.StructureTypeCommandBufferAllocateInfo,
@@ -216,7 +224,7 @@ func (c *context) prepare(needCleanup bool) {
 		orPanic(NewError(ret))
 		c.presentCmdPool = cmdPool
 
-		for i := 0; i < len(c.swapchainImageResources); i++ {
+		for i := range c.swapchainImageResources {
 			var cmd = make([]vk.CommandBuffer, 1)
 			ret = vk.AllocateCommandBuffers(c.device, &vk.CommandBufferAllocateInfo{
 				SType:              vk.StructureTypeCommandBufferAllocateInfo,
@@ -232,7 +240,7 @@ func (c *context) prepare(needCleanup bool) {
 		}
 	}
 
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		var view vk.ImageView
 		ret = vk.CreateImageView(c.device, &vk.ImageViewCreateInfo{
 			SType:  vk.StructureTypeImageViewCreateInfo,
@@ -330,9 +338,35 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 	} else {
 		swapchainSize = surfaceCapabilities.CurrentExtent
 	}
-	// The FIFO present mode is guaranteed by the spec to be supported
-	// and to have no tearing.  It's a great default present mode to use.
+
+	var presentModeCount uint32
+	ret = vk.GetPhysicalDeviceSurfacePresentModes(gpu, surface, &presentModeCount, nil)
+	orPanic(NewError(ret))
+	availableModes := make([]vk.PresentMode, presentModeCount)
+	ret = vk.GetPhysicalDeviceSurfacePresentModes(gpu, surface, &presentModeCount, availableModes)
+	orPanic(NewError(ret))
+
+	// Default to FIFO (guaranteed by spec)
 	swapchainPresentMode := vk.PresentModeFifo
+
+	// Check if app provides a preferred mode
+	if app, ok := c.app.(ApplicationPresentMode); ok {
+		requestedMode := app.VulkanPresentMode()
+
+		// Check if requested mode is supported
+		modeSupported := false
+		if slices.Contains(availableModes, requestedMode) {
+			modeSupported = true
+			swapchainPresentMode = requestedMode
+		}
+
+		if !modeSupported {
+			log.Printf("vulkan warning: requested present mode %v not supported, falling back to FIFO", requestedMode)
+			log.Printf("vulkan: available present modes: %v", availableModes)
+		}
+	}
+
+	c.presentMode = swapchainPresentMode
 
 	// Determine the number of VkImage's to use in the swapchain.
 	// Ideally, we desire to own 1 image at a time, the rest of the images can either be rendered to and/or
@@ -361,7 +395,7 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 		vk.CompositeAlphaPostMultipliedBit,
 		vk.CompositeAlphaInheritBit,
 	}
-	for i := 0; i < len(compositeAlphaFlags); i++ {
+	for i := range compositeAlphaFlags {
 		alphaFlags := vk.CompositeAlphaFlags(compositeAlphaFlags[i])
 		flagSupported := surfaceCapabilities.SupportedCompositeAlpha&alphaFlags != 0
 		if flagSupported {
@@ -410,11 +444,11 @@ func (c *context) prepareSwapchain(gpu vk.PhysicalDevice, surface vk.Surface, di
 	swapchainImages := make([]vk.Image, imageCount)
 	ret = vk.GetSwapchainImages(c.device, c.swapchain, &imageCount, swapchainImages)
 	orPanic(NewError(ret))
-	for i := 0; i < len(c.swapchainImageResources); i++ {
+	for i := range c.swapchainImageResources {
 		c.swapchainImageResources[i].Destroy(c.device, c.cmdPool)
 	}
 	c.swapchainImageResources = make([]*SwapchainImageResources, 0, imageCount)
-	for i := 0; i < len(swapchainImages); i++ {
+	for i := range swapchainImages {
 		c.swapchainImageResources = append(c.swapchainImageResources, &SwapchainImageResources{
 			image: swapchainImages[i],
 		})
@@ -581,6 +615,21 @@ func (s *SwapchainImageResources) SetImageOwnership(graphicsQueueFamilyIndex, pr
 
 	ret = vk.EndCommandBuffer(s.graphicsToPresentCmd)
 	orPanic(NewError(ret))
+}
+
+func (c *context) PresentModeString() string {
+	switch c.presentMode {
+	case vk.PresentModeImmediate:
+		return "IMMEDIATE"
+	case vk.PresentModeMailbox:
+		return "MAILBOX"
+	case vk.PresentModeFifo:
+		return "FIFO"
+	case vk.PresentModeFifoRelaxed:
+		return "FIFO_RELAXED"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", c.presentMode)
+	}
 }
 
 func (s *SwapchainImageResources) SetUniformBuffer(buffer vk.Buffer, mem vk.DeviceMemory) {

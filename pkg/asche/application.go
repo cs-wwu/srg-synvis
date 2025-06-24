@@ -21,6 +21,7 @@ type Application interface {
 	VulkanAppVersion() vk.Version
 	VulkanAppName() string
 	VulkanMode() VulkanMode
+	VulkanPresentMode() vk.PresentMode
 	VulkanSurface(instance vk.Instance) vk.Surface
 	VulkanInstanceExtensions() []string
 	VulkanDeviceExtensions() []string
@@ -52,6 +53,10 @@ type ApplicationContextCleanup interface {
 
 type ApplicationContextInvalidate interface {
 	VulkanContextInvalidate(imageIdx int) error
+}
+
+type ApplicationPresentMode interface {
+	VulkanPresentMode() vk.PresentMode
 }
 
 var (
@@ -97,6 +102,10 @@ func (app *BaseVulkanApp) VulkanAppName() string {
 
 func (app *BaseVulkanApp) VulkanMode() VulkanMode {
 	return DefaultVulkanMode
+}
+
+func (app *BaseVulkanApp) VulkanPresentMode() vk.PresentMode {
+	return vk.PresentModeFifo
 }
 
 func (app *BaseVulkanApp) VulkanSurface(instance vk.Instance) vk.Surface {

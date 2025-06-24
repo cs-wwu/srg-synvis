@@ -143,7 +143,7 @@ func authenticate(client *http.Client, url, location string) error {
 	}
 
 	// Attempt authentication
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		location, err = attemptAuthenticate(client, location, creds)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate at \"%v\": %v", location, err)

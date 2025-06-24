@@ -7,7 +7,11 @@ layout(std140, binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
+    float renderDistance;
+    vec3 cameraPos;
     float time;
+    float disableWarnings;
+    float disableFog;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;

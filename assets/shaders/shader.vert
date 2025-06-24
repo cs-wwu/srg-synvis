@@ -8,17 +8,19 @@ layout(std140, binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     vec3 lightDir;
-    float time;
+    float renderDistance;
     vec3 cameraPos;
+    float time;
+    float disableWarnings;
+    float disableFog;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inTexCoord;
 layout(location = 2) in vec3 inNormal;
 
-const float AMBIENT = 0.15;       // Ambient light intensity
-const float FOG_START = 3600.0;   // Start fog at this distance
-const float FOG_END = 6000.0;     // End of fog at this distance
+const float AMBIENT = 0.15;      // Ambient light intensity
+const float FOG_OFFSET = 0.75;   // How far to start the fog from the renderDistance
 
 layout(location = 0) out vec3 fragColor;
 layout(location = 1) out vec3 fragTexCoord;
@@ -44,17 +46,24 @@ void main()
     vec3 lightDir = normalize(ubo.lightDir);
     float diffuse = max(dot(worldNormal, lightDir), 0.0);
     float intense = AMBIENT + diffuse * 0.85;
-    
-    // Calculate fog factors based on distance and height
-    float distance = length(viewPosition.xyz);
-    float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
-    
-    // Smoother fog transition
-    fogFactor = 1.0 - clamp((distance - FOG_START) / (FOG_END - FOG_START), 0.0, 1.0);
-    fogFactor = pow(fogFactor, 1.5);
-    
-    // Make fog more transparent at high elevations
-    fogFactor = mix(fogFactor, 1.0, heightFactor * 0.3);
+
+    // Calculate fog factor
+    if (ubo.disableFog > 0.5) {
+        // Fog disabled - no fog blending
+        fogFactor = 1.0;
+    } else {
+        // Fog enabled - calculate fog based on distance and height
+        float fogStart = ubo.renderDistance * FOG_OFFSET;
+        float distance = length(viewPosition.xyz);
+        float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
+
+        // Calculate base fog factor
+        fogFactor = 1.0 - clamp((distance - fogStart) / (ubo.renderDistance - fogStart), 0.0, 1.0);
+        fogFactor = pow(fogFactor, 1.5);
+
+        // Reduce fog at high elevations
+        fogFactor = mix(fogFactor, 1.0, heightFactor * 0.3);
+    }
 
     fragColor = intense * vec3(1.0);
     fragTexCoord = inTexCoord.xyz;

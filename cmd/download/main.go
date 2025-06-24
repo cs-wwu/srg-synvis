@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/pkg/api"
-	"github.com/cs-wwu/srg-synvis/internal/processor"
+	"github.com/cs-wwu/srg-synvis/pkg/processor"
 )
 
 // This file should be used for downloading the necessary heightmaps, etc.
