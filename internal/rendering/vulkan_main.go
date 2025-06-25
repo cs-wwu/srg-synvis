@@ -211,6 +211,16 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// Draw skybox
 	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
 
+	// Draw the plane
+	if app.camera.MapView() {
+		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
+		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.planeVertexBuffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, app.planeIndexBuffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, app.planeIndexCount, 1, 0, 0, 0)
+	}
+
 	// THEN DRAW THE TERRAIN (as before)
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,

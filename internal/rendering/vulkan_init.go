@@ -148,6 +148,8 @@ func (app *Application) updateUBO() {
 		}
 		app.ubo.Projection.Mult(&correction, &ortho)
 		app.ubo.Projection[1][1] *= -1
+
+		app.camera.ForwardMatrix(&app.ubo.PlaneDirection)
 	} else {
 		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1
@@ -623,34 +625,9 @@ func (app *Application) preparePlaneModel() {
 		log.Fatal(err)
 	}
 
-	// The `obj` contains 3 fields in the `Coord` slice:
-	// The position, [x, y, z]
-	// The texture coordinates, [u, v]
-	// The normal, [nx, ny, nz]
-	//
-	// So, the stride is 8 floats. We then copy the bits we care
-	// about into the same format as the ground, so we can reuse the pipeline.
-	//
-	// Our pipeline uses a vec3 for the texture coordinates, so it has a stride
-	// of 9 floats, or 9*4 bytes.
-	numVertices := len(obj.Coord) / 8
-	vertBytes := make([]byte, numVertices*9*4)
-
-	for i := range numVertices {
-		insertFloatBytes(vertBytes, i*9+0, obj.Coord[i*8+0]) // x
-		insertFloatBytes(vertBytes, i*9+1, obj.Coord[i*8+1]) // y
-		insertFloatBytes(vertBytes, i*9+2, obj.Coord[i*8+2]) // z
-		insertFloatBytes(vertBytes, i*9+3, obj.Coord[i*8+3]) // u
-		insertFloatBytes(vertBytes, i*9+4, obj.Coord[i*8+4]) // v
-		insertFloatBytes(vertBytes, i*9+5, 0)                // ???
-		insertFloatBytes(vertBytes, i*9+6, obj.Coord[i*8+5]) // nx
-		insertFloatBytes(vertBytes, i*9+7, obj.Coord[i*8+6]) // ny
-		insertFloatBytes(vertBytes, i*9+8, obj.Coord[i*8+7]) // nz
-	}
-
 	vertexBuffer := as.CreateBuffer(app.Context().Device(),
 		app.Context().Platform().MemoryProperties(),
-		vertBytes,
+		convertFloatSliceToBytes(obj.Coord),
 		vk.BufferUsageVertexBufferBit)
 	app.planeVertexBuffer = vertexBuffer.Buffer
 	app.planeVertexMemory = vertexBuffer.Memory
@@ -663,16 +640,12 @@ func (app *Application) preparePlaneModel() {
 	indexBuffer := as.CreateBuffer(app.Context().Device(),
 		app.Context().Platform().MemoryProperties(),
 		indexBytes,
-		vk.BufferUsageVertexBufferBit)
+		vk.BufferUsageIndexBufferBit)
 	app.planeIndexBuffer = indexBuffer.Buffer
 	app.planeIndexMemory = indexBuffer.Memory
 
 	group := obj.Groups[0]
 	app.planeIndexCount = uint32(group.IndexCount)
-}
-
-func insertFloatBytes(bytes []byte, i int, v float32) {
-	binary.LittleEndian.PutUint32(bytes[i*4:], math.Float32bits(v))
 }
 
 // Helper functions to convert slices to bytes
@@ -799,6 +772,129 @@ func (app *Application) prepareSkyboxPipeline() {
 	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, skyboxPipeline)
 	OrPanic(as.NewError(ret))
 	app.skyboxPipeline = skyboxPipeline[0]
+
+	// Clean up shader modules
+	vk.DestroyShaderModule(dev, vs, nil)
+	vk.DestroyShaderModule(dev, fs, nil)
+}
+
+func (app *Application) preparePlanePipeline() {
+	dev := app.Context().Device()
+
+	// Load plane shaders
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/plane.vert.spv"))
+	OrPanic(err)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/plane.frag.spv"))
+	OrPanic(err)
+
+	// Pipeline is similar to main pipeline, with key differences
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout, // Reuse existing layout
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    32, // 8 floats * 4 bytes = 32 bytes per vertex
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 3,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
+				{
+					Binding:  0,
+					Location: 0,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   0,
+				},
+				{
+					Binding:  0,
+					Location: 1,
+					Format:   vk.FormatR32g32Sfloat,
+					Offset:   4 * 3,
+				},
+				{
+					Binding:  0,
+					Location: 2,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   4 * 5,
+				},
+			},
+		},
+
+		// Use triangles for the cube
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask: 0xF,
+				BlendEnable:    vk.False,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.True,
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.False,
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	// Create the pipeline
+	planePipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, planePipeline)
+	OrPanic(as.NewError(ret))
+	app.planePipeline = planePipeline[0]
 
 	// Clean up shader modules
 	vk.DestroyShaderModule(dev, vs, nil)
@@ -1053,6 +1149,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareSkyboxCube()
 	app.prepareSkyboxPipeline()
 	app.preparePlaneModel()
+	app.preparePlanePipeline()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()

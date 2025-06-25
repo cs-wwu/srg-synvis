@@ -57,6 +57,7 @@ type Camera interface {
 	Position() lin.Vec3
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
+	ForwardMatrix(*lin.Mat4x4)
 
 	// Input processing
 	ProcessInput(window *glfw.Window)

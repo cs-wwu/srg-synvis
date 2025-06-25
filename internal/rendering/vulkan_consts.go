@@ -32,6 +32,7 @@ type Application struct {
 	pipeline       vk.Pipeline
 
 	// Plane model resources
+	planePipeline     vk.Pipeline
 	planeVertexBuffer vk.Buffer
 	planeVertexMemory vk.DeviceMemory
 	planeIndexBuffer  vk.Buffer
