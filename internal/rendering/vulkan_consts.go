@@ -31,6 +31,13 @@ type Application struct {
 	renderPass     vk.RenderPass
 	pipeline       vk.Pipeline
 
+	// Plane model resources
+	planeVertexBuffer vk.Buffer
+	planeVertexMemory vk.DeviceMemory
+	planeIndexBuffer  vk.Buffer
+	planeIndexMemory  vk.DeviceMemory
+	planeIndexCount   uint32
+
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
 	skyboxVertexBuffer vk.Buffer

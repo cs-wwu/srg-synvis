@@ -15,6 +15,8 @@ import (
 
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
+	"github.com/udhos/gwob"
+
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -613,6 +615,66 @@ func (app *Application) prepareSkyboxCube() {
 	app.skyboxIndexCount = uint32(len(indices))
 }
 
+func (app *Application) preparePlaneModel() {
+	options := &gwob.ObjParserOptions{} // parser options
+
+	obj, err := gwob.NewObjFromFile("assets/models/cessna.obj", options) // parse/load OBJ
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// The `obj` contains 3 fields in the `Coord` slice:
+	// The position, [x, y, z]
+	// The texture coordinates, [u, v]
+	// The normal, [nx, ny, nz]
+	//
+	// So, the stride is 8 floats. We then copy the bits we care
+	// about into the same format as the ground, so we can reuse the pipeline.
+	//
+	// Our pipeline uses a vec3 for the texture coordinates, so it has a stride
+	// of 9 floats, or 9*4 bytes.
+	numVertices := len(obj.Coord) / 8
+	vertBytes := make([]byte, numVertices*9*4)
+
+	for i := range numVertices {
+		insertFloatBytes(vertBytes, i*9+0, obj.Coord[i*8+0]) // x
+		insertFloatBytes(vertBytes, i*9+1, obj.Coord[i*8+1]) // y
+		insertFloatBytes(vertBytes, i*9+2, obj.Coord[i*8+2]) // z
+		insertFloatBytes(vertBytes, i*9+3, obj.Coord[i*8+3]) // u
+		insertFloatBytes(vertBytes, i*9+4, obj.Coord[i*8+4]) // v
+		insertFloatBytes(vertBytes, i*9+5, 0)                // ???
+		insertFloatBytes(vertBytes, i*9+6, obj.Coord[i*8+5]) // nx
+		insertFloatBytes(vertBytes, i*9+7, obj.Coord[i*8+6]) // ny
+		insertFloatBytes(vertBytes, i*9+8, obj.Coord[i*8+7]) // nz
+	}
+
+	vertexBuffer := as.CreateBuffer(app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		vertBytes,
+		vk.BufferUsageVertexBufferBit)
+	app.planeVertexBuffer = vertexBuffer.Buffer
+	app.planeVertexMemory = vertexBuffer.Memory
+
+	indexBytes := make([]byte, len(obj.Indices)*4)
+	for i, index := range obj.Indices {
+		binary.LittleEndian.PutUint32(indexBytes[i*4:], uint32(index))
+	}
+
+	indexBuffer := as.CreateBuffer(app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		indexBytes,
+		vk.BufferUsageVertexBufferBit)
+	app.planeIndexBuffer = indexBuffer.Buffer
+	app.planeIndexMemory = indexBuffer.Memory
+
+	group := obj.Groups[0]
+	app.planeIndexCount = uint32(group.IndexCount)
+}
+
+func insertFloatBytes(bytes []byte, i int, v float32) {
+	binary.LittleEndian.PutUint32(bytes[i*4:], math.Float32bits(v))
+}
+
 // Helper functions to convert slices to bytes
 func convertFloatSliceToBytes(slice []float32) []byte {
 	byteLen := len(slice) * 4
@@ -990,6 +1052,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.preparePipeline()
 	app.prepareSkyboxCube()
 	app.prepareSkyboxPipeline()
+	app.preparePlaneModel()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
