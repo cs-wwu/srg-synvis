@@ -3,7 +3,6 @@ package camera
 import (
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
@@ -18,11 +17,6 @@ type CameraImpl struct {
 	up    *lin.Vec3 // Up Direction of the camera
 	front *lin.Vec3 // Front direction of the camera
 	right *lin.Vec3 // Right direction of the Camera
-
-	// Thread safety
-	frontMutex sync.Mutex // Mutex for updating the front vector
-	posMutex   sync.Mutex // Mutex for updating the position vector
-	upMutex    sync.Mutex // Mutex for updating the up vector
 
 	// Camera parameters
 	speed       float32 // Camera speed
@@ -105,8 +99,6 @@ func NewCamera(config CameraConfig) Camera {
 
 // Position returns the current camera position
 func (c *CameraImpl) Position() lin.Vec3 {
-	c.posMutex.Lock()
-	defer c.posMutex.Unlock()
 	return *c.pos
 }
 
@@ -159,9 +151,7 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 
 // SetPosition sets the camera position
 func (c *CameraImpl) SetPosition(newPos lin.Vec3) {
-	c.posMutex.Lock()
 	*c.pos = newPos
-	c.posMutex.Unlock()
 }
 
 // ProcessInput handles input from the window
@@ -207,47 +197,33 @@ func (c *CameraImpl) GetViewVectors() string {
 
 // updatePosition updates the camera position (thread-safe)
 func (c *CameraImpl) updatePosition(newX, newZ, newY float32) {
-	c.posMutex.Lock()
 	(*c.pos)[0] = newX
 	(*c.pos)[2] = newZ
 	(*c.pos)[1] = newY
-	c.posMutex.Unlock()
 }
 
 // addPosition adds to the camera position (thread-safe)
 func (c *CameraImpl) addPosition(delta lin.Vec3) {
-	c.posMutex.Lock()
 	c.pos.Add(c.pos, &delta)
-	c.posMutex.Unlock()
 }
 
 // subPosition subtracts from the camera position (thread-safe)
 func (c *CameraImpl) subPosition(delta lin.Vec3) {
-	c.posMutex.Lock()
 	c.pos.Sub(c.pos, &delta)
-	c.posMutex.Unlock()
 }
 
 // updateVectors updates the camera orientation vectors (thread-safe)
 func (c *CameraImpl) updateVectors(front, right, up lin.Vec3) {
-	c.frontMutex.Lock()
-	c.upMutex.Lock()
 	*c.front = front
 	*c.right = right
 	*c.up = up
-	c.upMutex.Unlock()
-	c.frontMutex.Unlock()
 }
 
 // getVectors returns copies of the current vectors (thread-safe)
 func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
-	c.frontMutex.Lock()
-	c.upMutex.Lock()
 	front = *c.front
 	right = *c.right
 	up = *c.up
-	c.upMutex.Unlock()
-	c.frontMutex.Unlock()
 	return
 }
 
