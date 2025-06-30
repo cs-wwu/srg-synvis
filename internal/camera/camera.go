@@ -43,6 +43,9 @@ type CameraImpl struct {
 
 	mapView          bool
 	mapButtonPressed bool
+
+	northView          bool
+	northButtonPressed bool
 }
 
 var (
