@@ -13,6 +13,8 @@ import (
 	"os"
 	"unsafe"
 
+	ui "github.com/cs-wwu/srg-synvis/ui"
+
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	// as "github.com/vulkan-go/asche"
@@ -975,6 +977,12 @@ func (app *Application) VulkanContextPrepare() error {
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
+
+	vkInstance := unsafe.Pointer(app.Context().Platform().Instance())
+	vkDevice := unsafe.Pointer(app.Context().Platform().Device())
+	vkPhysicalDevice := unsafe.Pointer(app.Context().Platform().PhysicalDevice())
+	ui.NewUIRenderer(vkInstance, vkDevice, vkPhysicalDevice)
+
 	return nil
 }
 
