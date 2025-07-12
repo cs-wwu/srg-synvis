@@ -33,3 +33,7 @@ go.work
 
 # Vulkan out file
 experimemtal/vulkan/shape/VulkanTest
+
+#Imgui Build
+/build
+ui/build

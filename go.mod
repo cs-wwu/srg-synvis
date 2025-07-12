@@ -16,4 +16,7 @@ require (
 	golang.org/x/term v0.23.0
 )
 
-require golang.org/x/sys v0.23.0 // indirect
+require (
+	github.com/AllenDang/cimgui-go v1.3.1 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+)
