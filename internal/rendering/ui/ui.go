@@ -4,7 +4,7 @@ package ui
 #cgo CFLAGS: -I.
 #cgo LDFLAGS: -L./build -lImGuiUI -lstdc++ -Wl,-rpath,'${SRCDIR}/build'
 
-#include "ui_c_interface.h"
+#include "./cpp_ui/ui_c_interface.h"
 #include <stdlib.h>
 #include <stdint.h>
 */

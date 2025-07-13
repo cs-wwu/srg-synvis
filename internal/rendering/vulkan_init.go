@@ -13,10 +13,9 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
-	"github.com/cs-wwu/srg-synvis/ui"
 
-	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )

@@ -9,8 +9,8 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 
 # ImGui setup
-set(UI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ui)
-set(IMGUI_DIR ${UI_DIR}/cpp_ui/imgui)
+set(UI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/internal/rendering/ui)
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/pkg/imgui)
 set(IMGUI_SOURCES
     ${IMGUI_DIR}/imgui.cpp
     ${IMGUI_DIR}/imgui_demo.cpp
@@ -24,14 +24,14 @@ set(IMGUI_SOURCES
 # Create shared library
 add_library(${PROJECT_NAME} SHARED
     ${UI_DIR}/cpp_ui/ui_renderer.cpp
+    ${UI_DIR}/cpp_ui
     ${IMGUI_SOURCES}
-    ${UI_DIR}
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${IMGUI_DIR}
     ${IMGUI_DIR}/backends
-    ${UI_DIR}
+    ${UI_DIR}/cpp_ui
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

@@ -36,5 +36,5 @@ experimemtal/vulkan/shape/VulkanTest
 
 #Imgui Build
 /build
-ui/build
+internal/rendering/ui/build
 imgui.ini

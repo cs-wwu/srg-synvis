@@ -3,8 +3,8 @@ package rendering
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
+	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
-	ui "github.com/cs-wwu/srg-synvis/ui"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	// as "github.com/vulkan-go/asche"
