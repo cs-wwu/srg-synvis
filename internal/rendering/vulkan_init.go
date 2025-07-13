@@ -13,9 +13,8 @@ import (
 	"os"
 	"unsafe"
 
-	ui "github.com/cs-wwu/srg-synvis/ui"
-
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/cs-wwu/srg-synvis/ui"
 
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -981,7 +980,12 @@ func (app *Application) VulkanContextPrepare() error {
 	vkInstance := unsafe.Pointer(app.Context().Platform().Instance())
 	vkDevice := unsafe.Pointer(app.Context().Platform().Device())
 	vkPhysicalDevice := unsafe.Pointer(app.Context().Platform().PhysicalDevice())
-	ui.NewUIRenderer(vkInstance, vkDevice, vkPhysicalDevice)
+	vkGraphicsQueue := unsafe.Pointer(app.Context().Platform().GraphicsQueue())
+	vkQueueFamily := app.Context().Platform().GraphicsQueueFamilyIndex()
+	vkPipelineCache := unsafe.Pointer(app.pipelineCache)
+
+	uiRenderer := ui.NewUIRenderer(vkInstance, vkDevice, vkPhysicalDevice, vkGraphicsQueue, vkQueueFamily, vkPipelineCache)
+	app.UIRenderer = uiRenderer
 
 	return nil
 }

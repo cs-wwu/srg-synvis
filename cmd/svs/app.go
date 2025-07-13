@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"reflect"
 	"time"
+	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
@@ -44,6 +46,12 @@ func runApplication(config models.AppConfig) error {
 	dim := app.Context().SwapchainDimensions()
 	frameDelay, refreshRate := getRefreshRate(monitor)
 	log.Printf("Initialized %s with %+v swapchain, %d FPS", app.VulkanAppName(), dim, refreshRate)
+
+	v := reflect.ValueOf(window).Elem()
+	dataField := v.FieldByName("data")
+
+	app.UIRenderer.CreateFrameBuffers(app.Context().SwapchainImageResources(), app.Context().SwapchainDimensions())
+	app.UIRenderer.InitForWindow(unsafe.Pointer(dataField.Pointer()))
 
 	// Start the main render loop
 	runMainLoop(app, window, platform, frameDelay)
@@ -198,6 +206,13 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			if outdated {
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
+
+			resources := app.Context().SwapchainImageResources()
+			vkCmdBuffer := resources[imageIdx].CommandBuffer()
+
+			app.UIRenderer.NewFrame()
+			app.UIRenderer.Render(unsafe.Pointer(vkCmdBuffer), imageIdx)
+
 			_, err = app.Context().PresentImage(imageIdx)
 			if err != nil {
 				panic(err)

@@ -4,6 +4,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	ui "github.com/cs-wwu/srg-synvis/ui"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
 	// as "github.com/vulkan-go/asche"
@@ -48,6 +49,7 @@ type Application struct {
 	camera        camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
+	UIRenderer    *ui.UIRenderer
 
 	Gps bool
 	Hat bool
