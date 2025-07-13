@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"reflect"
 	"time"
 	"unsafe"
 
@@ -47,11 +46,11 @@ func runApplication(config models.AppConfig) error {
 	frameDelay, refreshRate := getRefreshRate(monitor)
 	log.Printf("Initialized %s with %+v swapchain, %d FPS", app.VulkanAppName(), dim, refreshRate)
 
-	v := reflect.ValueOf(window).Elem()
-	dataField := v.FieldByName("data")
-
-	app.UIRenderer.CreateFrameBuffers(app.Context().SwapchainImageResources(), app.Context().SwapchainDimensions())
-	app.UIRenderer.InitForWindow(unsafe.Pointer(dataField.Pointer()))
+	app.UIRenderer.CreateFrameBuffers(
+		app.Context().SwapchainImageResources(),
+		app.Context().SwapchainDimensions(),
+	)
+	app.UIRenderer.InitForWindow(window)
 
 	// Start the main render loop
 	runMainLoop(app, window, platform, frameDelay)

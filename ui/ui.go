@@ -10,23 +10,27 @@ package ui
 */
 import "C"
 import (
+	"reflect"
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/go-gl/glfw/v3.3/glfw"
+	vk "github.com/vulkan-go/vulkan"
 )
 
 type UIRenderer struct {
 	cPtr *C.UIRenderer
 }
 
-func NewUIRenderer(vkInstance, vkDevice, vkPhysicalDevice, vkGraphicsQueue unsafe.Pointer, graphicsQueueFamily uint32, vkPipelineCache unsafe.Pointer) *UIRenderer {
+func NewUIRenderer(vkInstance vk.Instance, vkDevice vk.Device, vkPhysicalDevice vk.PhysicalDevice, vkGraphicsQueue vk.Queue, vkPipelineCache vk.PipelineCache, graphicsQueueFamily uint32) *UIRenderer {
 	cPtr := C.ui_create(
-		vkInstance,
-		vkDevice,
-		vkPhysicalDevice,
-		vkGraphicsQueue,
+		unsafe.Pointer(vkInstance),
+		unsafe.Pointer(vkDevice),
+		unsafe.Pointer(vkPhysicalDevice),
+		unsafe.Pointer(vkGraphicsQueue),
+		unsafe.Pointer(vkPipelineCache),
 		C.uint32_t(graphicsQueueFamily),
-		vkPipelineCache)
+	)
 	return &UIRenderer{cPtr: cPtr}
 }
 
@@ -61,8 +65,12 @@ func (ui *UIRenderer) CreateFrameBuffers(swapchainImageResources []*as.Swapchain
 	return int(result) != 0
 }
 
-func (ui *UIRenderer) InitForWindow(window unsafe.Pointer) bool {
-	result := C.ui_init_for_window(ui.cPtr, window)
+func (ui *UIRenderer) InitForWindow(window *glfw.Window) bool {
+	v := reflect.ValueOf(window).Elem()
+	dataField := v.FieldByName("data")
+	cGlfwWindow := unsafe.Pointer(dataField.Pointer())
+
+	result := C.ui_init_for_window(ui.cPtr, cGlfwWindow)
 	return int(result) != 0
 }
 
@@ -72,16 +80,4 @@ func (ui *UIRenderer) NewFrame() {
 
 func (ui *UIRenderer) Render(vkCommandBuffer unsafe.Pointer, image_index int) {
 	C.ui_render(ui.cPtr, vkCommandBuffer, C.int(image_index))
-}
-
-func (ui *UIRenderer) SetWindowTitle(title string) {
-	cTitle := C.CString(title)
-	defer C.free(unsafe.Pointer(cTitle))
-	C.ui_set_window_title(ui.cPtr, cTitle)
-}
-
-func (ui *UIRenderer) AddText(text string) {
-	cText := C.CString(text)
-	defer C.free(unsafe.Pointer(cText))
-	C.ui_add_text(ui.cPtr, cText)
 }

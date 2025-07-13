@@ -6,9 +6,9 @@
 #include <iostream>
 
 UIRenderer::UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice physical_device, 
-    VkQueue graphics_queue, uint32_t graphics_queue_family, VkPipelineCache pipeline_cache)
+    VkQueue graphics_queue, VkPipelineCache pipeline_cache, uint32_t graphics_queue_family)
     : m_instance(instance), m_device(device), m_physical_device(physical_device), 
-    m_graphics_queue(graphics_queue), m_graphics_queue_family(graphics_queue_family), m_pipeline_cache(pipeline_cache),
+    m_graphics_queue(graphics_queue), m_pipeline_cache(pipeline_cache), m_graphics_queue_family(graphics_queue_family),
     m_window(nullptr), m_initialized(false) {
 }
 
@@ -74,13 +74,10 @@ bool UIRenderer::InitForWindow(GLFWwindow* window) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForVulkan(window, true);
     
-    // The pool is very oversized, but its mentioned explicitly it needs to be this large.
+    // The pool is very oversized, an example I found said to do this, idk what else to set it to
 	VkDescriptorPoolSize pool_sizes[] =
 	{
 		{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -189,27 +186,17 @@ void UIRenderer::Render(VkCommandBuffer command_buffer, int image_index) {
     vkCmdEndRenderPass(command_buffer);
 }
 
-void UIRenderer::SetWindowTitle(const char* title) {
-    if (m_window) {
-        glfwSetWindowTitle(m_window, title);
-    }
-}
-
-void UIRenderer::AddText(const char* text) {
-    ImGui::Text("%s", text);
-}
-
 // C interface implementations
 extern "C" {
     UIRenderer* ui_create(void* vulkan_instance, void* vulkan_device, void* vulkan_physical_device, void* vulkan_graphics_queue,
-    uint32_t graphics_queue_family, void* vulkan_pipeline_cache) {
+    void* vulkan_pipeline_cache, uint32_t graphics_queue_family) {
         return new UIRenderer(
             static_cast<VkInstance>(vulkan_instance),
             static_cast<VkDevice>(vulkan_device), 
             static_cast<VkPhysicalDevice>(vulkan_physical_device),
             static_cast<VkQueue>(vulkan_graphics_queue),
-            graphics_queue_family,
-            static_cast<VkPipelineCache>(vulkan_pipeline_cache)
+            static_cast<VkPipelineCache>(vulkan_pipeline_cache),
+            graphics_queue_family
         );
     }
     
@@ -245,13 +232,5 @@ extern "C" {
             static_cast<VkCommandBuffer>(vulkan_command_buffer),
             image_index
         );
-    }
-    
-    void ui_set_window_title(UIRenderer* renderer, const char* title) {
-        renderer->SetWindowTitle(title);
-    }
-    
-    void ui_add_text(UIRenderer* renderer, const char* text) {
-        renderer->AddText(text);
     }
 }

@@ -7,16 +7,14 @@
 
 class UIRenderer {
 public:
-    UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice physical_device, VkQueue graphics_queue,
-        uint32_t graphics_queue_family, VkPipelineCache pipeline_cache);
+    UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice physical_device, VkQueue graphics_queue, 
+        VkPipelineCache pipeline_cache, uint32_t graphics_queue_family);
     ~UIRenderer();
     
     bool InitForWindow(GLFWwindow* window);
     bool CreateFrameBuffers(std::vector<VkImageView> image_views, VkFormat swapchain_format, uint32_t swapchain_image_count, int width, int height);
     void NewFrame();
     void Render(VkCommandBuffer command_buffer, int image_index);
-    void SetWindowTitle(const char* title);
-    void AddText(const char* text);
     
 private:
     bool CreateRenderPass();

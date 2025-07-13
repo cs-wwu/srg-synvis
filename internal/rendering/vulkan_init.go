@@ -977,15 +977,15 @@ func (app *Application) VulkanContextPrepare() error {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
 
-	vkInstance := unsafe.Pointer(app.Context().Platform().Instance())
-	vkDevice := unsafe.Pointer(app.Context().Platform().Device())
-	vkPhysicalDevice := unsafe.Pointer(app.Context().Platform().PhysicalDevice())
-	vkGraphicsQueue := unsafe.Pointer(app.Context().Platform().GraphicsQueue())
-	vkQueueFamily := app.Context().Platform().GraphicsQueueFamilyIndex()
-	vkPipelineCache := unsafe.Pointer(app.pipelineCache)
-
-	uiRenderer := ui.NewUIRenderer(vkInstance, vkDevice, vkPhysicalDevice, vkGraphicsQueue, vkQueueFamily, vkPipelineCache)
-	app.UIRenderer = uiRenderer
+	platform := app.Context().Platform()
+	app.UIRenderer = ui.NewUIRenderer(
+		platform.Instance(),
+		platform.Device(),
+		platform.PhysicalDevice(),
+		platform.GraphicsQueue(),
+		app.pipelineCache,
+		platform.GraphicsQueueFamilyIndex(),
+	)
 
 	return nil
 }
