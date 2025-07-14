@@ -68,8 +68,7 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 		panic("No device-local heap found")
 	}
 
-	maxBudget := float64(6144 * 1024 * 1024)
-	budget := vk.DeviceSize(min(float64(totalMemory)*0.5, maxBudget)) // safety margin
+	budget := vk.DeviceSize(float64(totalMemory) * 0.5) // safety margin
 	fmt.Printf("Total device-local memory: %.1fMB\n", float32(totalMemory)/(1024*1024))
 	fmt.Printf("Allocated memory budget: %.1fMB\n", float32(budget)/(1024*1024))
 
