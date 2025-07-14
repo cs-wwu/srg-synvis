@@ -14,11 +14,13 @@ UIRenderer::UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice ph
 
 UIRenderer::~UIRenderer() {
     if (m_initialized) {
+        // Wait for everything to finish before cleaning up
+        vkDeviceWaitIdle(m_device);
+        vkWaitForFences(m_device, m_fences.size(), m_fences.data(), VK_TRUE, UINT64_MAX);
+
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
-
-        vkDeviceWaitIdle(m_device);
 
         // Destroy Fences
         for (int i = 0; i < m_swapchain_image_count; i++) {
@@ -28,8 +30,8 @@ UIRenderer::~UIRenderer() {
         m_fences.clear();
 
         // Command buffers and command pool
-        m_command_buffers.clear();
         vkDestroyCommandPool(m_device, m_command_pool, nullptr); // Also frees command buffers
+        m_command_buffers.clear();
 
         // Frame buffers
         for (int i = 0; i < m_framebuffers.size(); i++) {

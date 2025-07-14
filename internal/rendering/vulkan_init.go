@@ -13,7 +13,7 @@ import (
 	"os"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
+	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	vk "github.com/vulkan-go/vulkan"
