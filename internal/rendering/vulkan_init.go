@@ -41,7 +41,7 @@ func (app *Application) VulkanAppName() string {
 
 func (app *Application) VulkanLayers() []string {
 	validationLayers := []string{}
-	if app.cfg.DebugMode {
+	if true { //if app.cfg.DebugMode {
 		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
 	} else {
 		log.Println("vulkan: debug mode is off, not using validation layers")
@@ -52,6 +52,9 @@ func (app *Application) VulkanLayers() []string {
 func (app *Application) VulkanDeviceExtensions() []string {
 	return []string{
 		"VK_KHR_swapchain",
+		"VK_KHR_surface",
+		// Add debug extension for custom callbacks
+		"VK_EXT_debug_utils",
 	}
 }
 

@@ -9,7 +9,7 @@ UIRenderer::UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice ph
     VkQueue graphics_queue, VkPipelineCache pipeline_cache, uint32_t graphics_queue_family)
     : m_instance(instance), m_device(device), m_physical_device(physical_device), 
     m_graphics_queue(graphics_queue), m_pipeline_cache(pipeline_cache), m_graphics_queue_family(graphics_queue_family),
-    m_window(nullptr), m_initialized(false) {
+    m_window(nullptr), m_initialized(false), m_next_op_id(0) {
 }
 
 UIRenderer::~UIRenderer() {
@@ -17,6 +17,34 @@ UIRenderer::~UIRenderer() {
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
+
+        vkDeviceWaitIdle(m_device);
+
+        // Destroy Fences
+        for (int i = 0; i < m_swapchain_image_count; i++) {
+            vkDestroyFence(m_device, m_fences[i], nullptr);
+            m_fences[i] = VK_NULL_HANDLE;
+        }
+        m_fences.clear();
+
+        // Command buffers and command pool
+        m_command_buffers.clear();
+        vkDestroyCommandPool(m_device, m_command_pool, nullptr); // Also frees command buffers
+
+        // Frame buffers
+        for (int i = 0; i < m_framebuffers.size(); i++) {
+            vkDestroyFramebuffer(m_device, m_framebuffers[i], nullptr);
+            m_framebuffers[i] = VK_NULL_HANDLE;
+        }
+        m_framebuffers.clear();
+
+        vkDestroyRenderPass(m_device, m_imgui_render_pass, nullptr);
+        m_imgui_render_pass = VK_NULL_HANDLE;
+
+        vkDestroyDescriptorPool(m_device, m_descriptor_pool, nullptr);
+        m_descriptor_pool = VK_NULL_HANDLE;
+
+        printf("UI Renderer Cleanup Complete!\n");
     }
 }
 
@@ -31,19 +59,16 @@ bool UIRenderer::CreateRenderPass() {
         color_attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-        // Color attachment reference
-        VkAttachmentReference color_attachment_ref = {};
+    VkAttachmentReference color_attachment_ref = {};
         color_attachment_ref.attachment = 0;
         color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        // Single subpass
-        VkSubpassDescription subpass = {};
+    VkSubpassDescription subpass = {};
         subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         subpass.colorAttachmentCount = 1;
         subpass.pColorAttachments = &color_attachment_ref;
 
-        // Subpass dependency for layout transitions
-        VkSubpassDependency dependency = {};
+    VkSubpassDependency dependency = {};
         dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         dependency.dstSubpass = 0;
         dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -51,8 +76,7 @@ bool UIRenderer::CreateRenderPass() {
         dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
         dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-        // Create render pass
-        VkRenderPassCreateInfo render_pass_info = {};
+    VkRenderPassCreateInfo render_pass_info = {};
         render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
         render_pass_info.attachmentCount = 1;
         render_pass_info.pAttachments = &color_attachment;
@@ -61,11 +85,11 @@ bool UIRenderer::CreateRenderPass() {
         render_pass_info.dependencyCount = 1;
         render_pass_info.pDependencies = &dependency;
 
-        VkResult result = vkCreateRenderPass(m_device, &render_pass_info, nullptr, &m_imgui_render_pass);
-        return result == VK_SUCCESS;
+    VkResult result = vkCreateRenderPass(m_device, &render_pass_info, nullptr, &m_imgui_render_pass);
+    return result == VK_SUCCESS;
 }
 
-bool UIRenderer::InitForWindow(GLFWwindow* window) {
+bool UIRenderer::AttachToWindow(GLFWwindow* window) {
     m_window = window;
 
     // Setup Dear ImGui context
@@ -100,9 +124,7 @@ bool UIRenderer::InitForWindow(GLFWwindow* window) {
 	pool_info.poolSizeCount = std::size(pool_sizes);
 	pool_info.pPoolSizes = pool_sizes;
 
-    VkDescriptorPool imguiPool;
-	vkCreateDescriptorPool(this->m_device, &pool_info, nullptr, &imguiPool);
-    CreateRenderPass();
+	vkCreateDescriptorPool(this->m_device, &pool_info, nullptr, &m_descriptor_pool);
 
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = m_instance;
@@ -111,34 +133,79 @@ bool UIRenderer::InitForWindow(GLFWwindow* window) {
     init_info.Queue = m_graphics_queue;
     init_info.QueueFamily = m_graphics_queue_family;
     init_info.PipelineCache = m_pipeline_cache;
-    init_info.DescriptorPool = imguiPool;
+    init_info.DescriptorPool = m_descriptor_pool;
     init_info.RenderPass = m_imgui_render_pass;
     init_info.Subpass = 0;
     init_info.MinImageCount = 2;
 	init_info.ImageCount = m_swapchain_image_count;
 	init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    
-
     init_info.Allocator = nullptr;
     init_info.CheckVkResultFn = nullptr;
+
     ImGui_ImplVulkan_Init(&init_info);
-
-
-    // TODO: Initialize ImGui_ImplVulkan_Init with your Vulkan setup
-    // This requires render pass, command pool, etc.
     
     m_initialized = true;
     return true;
 }
 
-bool UIRenderer::CreateFrameBuffers(std::vector<VkImageView> image_views, VkFormat swapchain_format, uint32_t swapchain_image_count, int width, int height) {
+bool UIRenderer::CreateCommandBuffers() {
+    VkCommandPoolCreateInfo pool_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = m_graphics_queue_family
+    };
+
+    VkResult result = vkCreateCommandPool(m_device, &pool_info, nullptr, &m_command_pool);
+    if (result != VK_SUCCESS) {
+        printf("IMGUI Command pool allocation failed!\n");
+        return false;
+    }
+
+    VkCommandBufferAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = m_command_pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = m_swapchain_image_count
+    };
+
+    m_command_buffers.resize(m_swapchain_image_count);
+    result = vkAllocateCommandBuffers(m_device, &alloc_info, m_command_buffers.data());
+
+    if (result != VK_SUCCESS) {
+        printf("IMGUI Command buffer allocations failed!\n");
+        return false;
+    }
+
+    // Create fences
+    m_fences.resize(m_swapchain_image_count);
+    VkFenceCreateInfo fence_info = {};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (int i = 0; i < m_swapchain_image_count; i++) {
+        result = vkCreateFence(m_device, &fence_info, nullptr, &m_fences[i]);
+        
+        if (result != VK_SUCCESS) {
+            printf("ERROR: Failed to create fence %u! Result: %d\n", i, result);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool UIRenderer::InitRenderPass(std::vector<VkImageView> image_views, std::vector<VkImage> swapchain_images, VkFormat swapchain_format, uint32_t swapchain_image_count, int width, int height) {
     m_framebuffers.resize(image_views.size());
     m_swapchain_format = swapchain_format;
     m_swapchain_image_count = swapchain_image_count;
+    m_swapchain_images = swapchain_images;
         
+    CreateRenderPass();
+    CreateCommandBuffers();
+
     for (size_t i = 0; i < image_views.size(); i++) {
         VkImageView attachments[] = { image_views[i] };
-        
+
         VkFramebufferCreateInfo framebuffer_info = {};
         framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebuffer_info.renderPass = m_imgui_render_pass;
@@ -156,18 +223,81 @@ bool UIRenderer::CreateFrameBuffers(std::vector<VkImageView> image_views, VkForm
     return true;
 }
 
-void UIRenderer::NewFrame() {
+/*
+Creates a slider for float values. f
+*/
+int UIRenderer::DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation floatOp = {
+        id,
+        [label, slider_value, min_value, max_value, format](){ ImGui::SliderFloat(label.c_str(), slider_value, min_value, max_value, format.c_str());}
+    };
+
+    m_ui_operations[id] = floatOp;
+    m_operation_order.push_back(id);
+    printf("Create float slider\n\tTitle: %s\n\tCurrent Value: %.2f\n", label.c_str(), *slider_value);
+
+    return id;
+}
+
+void UIRenderer::Render(int image_index) {
+    VkCommandBuffer command_buffer = m_command_buffers[image_index];
+    VkFence fence = m_fences[image_index];
+
+    // Wait for command buffer to finish its last cycle
+    vkWaitForFences(m_device, 1, &fence, VK_TRUE, UINT64_MAX);
+    vkResetFences(m_device, 1, &fence);
+
+    VkCommandBufferBeginInfo cmd_begin_info = {};
+    cmd_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmd_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    cmd_begin_info.pInheritanceInfo = nullptr;
+    cmd_begin_info.pNext = nullptr;
+
+    vkResetCommandBuffer(command_buffer, 0);
+    vkBeginCommandBuffer(command_buffer, &cmd_begin_info);
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     bool open = true;
     ImGui::ShowDemoWindow(&open);
-}
+    //Run UI operations here
+    for (size_t i = 0; i < m_operation_order.size(); i++) {
+        UIOperation op = m_ui_operations[i];
+        op.fn();
+    }
 
-void UIRenderer::Render(VkCommandBuffer command_buffer, int image_index) {
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
+
+    VkImageMemoryBarrier barrier1 = {};
+    barrier1.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier1.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    barrier1.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier1.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barrier1.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier1.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier1.image = m_swapchain_images[image_index];
+    barrier1.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier1.subresourceRange.baseMipLevel = 0;
+    barrier1.subresourceRange.levelCount = 1;
+    barrier1.subresourceRange.baseArrayLayer = 0;
+    barrier1.subresourceRange.layerCount = 1;
+
+    vkCmdPipelineBarrier(
+        command_buffer,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier1
+    );
 
     VkRenderPassBeginInfo render_pass_begin_info = {};
     render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -180,10 +310,19 @@ void UIRenderer::Render(VkCommandBuffer command_buffer, int image_index) {
     clear_values[0].color = {{0.0f, 0.0f, 0.0f, 0.0f}};  // Transparent
     render_pass_begin_info.clearValueCount = 1;
     render_pass_begin_info.pClearValues = clear_values;
-
+    
+    
     vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
-    ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer);  // ← Uses same command buffer
+    ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer); 
     vkCmdEndRenderPass(command_buffer);
+    
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+    
+    vkEndCommandBuffer(command_buffer);
+    VkResult result = vkQueueSubmit(m_graphics_queue, 1, &submit_info, fence);
 }
 
 // C interface implementations
@@ -204,18 +343,21 @@ extern "C" {
         delete renderer;
     }
     
-    int ui_init_for_window(UIRenderer* renderer, void* window_handle) {
-        return renderer->InitForWindow(static_cast<GLFWwindow*>(window_handle)) ? 1 : 0;
+    int ui_attach_to_window(UIRenderer* renderer, void* window_handle) {
+        return renderer->AttachToWindow(static_cast<GLFWwindow*>(window_handle)) ? 1 : 0;
     }
 
-    int ui_create_frame_buffers(UIRenderer* renderer, void** image_views, uint32_t swapchain_format, uint32_t swapchain_image_count, int width, int height) {
+    int ui_init_render_pass(UIRenderer* renderer, void** image_views, void** swapchain_images, uint32_t swapchain_format, uint32_t swapchain_image_count, int width, int height) {
         std::vector<VkImageView> views(swapchain_image_count);
+        std::vector<VkImage> images(swapchain_image_count);
         for (unsigned int i = 0; i < swapchain_image_count; i++) {
             views[i] = static_cast<VkImageView>(image_views[i]);
+            images[i] = static_cast<VkImage>(swapchain_images[i]);
         }
         
-        return renderer->CreateFrameBuffers(
+        return renderer->InitRenderPass(
             views,
+            images,
             static_cast<VkFormat>(swapchain_format),
             swapchain_image_count,
             width,
@@ -223,14 +365,16 @@ extern "C" {
         );
     }
     
-    void ui_new_frame(UIRenderer* renderer) {
-        renderer->NewFrame();
-    }
-    
-    void ui_render(UIRenderer* renderer, void* vulkan_command_buffer, int image_index) {
+    void ui_render(UIRenderer* renderer, int image_index) {
         renderer->Render(
-            static_cast<VkCommandBuffer>(vulkan_command_buffer),
             image_index
         );
+    }
+
+    int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format) {
+        std::string labelStr(label ? label : "");
+        std::string formatStr(format ? format : "%.2f");
+        
+        return renderer->DebugFloatSlider(labelStr, slider_value, min_value, max_value, formatStr);
     }
 }

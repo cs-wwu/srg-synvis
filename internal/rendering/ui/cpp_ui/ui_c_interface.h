@@ -7,16 +7,16 @@
 extern "C" {
 #endif
 
-// Opaque pointer to C++ class
 typedef struct UIRenderer UIRenderer;
 
-// C interface functions
 UIRenderer* ui_create(void* vulkan_instance, void* vulkan_device, void* vulkan_physical_device, void* vulkan_graphics_queue, void* vulkan_pipeline_cache, uint32_t graphics_queue_family);
 void ui_destroy(UIRenderer* renderer);
-int ui_create_frame_buffers(UIRenderer* renderer, void** image_views, uint32_t swapchain_format, uint32_t swapchain_image_count, int width, int height);
-int ui_init_for_window(UIRenderer* renderer, void* window_handle);
-void ui_new_frame(UIRenderer* renderer);
-void ui_render(UIRenderer* renderer, void* vulkan_command_buffer, int image_index);
+int ui_init_render_pass(UIRenderer* renderer, void** image_views, void** swapchain_images, uint32_t swapchain_format, uint32_t swapchain_image_count, int width, int height);
+int ui_attach_to_window(UIRenderer* renderer, void* window_handle);
+void ui_render(UIRenderer* renderer, int image_index);
+
+// Debug UI
+int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format);
 
 #ifdef __cplusplus
 }
