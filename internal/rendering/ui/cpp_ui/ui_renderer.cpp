@@ -224,7 +224,7 @@ bool UIRenderer::InitRenderPass(std::vector<VkImageView> image_views, std::vecto
 }
 
 /*
-Creates a slider for float values. f
+Creates a slider for float values.
 */
 int UIRenderer::DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format) {
     int id = m_next_op_id;
@@ -263,13 +263,13 @@ void UIRenderer::Render(int image_index) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    bool open = true;
-    ImGui::ShowDemoWindow(&open);
-    //Run UI operations here
     for (size_t i = 0; i < m_operation_order.size(); i++) {
         UIOperation op = m_ui_operations[i];
         op.fn();
     }
+
+    ImGui::RadioButton("Radio1", true);
+    ImGui::RadioButton("Radio2", false);
 
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
