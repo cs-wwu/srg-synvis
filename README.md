@@ -98,6 +98,15 @@ sudo ./install.sh
 
 5. Run `vkcube` and `go run cmd/svs/main.go` to test installation
 
+## Building ImGui-Go Wrapper
+From project root:
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+
 ## Guidelines
 
 - Check in code to the repo, including experimental investigations
