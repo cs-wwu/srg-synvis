@@ -225,25 +225,6 @@ bool UIRenderer::InitRenderPass(std::vector<VkImageView> image_views, std::vecto
     return true;
 }
 
-/*
-Creates a slider for float values.
-*/
-int UIRenderer::DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format) {
-    int id = m_next_op_id;
-    m_next_op_id++;
-
-    UIOperation floatOp = {
-        id,
-        [label, slider_value, min_value, max_value, format](){ ImGui::SliderFloat(label.c_str(), slider_value, min_value, max_value, format.c_str());}
-    };
-
-    m_ui_operations[id] = floatOp;
-    m_operation_order.push_back(id);
-    printf("Create float slider\n\tTitle: %s\n\tCurrent Value: %.2f\n", label.c_str(), *slider_value);
-
-    return id;
-}
-
 void UIRenderer::Render(int image_index) {
     VkCommandBuffer command_buffer = m_command_buffers[image_index];
     VkFence fence = m_fences[image_index];
@@ -266,13 +247,10 @@ void UIRenderer::Render(int image_index) {
     ImGui::NewFrame();
 
     for (size_t i = 0; i < m_operation_order.size(); i++) {
-        UIOperation op = m_ui_operations[i];
-        op.fn();
+        UIOperation* op = m_ui_operations[i];
+        op->execute();
     }
-
-    ImGui::RadioButton("Radio1", true);
-    ImGui::RadioButton("Radio2", false);
-
+    ImGui::ShowDemoWindow();
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
 
@@ -327,6 +305,74 @@ void UIRenderer::Render(int image_index) {
     VkResult result = vkQueueSubmit(m_graphics_queue, 1, &submit_info, fence);
 }
 
+/*
+Creates a slider for float values.
+*/
+int UIRenderer::DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* floatOp = new UIOperation();
+    floatOp->id = id;
+    floatOp->type = UIOperation::FLOAT_SLIDER;
+    floatOp->label = label;
+    floatOp->formatStr = format;
+    floatOp->min_value_float = min_value;
+    floatOp->max_value_float = max_value;
+    floatOp->value_float = slider_value;
+    floatOp->execute = [floatOp](){
+        ImGui::SliderFloat(floatOp->label.c_str(), floatOp->value_float, floatOp->min_value_float, floatOp->max_value_float, floatOp->formatStr.c_str());
+    };
+
+    m_ui_operations[id] = floatOp;
+    m_operation_order.push_back(id);
+
+    return id;
+}
+
+int UIRenderer::DebugCheckbox(std::string label, bool* toggled) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* checkOp = new UIOperation();
+    checkOp->type = UIOperation::CHECKBOX;
+    checkOp->id = id;
+    checkOp->label = label;
+    checkOp->toggled = toggled;
+    checkOp->execute = [checkOp](){
+        ImGui::Checkbox(checkOp->label.c_str(), checkOp->toggled);
+    };
+
+    m_ui_operations[id] = checkOp;
+    m_operation_order.push_back(id);
+
+    return id;
+}
+
+int UIRenderer::DebugTextLabel(std::string label) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* op = new UIOperation();
+    op->type = UIOperation::TEXT_LABEL;
+    op->id = id;
+    op->label = label;
+    op->execute = [op](){
+        ImGui::Text(op->label.c_str());
+    };
+
+    m_ui_operations[id] = op;
+    m_operation_order.push_back(id);
+
+    return id;
+}
+
+void UIRenderer::DebugUpdateLabel(int id, std::string newLabel) {
+    UIOperation* op = m_ui_operations[id];
+    op->label = newLabel;
+}
+
+
 // C interface implementations
 extern "C" {
     UIRenderer* ui_create(void* vulkan_instance, void* vulkan_device, void* vulkan_physical_device, void* vulkan_graphics_queue,
@@ -378,5 +424,20 @@ extern "C" {
         std::string formatStr(format ? format : "%.2f");
         
         return renderer->DebugFloatSlider(labelStr, slider_value, min_value, max_value, formatStr);
+    }
+
+    int ui_debug_checkbox(UIRenderer* renderer, const char* label, bool* toggled) {
+        std::string labelStr(label ? label : "");
+        return renderer->DebugCheckbox(labelStr, toggled);
+    }
+
+    int ui_debug_text_label(UIRenderer* renderer, const char* label) {
+        std::string labelStr(label ? label : "");
+        return renderer->DebugTextLabel(labelStr);
+    }
+
+    void ui_debug_update_label(UIRenderer* renderer, int id, const char* new_label) {
+        std::string labelStr(new_label ? new_label : "");
+        renderer->DebugUpdateLabel(id, labelStr);
     }
 }

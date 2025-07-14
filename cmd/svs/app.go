@@ -181,6 +181,9 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 
+	toggled := false
+	app.UIRenderer.DebugCheckbox("Track Position", &toggled)
+
 	for {
 		select {
 		case <-exitC:
@@ -207,6 +210,9 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
 
+			if toggled {
+				app.UpdateCameraDebug()
+			}
 			app.UIRenderer.Render(imageIdx)
 
 			_, err = app.Context().PresentImage(imageIdx)

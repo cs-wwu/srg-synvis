@@ -7,6 +7,7 @@ package ui
 #include "./cpp_ui/ui_c_interface.h"
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 */
 import "C"
 import (
@@ -117,4 +118,28 @@ func (ui *UIRenderer) DebugFloatSlider(title string, sliderValue *float32, minVa
 	)
 
 	return int(id)
+}
+
+func (ui *UIRenderer) DebugCheckbox(label string, toggled *bool) int {
+	cLabel := C.CString(label)
+	toggledPtr := (*C.bool)(unsafe.Pointer(toggled))
+	defer C.free(unsafe.Pointer(cLabel))
+
+	id := C.ui_debug_checkbox(ui.cPtr, cLabel, toggledPtr)
+	return int(id)
+}
+
+func (ui *UIRenderer) DebugTextLabel(label string) int {
+	cLabel := C.CString(label)
+	defer C.free(unsafe.Pointer(cLabel))
+
+	id := C.ui_debug_text_label(ui.cPtr, cLabel)
+	return int(id)
+}
+
+func (ui *UIRenderer) DebugUpdateLabel(id int, newLabel string) {
+	cLabel := C.CString(newLabel)
+	defer C.free(unsafe.Pointer(cLabel))
+
+	C.ui_debug_update_label(ui.cPtr, C.int(id), cLabel)
 }

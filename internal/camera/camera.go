@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
 )
@@ -88,6 +89,11 @@ func NewCamera(config CameraConfig) Camera {
 	}
 
 	return camera
+}
+
+func (c *CameraImpl) ShowSpeedSlider(uiRenderer *ui.UIRenderer) {
+	uiRenderer.DebugFloatSlider("Camera Speed", &c.speed, 0.0, 20.0, "%.2f")
+	uiRenderer.DebugTextLabel("Camera Position: ???")
 }
 
 // Position returns the current camera position

@@ -3,6 +3,7 @@ package camera
 import (
 	"time"
 
+	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
 )
@@ -54,6 +55,7 @@ type GPSPosition struct {
 // Camera interface defines what external systems need from the camera
 type Camera interface {
 	// Position and orientation
+	ShowSpeedSlider(*ui.UIRenderer)
 	Position() lin.Vec3
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)

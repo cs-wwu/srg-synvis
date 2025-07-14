@@ -986,7 +986,15 @@ func (app *Application) VulkanContextPrepare() error {
 		platform.GraphicsQueueFamilyIndex(),
 	)
 
+	app.camera.ShowSpeedSlider(app.UIRenderer)
 	return nil
+}
+
+func (app *Application) UpdateCameraDebug() {
+	pos := app.camera.Position()
+	posStr := fmt.Sprintf("Camera Position\n\tX: %.2f\n\tY: %.2f\n\tZ: %.2f\n", pos[0], pos[1], pos[2])
+
+	app.UIRenderer.DebugUpdateLabel(1, posStr)
 }
 
 func IsError(ret vk.Result) bool {

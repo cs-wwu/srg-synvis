@@ -9,9 +9,19 @@
 #include <string>
 
 struct UIOperation {
+    enum UIOperationType { FLOAT_SLIDER, CHECKBOX, TEXT_LABEL } type;
+    std::function<void()> execute;
     int id;
-    std::function<void()> fn;
+    float min_value_float;
+    float max_value_float;
+    std::string label;
+    std::string formatStr;
+    
+    float* value_float;
+    bool* toggled;
 };
+
+
 
 class UIRenderer {
 public:
@@ -23,6 +33,9 @@ public:
     bool InitRenderPass(std::vector<VkImageView> image_views, std::vector<VkImage> swapchain_images, VkFormat swapchain_format, uint32_t swapchain_image_count, int width, int height);
     void Render(int image_index);
     int DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format);
+    int DebugCheckbox(std::string label, bool* toggled);
+    int DebugTextLabel(std::string label);
+    void DebugUpdateLabel(int id, std::string newLabel);
 private:
     bool CreateRenderPass();
     bool CreateCommandBuffers();
@@ -40,7 +53,7 @@ private:
     std::vector<VkFramebuffer> m_framebuffers;
     std::vector<VkImage> m_swapchain_images;
     std::vector<int> m_operation_order;
-    std::unordered_map<int, UIOperation> m_ui_operations;
+    std::unordered_map<int, UIOperation*> m_ui_operations;
 
     VkCommandPool m_command_pool;
     std::vector<VkCommandBuffer> m_command_buffers;

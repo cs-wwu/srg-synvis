@@ -2,6 +2,7 @@
 #define UI_C_INTERFACE_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,10 @@ void ui_render(UIRenderer* renderer, int image_index);
 
 // Debug UI
 int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format);
+int ui_debug_checkbox(UIRenderer* renderer, const char* label, bool* toggled);
+int ui_debug_text_label(UIRenderer* renderer, const char* label);
+void ui_debug_update_label(UIRenderer* renderer, int id, const char* new_label);
+
 
 #ifdef __cplusplus
 }
