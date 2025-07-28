@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "widgets.h"
 #include <iostream>
 
 UIRenderer::UIRenderer(VkInstance instance, VkDevice device, VkPhysicalDevice physical_device, 
@@ -99,7 +100,7 @@ bool UIRenderer::AttachToWindow(GLFWwindow* window) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    
+
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForVulkan(window, true);
     
@@ -225,6 +226,8 @@ bool UIRenderer::InitRenderPass(std::vector<VkImageView> image_views, std::vecto
     return true;
 }
 
+float alt = 0.0f;
+
 void UIRenderer::Render(int image_index) {
     VkCommandBuffer command_buffer = m_command_buffers[image_index];
     VkFence fence = m_fences[image_index];
@@ -303,6 +306,25 @@ void UIRenderer::Render(int image_index) {
     
     vkEndCommandBuffer(command_buffer);
     VkResult result = vkQueueSubmit(m_graphics_queue, 1, &submit_info, fence);
+}
+
+int UIRenderer::Altimeter(std::string label, float* altitudePtr) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* op = new UIOperation();
+    op->id = id;
+    op->type = UIOperation::ALTIMETER;
+    op->label = label;
+    op->value_float = altitudePtr;
+    op->execute = [op](){
+        altimeter(op->label, op->value_float);
+    };
+
+    m_ui_operations[id] = op;
+    m_operation_order.push_back(id);
+
+    return id;
 }
 
 /*
@@ -416,6 +438,11 @@ extern "C" {
         renderer->Render(
             image_index
         );
+    }
+
+    int ui_altimeter(UIRenderer* renderer, const char* label, float* altitudePtr) {
+        std::string labelStr(label ? label : "");
+        return renderer->Altimeter(labelStr, altitudePtr);
     }
 
     int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format) {

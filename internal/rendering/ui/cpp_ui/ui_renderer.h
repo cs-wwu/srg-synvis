@@ -9,7 +9,7 @@
 #include <string>
 
 struct UIOperation {
-    enum UIOperationType { FLOAT_SLIDER, CHECKBOX, TEXT_LABEL } type;
+    enum UIOperationType { FLOAT_SLIDER, CHECKBOX, TEXT_LABEL, ALTIMETER } type;
     std::function<void()> execute;
     int id;
     float min_value_float;
@@ -30,6 +30,9 @@ public:
     bool AttachToWindow(GLFWwindow* window);
     bool InitRenderPass(std::vector<VkImageView> image_views, std::vector<VkImage> swapchain_images, VkFormat swapchain_format, uint32_t swapchain_image_count, int width, int height);
     void Render(int image_index);
+
+    int Altimeter(std::string label, float* altitude);
+
     int DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format);
     int DebugCheckbox(std::string label, bool* toggled);
     int DebugTextLabel(std::string label);

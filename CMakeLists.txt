@@ -24,6 +24,7 @@ set(IMGUI_SOURCES
 # Create shared library
 add_library(${PROJECT_NAME} SHARED
     ${UI_DIR}/cpp_ui/ui_renderer.cpp
+    ${UI_DIR}/cpp_ui/widgets.cpp
     ${UI_DIR}/cpp_ui
     ${IMGUI_SOURCES}
 )

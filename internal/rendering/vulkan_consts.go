@@ -46,7 +46,7 @@ type Application struct {
 
 	cfg models.AppConfig
 
-	camera        camera.Camera
+	Camera        camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 	UIRenderer    *ui.UIRenderer

@@ -181,6 +181,9 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 
+	var altitiude float32 = 0
+	app.UIRenderer.Altimeter("Altitude (Ft)", &altitiude)
+
 	for {
 		select {
 		case <-exitC:
@@ -206,6 +209,8 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			if outdated {
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
+
+			altitiude = app.Camera.Position()[1]
 
 			app.UIRenderer.Render(imageIdx)
 

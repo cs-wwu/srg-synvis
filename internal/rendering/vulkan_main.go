@@ -38,7 +38,7 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera:       cam,
+		Camera:       cam,
 		Gps:          cfg.UseGPS,
 		Hat:          cfg.UseHat,
 		cfg:          cfg,
@@ -102,19 +102,19 @@ func (app *Application) NextFrame() {
 
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
+	app.Camera.ProcessInput(app.WindowHandle)
+	app.ubo.View = app.Camera.ViewMatrix()
 
 	// Set camera position in UBO for terrain height warnings
-	cameraPos := app.camera.Position()
+	cameraPos := app.Camera.Position()
 	app.ubo.CameraPos = cameraPos
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 
-	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
+	app.Camera.ProcessInput(app.WindowHandle)
+	app.ubo.View = app.Camera.ViewMatrix()
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
