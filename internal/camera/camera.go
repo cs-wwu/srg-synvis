@@ -130,6 +130,8 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 	return
 }
 
+const CAMERA_TO_PLANE_DISTANCE = 50.0
+
 func (c *CameraImpl) ForwardMatrix(result *lin.Mat4x4) {
 	result.Identity()
 
@@ -146,7 +148,7 @@ func (c *CameraImpl) ForwardMatrix(result *lin.Mat4x4) {
 	})
 
 	// Move it towards the camera.
-	result[3][2] = -50
+	result[3][2] = -CAMERA_TO_PLANE_DISTANCE
 
 	lookAt := lin.Mat4x4{}
 	lookAt.LookAt(&lin.Vec3{0, 0, 0}, c.front, c.up)
