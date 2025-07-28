@@ -149,7 +149,7 @@ func (app *Application) updateUBO() {
 		app.ubo.Projection.Mult(&correction, &ortho)
 		app.ubo.Projection[1][1] *= -1
 
-		app.camera.ForwardMatrix(&app.ubo.PlaneDirection)
+		app.camera.PlaneMatrix(&app.ubo.PlaneDirection)
 	} else {
 		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1

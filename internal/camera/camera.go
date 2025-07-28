@@ -132,7 +132,7 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 
 const CAMERA_TO_PLANE_DISTANCE = 50.0
 
-func (c *CameraImpl) ForwardMatrix(result *lin.Mat4x4) {
+func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 	result.Identity()
 
 	// Face forwards.
