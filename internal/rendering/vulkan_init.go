@@ -784,8 +784,10 @@ func (app *Application) preparePlanePipeline() {
 	// Load plane shaders
 	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/plane.vert.spv"))
 	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
 	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/plane.frag.spv"))
 	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
 
 	// Pipeline is similar to main pipeline, with key differences
 	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
@@ -895,10 +897,6 @@ func (app *Application) preparePlanePipeline() {
 	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, planePipeline)
 	OrPanic(as.NewError(ret))
 	app.planePipeline = planePipeline[0]
-
-	// Clean up shader modules
-	vk.DestroyShaderModule(dev, vs, nil)
-	vk.DestroyShaderModule(dev, fs, nil)
 }
 
 func (app *Application) preparePipeline() {
