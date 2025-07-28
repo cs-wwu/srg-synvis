@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -127,6 +128,33 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 		result.LookAt(c.pos, &target, c.up)
 	}
 	return
+}
+
+const CAMERA_TO_PLANE_DISTANCE = 50.0
+
+func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
+	result.Identity()
+
+	// Face forwards.
+	result.RotateX(result, math.Pi/2)
+
+	// Scale the plane up (NB: `lin.Mat4x4.Scale` does not scale correctly!)
+	scale := float32(5)
+	result.Mult(result, &lin.Mat4x4{
+		{scale, 0, 0, 0},
+		{0, scale, 0, 0},
+		{0, 0, scale, 0},
+		{0, 0, 0, 1},
+	})
+
+	// Move it towards the camera.
+	result[3][2] = -CAMERA_TO_PLANE_DISTANCE
+
+	lookAt := lin.Mat4x4{}
+	lookAt.LookAt(&lin.Vec3{0, 0, 0}, c.front, c.up)
+	tmp := lin.Mat4x4{}
+	tmp.Transpose(&lookAt)
+	result.Mult(result, &tmp)
 }
 
 // SetPosition sets the camera position

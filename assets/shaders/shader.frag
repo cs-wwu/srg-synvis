@@ -9,6 +9,7 @@ layout(std140, binding = 0) uniform UBO {
     mat4 view;
     mat4 proj;
     mat4 normalM;
+    mat4 planeDirection;
     vec3 lightDir;
     float renderDistance;
     vec3 cameraPos;

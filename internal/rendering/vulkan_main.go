@@ -103,7 +103,7 @@ func (app *Application) NextFrame() {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
+	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
 	cameraPos := app.camera.Position()
@@ -114,7 +114,6 @@ func (app *Application) NextFrame() {
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 
 	app.camera.ProcessInput(app.WindowHandle)
-	app.ubo.View = app.camera.ViewMatrix()
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
@@ -211,6 +210,16 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	// Draw skybox
 	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
+
+	// Draw the plane
+	if app.camera.MapView() {
+		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
+		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.planeVertexBuffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, app.planeIndexBuffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, app.planeIndexCount, 1, 0, 0, 0)
+	}
 
 	// THEN DRAW THE TERRAIN (as before)
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
