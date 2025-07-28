@@ -69,6 +69,8 @@ type Camera interface {
 	Update(deltaTime float32)
 	GetPositionString() string
 	GetViewVectors() string
+
+	MapView() bool
 }
 
 // Mode represents different camera operation modes
