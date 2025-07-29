@@ -15,7 +15,10 @@ require (
 	github.com/ungerik/go3d v0.0.0-20240502073936-1137f6adf7e9
 	github.com/westphae/geomag v1.0.2
 	github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
-	golang.org/x/term v0.23.0
+	golang.org/x/term v0.33.0
 )
 
-require golang.org/x/sys v0.23.0 // indirect
+require (
+	golang.org/x/net v0.42.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+)

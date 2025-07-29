@@ -1,43 +1,21 @@
 package processor
 
 import (
+	"archive/zip"
 	"bufio"
 	"fmt"
-	pb "github.com/cs-wwu/srg-synvis/assets/obs"
-	"google.golang.org/protobuf/proto"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-)
+	"time"
 
-// TODO group into types
-// const (
-// 	TOWER = iota
-// 	BLDG
-// 	POLE
-// 	ELEC_SYS
-// 	T-L_TWR
-// 	TANK
-// 	FENCE
-// 	SIGN
-// 	NAVAID
-// 	GEN_UTIL
-// 	WINDMILL
-// 	SPIRE
-// 	CTRL_TWR
-// 	LANDFILL
-// 	VERICAL_STRUCTURE
-// 	UTILITY_POLE
-// 	STACK
-// 	CATENARY
-// 	SOLAR_PANELS
-// 	ANTENNA
-// 	VERTICAL_STRUCTURE
-// 	CRANE
-// 	BLDG_TWR
-//  RIG
-// )
+	pb "github.com/cs-wwu/srg-synvis/assets/obs"
+	"golang.org/x/net/html"
+	"google.golang.org/protobuf/proto"
+)
 
 const (
 	latDegStart = 35
@@ -64,6 +42,7 @@ type FAAPoint struct {
 	Lat    float64
 	Lon    float64
 	Height float64
+	Type   string
 }
 
 type ObsSquare struct {
@@ -108,8 +87,7 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		lonSec := strings.TrimSpace(line[lonSecStart:lonSecEnd])
 		lonHem := strings.TrimSpace(line[lonSecEnd : lonSecEnd+1])
 
-		// TODO: decide if want obstacle type
-		// ObsType := strings.TrimSpace(line[63:81])
+		obsType := strings.TrimSpace(line[62:81])
 		heightStr := strings.TrimSpace(line[hgtStart:hgtEnd])
 		eleStr := strings.TrimSpace(line[eleStart:eleEnd])
 
@@ -143,6 +121,7 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 			Lat:    lat,
 			Lon:    lon,
 			Height: ele,
+			Type:   obsType,
 		}
 
 		squareKey := generateSquareKey(lat, lon)
@@ -184,6 +163,7 @@ func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
 				Lat:    obs.Lat,
 				Lon:    obs.Lon,
 				Height: obs.Height,
+				Type:   obs.Type,
 			}
 			pbSquare.Obstructions = append(pbSquare.Obstructions, pbObs)
 		}
@@ -206,12 +186,150 @@ func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
 	return nil
 }
 
+// Function to scrape FAA DOF webpage and get link to most recent DOF release
+func getDOFLink() (string, error) {
+	FAAurl := "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dof"
+	DOFurl := ""
+
+	res, err := http.Get(FAAurl)
+	if err != nil {
+		return DOFurl, fmt.Errorf("error finding dof webpage: %v", err)
+	}
+	defer res.Body.Close()
+
+	tokenizer := html.NewTokenizer(res.Body)
+	counter := 0
+
+	for {
+		// End if type is error
+		tokenType := tokenizer.Next()
+		if tokenType == html.ErrorToken {
+			break
+		}
+
+		// Grab token and look for <a> tag (hyperlink)
+		token := tokenizer.Token()
+
+		if token.Type == html.StartTagToken && token.Data == "a" {
+			for _, attr := range token.Attr {
+				if attr.Key == "href" {
+					href := attr.Val
+					if strings.Contains(href, "DOF_") && strings.HasSuffix(href, ".zip") {
+						// We want the second DOF link (most recent)
+						counter++
+						if counter == 2 {
+							DOFurl = href
+							break
+						}
+					}
+				}
+			}
+		}
+		if DOFurl != "" {
+			break
+		}
+	}
+	if DOFurl == "" {
+		return DOFurl, fmt.Errorf("error finding link on webpage: %v", err)
+	}
+	return DOFurl, nil
+}
+
+// Function to download latest DOF.DAT file from FAA
+func downloadFAADOF(finalPath string) error {
+	DOFurl, err := getDOFLink()
+	if err != nil {
+		return fmt.Errorf("error getting dof link: %v", err)
+	}
+
+	res, err := http.Get(DOFurl)
+	if (err != nil) || (res.StatusCode != http.StatusOK) {
+		return fmt.Errorf("error finding dof webpage: %v", err)
+	}
+	defer res.Body.Close()
+
+	initialPath := "./assets/DOF_Files/DOF.zip"
+
+	// Create and copy ZIP file
+	zipFile, err1 := os.Create(initialPath)
+	_, err2 := io.Copy(zipFile, res.Body)
+
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("error forming zipfile: %v, %v", err1, err2)
+	}
+	defer zipFile.Close()
+
+	// Read ZIP file
+	zipReader, err := zip.OpenReader(initialPath)
+	if err != nil {
+		return fmt.Errorf("error opening zip: %v", err)
+	}
+	defer zipReader.Close()
+
+	// Find DOF.DAT in ZIP file
+	for _, file := range zipReader.File {
+		if file.Name == "DOF.DAT" {
+			fileReader, err1 := file.Open()
+			DATFile, err2 := os.Create(finalPath)
+			_, err3 := io.Copy(DATFile, fileReader)
+
+			if err1 != nil || err2 != nil || err3 != nil {
+				return fmt.Errorf("error forming datfile: %v, %v, %v", err1, err2, err3)
+			}
+			defer fileReader.Close()
+			defer DATFile.Close()
+
+			// Delete ZIP file
+			err = os.Remove(initialPath)
+			return err
+		}
+	}
+
+	// If didn't find DOF.DAT
+	return fmt.Errorf("error finding dof.dat")
+}
+
+// Function to convert the release date in the DOF.DAT file to time.Time
+func parseCurrencyDate(file *os.File) (time.Time, error) {
+	scanner := bufio.NewScanner(file)
+	scanner.Scan()
+	header := scanner.Text()
+
+	currencyString := strings.TrimSpace(header[18:26]) // Header date starts at col 18, ends at col 26
+	formatString := "01/02/06"                         // Stored month/day/year
+	currencyTime, err := time.Parse(formatString, currencyString)
+
+	return currencyTime, err
+}
+
 // this file assumes that the data is already downloaded and just needs to be parsed
-// TODO: script to download and delete DOF data
 // GenerateObsData puts FAA DOF data into coordinate buffers that are written to files
 func GenerateObsData() {
+	// Check for file existence and date modified
+	filePath := "./assets/DOF_Files/DOF.DAT"
+	file, err := os.Open(filePath)
+	daysSinceUpdate := 0.0
+	if err == nil {
+		fileCurrencyDate, err := parseCurrencyDate(file)
+		if err != nil {
+			fmt.Println("Error parsing file currency", err)
+		}
+		currentTime := time.Now()
+		daysSinceUpdate = (currentTime.Sub(fileCurrencyDate)).Hours() / 24
+	}
+	defer file.Close()
+
+	// DOF is updated every 56 days, and the new version is released 2 days after that
+	if err != nil || daysSinceUpdate >= 58 {
+		// File either doesn't exist, or is outdated
+		err = downloadFAADOF(filePath)
+		if err != nil {
+			fmt.Println("Error downloading DOF data", err)
+		}
+	}
+
 	squareBuffers := make(map[string]*ObsSquare)
-	err := parseDOFFile("./assets/DOF_Files/DOF.DAT", squareBuffers)
+	err = parseDOFFile(filePath, squareBuffers)
 	if err != nil {
 		fmt.Println("Error parsing file", err)
 	}
@@ -260,7 +378,7 @@ func PrintProtoSquare() {
 	if square != nil {
 		fmt.Printf("Found %d obstructions\n", len(square.GetObstructions()))
 		for _, obs := range square.GetObstructions() {
-			fmt.Printf("Lat: %f, Lon: %f, Height: %f\n", obs.Lat, obs.Lon, obs.Height)
+			fmt.Printf("Lat: %f, Lon: %f, Height: %f, Type: %s\n", obs.Lat, obs.Lon, obs.Height, obs.Type)
 		}
 	} else {
 		fmt.Println("No data for given coordinate square")

@@ -8,6 +8,7 @@ message FAAPoint {
   double lat = 1;
   double lon = 2;
   double height = 4;
+  string type = 5;
 }
 
 message CoordSquare {
