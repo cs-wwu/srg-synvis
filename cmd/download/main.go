@@ -364,7 +364,7 @@ func main() {
 	}
 
 	if cfg.useOSM {
-		if err := processor.GenerateOsmPng(heightmaps); err != nil {
+		if err := processor.GenerateRoadProtobufs(heightmaps); err != nil {
 			log.Printf("Failed to download OSM data: %v", err)
 		}
 	}

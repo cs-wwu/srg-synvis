@@ -57,9 +57,7 @@ var widths = map[string]float64{
 }
 
 // Make an api request to overpass-api, process the data into and overpassResponse data type
-func MakeRoadApiRequest(maps []int) (OverpassResponse, error) {
-	lat := maps[0]
-	lon := maps[1]
+func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 	bounds := "(" + strconv.Itoa(lat) + "," + strconv.Itoa(lon) + "," + strconv.Itoa(lat+1) + "," + strconv.Itoa(lon+1) + ");"
 	query := `
 	[out:json];
@@ -169,7 +167,7 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 	outputDir := "assets/chunks/roads/data"
 	os.MkdirAll(outputDir, 0755)
 
-	maps := make([][]int, 0, len(heightmaps))
+	channels := make([]chan error, len(heightmaps))
 	for _, heightmap := range heightmaps {
 		// Convert the heightmap string to a coordinate pair
 		coords, err := ParseHeightmapToCoords(heightmap)
@@ -177,68 +175,84 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 			log.Printf("Warning: skipping invalid heightmap %s: %v", heightmap, err)
 			continue
 		}
-		maps = append(maps, coords)
+
+		channel := make(chan error)
+		go func() {
+			channel <- generateRoadSquare(outputDir, coords[0], coords[1])
+		}()
+		channels = append(channels, channel)
 	}
 
-	for i := range maps {
-		osmData, err := MakeRoadApiRequest(maps[i])
+	// Block on all the threads.
+	for i, channel := range channels {
+		err := <-channel
 		if err != nil {
-			return err
+			log.Printf("Error generating road square for %s: %v", heightmaps[i], err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+func generateRoadSquare(outputDir string, lat int, lon int) error {
+	osmData, err := MakeRoadApiRequest(lat, lon)
+	if err != nil {
+		return err
+	}
+
+	nodes := make(map[int64]Element)
+
+	square := pb.RoadSquare{
+		LatDeg: int32(lat),
+		LonDeg: int32(lon),
+		Roads:  make([]*pb.Road, 0),
+	}
+
+	for _, element := range osmData.Elements {
+		// Store nodes for easy access by ID
+		if element.Type == "node" {
+			nodes[element.ID] = element
+			continue
 		}
 
-		nodes := make(map[int64]Element)
-
-		square := pb.RoadSquare{
-			LatDeg: int32(maps[i][0]),
-			LonDeg: int32(maps[i][1]),
-			Roads:  make([]*pb.Road, 0),
-		}
-
-		for _, element := range osmData.Elements {
-			// Store nodes for easy access by ID
-			if element.Type == "node" {
-				nodes[element.ID] = element
+		// Sort roads and railways by type
+		if element.Type == "way" {
+			name, err := elementName(&element)
+			if err != nil {
+				log.Printf("Warning: invalid way %v: %v", element.ID, err)
 				continue
 			}
 
-			// Sort roads and railways by type
-			if element.Type == "way" {
-				name, err := elementName(&element)
-				if err != nil {
-					log.Printf("Warning: invalid way %v: %v", element.ID, err)
+			points := make([]*pb.Point, 0, len(element.Nodes))
+			for _, nodeID := range element.Nodes {
+				node, exists := nodes[nodeID]
+				if !exists {
+					log.Printf("Warning: node %d not found for way %d", nodeID, element.ID)
 					continue
 				}
 
-				points := make([]*pb.Point, 0, len(element.Nodes))
-				for _, nodeID := range element.Nodes {
-					node, exists := nodes[nodeID]
-					if !exists {
-						log.Printf("Warning: node %d not found for way %d", nodeID, element.ID)
-						continue
-					}
-
-					points = append(points, &pb.Point{
-						Lat: node.Lat,
-						Lon: node.Lon,
-					})
-				}
-
-				square.Roads = append(square.Roads, &pb.Road{
-					Type:   name,
-					Points: points,
+				points = append(points, &pb.Point{
+					Lat: node.Lat,
+					Lon: node.Lon,
 				})
 			}
-		}
 
-		data, err := proto.Marshal(&square)
-		if err != nil {
-			return fmt.Errorf("error marshaling all data: %v", err)
+			square.Roads = append(square.Roads, &pb.Road{
+				Type:   name,
+				Points: points,
+			})
 		}
+	}
 
-		path := filepath.Join(outputDir, CoordToString(int(square.LatDeg), int(square.LonDeg))+".pb")
-		if err := os.WriteFile(path, data, 0644); err != nil {
-			return fmt.Errorf("error writing all data file: %v", err)
-		}
+	data, err := proto.Marshal(&square)
+	if err != nil {
+		return fmt.Errorf("error marshaling all data: %v", err)
+	}
+
+	path := filepath.Join(outputDir, CoordToString(int(square.LatDeg), int(square.LonDeg))+".pb")
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("error writing all data file: %v", err)
 	}
 
 	return nil
