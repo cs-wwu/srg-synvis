@@ -244,6 +244,17 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	app.StreamManager.RenderChunks(cmd)
 
+	// Draw roads last
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	for _, roadSquare := range app.roadSquares {
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{roadSquare.vertices.Buffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, roadSquare.indices.Buffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, roadSquare.indexCount, 1, 0, 0, 0)
+	}
+
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)
 	OrPanic(as.NewError(ret))
