@@ -336,7 +336,7 @@ func TestMakeApiRequest(t *testing.T) {
 			defer testServer.Close()
 
 			maps := []int{48, -123}
-			gotElements, gotErr := MakeApiRequest(testServer.URL, maps)
+			gotElements, gotErr := MakeRoadApiRequest(testServer.URL, maps)
 
 			if tc.wantErr != nil && gotErr == nil {
 				t.Errorf("wanted err: %e, got err: %e", tc.wantErr, gotErr)
