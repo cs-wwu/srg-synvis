@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	pb "github.com/cs-wwu/srg-synvis/assets/obs"
+	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
 	"golang.org/x/net/html"
 	"google.golang.org/protobuf/proto"
 )
@@ -145,14 +145,11 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 }
 
 func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
-	outputDir := "assets/obs"
-
-	allData := &pb.DOFData{
-		Squares: make([]*pb.CoordSquare, 0, len(squareBuffers)),
-	}
+	outputDir := "assets/chunks/obstructions/data"
+	os.MkdirAll(outputDir, 0755)
 
 	for _, square := range squareBuffers {
-		pbSquare := &pb.CoordSquare{
+		pbSquare := &pb.ObstructionSquare{
 			LatDeg:       int32(square.LatDeg),
 			LonDeg:       int32(square.LonDeg),
 			Obstructions: make([]*pb.FAAPoint, 0, len(square.Records)),
@@ -168,19 +165,15 @@ func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
 			pbSquare.Obstructions = append(pbSquare.Obstructions, pbObs)
 		}
 
-		allData.Squares = append(allData.Squares, pbSquare)
+		data, err := proto.Marshal(pbSquare)
+		if err != nil {
+			return fmt.Errorf("error marshaling all data: %v", err)
+		}
 
-	}
-
-	// Save all data to a single protobuf file
-	allDataBytes, err := proto.Marshal(allData)
-	if err != nil {
-		return fmt.Errorf("error marshaling all data: %v", err)
-	}
-
-	allDataFilePath := filepath.Join(outputDir, "all_dof_data.pb")
-	if err := os.WriteFile(allDataFilePath, allDataBytes, 0644); err != nil {
-		return fmt.Errorf("error writing all data file: %v", err)
+		path := filepath.Join(outputDir, CoordToString(square.LatDeg, square.LonDeg)+".pb")
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return fmt.Errorf("error writing all data file: %v", err)
+		}
 	}
 
 	return nil
@@ -337,50 +330,5 @@ func GenerateObsData() {
 	err = saveToProtobufs(squareBuffers)
 	if err != nil {
 		fmt.Printf("Error writing results: %v\n", err)
-	}
-}
-
-// Load and parse the DOFData protobuf
-func loadDOFData(filename string) (*pb.DOFData, error) {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %w", err)
-	}
-	var dofData pb.DOFData
-	if err := proto.Unmarshal(data, &dofData); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
-	}
-	return &dofData, nil
-}
-
-// Find CoordSquare by lat/lon degrees
-func findCoordSquare(dofData *pb.DOFData, latDeg, lonDeg int32) *pb.CoordSquare {
-	for _, square := range dofData.Squares {
-		if square.LatDeg == latDeg && square.LonDeg == lonDeg {
-			return square
-		}
-	}
-	return nil
-}
-
-// Prints all the obstructions in a coordinate square, loaded from protobuf
-func PrintProtoSquare() {
-	dofData, err := loadDOFData("assets/obs/all_dof_data.pb")
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	latDeg := int32(47)
-	lonDeg := int32(-123)
-
-	square := findCoordSquare(dofData, latDeg, lonDeg)
-	if square != nil {
-		fmt.Printf("Found %d obstructions\n", len(square.GetObstructions()))
-		for _, obs := range square.GetObstructions() {
-			fmt.Printf("Lat: %f, Lon: %f, Height: %f, Type: %s\n", obs.Lat, obs.Lon, obs.Height, obs.Type)
-		}
-	} else {
-		fmt.Println("No data for given coordinate square")
 	}
 }

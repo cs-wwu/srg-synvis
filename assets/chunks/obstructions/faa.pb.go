@@ -25,8 +25,8 @@ type FAAPoint struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Lat           float64                `protobuf:"fixed64,1,opt,name=lat,proto3" json:"lat,omitempty"`
 	Lon           float64                `protobuf:"fixed64,2,opt,name=lon,proto3" json:"lon,omitempty"`
-	Height        float64                `protobuf:"fixed64,4,opt,name=height,proto3" json:"height,omitempty"`
-	Type          string                 `protobuf:"bytes,5,opt,name=type,proto3" json:"type,omitempty"`
+	Height        float64                `protobuf:"fixed64,3,opt,name=height,proto3" json:"height,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -89,7 +89,7 @@ func (x *FAAPoint) GetType() string {
 	return ""
 }
 
-type CoordSquare struct {
+type ObstructionSquare struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LatDeg        int32                  `protobuf:"varint,1,opt,name=lat_deg,json=latDeg,proto3" json:"lat_deg,omitempty"`
 	LonDeg        int32                  `protobuf:"varint,2,opt,name=lon_deg,json=lonDeg,proto3" json:"lon_deg,omitempty"`
@@ -98,20 +98,20 @@ type CoordSquare struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CoordSquare) Reset() {
-	*x = CoordSquare{}
+func (x *ObstructionSquare) Reset() {
+	*x = ObstructionSquare{}
 	mi := &file_faa_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CoordSquare) String() string {
+func (x *ObstructionSquare) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CoordSquare) ProtoMessage() {}
+func (*ObstructionSquare) ProtoMessage() {}
 
-func (x *CoordSquare) ProtoReflect() protoreflect.Message {
+func (x *ObstructionSquare) ProtoReflect() protoreflect.Message {
 	mi := &file_faa_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -123,72 +123,28 @@ func (x *CoordSquare) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CoordSquare.ProtoReflect.Descriptor instead.
-func (*CoordSquare) Descriptor() ([]byte, []int) {
+// Deprecated: Use ObstructionSquare.ProtoReflect.Descriptor instead.
+func (*ObstructionSquare) Descriptor() ([]byte, []int) {
 	return file_faa_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *CoordSquare) GetLatDeg() int32 {
+func (x *ObstructionSquare) GetLatDeg() int32 {
 	if x != nil {
 		return x.LatDeg
 	}
 	return 0
 }
 
-func (x *CoordSquare) GetLonDeg() int32 {
+func (x *ObstructionSquare) GetLonDeg() int32 {
 	if x != nil {
 		return x.LonDeg
 	}
 	return 0
 }
 
-func (x *CoordSquare) GetObstructions() []*FAAPoint {
+func (x *ObstructionSquare) GetObstructions() []*FAAPoint {
 	if x != nil {
 		return x.Obstructions
-	}
-	return nil
-}
-
-type DOFData struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Squares       []*CoordSquare         `protobuf:"bytes,1,rep,name=squares,proto3" json:"squares,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DOFData) Reset() {
-	*x = DOFData{}
-	mi := &file_faa_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DOFData) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DOFData) ProtoMessage() {}
-
-func (x *DOFData) ProtoReflect() protoreflect.Message {
-	mi := &file_faa_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DOFData.ProtoReflect.Descriptor instead.
-func (*DOFData) Descriptor() ([]byte, []int) {
-	return file_faa_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *DOFData) GetSquares() []*CoordSquare {
-	if x != nil {
-		return x.Squares
 	}
 	return nil
 }
@@ -201,14 +157,12 @@ const file_faa_proto_rawDesc = "" +
 	"\bFAAPoint\x12\x10\n" +
 	"\x03lat\x18\x01 \x01(\x01R\x03lat\x12\x10\n" +
 	"\x03lon\x18\x02 \x01(\x01R\x03lon\x12\x16\n" +
-	"\x06height\x18\x04 \x01(\x01R\x06height\x12\x12\n" +
-	"\x04type\x18\x05 \x01(\tR\x04type\"r\n" +
-	"\vCoordSquare\x12\x17\n" +
+	"\x06height\x18\x03 \x01(\x01R\x06height\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\"x\n" +
+	"\x11ObstructionSquare\x12\x17\n" +
 	"\alat_deg\x18\x01 \x01(\x05R\x06latDeg\x12\x17\n" +
 	"\alon_deg\x18\x02 \x01(\x05R\x06lonDeg\x121\n" +
-	"\fobstructions\x18\x03 \x03(\v2\r.obs.FAAPointR\fobstructions\"5\n" +
-	"\aDOFData\x12*\n" +
-	"\asquares\x18\x01 \x03(\v2\x10.obs.CoordSquareR\asquaresB)Z'github.com/cs-wwu/srg-synvis/assets/obsb\x06proto3"
+	"\fobstructions\x18\x03 \x03(\v2\r.obs.FAAPointR\fobstructionsB)Z'github.com/cs-wwu/srg-synvis/assets/obsb\x06proto3"
 
 var (
 	file_faa_proto_rawDescOnce sync.Once
@@ -222,20 +176,18 @@ func file_faa_proto_rawDescGZIP() []byte {
 	return file_faa_proto_rawDescData
 }
 
-var file_faa_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_faa_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_faa_proto_goTypes = []any{
-	(*FAAPoint)(nil),    // 0: obs.FAAPoint
-	(*CoordSquare)(nil), // 1: obs.CoordSquare
-	(*DOFData)(nil),     // 2: obs.DOFData
+	(*FAAPoint)(nil),          // 0: obs.FAAPoint
+	(*ObstructionSquare)(nil), // 1: obs.ObstructionSquare
 }
 var file_faa_proto_depIdxs = []int32{
-	0, // 0: obs.CoordSquare.obstructions:type_name -> obs.FAAPoint
-	1, // 1: obs.DOFData.squares:type_name -> obs.CoordSquare
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: obs.ObstructionSquare.obstructions:type_name -> obs.FAAPoint
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_faa_proto_init() }
@@ -249,7 +201,7 @@ func file_faa_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_faa_proto_rawDesc), len(file_faa_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

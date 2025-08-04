@@ -7,14 +7,12 @@ option go_package = "github.com/cs-wwu/srg-synvis/assets/obs";
 message FAAPoint {
   double lat = 1;
   double lon = 2;
-  double height = 4;
-  string type = 5;
+  double height = 3;
+  string type = 4;
 }
 
-message CoordSquare {
+message ObstructionSquare {
   int32 lat_deg = 1;
   int32 lon_deg = 2;
   repeated FAAPoint obstructions = 3;
 }
-
-message DOFData { repeated CoordSquare squares = 1; }
