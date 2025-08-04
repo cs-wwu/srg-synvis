@@ -14,9 +14,11 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
 
+	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -478,7 +480,46 @@ func (app *Application) prepareTextures() {
 	for _, texFile := range texEnabled {
 		app.textures = append(app.textures, prepareTex(texFile))
 	}
+
+	app.roadSquares = make([]*RoadSquare, 0, len(roadEnabled))
+	for _, roadFile := range roadEnabled {
+		roadSquare := pb.RoadSquare{}
+		err := proto.Unmarshal(FileToBytes(roadFile), &roadSquare)
+		if err != nil {
+			log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
+			continue
+		}
+
+		builder := newRoadBuilder()
+
+		for _, road := range roadSquare.Roads {
+			renderRoad(builder, road)
+		}
+
+		// NB: These buffers must be created while `builder` is still referenced,
+		// so that the `vertexBytes` and `indexBytes` methods return valid slices.
+		vertices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.vertexBytes(),
+			vk.BufferUsageVertexBufferBit,
+		)
+
+		indices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.indexBytes(),
+			vk.BufferUsageIndexBufferBit,
+		)
+
+		app.roadSquares = append(app.roadSquares, &RoadSquare{
+			vertices:   vertices,
+			indices:    indices,
+			indexCount: uint32(len(builder.indices)),
+		})
+	}
 }
+
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
