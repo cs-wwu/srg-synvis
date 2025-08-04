@@ -40,6 +40,9 @@ type Application struct {
 	planeIndexMemory  vk.DeviceMemory
 	planeIndexCount   uint32
 
+	// Roads
+	roadPipeline vk.Pipeline
+
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
 	skyboxVertexBuffer vk.Buffer
