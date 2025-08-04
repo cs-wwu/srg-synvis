@@ -10,8 +10,12 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
+	"google.golang.org/protobuf/proto"
 )
 
 // Define structs for Overpass API response data
@@ -288,7 +292,7 @@ func IsPointInPolygon(x, y float64, points []Point) bool {
 }
 
 // Make an api request to overpass-api, process the data into and overpassResponse data type
-func MakeRoadApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
+func MakeRoadApiRequest(maps []int) (OverpassResponse, error) {
 	lat := maps[0]
 	lon := maps[1]
 	bounds := "(" + strconv.Itoa(lat) + "," + strconv.Itoa(lon) + "," + strconv.Itoa(lat+1) + "," + strconv.Itoa(lon+1) + ");"
@@ -312,9 +316,9 @@ func MakeRoadApiRequest(apiUrl string, maps []int) (OverpassResponse, error) {
 	`
 	log.Printf("Posting request to osm...\n")
 	var osmData OverpassResponse
-	resp, err := http.Post(apiUrl, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
+	resp, err := http.Post(OSMURL, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
-		return osmData, fmt.Errorf("failed to make post request to %v: %w", apiUrl, err)
+		return osmData, fmt.Errorf("failed to make post request to %v: %w", OSMURL, err)
 	}
 	defer resp.Body.Close()
 
@@ -447,10 +451,9 @@ func ParseHeightmapToCoords(heightmap string) ([]int, error) {
 	return []int{lat, lon}, nil
 }
 
-func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error {
-	if heightmaps == nil || targetDir == "" {
-		return fmt.Errorf("no maps or targetDir specified")
-	}
+func GenerateOsmPng(heightmaps []string) error {
+	outputDir := "assets/chunks/roads/data"
+	os.MkdirAll(outputDir, 0755)
 
 	maps := make([][]int, 0, len(heightmaps))
 	for _, heightmap := range heightmaps {
@@ -464,106 +467,87 @@ func GenerateOsmPng(heightmaps []string, targetDir string, apiURL string) error 
 	}
 
 	for i := range maps {
-		osmData, err := MakeRoadApiRequest(apiURL, maps[i])
+		osmData, err := MakeRoadApiRequest(maps[i])
 		if err != nil {
 			return err
 		}
 
-		// Filter the data to keep only relevant highways
-		var motorways, trunks, primaries, secondaries, tertiaries []Element
-		var rails, lightRails, trams []Element
-		var runways, airstrips, taxiways []Element
 		nodes := make(map[int64]Element)
 
-		for _, Element := range osmData.Elements {
+		square := pb.RoadSquare{
+			LatDeg: int32(maps[i][0]),
+			LonDeg: int32(maps[i][1]),
+			Roads:  make([]*pb.Road, 0),
+		}
+
+		for _, element := range osmData.Elements {
 			// Store nodes for easy access by ID
-			if Element.Type == "node" {
-				nodes[Element.ID] = Element
+			if element.Type == "node" {
+				nodes[element.ID] = element
 				continue
 			}
 
 			// Sort roads and railways by type
-			if Element.Type == "way" {
-				// Handle highways
-				if highway, exists := Element.Tags["highway"]; exists {
-					switch highway {
-					case "motorway":
-						motorways = append(motorways, Element)
-					case "trunk":
-						trunks = append(trunks, Element)
-					case "primary":
-						primaries = append(primaries, Element)
-					case "secondary":
-						secondaries = append(secondaries, Element)
-					case "tertiary":
-						tertiaries = append(tertiaries, Element)
-					}
+			if element.Type == "way" {
+				name, err := elementName(&element)
+				if err != nil {
+					log.Printf("Warning: invalid way %v: %v", element.ID, err)
+					continue
 				}
 
-				if aeroway, exists := Element.Tags["aeroway"]; exists {
-					switch aeroway {
-					case "runway":
-						runways = append(runways, Element)
-					case "airstrip":
-						airstrips = append(airstrips, Element)
-					case "taxiway":
-						taxiways = append(taxiways, Element)
+				points := make([]*pb.Point, 0, len(element.Nodes))
+				for _, nodeID := range element.Nodes {
+					node, exists := nodes[nodeID]
+					if !exists {
+						log.Printf("Warning: node %d not found for way %d", nodeID, element.ID)
+						continue
 					}
 
+					points = append(points, &pb.Point{
+						Lat: node.Lat,
+						Lon: node.Lon,
+					})
 				}
 
-				// Handle railways
-				if railway, exists := Element.Tags["railway"]; exists {
-					switch railway {
-					case "rail":
-						rails = append(rails, Element)
-					case "light_rail":
-						lightRails = append(lightRails, Element)
-					case "tram":
-						trams = append(trams, Element)
-					}
-				}
+				square.Roads = append(square.Roads, &pb.Road{
+					Type:   name,
+					Points: points,
+				})
 			}
 		}
 
-		// Generate an all white PNG
-		grayImage := image.NewRGBA(image.Rect(0, 0, Scale*ImgLength, Scale*ImgLength))
-		for x := range ImgLength * int(Scale) {
-			for y := range ImgLength * int(Scale) {
-				grayImage.Set(x, y, color.Transparent)
-			}
-		}
-
-		// Draw each set of roads
-		DrawRoads(motorways, nodes, maps[i], grayImage, "motorway")
-		DrawRoads(trunks, nodes, maps[i], grayImage, "trunk")
-		DrawRoads(primaries, nodes, maps[i], grayImage, "primary")
-		DrawRoads(secondaries, nodes, maps[i], grayImage, "secondary")
-		DrawRoads(tertiaries, nodes, maps[i], grayImage, "tertiary")
-
-		// Draw each set of railways
-		DrawRailways(rails, nodes, maps[i], grayImage, "rail")
-		DrawRailways(lightRails, nodes, maps[i], grayImage, "light_rail")
-		DrawRailways(trams, nodes, maps[i], grayImage, "tram")
-
-		// Draw 2D airport data
-		DrawRoads(runways, nodes, maps[i], grayImage, "runway")
-		DrawRoads(airstrips, nodes, maps[i], grayImage, "airstrip")
-		DrawRoads(taxiways, nodes, maps[i], grayImage, "taxiway")
-
-		bounds := CoordToString(maps[i][0], maps[i][1])
-		pngFilepath := targetDir + bounds + ".osm.png"
-		pngFile, err := os.Create(pngFilepath)
-		fmt.Println("created png", pngFilepath)
+		data, err := proto.Marshal(&square)
 		if err != nil {
-			return fmt.Errorf("failed to create %s: %w", pngFilepath, err)
+			return fmt.Errorf("error marshaling all data: %v", err)
 		}
-		defer pngFile.Close()
 
-		if err := encodePNG(pngFile, grayImage); err != nil {
-			return fmt.Errorf("failed to encode %s: %w", pngFilepath, err)
+		path := filepath.Join(outputDir, CoordToString(int(square.LatDeg), int(square.LonDeg))+".pb")
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return fmt.Errorf("error writing all data file: %v", err)
 		}
 	}
 
 	return nil
+}
+
+func elementName(element *Element) (name string, err error) {
+	// Handle highways
+	if highway, exists := element.Tags["highway"]; exists {
+		name = highway
+		return
+	}
+
+	if aeroway, exists := element.Tags["aeroway"]; exists {
+		name = aeroway
+		return
+	}
+
+	// Handle railways
+	if railway, exists := element.Tags["railway"]; exists {
+		name = railway
+		return
+	}
+
+	err = fmt.Errorf("element %v has no valid name", element.ID)
+	return
 }

@@ -364,7 +364,7 @@ func main() {
 	}
 
 	if cfg.useOSM {
-		if err := processor.GenerateOsmPng(heightmaps, "assets/textures/", processor.OSMURL); err != nil {
+		if err := processor.GenerateOsmPng(heightmaps); err != nil {
 			log.Printf("Failed to download OSM data: %v", err)
 		}
 	}
