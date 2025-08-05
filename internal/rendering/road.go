@@ -34,8 +34,6 @@ func toWorld(point *pb.Point) vec2.T {
 }
 
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
-	builder.color = vec3.T{255, 0, 0}
-
 	points := make([]vec2.T, len(road.Points))
 	for i, point := range road.Points {
 		points[i] = toWorld(point)
@@ -45,20 +43,127 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	// far away. So, we simplify them.
 	points = simplify(points, SIMPLIFICATION_EPSILON)
 
+	if len(points) < 2 {
+		return
+	}
+
+	// TODO: Road color based off the road type.
+	builder.color = vec3.T{0.5, 0.5, 0.5}
+
+	width := 5.0
+	half_w := width / 2.0
+	distance := 5.0
+	min_angle := math.Pi / 12 // 15 degrees
+
+	var prev_left, prev_right uint32
+
+	{
+		p0 := points[0]
+		p1 := points[1]
+		dir := p1.Subed(&p0)
+		dir.Normalize()
+		normal := perpendicular(dir)
+		normal_half_w := normal.Scaled(half_w)
+		left := p0.Subed(&normal_half_w)
+		right := p0.Added(&normal_half_w)
+		prev_left = builder.addPoint(left)
+		prev_right = builder.addPoint(right)
+	}
+
 	for i := range points {
-		if i == 0 {
+		if i == 0 || i == len(points)-1 {
 			continue
 		}
 
-		from := points[i-1]
-		to := points[i]
+		p0 := points[i-1]
+		p1 := points[i]
+		p2 := points[i+1]
+		dir1 := p1.Subed(&p0)
+		dir1.Normalize()
+		dir2 := p2.Subed(&p1)
+		dir2.Normalize()
+		norm1 := perpendicular(dir1)
+		norm2 := perpendicular(dir2)
 
-		builder.drawLine(
-			from,
-			to,
-			5.0,
-		)
+		lefthanded := dir1[0]*dir2[1]-dir1[1]*dir2[0] < 0
+		if lefthanded {
+			norm1.Scale(-1.0)
+			norm2.Scale(-1.0)
+		}
+
+		angle := math.Acos(vec2.Dot(&dir1, &dir2))
+		half_angle := (math.Pi - angle) / 2
+		radius := distance / math.Tan(half_angle)
+		if radius > distance*2 {
+			radius = distance * 2
+			distance = radius * math.Tan(half_angle)
+		}
+		origin := p1
+		dir1_scaled := dir1.Scaled(radius)
+		origin.Sub(&dir1_scaled)
+		norm1_scaled := norm1.Scaled(distance)
+		origin.Add(&norm1_scaled)
+
+		steps := int(math.Ceil(angle / min_angle))
+		per_step := 1.0 / float64(steps)
+
+		t := 0.0
+		for range steps + 1 {
+			norm := slerp(norm1, norm2, t)
+
+			norm_scaled := norm.Scaled(distance + width/2)
+			outside := origin.Subed(&norm_scaled)
+			norm_scaled = norm.Scaled(distance - width/2)
+			inside := origin.Subed(&norm_scaled)
+
+			var left, right vec2.T
+			if lefthanded {
+				left = inside
+				right = outside
+			} else {
+				left = outside
+				right = inside
+			}
+
+			curr_left := builder.addPoint(left)
+			curr_right := builder.addPoint(right)
+
+			builder.addTriangle(prev_left, prev_right, curr_left)
+			builder.addTriangle(curr_left, prev_right, curr_right)
+
+			prev_left = curr_left
+			prev_right = curr_right
+
+			t += per_step
+		}
 	}
+
+	{
+		p0 := points[len(points)-2]
+		p1 := points[len(points)-1]
+		dir := p1.Subed(&p0)
+		dir.Normalize()
+		normal := perpendicular(dir)
+		normal_half_w := normal.Scaled(half_w)
+		left := p1.Subed(&normal_half_w)
+		right := p1.Added(&normal_half_w)
+		curr_left := builder.addPoint(left)
+		curr_right := builder.addPoint(right)
+
+		builder.addTriangle(prev_left, prev_right, curr_left)
+		builder.addTriangle(curr_left, prev_right, curr_right)
+	}
+}
+
+func perpendicular(v vec2.T) vec2.T {
+	return vec2.T{-v[1], v[0]}
+}
+
+func slerp(a, b vec2.T, t float64) vec2.T {
+	angle := math.Acos(vec2.Dot(&a, &b))
+	f1 := math.Sin(angle*(1-t)) / math.Sin(angle)
+	f2 := math.Sin(angle*t) / math.Sin(angle)
+	return vec2.T{a[0]*f1 + b[0]*f2, a[1]*f1 + b[1]*f2}
 }
 
 // This is the Ramer-Douglas-Peucker algorithm for line simplification.
@@ -107,21 +212,6 @@ func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
 		vertices:   make([]RoadVertex, 0),
 		indices:    make([]uint32, 0),
 	}
-}
-
-func (r *RoadBuilder) drawLine(from, to vec2.T, width float64) {
-	dir := to.Subed(&from)
-	dir.Normalize()
-
-	perp := vec2.T{-dir[1], dir[0]}
-
-	a := r.addPoint(vec2.T{from[0] - perp[0]*width, from[1] - perp[1]*width})
-	b := r.addPoint(vec2.T{from[0] + perp[0]*width, from[1] + perp[1]*width})
-	c := r.addPoint(vec2.T{to[0] - perp[0]*width, to[1] - perp[1]*width})
-	d := r.addPoint(vec2.T{to[0] + perp[0]*width, to[1] + perp[1]*width})
-
-	r.addTriangle(a, b, c)
-	r.addTriangle(b, d, c)
 }
 
 func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
