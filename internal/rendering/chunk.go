@@ -2,6 +2,7 @@ package rendering
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
@@ -44,6 +45,25 @@ func newHeightInfo(data []uint16) *HeightInfo {
 	return &HeightInfo{
 		heightData: (*[MAP_LENGTH * MAP_LENGTH]uint16)(data),
 	}
+}
+
+func (h *HeightInfo) Height(x, z float32) float32 {
+	localX := math.Mod(math.Mod(float64(x), 3600)+3600, 3600)
+	localZ := math.Mod(math.Mod(float64(z), 3600)+3600, 3600)
+
+	a := h.getLocal(int(localX), int(localZ))
+	b := h.getLocal(int(localX+1), int(localZ))
+	c := h.getLocal(int(localX), int(localZ+1))
+	d := h.getLocal(int(localX+1), int(localZ+1))
+
+	_, fractX := math.Modf(localX)
+	_, fractZ := math.Modf(localZ)
+
+	return lerp(lerp(a, b, fractX), lerp(c, d, fractX), fractZ)
+}
+
+func lerp(a, b float32, t float64) float32 {
+	return a + (b-a)*float32(t)
 }
 
 func (h *HeightInfo) getLocal(x, z int) float32 {
