@@ -1014,6 +1014,11 @@ func (app *Application) prepareRoadPipeline() {
 			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
 			FrontFace:   vk.FrontFaceCounterClockwise,
 			LineWidth:   1.0,
+
+			DepthBiasEnable:         vk.True,
+			DepthBiasConstantFactor: -10.0,
+			DepthBiasClamp:          0.0,
+			DepthBiasSlopeFactor:    0.0,
 		},
 
 		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
@@ -1039,7 +1044,7 @@ func (app *Application) prepareRoadPipeline() {
 		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
 			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
 			DepthTestEnable:       vk.True,
-			DepthWriteEnable:      vk.True,
+			DepthWriteEnable:      vk.False,
 			DepthCompareOp:        vk.CompareOpLessOrEqual,
 			DepthBoundsTestEnable: vk.False,
 			StencilTestEnable:     vk.False,
