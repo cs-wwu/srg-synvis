@@ -23,7 +23,7 @@ const (
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 
 	ROAD_OFFSET            = float32(1.0)
-	SIMPLIFICATION_EPSILON = 0.5 // 0.5 arcseconds (50 feet at the equator)
+	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
 )
 
 func toWorld(point *pb.Point) vec2.T {
@@ -31,6 +31,28 @@ func toWorld(point *pb.Point) vec2.T {
 		point.Lon * ARC_DEGREES_TO_SECONDS,
 		-point.Lat * ARC_DEGREES_TO_SECONDS,
 	}
+}
+
+type RoadType struct {
+	Width float64
+	Color vec3.T
+}
+
+var ROAD_TYPES = map[string]RoadType{
+	// Highway types:
+	"motorway":  {Width: 8, Color: vec3.T{0.5, 0.8, 0.9}},
+	"trunk":     {Width: 6, Color: vec3.T{0.5, 0.8, 0.9}},
+	"primary":   {Width: 4, Color: vec3.T{0.5, 0.8, 0.9}},
+	"secondary": {Width: 2, Color: vec3.T{0.5, 0.7, 0.8}},
+	"tertiary":  {Width: 1, Color: vec3.T{0.5, 0.6, 0.7}},
+	// Railway types:
+	"rail":       {Width: 3, Color: vec3.T{0.8, 0.6, 0.5}},
+	"light_rail": {Width: 2, Color: vec3.T{0.8, 0.6, 0.5}},
+	"tram":       {Width: 1, Color: vec3.T{0.8, 0.6, 0.5}},
+	// Aeroway types:
+	"runway":   {Width: 6, Color: vec3.T{0.9, 0.5, 0.8}},
+	"airstrip": {Width: 5, Color: vec3.T{0.9, 0.5, 0.8}},
+	"taxiway":  {Width: 2, Color: vec3.T{0.9, 0.5, 0.8}},
 }
 
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
@@ -47,12 +69,15 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 		return
 	}
 
-	// TODO: Road color based off the road type.
-	builder.color = vec3.T{0.5, 0.5, 0.5}
+	ty, exists := ROAD_TYPES[road.Type]
+	if !exists {
+		return
+	}
 
-	width := 5.0
+	builder.color = ty.Color
+	width := ty.Width
 	half_w := width / 2.0
-	distance := 5.0
+	distance := 2.0
 	min_angle := math.Pi / 12 // 15 degrees
 
 	var prev_left, prev_right uint32
