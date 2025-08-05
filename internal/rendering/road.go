@@ -9,8 +9,9 @@ import (
 )
 
 type RoadBuilder struct {
-	vertices []RoadVertex
-	indices  []uint32
+	heightInfo *HeightInfo
+	vertices   []RoadVertex
+	indices    []uint32
 
 	color vec3.T
 }
@@ -47,10 +48,11 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	}
 }
 
-func newRoadBuilder() *RoadBuilder {
+func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
 	return &RoadBuilder{
-		vertices: make([]RoadVertex, 0),
-		indices:  make([]uint32, 0),
+		heightInfo: heightInfo,
+		vertices:   make([]RoadVertex, 0),
+		indices:    make([]uint32, 0),
 	}
 }
 
@@ -70,7 +72,7 @@ func (r *RoadBuilder) drawLine(from, to *vec2.T, width float32) {
 }
 
 func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
-	height := float32(80.0)
+	height := r.heightInfo.Height(point[0], point[1])
 	return r.addVertex(RoadVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},
 		Color:    r.color,

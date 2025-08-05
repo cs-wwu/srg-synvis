@@ -13,6 +13,7 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/internal/coords"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"google.golang.org/protobuf/proto"
 
@@ -480,7 +481,9 @@ func (app *Application) prepareTextures() {
 	for _, texFile := range texEnabled {
 		app.textures = append(app.textures, prepareTex(texFile))
 	}
+}
 
+func (app *Application) prepareRoads() {
 	app.roadSquares = make([]*RoadSquare, 0, len(roadEnabled))
 	for _, roadFile := range roadEnabled {
 		roadSquare := pb.RoadSquare{}
@@ -490,7 +493,16 @@ func (app *Application) prepareTextures() {
 			continue
 		}
 
-		builder := newRoadBuilder()
+		mapData, err := app.StreamManager.assetManager.LoadMapData(coords.LatLonToMap(
+			int(roadSquare.LatDeg),
+			int(roadSquare.LonDeg),
+		))
+		if err != nil {
+			log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
+			continue
+		}
+		heightInfo := newHeightInfo(mapData.HeightData)
+		builder := newRoadBuilder(heightInfo)
 
 		for _, road := range roadSquare.Roads {
 			renderRoad(builder, road)
@@ -1291,6 +1303,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
 	app.StreamManager.UpdateCameraPosition(app.camera.Position())
 	app.StreamManager.Start()
+
+	app.prepareRoads()
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

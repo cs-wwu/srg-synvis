@@ -70,6 +70,10 @@ func WorldToMap(x, z int) string {
 		lon -= 1
 	}
 
+	return LatLonToMap(lat, lon)
+}
+
+func LatLonToMap(lat, lon int) string {
 	latDir := 'n'
 	if lat < 0 {
 		latDir = 's'
