@@ -1,10 +1,11 @@
 package rendering
 
 import (
+	"math"
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
-	"github.com/ungerik/go3d/vec2"
+	"github.com/ungerik/go3d/float64/vec2"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -21,26 +22,36 @@ const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 
-	ROAD_OFFSET = float32(1.0)
+	ROAD_OFFSET            = float32(1.0)
+	SIMPLIFICATION_EPSILON = 0.5 // 0.5 arcseconds (50 feet at the equator)
 )
 
-func toWorld(point *pb.Point) *vec2.T {
-	return &vec2.T{
-		float32(point.Lon * ARC_DEGREES_TO_SECONDS),
-		float32(-point.Lat * ARC_DEGREES_TO_SECONDS),
+func toWorld(point *pb.Point) vec2.T {
+	return vec2.T{
+		point.Lon * ARC_DEGREES_TO_SECONDS,
+		-point.Lat * ARC_DEGREES_TO_SECONDS,
 	}
 }
 
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	builder.color = vec3.T{255, 0, 0}
 
-	for i := range road.Points {
+	points := make([]vec2.T, len(road.Points))
+	for i, point := range road.Points {
+		points[i] = toWorld(point)
+	}
+
+	// Roads from OSM are quite complex, which make them difficult to render from
+	// far away. So, we simplify them.
+	points = simplify(points, SIMPLIFICATION_EPSILON)
+
+	for i := range points {
 		if i == 0 {
 			continue
 		}
 
-		from := toWorld(road.Points[i-1])
-		to := toWorld(road.Points[i])
+		from := points[i-1]
+		to := points[i]
 
 		builder.drawLine(
 			from,
@@ -48,6 +59,46 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 			5.0,
 		)
 	}
+}
+
+// This is the Ramer-Douglas-Peucker algorithm for line simplification.
+func simplify(points []vec2.T, epsilon float64) []vec2.T {
+	if len(points) < 3 {
+		return points
+	}
+
+	// Find the point with the maximum distance from the line
+	maxDist := 0.0
+	index := 0
+	for i := 1; i < len(points)-1; i++ {
+		dist := perpendicularDistance(points[i], points[0], points[len(points)-1])
+		if dist > maxDist {
+			index = i
+			maxDist = dist
+		}
+	}
+
+	if maxDist > epsilon {
+		left := simplify(points[:index+1], epsilon)
+		right := simplify(points[index:], epsilon)
+
+		// Combine results, remove duplicate at index
+		return append(left[:len(left)-1], right...)
+	}
+
+	return []vec2.T{points[0], points[len(points)-1]}
+}
+
+func perpendicularDistance(pt, lineStart, lineEnd vec2.T) float64 {
+	if lineStart == lineEnd {
+		dx := pt[0] - lineStart[0]
+		dy := pt[1] - lineStart[1]
+		return math.Hypot(dx, dy)
+	}
+
+	num := math.Abs((lineEnd[1]-lineStart[1])*pt[0] - (lineEnd[0]-lineStart[0])*pt[1] + lineEnd[0]*lineStart[1] - lineEnd[1]*lineStart[0])
+	den := math.Hypot(lineEnd[0]-lineStart[0], lineEnd[1]-lineStart[1])
+	return num / den
 }
 
 func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
@@ -58,8 +109,8 @@ func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
 	}
 }
 
-func (r *RoadBuilder) drawLine(from, to *vec2.T, width float32) {
-	dir := to.Subed(from)
+func (r *RoadBuilder) drawLine(from, to vec2.T, width float64) {
+	dir := to.Subed(&from)
 	dir.Normalize()
 
 	perp := vec2.T{-dir[1], dir[0]}
@@ -74,7 +125,7 @@ func (r *RoadBuilder) drawLine(from, to *vec2.T, width float32) {
 }
 
 func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
-	height := r.heightInfo.Height(point[0], point[1])
+	height := r.heightInfo.Height(float32(point[0]), float32(point[1]))
 	height += ROAD_OFFSET
 	return r.addVertex(RoadVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},
