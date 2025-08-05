@@ -20,6 +20,8 @@ type RoadBuilder struct {
 const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
+
+	ROAD_OFFSET = float32(1.0)
 )
 
 func toWorld(point *pb.Point) *vec2.T {
@@ -73,6 +75,7 @@ func (r *RoadBuilder) drawLine(from, to *vec2.T, width float32) {
 
 func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
 	height := r.heightInfo.Height(point[0], point[1])
+	height += ROAD_OFFSET
 	return r.addVertex(RoadVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},
 		Color:    r.color,
