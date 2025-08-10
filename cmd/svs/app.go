@@ -182,7 +182,9 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	defer fpsTicker.Stop()
 
 	var altitiude float32 = 0
+	var speed float32 = 0
 	app.UIRenderer.Altimeter("Altitude (Ft)", &altitiude)
+	app.UIRenderer.Speedometer("Speed (KTS)", &speed)
 
 	for {
 		select {
@@ -200,7 +202,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				continue
 			}
 			glfw.PollEvents()
-			app.NextFrame()
+			app.NextFrame(&speed)
 
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			if err != nil {
@@ -211,7 +213,6 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			}
 
 			altitiude = app.Camera.Position()[1]
-
 			app.UIRenderer.Render(imageIdx)
 
 			_, err = app.Context().PresentImage(imageIdx)

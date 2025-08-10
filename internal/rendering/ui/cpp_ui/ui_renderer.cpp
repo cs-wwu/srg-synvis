@@ -318,7 +318,26 @@ int UIRenderer::Altimeter(std::string label, float* altitudePtr) {
     op->label = label;
     op->value_float = altitudePtr;
     op->execute = [op](){
-        altimeter(op->label, op->value_float);
+        rect_meter_dashed(op->label, LEFT, *(op->value_float), 500, 20, 100);
+    };
+
+    m_ui_operations[id] = op;
+    m_operation_order.push_back(id);
+
+    return id;
+}
+
+int UIRenderer::Speedometer(std::string label, float* speedPtr) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* op = new UIOperation();
+    op->id = id;
+    op->type = UIOperation::ALTIMETER;
+    op->label = label;
+    op->value_float = speedPtr;
+    op->execute = [op](){
+        rect_meter_dashed(op->label, RIGHT, *(op->value_float), 200, 10, 20);
     };
 
     m_ui_operations[id] = op;
@@ -443,6 +462,11 @@ extern "C" {
     int ui_altimeter(UIRenderer* renderer, const char* label, float* altitudePtr) {
         std::string labelStr(label ? label : "");
         return renderer->Altimeter(labelStr, altitudePtr);
+    }
+
+    int ui_speedometer(UIRenderer* renderer, const char* label, float* speedPtr) {
+        std::string labelStr(label ? label : "");
+        return renderer->Speedometer(labelStr, speedPtr);
     }
 
     int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format) {

@@ -113,6 +113,20 @@ func (ui *UIRenderer) Altimeter(label string, altitude *float32) int {
 	return int(id)
 }
 
+func (ui *UIRenderer) Speedometer(label string, speed *float32) int {
+	cLabel := C.CString(label)
+	defer C.free(unsafe.Pointer(cLabel))
+
+	altitudePtr := (*C.float)(unsafe.Pointer(speed))
+	id := C.ui_speedometer(
+		ui.cPtr,
+		cLabel,
+		altitudePtr,
+	)
+
+	return int(id)
+}
+
 func (ui *UIRenderer) DebugFloatSlider(title string, sliderValue *float32, minValue float32, maxValue float32, formatStr string) int {
 	cTitle := C.CString(title)
 	cFormatStr := C.CString(formatStr)

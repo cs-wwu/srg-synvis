@@ -55,11 +55,12 @@ type GPSPosition struct {
 type Camera interface {
 	// Position and orientation
 	Position() lin.Vec3
+	Speed() float32
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
 
 	// Input processing
-	ProcessInput(window *glfw.Window)
+	ProcessInput(window *glfw.Window, speedPtr *float32)
 
 	// Hardware integration
 	EnableGPS() error

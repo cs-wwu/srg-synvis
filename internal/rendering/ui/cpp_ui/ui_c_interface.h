@@ -17,6 +17,7 @@ int ui_attach_to_window(UIRenderer* renderer, void* window_handle);
 void ui_render(UIRenderer* renderer, int image_index);
 
 int ui_altimeter(UIRenderer* renderer, const char* label, float* altitude);
+int ui_speedometer(UIRenderer* renderer, const char* label, float* speed);
 
 // Debug UI
 int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format);

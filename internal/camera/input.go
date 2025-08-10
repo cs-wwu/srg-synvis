@@ -22,7 +22,7 @@ func NewInputProcessor(camera *CameraImpl) *InputProcessor {
 
 // ProcessInput processes input from the GLFW window and moves the camera accordingly
 // This function is mainly for debugging purposes and manual control
-func (ip *InputProcessor) ProcessInput(window *glfw.Window) {
+func (ip *InputProcessor) ProcessInput(window *glfw.Window, speedPtr *float32) {
 	if window.GetAttrib(glfw.Focused) != glfw.True {
 		return
 	}
@@ -35,7 +35,7 @@ func (ip *InputProcessor) ProcessInput(window *glfw.Window) {
 	}
 
 	// Process movement inputs
-	ip.processMovementInput(window)
+	ip.processMovementInput(window, speedPtr)
 
 	// Process view inputs
 	ip.processViewInput(window)
@@ -45,19 +45,22 @@ func (ip *InputProcessor) ProcessInput(window *glfw.Window) {
 }
 
 // processMovementInput handles WASD movement and vertical controls
-func (ip *InputProcessor) processMovementInput(window *glfw.Window) {
+func (ip *InputProcessor) processMovementInput(window *glfw.Window, speedPtr *float32) {
 	tmp := lin.Vec3{}
 	front, _, up := ip.camera.getVectors()
 	speed := ip.camera.speed
+	*speedPtr = 0
 
 	// Forward/Backward movement
 	if window.GetKey(glfw.KeyW) == glfw.Press { // Move Forward
 		tmp.Scale(&front, speed)
 		ip.camera.addPosition(tmp)
+		*speedPtr = speed
 	}
 	if window.GetKey(glfw.KeyS) == glfw.Press { // Move Backward
 		tmp.Scale(&front, speed)
 		ip.camera.subPosition(tmp)
+		*speedPtr = speed
 	}
 
 	// Left/Right strafe movement
@@ -66,22 +69,26 @@ func (ip *InputProcessor) processMovementInput(window *glfw.Window) {
 		tmp.Norm(&tmp)
 		tmp.Scale(&tmp, speed)
 		ip.camera.subPosition(tmp)
+		*speedPtr = speed
 	}
 	if window.GetKey(glfw.KeyD) == glfw.Press { // Move Right
 		tmp.MultCross(&front, &up)
 		tmp.Norm(&tmp)
 		tmp.Scale(&tmp, speed)
 		ip.camera.addPosition(tmp)
+		*speedPtr = speed
 	}
 
 	// Vertical movement
 	if window.GetKey(glfw.KeySpace) == glfw.Press { // Move Up
 		tmp.Scale(&up, speed)
 		ip.camera.addPosition(tmp)
+		*speedPtr = speed
 	}
 	if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Move Down
 		tmp.Scale(&up, speed)
 		ip.camera.subPosition(tmp)
+		*speedPtr = speed
 	}
 }
 

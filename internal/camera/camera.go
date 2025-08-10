@@ -97,6 +97,10 @@ func (c *CameraImpl) Position() lin.Vec3 {
 	return *c.pos
 }
 
+func (c *CameraImpl) Speed() float32 {
+	return c.speed
+}
+
 // ViewMatrix returns the camera's view matrix
 func (c *CameraImpl) ViewMatrix() lin.Mat4x4 {
 	center := lin.Vec3{}
@@ -115,8 +119,8 @@ func (c *CameraImpl) SetPosition(newPos lin.Vec3) {
 }
 
 // ProcessInput handles input from the window
-func (c *CameraImpl) ProcessInput(window *glfw.Window) {
-	c.inputProcessor.ProcessInput(window)
+func (c *CameraImpl) ProcessInput(window *glfw.Window, speedPtr *float32) {
+	c.inputProcessor.ProcessInput(window, speedPtr)
 }
 
 // EnableGPS starts GPS integration
