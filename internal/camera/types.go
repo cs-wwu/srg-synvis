@@ -56,6 +56,7 @@ type Camera interface {
 	// Position and orientation
 	Position() lin.Vec3
 	Speed() float32
+	getOrientation() (float64, float64, float64)
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
 

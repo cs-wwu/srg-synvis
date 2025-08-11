@@ -346,6 +346,25 @@ int UIRenderer::Speedometer(std::string label, float* speedPtr) {
     return id;
 }
 
+int UIRenderer::Compass(std::string label, float* heading) {
+    int id = m_next_op_id;
+    m_next_op_id++;
+
+    UIOperation* op = new UIOperation();
+    op->id = id;
+    op->type = UIOperation::ALTIMETER;
+    op->label = label;
+    op->value_float = heading;
+    op->execute = [op](){
+        compass(op->label, 150, *(op->value_float));
+    };
+
+    m_ui_operations[id] = op;
+    m_operation_order.push_back(id);
+
+    return id;
+}
+
 /*
 Creates a slider for float values.
 */
@@ -467,6 +486,11 @@ extern "C" {
     int ui_speedometer(UIRenderer* renderer, const char* label, float* speedPtr) {
         std::string labelStr(label ? label : "");
         return renderer->Speedometer(labelStr, speedPtr);
+    }
+
+    int ui_compass(UIRenderer* renderer, const char* label, float* headingPtr) {
+        std::string labelStr(label ? label : "");
+        return renderer->Compass(labelStr, headingPtr);
     }
 
     int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format) {

@@ -183,8 +183,11 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 
 	var altitiude float32 = 0
 	var speed float32 = 0
+	var heading float32 = 0
 	app.UIRenderer.Altimeter("Altitude (Ft)", &altitiude)
 	app.UIRenderer.Speedometer("Speed (KTS)", &speed)
+	app.UIRenderer.Compass("Compass", &heading)
+	app.UIRenderer.DebugFloatSlider("Compass Heading", &heading, 0, 360, "%.1f")
 
 	for {
 		select {
@@ -212,6 +215,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
 
+			println(heading)
 			altitiude = app.Camera.Position()[1]
 			app.UIRenderer.Render(imageIdx)
 

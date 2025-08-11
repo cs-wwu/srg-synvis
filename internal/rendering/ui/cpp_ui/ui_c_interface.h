@@ -18,6 +18,7 @@ void ui_render(UIRenderer* renderer, int image_index);
 
 int ui_altimeter(UIRenderer* renderer, const char* label, float* altitude);
 int ui_speedometer(UIRenderer* renderer, const char* label, float* speed);
+int ui_compass(UIRenderer* renderer, const char* label, float* heading);
 
 // Debug UI
 int ui_debug_float_slider(UIRenderer* renderer, const char* label, float* slider_value, float min_value, float max_value, const char* format);

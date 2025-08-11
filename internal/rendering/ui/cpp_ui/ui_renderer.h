@@ -33,6 +33,7 @@ public:
 
     int Altimeter(std::string label, float* altitude);
     int Speedometer(std::string label, float* speedPtr);
+    int Compass(std::string label, float* heading);
 
     int DebugFloatSlider(std::string label, float* slider_value, float min_value, float max_value, std::string format);
     int DebugCheckbox(std::string label, bool* toggled);
