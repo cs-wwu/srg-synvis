@@ -165,7 +165,10 @@ func ParseHeightmapToCoords(heightmap string) ([]int, error) {
 
 func GenerateRoadProtobufs(heightmaps []string) error {
 	outputDir := "assets/chunks/roads/data"
-	os.MkdirAll(outputDir, 0755)
+	err := os.MkdirAll(outputDir, 0755)
+	if err != nil {
+		return fmt.Errorf("error creating output directory %s: %v", outputDir, err)
+	}
 
 	channels := make([]chan error, len(heightmaps))
 	for _, heightmap := range heightmaps {
