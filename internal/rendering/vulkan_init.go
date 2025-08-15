@@ -14,6 +14,7 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"google.golang.org/protobuf/proto"
 
@@ -483,52 +484,53 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) prepareRoads() {
-	app.roadSquares = make([]*RoadSquare, 0, len(roadEnabled))
-	for _, roadFile := range roadEnabled {
-		roadSquare := pb.RoadSquare{}
-		err := proto.Unmarshal(FileToBytes(roadFile), &roadSquare)
-		if err != nil {
-			log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
-			continue
-		}
+func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
+	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
+	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
+	roadSquare := pb.RoadSquare{}
+	file, err := FileToBytesChecked(roadFile)
+	if err != nil {
+		log.Printf("vulkan: error loading road square %s: %v", roadFile, err)
+		return nil
+	}
+	err = proto.Unmarshal(file, &roadSquare)
+	if err != nil {
+		log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
+		return nil
+	}
 
-		mapData, err := app.StreamManager.assetManager.LoadMapData(coords.LatLonToMap(
-			int(roadSquare.LatDeg),
-			int(roadSquare.LonDeg),
-		))
-		if err != nil {
-			log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-			continue
-		}
-		heightInfo := newHeightInfo(mapData.HeightData)
-		builder := newRoadBuilder(heightInfo)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	if err != nil {
+		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
+		return nil
+	}
+	heightInfo := newHeightInfo(mapData.HeightData)
+	builder := newRoadBuilder(heightInfo)
 
-		for _, road := range roadSquare.Roads {
-			renderRoad(builder, road)
-		}
+	for _, road := range roadSquare.Roads {
+		renderRoad(builder, road)
+	}
 
-		// NB: These buffers must be created while `builder` is still referenced,
-		// so that the `vertexBytes` and `indexBytes` methods return valid slices.
-		vertices := as.CreateBuffer(
-			app.Context().Device(),
-			app.Context().Platform().MemoryProperties(),
-			builder.vertexBytes(),
-			vk.BufferUsageVertexBufferBit,
-		)
+	// NB: These buffers must be created while `builder` is still referenced,
+	// so that the `vertexBytes` and `indexBytes` methods return valid slices.
+	vertices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.vertexBytes(),
+		vk.BufferUsageVertexBufferBit,
+	)
 
-		indices := as.CreateBuffer(
-			app.Context().Device(),
-			app.Context().Platform().MemoryProperties(),
-			builder.indexBytes(),
-			vk.BufferUsageIndexBufferBit,
-		)
+	indices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.indexBytes(),
+		vk.BufferUsageIndexBufferBit,
+	)
 
-		app.roadSquares = append(app.roadSquares, &RoadSquare{
-			vertices:   vertices,
-			indices:    indices,
-			indexCount: uint32(len(builder.indices)),
-		})
+	return &RoadSquare{
+		vertices:   vertices,
+		indices:    indices,
+		indexCount: uint32(len(builder.indices)),
 	}
 }
 
@@ -1309,7 +1311,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.StreamManager.UpdateCameraPosition(app.camera.Position())
 	app.StreamManager.Start()
 
-	app.prepareRoads()
+	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
+	app.RoadStreamer.UpdatePos(app.camera.Position())
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
