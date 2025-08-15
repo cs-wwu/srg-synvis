@@ -1347,19 +1347,31 @@ func OrPanic(err error, finalizers ...func()) {
 
 // Converts the given file to a byte array to be used
 func FileToBytes(filename string) []byte {
-	file, err := os.Open(filename)
+	data, err := FileToBytesChecked(filename)
 	OrPanic(err)
+	return data
+}
+
+func FileToBytesChecked(filename string) ([]byte, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
 	defer file.Close()
 
 	// Read the file into data
 	fileInfo, err := file.Stat()
-	OrPanic(err)
+	if err != nil {
+		return nil, err
+	}
 	fileSize := fileInfo.Size()
 	data := make([]byte, fileSize)
 	_, err = file.Read(data)
-	OrPanic(err)
+	if err != nil {
+		return nil, err
+	}
 
-	return data
+	return data, nil
 }
 
 // Handle stride and alignment properly
