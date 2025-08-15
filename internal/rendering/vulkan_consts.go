@@ -20,6 +20,7 @@ type Application struct {
 	height uint32
 
 	textures          []*Texture
+	roadSquares       []*RoadSquare
 	depth             *Depth
 	useStagingBuffers bool
 
@@ -38,6 +39,9 @@ type Application struct {
 	planeIndexBuffer  vk.Buffer
 	planeIndexMemory  vk.DeviceMemory
 	planeIndexCount   uint32
+
+	// Roads
+	roadPipeline vk.Pipeline
 
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
@@ -71,6 +75,10 @@ const (
 
 var texEnabled = []string{
 	"assets/textures/Default.png",
+}
+
+var roadEnabled = []string{
+	"assets/chunks/roads/data/n48w122.pb",
 }
 
 const (

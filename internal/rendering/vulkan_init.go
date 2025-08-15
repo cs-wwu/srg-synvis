@@ -14,9 +14,11 @@ import (
 	"unsafe"
 
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
 
+	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -478,7 +480,46 @@ func (app *Application) prepareTextures() {
 	for _, texFile := range texEnabled {
 		app.textures = append(app.textures, prepareTex(texFile))
 	}
+
+	app.roadSquares = make([]*RoadSquare, 0, len(roadEnabled))
+	for _, roadFile := range roadEnabled {
+		roadSquare := pb.RoadSquare{}
+		err := proto.Unmarshal(FileToBytes(roadFile), &roadSquare)
+		if err != nil {
+			log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
+			continue
+		}
+
+		builder := newRoadBuilder()
+
+		for _, road := range roadSquare.Roads {
+			renderRoad(builder, road)
+		}
+
+		// NB: These buffers must be created while `builder` is still referenced,
+		// so that the `vertexBytes` and `indexBytes` methods return valid slices.
+		vertices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.vertexBytes(),
+			vk.BufferUsageVertexBufferBit,
+		)
+
+		indices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.indexBytes(),
+			vk.BufferUsageIndexBufferBit,
+		)
+
+		app.roadSquares = append(app.roadSquares, &RoadSquare{
+			vertices:   vertices,
+			indices:    indices,
+			indexCount: uint32(len(builder.indices)),
+		})
+	}
 }
+
 func (app *Application) prepareUniformBuffers() {
 	dev := app.Context().Device()
 
@@ -898,6 +939,121 @@ func (app *Application) preparePlanePipeline() {
 	app.planePipeline = planePipeline[0]
 }
 
+func (app *Application) prepareRoadPipeline() {
+	dev := app.Context().Device()
+
+	// Load plane shaders
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/road.vert.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/road.frag.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
+
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    uint32(unsafe.Sizeof(RoadVertex{})),
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 2,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
+				// Position
+				{
+					Binding:  0,
+					Location: 0,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   0,
+				},
+				// Color
+				{
+					Binding:  0,
+					Location: 1,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   4 * 3,
+				},
+			},
+		},
+
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask: 0xF,
+				BlendEnable:    vk.False,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.True,
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.False,
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	// Create the pipeline
+	roadPipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, roadPipeline)
+	OrPanic(as.NewError(ret))
+	app.roadPipeline = roadPipeline[0]
+}
+
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
@@ -1144,6 +1300,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareSkyboxPipeline()
 	app.preparePlaneModel()
 	app.preparePlanePipeline()
+	app.prepareRoadPipeline()
 	app.prepareDescriptorPool()
 	app.prepareDescriptorSet()
 	app.prepareFramebuffers()
