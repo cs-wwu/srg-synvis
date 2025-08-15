@@ -170,7 +170,7 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 		return fmt.Errorf("error creating output directory %s: %v", outputDir, err)
 	}
 
-	channels := make([]chan error, len(heightmaps))
+	channels := make([]chan error, 0)
 	for _, heightmap := range heightmaps {
 		// Convert the heightmap string to a coordinate pair
 		coords, err := ParseHeightmapToCoords(heightmap)
