@@ -100,6 +100,10 @@ void drawRotatedText(std::string textToRotate, ImU32 color, float font_size, ImV
     ImRotateEnd(rad, rotationCenter);
 }
 
+float to_radians(float degrees) {
+    return degrees * (M_PI / 180);
+}
+
 void rect_meter_dashed(std::string label, MeterDashSide dash_side, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize;
 
@@ -203,11 +207,131 @@ void rect_meter_dashed(std::string label, MeterDashSide dash_side, float meter_v
     ImGui::PopStyleColor();
 }
 
-float to_radians(float degrees) {
-    return degrees * (M_PI / 180);
+float map_to_360_range(float x) {
+    if (x < 0) {
+        return fmod(360 + x, 360);
+    } else {
+        return fmod(x, 360);
+    }
 }
 
-int textAngle = 0;
+void ribbon_compass(std::string label, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize;
+
+    ImVec2 window_size = ImVec2(300, 45);
+    float half_width = window_size.x / 2;
+    float value_per_pixel = meter_display_range / window_size.x;
+    
+    ImGui::SetNextWindowSize(window_size);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.5f, 0.5f, 0.5f, 0.6f));
+    ImGui::Begin(label.c_str(), nullptr, flags);
+    ImVec2 canvas_pos = ImGui::GetWindowPos();
+    
+    float value_at_left = map_to_360_range(meter_value - value_per_pixel * half_width);
+    float rounded_left_value = map_to_360_range(ceil(value_at_left / value_interval) * value_interval);
+    float left_dash_pos_x = canvas_pos.x + map_to_360_range(rounded_left_value - value_at_left) / value_per_pixel;
+    float dash_count = meter_display_range / value_interval;
+    float dash_spacing = window_size.x / dash_count;
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImFont* font13 = ImGui::GetIO().Fonts->Fonts[0];
+    float font_size = 13.0f;
+    
+    for (int x = 0; x < dash_count; x++) {
+        ImU32 color = IM_COL32(200, 200, 200, 255);
+        float value_here = map_to_360_range(rounded_left_value + (x * value_interval));
+        bool is_major = ((int)value_here % (int)major_value_interval) == 0;
+
+        int startX = left_dash_pos_x + (x * dash_spacing);
+        int length = 10;
+        int dash_thickness = 1;
+        font_size = 13;
+
+        if (is_major) {
+            length = 15;
+            dash_thickness = 2;
+            color = IM_COL32(255, 255, 255, 255);
+            ImU32 textColor = IM_COL32(255, 255, 255, 255);
+            std::string text = std::to_string((int)value_here);
+
+            if (value_here == 0.0 || value_here == 360.0) {
+                text = "N";
+                font_size = 16;
+                textColor = IM_COL32(255, 0, 0, 255);
+            } else if (value_here == 90.0) {
+                text = "E";
+                font_size = 16;
+            } else if (value_here == 180.0) {
+                text = "S";
+                font_size = 16;
+            } else if (value_here == 270.0) {
+                text = "W";
+                font_size = 16;
+            }
+
+            ImVec2 textBounds = ImGui::CalcTextSize(text.c_str());
+            float posX = startX + dash_thickness - textBounds.x / 2;
+            float posY = canvas_pos.y + window_size.y - length - font_size - 5;
+            
+            draw_list->AddText(
+                font13,
+                font_size,
+                ImVec2(posX, posY),
+                textColor,
+                text.c_str()
+            );
+        }
+
+        float posY1 = canvas_pos.y + window_size.y;
+        float posY2 = posY1 - length;
+        
+        draw_list->AddRectFilled(
+            ImVec2(startX, posY1),
+            ImVec2(startX + dash_thickness, posY2),
+            color
+        );
+    }
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+
+    ImGuiWindowFlags second_flags = ImGuiWindowFlags_NoTitleBar 
+        | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground;
+    ImVec2 second_window_size = ImVec2(window_size.x, 40);
+    ImVec2 second_window_pos = canvas_pos + ImVec2(0, window_size.y);
+    ImGui::SetNextWindowSize(second_window_size);
+    ImGui::SetNextWindowPos(second_window_pos);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::Begin((label + "HeadingReader").c_str(), nullptr, second_flags);
+    draw_list = ImGui::GetWindowDrawList();
+
+    ImVec2 p1 = second_window_pos + ImVec2(second_window_size.x / 2, 0);
+    draw_list->AddTriangleFilled(
+        p1,
+        p1 + ImVec2(10, 10),
+        p1 + ImVec2(-10, 10),
+        IM_COL32(255, 255, 255, 255)
+    );
+
+    ImVec2 c1 = p1 + ImVec2(-40, 10);
+    ImVec2 c2 = p1 + ImVec2(40, 35);
+    draw_list->AddRectFilled(
+        c1,
+        c2,
+        IM_COL32(0, 0, 0, 255),
+        5.0f
+    );
+
+    char heading_text[8];
+    snprintf(heading_text, sizeof(heading_text), "%.1f°\n", meter_value);
+    ImVec2 heading_text_size = ImGui::CalcTextSize(heading_text);
+    ImVec2 heading_text_pos = (c1 + c2) / 2 - (heading_text_size / 2);
+
+    draw_list->AddText(heading_text_pos, IM_COL32(255, 255, 255, 255), heading_text);
+
+    ImGui::End();
+    ImGui::PopStyleColor();    
+}
 
 void draw_compass_dash(float angle, float relative_angle, ImVec2 dash_size, ImVec2 compass_center, float compass_radius) {
     ImU32 color = IM_COL32(200, 200, 200, 255);
@@ -279,7 +403,6 @@ void compass(std::string label, float radius, float heading_angle) {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddCircleFilled(window_center, radius, IM_COL32(25, 25, 25, 153), 0);
     
-    textAngle += 1;
     for (int x = 0; x < 360; x += 5) {
         ImVec2 dashSize = (x % 10 == 0) ? ImVec2(10, 2) : ImVec2(4, 2);
         std::string angle_label = (x % 30 == 0) ? std::to_string(x) : "";

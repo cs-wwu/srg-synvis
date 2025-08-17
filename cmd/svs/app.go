@@ -186,7 +186,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	var heading float32 = 0
 	app.UIRenderer.Altimeter("Altitude (Ft)", &altitiude)
 	app.UIRenderer.Speedometer("Speed (KTS)", &speed)
-	app.UIRenderer.Compass("Compass", &heading)
+	app.UIRenderer.CompassRibbon("Compass", &heading)
 	app.UIRenderer.DebugFloatSlider("Compass Heading", &heading, 0, 360, "%.1f")
 
 	for {

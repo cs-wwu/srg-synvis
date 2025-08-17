@@ -142,6 +142,21 @@ func (ui *UIRenderer) Compass(label string, heading *float32) int {
 	return int(id)
 }
 
+func (ui *UIRenderer) CompassRibbon(label string, heading *float32) int {
+	cLabel := C.CString(label)
+	defer C.free(unsafe.Pointer(cLabel))
+
+	headingPtr := (*C.float)(unsafe.Pointer(heading))
+
+	id := C.ui_compass_ribbon(
+		ui.cPtr,
+		cLabel,
+		headingPtr,
+	)
+
+	return int(id)
+}
+
 func (ui *UIRenderer) DebugFloatSlider(title string, sliderValue *float32, minValue float32, maxValue float32, formatStr string) int {
 	cTitle := C.CString(title)
 	cFormatStr := C.CString(formatStr)
