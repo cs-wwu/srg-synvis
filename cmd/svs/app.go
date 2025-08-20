@@ -214,7 +214,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
 
-			println(heading)
+			heading = 0
 			altitiude = app.Camera.Position()[1]
 			app.UIRenderer.Render(imageIdx)
 
