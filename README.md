@@ -101,10 +101,7 @@ sudo ./install.sh
 ## Building ImGui-Go Wrapper
 From project root:
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+go generate
 ```
 
 ## Guidelines
