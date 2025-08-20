@@ -318,7 +318,7 @@ int UIRenderer::Altimeter(std::string label, float* altitudePtr) {
     op->label = label;
     op->value_float = altitudePtr;
     op->execute = [op](){
-        rect_meter_dashed(op->label, LEFT, *(op->value_float), 500, 20, 100);
+        rect_meter_dashed(op->label, ImVec2(710, 75), LEFT, *(op->value_float), 500, 20, 100);
     };
 
     m_ui_operations[id] = op;
@@ -337,7 +337,7 @@ int UIRenderer::Speedometer(std::string label, float* speedPtr) {
     op->label = label;
     op->value_float = speedPtr;
     op->execute = [op](){
-        rect_meter_dashed(op->label, RIGHT, *(op->value_float), 200, 10, 20);
+        rect_meter_dashed(op->label, ImVec2(20, 75), RIGHT, *(op->value_float), 200, 10, 20);
     };
 
     m_ui_operations[id] = op;
@@ -375,7 +375,7 @@ int UIRenderer::CompassRibbon(std::string label, float* heading) {
     op->label = label;
     op->value_float = heading;
     op->execute = [op](){
-        ribbon_compass(op->label, *(op->value_float), 100.0f, 5.0f, 10.0f);
+        ribbon_compass(op->label, ImVec2(250, 10), *(op->value_float), 100.0f, 5.0f, 10.0f);
     };
 
     m_ui_operations[id] = op;

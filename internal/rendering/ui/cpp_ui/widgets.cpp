@@ -104,13 +104,14 @@ float to_radians(float degrees) {
     return degrees * (M_PI / 180);
 }
 
-void rect_meter_dashed(std::string label, MeterDashSide dash_side, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
+void rect_meter_dashed(std::string label, ImVec2 pos, MeterDashSide dash_side, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize;
 
     ImVec2 window_size = ImVec2(75, 300);
     float half_height = window_size.y / 2;
     float value_per_pixel = meter_display_range / window_size.y;
     
+    ImGui::SetNextWindowPos(pos);
     ImGui::SetNextWindowSize(window_size);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.5f, 0.5f, 0.5f, 0.6f));
     ImGui::Begin(label.c_str(), nullptr, flags);
@@ -215,13 +216,14 @@ float map_to_360_range(float x) {
     }
 }
 
-void ribbon_compass(std::string label, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
+void ribbon_compass(std::string label, ImVec2 pos, float meter_value, float meter_display_range, float value_interval, float major_value_interval) {
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize;
 
     ImVec2 window_size = ImVec2(300, 45);
     float half_width = window_size.x / 2;
     float value_per_pixel = meter_display_range / window_size.x;
     
+    ImGui::SetNextWindowPos(pos);
     ImGui::SetNextWindowSize(window_size);
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.5f, 0.5f, 0.5f, 0.6f));
     ImGui::Begin(label.c_str(), nullptr, flags);
@@ -440,8 +442,8 @@ void compass(std::string label, float radius, float heading_angle) {
         5.0f
     );
 
-    char heading_text[6];
-    snprintf(heading_text, sizeof(heading_text), "%.1f°", heading_angle);
+    char heading_text[8];
+    snprintf(heading_text, sizeof(heading_text), "%.1f°\n", heading_angle);
     ImVec2 heading_text_size = ImGui::CalcTextSize(heading_text);
     ImVec2 heading_text_pos = (c1 + c2) / 2 - (heading_text_size / 2);
 

@@ -7,8 +7,8 @@ enum MeterDashSide {
     RIGHT
 };
 
-void rect_meter_dashed(std::string label, MeterDashSide dash_side, float meter_value, float meter_display_range, float value_interval, float major_value_interval);
+void rect_meter_dashed(std::string label, ImVec2 pos, MeterDashSide dash_side, float meter_value, float meter_display_range, float value_interval, float major_value_interval);
 void compass(std::string label, float radius, float heading_angle);
-void ribbon_compass(std::string label, float meter_value, float meter_display_range, float value_interval, float major_value_interval);
+void ribbon_compass(std::string label, ImVec2 pos, float meter_value, float meter_display_range, float value_interval, float major_value_interval);
 
 #endif
