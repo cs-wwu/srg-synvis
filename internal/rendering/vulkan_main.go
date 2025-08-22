@@ -112,6 +112,7 @@ func (app *Application) NextFrame() {
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
+	app.RoadStreamer.UpdatePos(app.camera.Position())
 
 	app.camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically
