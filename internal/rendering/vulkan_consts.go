@@ -3,6 +3,7 @@ package rendering
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -20,7 +21,6 @@ type Application struct {
 	height uint32
 
 	textures          []*Texture
-	roadSquares       []*RoadSquare
 	depth             *Depth
 	useStagingBuffers bool
 
@@ -61,6 +61,8 @@ type Application struct {
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 
+	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
+
 	Gps bool
 	Hat bool
 
@@ -75,10 +77,6 @@ const (
 
 var texEnabled = []string{
 	"assets/textures/Default.png",
-}
-
-var roadEnabled = []string{
-	"assets/chunks/roads/data/n48w122.pb",
 }
 
 const (

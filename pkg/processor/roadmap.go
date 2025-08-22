@@ -77,7 +77,7 @@ func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 	(._;>;);
 	out body;
 	`
-	log.Printf("Posting request to osm...\n")
+	log.Printf("Posting request to osm at %v,%v...\n", lat, lon)
 	var osmData OverpassResponse
 	resp, err := http.Post(OSMURL, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
@@ -170,7 +170,7 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 		return fmt.Errorf("error creating output directory %s: %v", outputDir, err)
 	}
 
-	channels := make([]chan error, len(heightmaps))
+	channels := make([]chan error, 0)
 	for _, heightmap := range heightmaps {
 		// Convert the heightmap string to a coordinate pair
 		coords, err := ParseHeightmapToCoords(heightmap)
