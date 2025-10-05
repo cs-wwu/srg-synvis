@@ -59,6 +59,7 @@ type Camera interface {
 	getOrientation() (float64, float64, float64)
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
+	PlaneMatrix(*lin.Mat4x4)
 
 	// Input processing
 	ProcessInput(window *glfw.Window, speedPtr *float32)
@@ -71,6 +72,8 @@ type Camera interface {
 	Update(deltaTime float32)
 	GetPositionString() string
 	GetViewVectors() string
+
+	MapView() bool
 }
 
 // Mode represents different camera operation modes

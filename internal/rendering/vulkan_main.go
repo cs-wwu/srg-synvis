@@ -103,7 +103,7 @@ func (app *Application) NextFrame(speedPtr *float32) {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.Camera.ProcessInput(app.WindowHandle, speedPtr)
-	app.ubo.View = app.Camera.ViewMatrix()
+	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
 	cameraPos := app.Camera.Position()
@@ -112,9 +112,9 @@ func (app *Application) NextFrame(speedPtr *float32) {
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
+	app.RoadStreamer.UpdatePos(app.Camera.Position())
 
 	app.Camera.ProcessInput(app.WindowHandle, speedPtr)
-	app.ubo.View = app.Camera.ViewMatrix()
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
@@ -212,6 +212,16 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// Draw skybox
 	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
 
+	// Draw the plane
+	if app.Camera.MapView() {
+		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
+		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.planeVertexBuffer}, []vk.DeviceSize{0})
+		vk.CmdBindIndexBuffer(cmd, app.planeIndexBuffer, 0, vk.IndexTypeUint32)
+		vk.CmdDrawIndexed(cmd, app.planeIndexCount, 1, 0, 0, 0)
+	}
+
 	// THEN DRAW THE TERRAIN (as before)
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
@@ -234,6 +244,21 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	)
 
 	app.StreamManager.RenderChunks(cmd)
+
+	// Draw roads last
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.RoadStreamer.Lock()
+	for _, roadSquare := range app.RoadStreamer.Chunks {
+		if roadSquare != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{roadSquare.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, roadSquare.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, roadSquare.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.RoadStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

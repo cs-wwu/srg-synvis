@@ -3,6 +3,8 @@ package rendering
 import (
 	"unsafe"
 
+	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/ungerik/go3d/vec3"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -11,6 +13,13 @@ type Vertex struct {
 	Position lin.Vec3
 	TexCoord lin.Vec3
 	Normal   lin.Vec3
+}
+
+// NB: This gets cast to a byte slice, so it must have the exact same bytes
+// that the shader expects.
+type RoadVertex struct {
+	Position vec3.T
+	Color    vec3.T
 }
 
 const VertexSize = int(unsafe.Sizeof(Vertex{}))
@@ -33,11 +42,12 @@ type UniformBufferObject struct {
 	View            lin.Mat4x4 // world to camera space
 	Projection      lin.Mat4x4 // camera to clip and screen space
 	NormalM         lin.Mat4x4 // for lighting
-	LightDir        lin.Vec3   // Light direction
-	RenderDistance  float32    // Maximum render distance
-	CameraPos       lin.Vec3   // camera position for terrain warnings
-	Time            float32    // Animation time
-	DisableWarnings float32    // 1.0 = disabled, 0.0 = enabled (match shader)
+	PlaneDirection  lin.Mat4x4
+	LightDir        lin.Vec3 // Light direction
+	RenderDistance  float32  // Maximum render distance
+	CameraPos       lin.Vec3 // camera position for terrain warnings
+	Time            float32  // Animation time
+	DisableWarnings float32  // 1.0 = disabled, 0.0 = enabled (match shader)
 	DisableFog      float32
 }
 
@@ -63,6 +73,12 @@ type Texture struct {
 
 	texWidth  int32
 	texHeight int32
+}
+
+type RoadSquare struct {
+	vertices   *as.Buffer
+	indices    *as.Buffer
+	indexCount uint32
 }
 
 func (t *Texture) Destroy(dev vk.Device) {

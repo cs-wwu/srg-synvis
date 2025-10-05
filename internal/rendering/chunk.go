@@ -2,6 +2,7 @@ package rendering
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
@@ -36,6 +37,45 @@ type Chunk struct {
 	LODLevel LODLevel
 }
 
+type HeightInfo struct {
+	heightData *[MAP_LENGTH * MAP_LENGTH]uint16
+}
+
+func newHeightInfo(data []uint16) *HeightInfo {
+	return &HeightInfo{
+		heightData: (*[MAP_LENGTH * MAP_LENGTH]uint16)(data),
+	}
+}
+
+func (h *HeightInfo) Height(x, z float32) float32 {
+	localX := math.Mod(math.Mod(float64(x), 3600)+3600, 3600)
+	localZ := math.Mod(math.Mod(float64(z), 3600)+3600, 3600)
+
+	a := h.getLocal(int(localX), int(localZ))
+	b := h.getLocal(int(localX+1), int(localZ))
+	c := h.getLocal(int(localX), int(localZ+1))
+	d := h.getLocal(int(localX+1), int(localZ+1))
+
+	_, fractX := math.Modf(localX)
+	_, fractZ := math.Modf(localZ)
+
+	return lerp(lerp(a, b, fractX), lerp(c, d, fractX), fractZ)
+}
+
+func lerp(a, b float32, t float64) float32 {
+	return a + (b-a)*float32(t)
+}
+
+func (h *HeightInfo) getLocal(x, z int) float32 {
+	if (x < 0 || x >= MAP_LENGTH) || (z < 0 || z >= MAP_LENGTH) {
+		return 0.0
+	}
+
+	value := h.heightData[z*MAP_LENGTH+x]
+	// normalize from 0-65535 to -32768 to 32767
+	return float32(int(value)-32768) * HEIGHT_SCALE
+}
+
 // Loads a specific chunk into memory, x and z are the upper-left corner of
 // the chunk (world is in arcsecond coordinates)
 // Note that the world is Latitude by Longitude times 3600 (arcseconds):
@@ -46,7 +86,7 @@ type Chunk struct {
 //	--------------------- ▼
 
 // Calculate vertices and texcoords for a chunk
-func CalculateChunkVertices(heightData []uint16, waterData []uint8, chunk *Chunk) {
+func CalculateChunkVertices(heightInfo *HeightInfo, waterData []uint8, chunk *Chunk) {
 	// Calculate vertex stride based on LOD
 	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on right/bottom edges
@@ -71,13 +111,12 @@ func CalculateChunkVertices(heightData []uint16, waterData []uint8, chunk *Chunk
 			}
 
 			// Direct array access - much faster than method image
-			pixelValue := heightData[localZ*MAP_LENGTH+localX]
-			height := float32(int(pixelValue) - 32768) // normalize from 0-65535 to -32768 to 32767
+			height := heightInfo.getLocal(localX, localZ)
 			isWater := waterData[localZ*MAP_LENGTH+localX]
 
 			idx := z*verticesPerSide + x
 			chunk.Vertices[idx] = Vertex{
-				Position: lin.Vec3{float32(worldX), height * HEIGHT_SCALE, float32(worldZ)},
+				Position: lin.Vec3{float32(worldX), height, float32(worldZ)},
 				TexCoord: lin.Vec3{
 					float32(localX) / float32(MAP_LENGTH),
 					float32(localZ) / float32(MAP_LENGTH),
