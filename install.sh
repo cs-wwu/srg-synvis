@@ -62,6 +62,8 @@ fi
 # Install ImGui
 echo -e "${GREEN}Installing ImGui v$IMGUI_VERSION...${NC}"
 rm -r "$IMGUI_INSTALL_DIR"
+rm -r "imgui-build"
+mkdir "imgui-build"
 mkdir -p "$TEMP_IMGUI_DIR"
 mkdir -p "$IMGUI_INSTALL_DIR"
 mkdir -p "$IMGUI_INSTALL_DIR/backends"
@@ -75,6 +77,11 @@ cp "$EXTRACTED_IMGUI/backends/imgui_impl_glfw.h" "$IMGUI_INSTALL_DIR/backends"
 cp "$EXTRACTED_IMGUI/backends/imgui_impl_vulkan.cpp" "$IMGUI_INSTALL_DIR/backends"
 cp "$EXTRACTED_IMGUI/backends/imgui_impl_vulkan.h" "$IMGUI_INSTALL_DIR/backends"
 rm -r "$TEMP_IMGUI_DIR"
+
+cd imgui-build
+cmake ..
+make
+cd ..
 
 # Check if Go is already installed and version is sufficient
 if command -v go >/dev/null 2>&1; then

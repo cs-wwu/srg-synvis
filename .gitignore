@@ -35,6 +35,7 @@ go.work
 experimemtal/vulkan/shape/VulkanTest
 
 #Imgui Build
-/build
+/imgui-build
 internal/rendering/ui/build
 imgui.ini
+pkg/imgui
