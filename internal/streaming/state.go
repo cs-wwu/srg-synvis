@@ -84,7 +84,7 @@ func isValidTransition(from, to ChunkState) bool {
 	case StateLoading:
 		return to == StateReady
 	case StateReady:
-		return to == StateEvicting
+		return to == StateEvicting || to == StateQueued
 	case StateEvicting:
 		return false // Can only go to Unloaded
 	default:

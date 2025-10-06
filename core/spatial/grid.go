@@ -15,7 +15,7 @@ type ChunkSelector struct {
 
 	// Current selection state
 	desiredChunks   map[GridCoord]ChunkSpec
-	availableChunks map[GridCoord]bool
+	availableChunks map[GridCoord]ChunkSpec
 
 	// Cache for performance
 	lastCameraPos    lin.Vec2
@@ -37,7 +37,7 @@ func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector
 		chunkSize:        chunkSize,
 		lodStrategy:      lodStrategy,
 		desiredChunks:    make(map[GridCoord]ChunkSpec),
-		availableChunks:  make(map[GridCoord]bool),
+		availableChunks:  make(map[GridCoord]ChunkSpec),
 		dirtyChunks:      make([]ChunkSpec, 0),
 		dirtyChunksDirty: true,
 	}
@@ -173,7 +173,8 @@ func (cs *ChunkSelector) GetDirtyChunks() []ChunkSpec {
 
 	// Now filter for missing chunks in deterministic order
 	for _, spec := range allDesired {
-		if !cs.availableChunks[spec.GridCoord] {
+		existing, exists := cs.availableChunks[spec.GridCoord]
+		if !exists || existing.LODLevel != spec.LODLevel {
 			cs.dirtyChunks = append(cs.dirtyChunks, spec)
 		}
 	}
@@ -218,11 +219,11 @@ func (cs *ChunkSelector) GetDesiredChunks() []ChunkSpec {
 }
 
 // MarkChunkAvailable marks a chunk as available (loaded by StreamManager)
-func (cs *ChunkSelector) MarkChunkAvailable(coord GridCoord) {
+func (cs *ChunkSelector) MarkChunkAvailable(spec ChunkSpec) {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	cs.availableChunks[coord] = true
+	cs.availableChunks[spec.GridCoord] = spec
 	cs.dirtyChunksDirty = true
 }
 
@@ -240,7 +241,8 @@ func (cs *ChunkSelector) IsChunkAvailable(coord GridCoord) bool {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
 
-	return cs.availableChunks[coord]
+	_, exists := cs.availableChunks[coord]
+	return exists
 }
 
 // IsChunkDesired returns true if this chunk should exist given current camera position
@@ -309,7 +311,7 @@ func (cs *ChunkSelector) Stats() ChunkSelectorStats {
 	// Count how many desired chunks are actually available
 	desiredAndAvailable := 0
 	for coord := range cs.desiredChunks {
-		if cs.availableChunks[coord] {
+		if _, exists := cs.availableChunks[coord]; exists {
 			desiredAndAvailable++
 		}
 	}
@@ -331,7 +333,7 @@ func (cs *ChunkSelector) Clear() {
 	defer cs.mu.Unlock()
 
 	cs.desiredChunks = make(map[GridCoord]ChunkSpec)
-	cs.availableChunks = make(map[GridCoord]bool)
+	cs.availableChunks = make(map[GridCoord]ChunkSpec)
 	cs.dirtyChunks = cs.dirtyChunks[:0]
 	cs.dirtyChunksDirty = true
 }

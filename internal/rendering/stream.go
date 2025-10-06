@@ -269,7 +269,7 @@ func (sm *StreamManager) GetChunkState(coord spatial.GridCoord) streaming.ChunkS
 }
 
 // MarkChunkAvailable marks chunk as available (called by WorkerPool)
-func (sm *StreamManager) MarkChunkAvailable(coord spatial.GridCoord) {
+func (sm *StreamManager) MarkChunkAvailable(coord spatial.ChunkSpec) {
 	sm.chunkSelector.MarkChunkAvailable(coord)
 }
 

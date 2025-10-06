@@ -39,7 +39,7 @@ type ChunkLoader interface {
 	EvictChunk(coord spatial.GridCoord) error
 	SetChunkState(coord spatial.GridCoord, state ChunkState, priority float32, lodLevel int) error
 	GetChunkState(coord spatial.GridCoord) ChunkState
-	MarkChunkAvailable(coord spatial.GridCoord)
+	MarkChunkAvailable(coord spatial.ChunkSpec)
 }
 
 // WorkerPoolConfig holds configuration for the worker pool
@@ -150,7 +150,7 @@ func (wp *WorkerPool) IsRunning() bool {
 func (wp *WorkerPool) QueueLoadJob(spec spatial.ChunkSpec, mapCoord string) {
 	// Check if already queued or loading
 	currentState := wp.loader.GetChunkState(spec.GridCoord)
-	if currentState != StateUnloaded {
+	if currentState != StateUnloaded && currentState != StateReady {
 		return
 	}
 
@@ -251,7 +251,7 @@ func (wp *WorkerPool) processLoadJob(workerID int, job LoadJob) {
 	}
 
 	// Mark as available in ChunkSelector
-	wp.loader.MarkChunkAvailable(job.Spec.GridCoord)
+	wp.loader.MarkChunkAvailable(job.Spec)
 }
 
 // processEvictJob handles evicting a chunk

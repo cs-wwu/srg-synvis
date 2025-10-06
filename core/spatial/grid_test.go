@@ -192,7 +192,10 @@ func TestChunkAvailabilityTracking(t *testing.T) {
 	}
 
 	// Mark as available
-	cs.MarkChunkAvailable(coord)
+	cs.MarkChunkAvailable(ChunkSpec{
+		GridCoord: coord,
+		LODLevel:  1,
+	})
 	if !cs.IsChunkAvailable(coord) {
 		t.Error("Chunk should be available after marking")
 	}
@@ -224,7 +227,7 @@ func TestMissingChunks(t *testing.T) {
 
 	// Mark some chunks as available
 	if len(desired) > 0 {
-		cs.MarkChunkAvailable(desired[0].GridCoord)
+		cs.MarkChunkAvailable(desired[0])
 
 		newMissing := cs.GetDirtyChunks()
 		if len(newMissing) != len(desired)-1 {
@@ -301,7 +304,9 @@ func TestClear(t *testing.T) {
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
 	coord := GridCoord{1, 1}
-	cs.MarkChunkAvailable(coord)
+	cs.MarkChunkAvailable(ChunkSpec{
+		GridCoord: coord,
+	})
 
 	// Verify state exists
 	if len(cs.GetDesiredChunks()) == 0 {
@@ -344,7 +349,7 @@ func TestStats(t *testing.T) {
 	// Mark some as available
 	desired := cs.GetDesiredChunks()
 	if len(desired) > 1 {
-		cs.MarkChunkAvailable(desired[0].GridCoord)
+		cs.MarkChunkAvailable(desired[0])
 	}
 
 	// Check stats
@@ -395,7 +400,7 @@ func TestConcurrentAccess(t *testing.T) {
 	go func() {
 		for i := range 100 {
 			coord := GridCoord{i % 10, i % 10}
-			cs.MarkChunkAvailable(coord)
+			cs.MarkChunkAvailable(ChunkSpec{GridCoord: coord})
 			cs.IsChunkAvailable(coord)
 			cs.MarkChunkUnavailable(coord)
 		}
@@ -457,6 +462,6 @@ func BenchmarkMarkChunkAvailable(b *testing.B) {
 
 	for i := 0; b.Loop(); i++ {
 		coord := GridCoord{i % 100, i % 100}
-		cs.MarkChunkAvailable(coord)
+		cs.MarkChunkAvailable(ChunkSpec{GridCoord: coord})
 	}
 }

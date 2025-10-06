@@ -28,7 +28,7 @@ func (cs *ChunkSelector) GetDetailedStats() string {
 
 	for _, spec := range cs.desiredChunks {
 		lodCounts[spec.LODLevel]++
-		if !cs.availableChunks[spec.GridCoord] {
+		if _, exists := cs.availableChunks[spec.GridCoord]; !exists {
 			lodMissing[spec.LODLevel]++
 		}
 	}
@@ -65,12 +65,12 @@ func (cs *ChunkSelector) GetDetailedStats() string {
 	for _, spec := range cs.desiredChunks {
 		if spec.InFrustum {
 			inFrustumCount++
-			if !cs.availableChunks[spec.GridCoord] {
+			if _, exists := cs.availableChunks[spec.GridCoord]; !exists {
 				inFrustumMissing++
 			}
 		} else {
 			outFrustumCount++
-			if !cs.availableChunks[spec.GridCoord] {
+			if _, exists := cs.availableChunks[spec.GridCoord]; !exists {
 				outFrustumMissing++
 			}
 		}
@@ -184,7 +184,7 @@ func (cs *ChunkSelector) VisualizeSelection() string {
 				symbol = "  C  "
 			} else if spec, desired := cs.desiredChunks[coord]; desired {
 				// Chunk is desired
-				available := cs.availableChunks[coord]
+				_, available := cs.availableChunks[coord]
 
 				var baseSymbol string
 				if available {
@@ -294,7 +294,7 @@ func (cs *ChunkSelector) VisualizeLoadingEfficiency() string {
 
 	// Categorize chunks by distance
 	for _, spec := range cs.desiredChunks {
-		available := cs.availableChunks[spec.GridCoord]
+		_, available := cs.availableChunks[spec.GridCoord]
 
 		for i := range groups {
 			if spec.Distance >= groups[i].minDist && spec.Distance < groups[i].maxDist {
@@ -354,7 +354,7 @@ func (cs *ChunkSelector) AnalyzeNeighborCoverage() string {
 	stats := neighborStats{}
 
 	for coord := range cs.desiredChunks {
-		if !cs.availableChunks[coord] {
+		if _, exists := cs.availableChunks[coord]; !exists {
 			continue // Only analyze available chunks
 		}
 
@@ -364,7 +364,7 @@ func (cs *ChunkSelector) AnalyzeNeighborCoverage() string {
 		for _, neighborCoord := range neighbors {
 			if _, desired := cs.desiredChunks[neighborCoord]; desired {
 				stats.totalNeighbors++
-				if cs.availableChunks[neighborCoord] {
+				if _, exists := cs.availableChunks[neighborCoord]; exists {
 					stats.availableNeighbors++
 				}
 			}
