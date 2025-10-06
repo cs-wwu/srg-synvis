@@ -38,7 +38,7 @@ func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector
 		lodStrategy:      lodStrategy,
 		desiredChunks:    make(map[GridCoord]ChunkSpec),
 		availableChunks:  make(map[GridCoord]bool),
-		dirtyChunks:      make([]ChunkSpec, 0, 100),
+		dirtyChunks:      make([]ChunkSpec, 0),
 		dirtyChunksDirty: true,
 	}
 }
