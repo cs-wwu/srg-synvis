@@ -33,3 +33,6 @@ go.work
 
 # Vulkan out file
 experimemtal/vulkan/shape/VulkanTest
+
+# Environment file
+.env
