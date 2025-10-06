@@ -237,7 +237,7 @@ func (cs *ChunkSelector) VisualizeSelection() string {
 
 // VisualizePriorities generates a visualization of chunk priorities
 func (cs *ChunkSelector) VisualizePriorities() string {
-	missing := cs.GetMissingChunks()
+	missing := cs.GetDirtyChunks()
 
 	var sb strings.Builder
 

@@ -378,7 +378,7 @@ func (sm *StreamManager) handleCameraUpdate(newPos lin.Vec2) {
 // periodicUpdate runs maintenance tasks
 func (sm *StreamManager) periodicUpdate() {
 	// Queue missing chunks for loading
-	sm.queueMissingChunks()
+	sm.queueChunkUpdates()
 
 	// Check for chunks that need eviction (when memory is getting full)
 	sm.checkMemoryPressure()
@@ -400,11 +400,11 @@ func (sm *StreamManager) updateChunkSelection() {
 	sm.chunkSelector.UpdateSelection(sm.lastCameraPos, frustum, sm.cfg.RenderDistance)
 }
 
-// queueMissingChunks adds missing chunks to the load queue
-func (sm *StreamManager) queueMissingChunks() {
-	missingChunks := sm.chunkSelector.GetMissingChunks()
+// queueChunkUpdates adds missing chunks to the load queue
+func (sm *StreamManager) queueChunkUpdates() {
+	dirty := sm.chunkSelector.GetDirtyChunks()
 
-	for _, spec := range missingChunks {
+	for _, spec := range dirty {
 		// Determine map coordinate
 		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
 

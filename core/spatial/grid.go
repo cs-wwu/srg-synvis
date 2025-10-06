@@ -18,10 +18,10 @@ type ChunkSelector struct {
 	availableChunks map[GridCoord]bool
 
 	// Cache for performance
-	lastCameraPos      lin.Vec2
-	lastRenderDist     float32
-	missingChunks      []ChunkSpec
-	missingChunksDirty bool
+	lastCameraPos    lin.Vec2
+	lastRenderDist   float32
+	dirtyChunks      []ChunkSpec
+	dirtyChunksDirty bool
 
 	// Thread safety
 	mu sync.RWMutex
@@ -34,12 +34,12 @@ func NewChunkSelector(chunkSize float32, lodStrategy LODStrategy) *ChunkSelector
 	}
 
 	return &ChunkSelector{
-		chunkSize:          chunkSize,
-		lodStrategy:        lodStrategy,
-		desiredChunks:      make(map[GridCoord]ChunkSpec),
-		availableChunks:    make(map[GridCoord]bool),
-		missingChunks:      make([]ChunkSpec, 0, 100),
-		missingChunksDirty: true,
+		chunkSize:        chunkSize,
+		lodStrategy:      lodStrategy,
+		desiredChunks:    make(map[GridCoord]ChunkSpec),
+		availableChunks:  make(map[GridCoord]bool),
+		dirtyChunks:      make([]ChunkSpec, 0, 100),
+		dirtyChunksDirty: true,
 	}
 }
 
@@ -61,7 +61,7 @@ func (cs *ChunkSelector) UpdateSelection(cameraPos lin.Vec2, viewFrustum Frustum
 		cs.addChunksAtRadius(centerCoord, radius, cameraPos, viewFrustum, renderDistance)
 	}
 
-	cs.missingChunksDirty = true
+	cs.dirtyChunksDirty = true
 }
 
 // addChunksAtRadius adds chunks at a specific distance from center
@@ -142,17 +142,17 @@ func (cs *ChunkSelector) calculatePriorityByDistance(distance float32, inFrustum
 	return basePriority
 }
 
-// GetMissingChunks returns desired chunks that are not available, sorted by priority (highest first)
-func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
+// GetDirtyChunks returns desired chunks that are not available, sorted by priority (highest first)
+func (cs *ChunkSelector) GetDirtyChunks() []ChunkSpec {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
-	if !cs.missingChunksDirty {
-		return cs.missingChunks
+	if !cs.dirtyChunksDirty {
+		return cs.dirtyChunks
 	}
 
 	// Rebuild missing chunks list
-	cs.missingChunks = cs.missingChunks[:0]
+	cs.dirtyChunks = cs.dirtyChunks[:0]
 
 	// Convert map to slice first for deterministic iteration
 	allDesired := make([]ChunkSpec, 0, len(cs.desiredChunks))
@@ -174,17 +174,17 @@ func (cs *ChunkSelector) GetMissingChunks() []ChunkSpec {
 	// Now filter for missing chunks in deterministic order
 	for _, spec := range allDesired {
 		if !cs.availableChunks[spec.GridCoord] {
-			cs.missingChunks = append(cs.missingChunks, spec)
+			cs.dirtyChunks = append(cs.dirtyChunks, spec)
 		}
 	}
 
-	cs.missingChunksDirty = false
-	return cs.missingChunks
+	cs.dirtyChunksDirty = false
+	return cs.dirtyChunks
 }
 
 // GetHighestPriorityMissing returns the missing chunk with highest priority
 func (cs *ChunkSelector) GetHighestPriorityMissing() *ChunkSpec {
-	missing := cs.GetMissingChunks()
+	missing := cs.GetDirtyChunks()
 	if len(missing) == 0 {
 		return nil
 	}
@@ -223,7 +223,7 @@ func (cs *ChunkSelector) MarkChunkAvailable(coord GridCoord) {
 	defer cs.mu.Unlock()
 
 	cs.availableChunks[coord] = true
-	cs.missingChunksDirty = true
+	cs.dirtyChunksDirty = true
 }
 
 // MarkChunkUnavailable marks a chunk as unavailable (unloaded by StreamManager)
@@ -232,7 +232,7 @@ func (cs *ChunkSelector) MarkChunkUnavailable(coord GridCoord) {
 	defer cs.mu.Unlock()
 
 	delete(cs.availableChunks, coord)
-	cs.missingChunksDirty = true
+	cs.dirtyChunksDirty = true
 }
 
 // IsChunkAvailable returns true if StreamManager has reported this chunk as available
@@ -332,6 +332,6 @@ func (cs *ChunkSelector) Clear() {
 
 	cs.desiredChunks = make(map[GridCoord]ChunkSpec)
 	cs.availableChunks = make(map[GridCoord]bool)
-	cs.missingChunks = cs.missingChunks[:0]
-	cs.missingChunksDirty = true
+	cs.dirtyChunks = cs.dirtyChunks[:0]
+	cs.dirtyChunksDirty = true
 }

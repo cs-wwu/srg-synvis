@@ -215,7 +215,7 @@ func TestMissingChunks(t *testing.T) {
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
 	// Initially, all should be missing
-	missing := cs.GetMissingChunks()
+	missing := cs.GetDirtyChunks()
 	desired := cs.GetDesiredChunks()
 
 	if len(missing) != len(desired) {
@@ -226,7 +226,7 @@ func TestMissingChunks(t *testing.T) {
 	if len(desired) > 0 {
 		cs.MarkChunkAvailable(desired[0].GridCoord)
 
-		newMissing := cs.GetMissingChunks()
+		newMissing := cs.GetDirtyChunks()
 		if len(newMissing) != len(desired)-1 {
 			t.Errorf("Expected %d missing chunks after marking one available, got %d",
 				len(desired)-1, len(newMissing))
@@ -251,7 +251,7 @@ func TestHighestPriorityMissing(t *testing.T) {
 	}
 
 	// Should be closest to camera (highest priority)
-	missing := cs.GetMissingChunks()
+	missing := cs.GetDirtyChunks()
 	for _, chunk := range missing {
 		if chunk.Priority > highest.Priority {
 			t.Errorf("Found chunk with higher priority than 'highest': %f > %f",
@@ -386,7 +386,7 @@ func TestConcurrentAccess(t *testing.T) {
 	go func() {
 		for range 100 {
 			cs.GetDesiredChunks()
-			cs.GetMissingChunks()
+			cs.GetDirtyChunks()
 			cs.Stats()
 		}
 		done <- true
@@ -448,7 +448,7 @@ func BenchmarkGetMissingChunks(b *testing.B) {
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
 	for b.Loop() {
-		cs.GetMissingChunks()
+		cs.GetDirtyChunks()
 	}
 }
 
