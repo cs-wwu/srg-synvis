@@ -450,16 +450,11 @@ func (sm *StreamManager) GetRenderableChunks() []*RenderableChunk {
 	sm.renderMutex.RLock()
 	defer sm.renderMutex.RUnlock()
 
-	// Only return chunks that are in Ready state
-	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
-
-	chunks := make([]*RenderableChunk, 0, len(readyChunks))
-	for _, record := range readyChunks {
-		if renderableChunk, exists := sm.renderableChunks[record.GridCoord]; exists {
-			// Touch the chunk since it's being rendered
-			sm.stateManager.TouchChunk(record.GridCoord)
-			chunks = append(chunks, renderableChunk)
-		}
+	chunks := make([]*RenderableChunk, 0)
+	for _, chunk := range sm.renderableChunks {
+		// Touch the chunk since it's being rendered
+		sm.stateManager.TouchChunk(chunk.GridCoord)
+		chunks = append(chunks, chunk)
 	}
 
 	return chunks
