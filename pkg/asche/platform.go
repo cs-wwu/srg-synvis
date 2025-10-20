@@ -72,7 +72,7 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		orPanic(err)
 		validationLayers, missing = checkExisting(actualValidationLayers, requiredValidationLayers)
 		if missing > 0 {
-			log.Println("vulkan warning: missing", missing, "required validation layers during init")
+			log.Fatalln("vulkan error: missing", missing, "required validation layers during init")
 		}
 	}
 
