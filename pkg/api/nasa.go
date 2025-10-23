@@ -136,11 +136,12 @@ func heightmapToURL(heightmap string) (string, error) {
 }
 
 // Authenticates the client by attempting to authenticate multiple times
-func authenticate(client *http.Client, url, location string) error {
-	creds, err := promptCredentials()
-	if err != nil {
-		return fmt.Errorf("failed to get credentials: %v", err)
-	}
+func authenticate(client *http.Client, url, location string, creds Credentials) error {
+	//creds, err := promptCredentials()
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get credentials: %v", err)
+	// }
+	var err error
 
 	// Attempt authentication
 	for range 3 {
@@ -158,7 +159,7 @@ func authenticate(client *http.Client, url, location string) error {
 
 // attempts to download the given url
 // on the user to defer response.Body.Close()
-func attemptDownload(client *http.Client, filepath, url string) error {
+func attemptDownload(client *http.Client, filepath, url string, creds Credentials) error {
 	resp, err := getResponse(client, url)
 	if err != nil {
 		return fmt.Errorf("failed to get response: %v", err)
@@ -177,7 +178,7 @@ func attemptDownload(client *http.Client, filepath, url string) error {
 
 	// Follow redirects to authenticate
 	location := resp.Header.Get("Location")
-	authenticate(client, url, location)
+	authenticate(client, url, location, creds)
 
 	// Retries the download after authenticating
 	resp, err = getResponse(client, url)
@@ -198,7 +199,7 @@ func attemptDownload(client *http.Client, filepath, url string) error {
 }
 
 // Downloads the selection of heightmaps to directoryPath
-func DownloadHeightmaps(heightmaps []string, directoryPath string) error {
+func DownloadHeightmaps(heightmaps []string, directoryPath, username, password string) error {
 	// Create a client
 	client, err := createClient()
 	if err != nil {
@@ -214,7 +215,11 @@ func DownloadHeightmaps(heightmaps []string, directoryPath string) error {
 		}
 
 		filepath := directoryPath + heightmap + ".zip"
-		err = attemptDownload(client, filepath, heightmapURL)
+		creds := Credentials{
+			Username: username,
+			Password: password,
+		}
+		err = attemptDownload(client, filepath, heightmapURL, creds)
 		if err != nil {
 			return fmt.Errorf("failed to download heightmap: %v", err)
 		}

@@ -33,6 +33,8 @@ type Config struct {
 	region    string // Custom region string (e.g., "n48w123,n48w122")
 	boundBox  string // Bounding box for area (e.g., "48.5,-123.5,47.5,-122.5")
 	usePreset string // Preset region name (e.g., "washington", "bellingham")
+	username  string // Nasa EarthData username
+	password  string // Nasa EarthData password
 
 	// Output options
 	outputDir    string
@@ -83,6 +85,8 @@ func parseFlags() *Config {
 	flag.StringVar(&cfg.region, "region", "", "Comma-separated list of region codes (e.g., 'n48w123,n48w122')")
 	flag.StringVar(&cfg.boundBox, "bbox", "", "Bounding box coordinates (e.g., '49,-125,45,-118') in format 'n, e, s, w'")
 	flag.StringVar(&cfg.usePreset, "preset", "", fmt.Sprintf("Use preset region: %v", getPresetNames()))
+	flag.StringVar(&cfg.username, "username", "", "EarthData username");
+	flag.StringVar(&cfg.password, "password", "", "EarthData password");
 
 	// Output option flags
 	flag.StringVar(&cfg.outputDir, "out", "assets/maps/", "Output directory for downloaded files")
@@ -191,7 +195,7 @@ func abs(x int) int {
 // creating a client and signing in once
 // Processes an array of heightmaps into pngs into the targetDir
 // See bottom of heightmap.go for example usage
-func NasaProcessHeightmaps(heightmaps []string, targetDir string) error {
+func NasaProcessHeightmaps(heightmaps []string, targetDir, username, password string) error {
 	if !strings.HasSuffix(targetDir, "/") { // append a "/" if necessary
 		targetDir += "/"
 	}
@@ -212,7 +216,7 @@ func NasaProcessHeightmaps(heightmaps []string, targetDir string) error {
 	heightmaps = newHeightmaps
 
 	// This should only be called once due to client cookies and sign-in
-	err := api.DownloadHeightmaps(heightmaps, targetDir)
+	err := api.DownloadHeightmaps(heightmaps, targetDir, username, password)
 	if err != nil {
 		return fmt.Errorf("failed to download heightmaps: %w", err)
 	}
@@ -354,7 +358,7 @@ func main() {
 	}
 
 	if cfg.useNASA {
-		if err := NasaProcessHeightmaps(heightmaps, cfg.outputDir); err != nil {
+		if err := NasaProcessHeightmaps(heightmaps, cfg.outputDir, cfg.username, cfg.password); err != nil {
 			log.Printf("Failed to download Nasa Heightmaps: %v", err)
 		}
 	}
