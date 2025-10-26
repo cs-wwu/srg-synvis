@@ -1,6 +1,6 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
-class JsPlatform : Platform {
+class JsPlatform: Platform {
     override val name: String = "Web with Kotlin/JS"
 }
 

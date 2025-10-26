@@ -1,4 +1,4 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
 interface Platform {
     val name: String

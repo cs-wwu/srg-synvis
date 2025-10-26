@@ -1,4 +1,4 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport

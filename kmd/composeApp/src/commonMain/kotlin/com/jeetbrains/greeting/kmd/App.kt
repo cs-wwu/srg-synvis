@@ -1,4 +1,4 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -29,17 +29,10 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
-import demo1.composeapp.generated.resources.Res
-import demo1.composeapp.generated.resources.compose_multiplatform
+import kmd.composeapp.generated.resources.Res
+import kmd.composeapp.generated.resources.compose_multiplatform
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.datetime.IllegalTimeZoneException
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.LocalTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 
 data class BoundingBox(val North: Int, val South: Int, val East: Int, val West: Int)

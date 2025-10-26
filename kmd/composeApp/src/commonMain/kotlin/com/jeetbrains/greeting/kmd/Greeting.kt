@@ -1,4 +1,4 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
 class Greeting {
     private val platform = getPlatform()

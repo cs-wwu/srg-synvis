@@ -1,4 +1,4 @@
-package com.jeetbrains.greeting.demo1
+package com.jeetbrains.greeting.kmd
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

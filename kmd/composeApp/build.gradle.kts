@@ -16,20 +16,20 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-
+    
     jvm()
-
+    
     js {
         browser()
         binaries.executable()
     }
-
+    
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser()
         binaries.executable()
     }
-
+    
     sourceSets {
         androidMain.dependencies {
             implementation(compose.preview)
@@ -44,10 +44,6 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-        }
-        webMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.22.0"))
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -60,11 +56,11 @@ kotlin {
 }
 
 android {
-    namespace = "com.jeetbrains.greeting.demo1"
+    namespace = "com.jeetbrains.greeting.kmd"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.jeetbrains.greeting.demo1"
+        applicationId = "com.jeetbrains.greeting.kmd"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
@@ -92,11 +88,11 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "com.jeetbrains.greeting.demo1.MainKt"
+        mainClass = "com.jeetbrains.greeting.kmd.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "com.jeetbrains.greeting.demo1"
+            packageName = "com.jeetbrains.greeting.kmd"
             packageVersion = "1.0.0"
         }
     }

@@ -214,12 +214,14 @@ func DownloadHeightmaps(heightmaps []string, directoryPath, username, password s
 			return fmt.Errorf("failed to convert heightmap to url: %v", err)
 		}
 
-		filepath := directoryPath + heightmap + ".zip"
+		filepath1 := directoryPath + heightmap + ".zip"
 		creds := Credentials{
 			Username: username,
 			Password: password,
 		}
-		err = attemptDownload(client, filepath, heightmapURL, creds)
+		absPath, err := filepath.Abs(filepath1)
+		fmt.Println("Absolute path:", absPath)
+		err = attemptDownload(client, filepath1, heightmapURL, creds)
 		if err != nil {
 			return fmt.Errorf("failed to download heightmap: %v", err)
 		}
