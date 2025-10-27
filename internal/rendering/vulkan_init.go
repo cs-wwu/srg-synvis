@@ -611,7 +611,7 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 
 func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspaces/data/Class_Airspace(2).geojson"
+	airspaceFile := "assets/chunks/airspace/data/Class_Airspace(2).geojson"
 	var geojson GeoJSON
 	file, err := FileToBytesChecked(airspaceFile)
 	if err != nil {
