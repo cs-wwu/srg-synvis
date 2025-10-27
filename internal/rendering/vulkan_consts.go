@@ -43,6 +43,10 @@ type Application struct {
 	planeIndexMemory  vk.DeviceMemory
 	planeIndexCount   uint32
 
+	//Airspaces
+	AispaceStreamer  *streaming.DegreeChunkStreamer[*Airspace]
+	airspacePipeline vk.Pipeline
+
 	// Roads
 	roadPipeline vk.Pipeline
 
