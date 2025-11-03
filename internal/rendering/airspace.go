@@ -3,7 +3,6 @@ package rendering
 import (
 	"unsafe"
 
-	"github.com/ungerik/go3d/float64/vec3"
 	as "github.com/vulkan-go/asche"
 )
 
@@ -35,7 +34,7 @@ type AirspaceBuilder struct {
 }
 
 type AirspaceVertex struct {
-	Position vec3.T
+	Position [3]float32
 	Color    [4]float32
 }
 
@@ -49,7 +48,7 @@ type Airspace struct {
 type AirspaceInstance struct {
 	LowerAlt float32
 	UpperAlt float32
-	Color    [3]float32
+	Color    [4]float32
 }
 
 const AIRSPACE_ALTITUDE_OFFSET = float32(100.0)
@@ -90,7 +89,7 @@ func (air *AirspaceBuilder) indexBytes() []byte {
 	return unsafe.Slice((*byte)(unsafe.Pointer(&air.indices[0])), size)
 }
 
-func renderAirspace(builder *AirspaceBuilder, feature Feature, color [3]float32) {
+func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32) {
 	coords := feature.Geometry
 	props := feature.Properties
 	if len(coords.Coordinates) == 0 {
@@ -116,13 +115,13 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [3]float32)
 		upperAlt := props.UpperVal
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
-			Position: vec3.T{float64(x), float64(lowerAlt), float64(y)},
-			Color:    [4]float32{1.0, 0.0, 1.0, .03},
+			Position: [3]float32{float32(x), float32(lowerAlt), float32(y)},
+			Color:    [4]float32(color),
 		})
 
 		topIds[i] = builder.addVertex(AirspaceVertex{
-			Position: vec3.T{float64(x), float64(upperAlt), float64(y)},
-			Color:    [4]float32{1.0, 0.0, 1.0, .03},
+			Position: [3]float32{float32(x), float32(upperAlt), float32(y)},
+			Color:    [4]float32(color),
 		})
 	}
 
