@@ -113,17 +113,17 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [3]float32)
 
 		height := builder.heightInfo.Height(x, y)
 		lowerAlt := props.LowerVal + int(height) + 10
-		// upperAlt := props.UpperVal
+		upperAlt := props.UpperVal
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
 			Position: vec3.T{float64(x), float64(lowerAlt), float64(y)},
-			Color:    [4]float32{1.0, 0.0, 1.0, 1},
+			Color:    [4]float32{1.0, 0.0, 1.0, .03},
 		})
 
-		// topIds[i] = builder.addVertex(AirspaceVertex{
-		// 	Position: vec3.T{float64(x), float64(upperAlt), float64(y)},
-		// 	Color:    [4]float32{1.0, 0.0, 1.0, 1},
-		// })
+		topIds[i] = builder.addVertex(AirspaceVertex{
+			Position: vec3.T{float64(x), float64(upperAlt), float64(y)},
+			Color:    [4]float32{1.0, 0.0, 1.0, .03},
+		})
 	}
 
 	// Fan triangulation from first vertex
@@ -133,18 +133,9 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [3]float32)
 	}
 
 	// build walls
-	// for i := 0; i < n-1; i++ {
-	// 	builder.addTriangle(topIds[i+1], bottomIds[i], topIds[i])
-	// 	builder.addTriangle(topIds[i+1], bottomIds[i+1], bottomIds[i])
-	// }
-}
-
-func instanceBytes(i []AirspaceInstance) []byte {
-	if len(i) == 0 {
-		return nil
+	for i := 0; i < n; i++ {
+		nextI := (i + 1) % n
+		builder.addTriangle(bottomIds[i], topIds[i], bottomIds[nextI])
+		builder.addTriangle(topIds[i], topIds[nextI], bottomIds[nextI])
 	}
-	elemSize := unsafe.Sizeof(i[0])
-	byteLen := uintptr(len(i)) * elemSize
-	ptr := unsafe.Pointer(&i[0])
-	return unsafe.Slice((*byte)(ptr), byteLen)
 }
