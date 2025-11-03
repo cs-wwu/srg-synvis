@@ -634,11 +634,11 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 
 	instances := make([]AirspaceInstance, len(geojson.Features))
 	for i, airspace := range geojson.Features {
-		renderAirspace(builder, airspace, [3]float32{0.8, 0.2, 0.5})
+		renderAirspace(builder, airspace, [4]float32{0.8, 0.2, 0.5, 0.1})
 		instances[i] = AirspaceInstance{
 			LowerAlt: float32(airspace.Properties.LowerVal),
 			UpperAlt: float32(airspace.Properties.UpperVal),
-			Color:    [3]float32{0.8, 0.2, 0.5},
+			Color:    [4]float32{0.8, 0.2, 0.5, 0.1},
 		}
 	}
 
@@ -1360,14 +1360,14 @@ func (app *Application) prepareAirspacePipeline() {
 				{
 					Binding:  0,
 					Location: 0,
-					Format:   vk.FormatR64g64b64Sfloat, // vec3.T is float64!
+					Format:   vk.FormatR32g32b32Sfloat,
 					Offset:   0,
 				},
 				{
 					Binding:  0,
 					Location: 1,
 					Format:   vk.FormatR32g32b32a32Sfloat,
-					Offset:   24, // After 3 float64s
+					Offset:   12,
 				},
 			},
 		},
@@ -1392,7 +1392,7 @@ func (app *Application) prepareAirspacePipeline() {
 			AttachmentCount: 1,
 			PAttachments: []vk.PipelineColorBlendAttachmentState{{
 				ColorWriteMask:      0xF,
-				BlendEnable:         vk.True, // ENABLE BLENDING
+				BlendEnable:         vk.True,
 				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
 				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
 				ColorBlendOp:        vk.BlendOpAdd,
