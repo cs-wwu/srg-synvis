@@ -360,7 +360,9 @@ func main() {
 	}
 
 	if cfg.useFAA {
-		// TODO: Download FAA data
+		if err := processor.GenerateRoadProtobufs(heightmaps); err != nil {
+			log.Printf("Failed to download OSM data: %v", err)
+		}
 	}
 
 	if cfg.useOSM {

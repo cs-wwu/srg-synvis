@@ -113,6 +113,7 @@ func (app *Application) NextFrame() {
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 	app.RoadStreamer.UpdatePos(app.camera.Position())
+	app.ObstructionStreamer.UpdatePos(app.camera.Position())
 
 	app.camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically
@@ -245,7 +246,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	app.StreamManager.RenderChunks(cmd)
 
-	// Draw roads last
+	// Draw roads
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
@@ -259,6 +260,21 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		}
 	}
 	app.RoadStreamer.Unlock()
+
+	// Draw Obstructions
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.obstructionPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.ObstructionStreamer.Lock()
+	for _, obstructionSquare := range app.ObstructionStreamer.Chunks {
+		if obstructionSquare != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{obstructionSquare.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, obstructionSquare.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, obstructionSquare.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.ObstructionStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

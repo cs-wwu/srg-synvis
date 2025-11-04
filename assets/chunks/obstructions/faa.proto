@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package obs;
 
-option go_package = "github.com/cs-wwu/srg-synvis/assets/obs";
+option go_package = "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions";
 
 message FAAPoint {
   double lat = 1;

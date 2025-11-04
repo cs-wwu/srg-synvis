@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -53,8 +54,8 @@ type ObsSquare struct {
 
 // Key generation for coordinate square map
 func generateSquareKey(lat, lon float64) string {
-	latDeg := int(lat)
-	lonDeg := int(lon)
+	latDeg := int(math.Floor(lat))
+	lonDeg := int(math.Floor(lon))
 	return fmt.Sprintf("%d,%d", latDeg, lonDeg)
 }
 
@@ -128,8 +129,8 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		square, exists := squareBuffers[squareKey]
 		if !exists {
 			square = &ObsSquare{
-				LatDeg:  int(lat),
-				LonDeg:  int(lon),
+				LatDeg:  int(math.Floor(lat)),
+				LonDeg:  int(math.Floor(lon)),
 				Records: []FAAPoint{},
 			}
 			squareBuffers[squareKey] = square

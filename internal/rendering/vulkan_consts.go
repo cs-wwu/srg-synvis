@@ -43,6 +43,9 @@ type Application struct {
 	// Roads
 	roadPipeline vk.Pipeline
 
+	// Obstructions
+	obstructionPipeline vk.Pipeline
+
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
 	skyboxVertexBuffer vk.Buffer
@@ -62,6 +65,8 @@ type Application struct {
 	WindowHandle  *glfw.Window
 
 	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
+
+	ObstructionStreamer *streaming.DegreeChunkStreamer[*ObstructionSquare]
 
 	Gps bool
 	Hat bool
