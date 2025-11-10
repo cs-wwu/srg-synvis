@@ -46,7 +46,6 @@ type Application struct {
 	//Airspaces
 	AirspaceStreamer *streaming.DegreeChunkStreamer[*Airspace]
 	airspacePipeline vk.Pipeline
-	globalAirspace   *Airspace
 
 	// Roads
 	roadPipeline vk.Pipeline
