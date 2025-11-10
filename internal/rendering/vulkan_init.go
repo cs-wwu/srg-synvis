@@ -653,6 +653,18 @@ func (app *Application) prepareDescriptorLayout() {
 	app.pipelineLayout = pipelineLayout
 }
 
+func (app *Application) Dimensions() *as.SwapchainDimensions {
+	if app.cfg.CaptureOnly {
+		return &as.SwapchainDimensions{
+			Width:  app.cfg.CaptureWidth,
+			Height: app.cfg.CaptureHeight,
+			Format: vk.FormatB8g8r8a8Unorm,
+		}
+	} else {
+		return app.Context().SwapchainDimensions()
+	}
+}
+
 func (app *Application) prepareRenderPass() {
 	dev := app.Context().Device()
 	var renderPass vk.RenderPass
@@ -660,7 +672,7 @@ func (app *Application) prepareRenderPass() {
 		SType:           vk.StructureTypeRenderPassCreateInfo,
 		AttachmentCount: 2,
 		PAttachments: []vk.AttachmentDescription{{
-			Format:         app.Context().SwapchainDimensions().Format,
+			Format:         app.Dimensions().Format,
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpStore,
@@ -694,6 +706,58 @@ func (app *Application) prepareRenderPass() {
 	}, nil, &renderPass)
 	OrPanic(as.NewError(ret))
 	app.renderPass = renderPass
+}
+
+func (app *Application) prepareFramebuffer() {
+	if !app.cfg.CaptureOnly {
+		log.Fatalln("prepareFramebuffer should only be called when in capture-only mode")
+	}
+
+	format := app.Dimensions().Format
+
+	var image vk.Image
+	vk.CreateImage(app.Context().Device(), &vk.ImageCreateInfo{
+		SType:       vk.StructureTypeImageCreateInfo,
+		ImageType:   vk.ImageType2d,
+		Format:      format,
+		Extent:      vk.Extent3D{Width: app.cfg.CaptureWidth, Height: app.cfg.CaptureHeight, Depth: 1},
+		MipLevels:   1,
+		ArrayLayers: 1,
+		Samples:     vk.SampleCount1Bit,
+		Tiling:      vk.ImageTilingOptimal,
+		Usage:       vk.ImageUsageFlags(vk.ImageUsageColorAttachmentBit | vk.ImageUsageTransferSrcBit),
+	}, nil, &image)
+
+	var imageView vk.ImageView
+	vk.CreateImageView(app.Context().Device(), &vk.ImageViewCreateInfo{
+		SType:    vk.StructureTypeSamplerCreateInfo,
+		Image:    image,
+		ViewType: vk.ImageViewType2d,
+		Format:   format,
+		Components: vk.ComponentMapping{
+			R: vk.ComponentSwizzleR,
+			G: vk.ComponentSwizzleG,
+			B: vk.ComponentSwizzleB,
+			A: vk.ComponentSwizzleA,
+		},
+		SubresourceRange: vk.ImageSubresourceRange{
+			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
+			LevelCount: 1,
+			LayerCount: 1,
+		},
+	}, nil, &imageView)
+
+	fbInfo := vk.FramebufferCreateInfo{
+		SType:           vk.StructureTypeFramebufferCreateInfo,
+		RenderPass:      app.renderPass,
+		AttachmentCount: 1,
+		PAttachments:    []vk.ImageView{imageView},
+		Width:           app.cfg.CaptureWidth,
+		Height:          app.cfg.CaptureHeight,
+		Layers:          1,
+	}
+	var framebuffer vk.Framebuffer
+	vk.CreateFramebuffer(app.Context().Device(), &fbInfo, nil, &framebuffer)
 }
 
 func (app *Application) prepareSkyboxCube() {
@@ -1494,7 +1558,7 @@ func (app *Application) prepareFramebuffers() {
 }
 
 func (app *Application) VulkanContextPrepare() error {
-	dim := app.Context().SwapchainDimensions()
+	dim := app.Dimensions()
 	dev := app.Context().Device()
 	memProps := app.Context().Platform().MemoryProperties()
 	app.height = dim.Height
@@ -1518,6 +1582,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
+	// Make a framebuffer instead of using the swapchain in capture-only mode.
+	if app.cfg.CaptureOnly {
+		app.prepareFramebuffer()
+	}
 	app.preparePipeline()
 	app.prepareSkyboxCube()
 	app.prepareSkyboxPipeline()
