@@ -506,6 +506,7 @@ func (app *Application) prepareTextures() {
 }
 
 func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
+
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
 	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
 	roadSquare := roadpb.RoadSquare{}
@@ -611,8 +612,8 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 
 func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspace/data/Class_Airspace(2).geojson"
-	var geojson GeoJSON
+	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
+	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
 	if err != nil {
 		log.Printf("vulkan: error loading airspace %s: %v", airspaceFile, err)
@@ -1690,8 +1691,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
 	app.ObstructionStreamer.UpdatePos(app.camera.Position())
 
-	app.AispaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
-	app.AispaceStreamer.UpdatePos(app.camera.Position())
+	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
+	app.AirspaceStreamer.UpdatePos(app.camera.Position())
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

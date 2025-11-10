@@ -279,15 +279,15 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	app.AispaceStreamer.Lock()
-	for _, airspace := range app.AispaceStreamer.Chunks {
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
 		if airspace != nil {
 			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
 			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
 			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
 		}
 	}
-	app.AispaceStreamer.Unlock()
+	app.AirspaceStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)
