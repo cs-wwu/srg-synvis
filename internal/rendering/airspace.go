@@ -20,6 +20,7 @@ type AirspaceProperties struct {
 	Class    string `json:"CLASS"`
 	UpperVal int    `json:"UPPER_VAL"` // Altitude ceiling
 	LowerVal int    `json:"LOWER_VAL"` // Altitude floor
+	GlobalId string `json:"GLOBAL_ID"`
 }
 
 type Geometry struct {
@@ -50,6 +51,13 @@ type AirspaceInstance struct {
 	UpperAlt float32
 	Color    [4]float32
 }
+
+type FeatureCollection struct {
+	Type     string    `json:"type"`
+	Features []Feature `json:"features"`
+}
+
+var outDir = "assets/chunks/airspace"
 
 const AIRSPACE_ALTITUDE_OFFSET = float32(100.0)
 

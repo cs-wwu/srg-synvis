@@ -44,7 +44,7 @@ type Application struct {
 	planeIndexCount   uint32
 
 	//Airspaces
-	AispaceStreamer  *streaming.DegreeChunkStreamer[*Airspace]
+	AirspaceStreamer *streaming.DegreeChunkStreamer[*Airspace]
 	airspacePipeline vk.Pipeline
 	globalAirspace   *Airspace
 
