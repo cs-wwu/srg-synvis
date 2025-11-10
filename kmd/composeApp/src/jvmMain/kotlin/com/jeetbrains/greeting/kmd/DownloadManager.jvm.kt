@@ -47,9 +47,7 @@ actual class DownloadManager {
         useNASA: Boolean,
         useOSM: Boolean,
         useFAA: Boolean,
-        outputDir: String,
-        username: String,
-        password: String
+        outputDir: String
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val binaryPath = getBundledBinaryPath()

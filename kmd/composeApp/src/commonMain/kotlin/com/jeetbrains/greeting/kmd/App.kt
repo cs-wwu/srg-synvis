@@ -109,8 +109,6 @@ fun App(regions: List<Region> = USregions()) {
         val coroutineScope = rememberCoroutineScope()
 
         // credentials
-        var username by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
         var isDownloading by remember { mutableStateOf(false) }
         var downloadStatus by remember { mutableStateOf("") }
         var isInstalling by remember { mutableStateOf(false) }
@@ -129,28 +127,6 @@ fun App(regions: List<Region> = USregions()) {
                 style = TextStyle(fontSize = 20.sp),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().align(Alignment.CenterHorizontally)
-            )
-
-            // Credential input fields
-            Text(
-                "Earthdata Credentials",
-                style = TextStyle(fontSize = 16.sp),
-                modifier = Modifier.padding(top = 20.dp, start = 20.dp)
-            )
-            TextField(
-                value = username,
-                onValueChange = { username = it },
-                label = { Text("Username") },
-                modifier = Modifier.padding(start = 20.dp, top = 10.dp).fillMaxWidth(0.5f),
-                singleLine = true
-            )
-            TextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text("Password") },
-                modifier = Modifier.padding(start = 20.dp, top = 10.dp).fillMaxWidth(0.5f),
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
             )
 
             // Drop-down multiple select options for states
@@ -203,9 +179,7 @@ fun App(regions: List<Region> = USregions()) {
                         val result = DownloadManager().downloadData(
                             regions = selectedBoxes,
                             useNASA = true,
-                            useOSM = true,
-                            username = username,
-                            password = password
+                            useOSM = true
                         )
 
                         result.onSuccess { output ->
@@ -217,7 +191,7 @@ fun App(regions: List<Region> = USregions()) {
                         isDownloading = false
                     }
                 },
-                enabled = !isDownloading && username.isNotBlank() && password.isNotBlank() && selectedBoxes.isNotEmpty()
+                enabled = !isDownloading && selectedBoxes.isNotEmpty()
             ) {
                 Text(if (isDownloading) "Downloading..." else "Download data")
             }

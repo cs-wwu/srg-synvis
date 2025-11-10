@@ -6,9 +6,7 @@ expect class DownloadManager() {
         useNASA: Boolean = true,
         useOSM: Boolean = true,
         useFAA: Boolean = false,
-        outputDir: String = "../../assets/maps/",
-        username: String,
-        password: String,
+        outputDir: String = "../../assets/maps/"
     ): Result<String>
 
     suspend fun installScript(): Result<String>
