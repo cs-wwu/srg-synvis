@@ -19,8 +19,10 @@ func init() {
 func main() {
 	var config models.AppConfig
 
-	config.CameraStartPos = linmath.Vec3([]float32{48.5, -123.5, 2600})
-	config.CameraStartDir = linmath.Vec3([]float32{0, 0, -1})
+	config.DebugMode = true
+
+	config.CameraStartPos = linmath.Vec3{-441970, 700, -171900}
+	config.CameraStartDir = linmath.Vec3{0, 0, -1}
 
 	config.CaptureOnly = true
 	config.CaptureWidth = 1024
