@@ -7,6 +7,8 @@ import kotlin.Exception
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.Paths
+import kotlin.io.path.absolutePathString
 
 actual class DownloadManager {
     private fun getBundledBinaryPath(): String {
@@ -59,16 +61,16 @@ actual class DownloadManager {
                 bboxArgs.add("${box.North},${box.West},${box.South},${box.East}")
             }
 
-        // val projectRoot = File(System.getProperty("user.dir")).parentFile?.parentFile
-        //     ?: throw IllegalStateException("Could not determine project root")
+        val projectRoot = File(System.getProperty("user.dir")).parentFile?.parentFile
+            ?: throw IllegalStateException("Could not determine project root")
 
-        // val outputDirectory = File(projectRoot, "assets/maps")
-        // outputDirectory.mkdirs()
+        val outputDirectory = File(projectRoot, "assets/maps")
+        outputDirectory.mkdirs()
 
             val command = buildList {
                 add(binaryPath)
                 add("-out")
-                add(outputDir)
+                add(outputDirectory.absolutePath)
                 if (useNASA) add("-nasa")
                 if (useOSM) add("-osm")
                 if (useFAA) add("-faa")

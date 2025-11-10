@@ -108,7 +108,7 @@ fun App(regions: List<Region> = USregions()) {
         var selectedBoxes by remember {mutableStateOf(setOf<BoundingBox>())}
         val coroutineScope = rememberCoroutineScope()
 
-        // credentials
+        // status text
         var isDownloading by remember { mutableStateOf(false) }
         var downloadStatus by remember { mutableStateOf("") }
         var isInstalling by remember { mutableStateOf(false) }
