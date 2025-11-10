@@ -6,7 +6,6 @@ package api
 
 import (
 	"archive/zip"
-	"bufio"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,45 +13,27 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
-
-	"golang.org/x/term"
 )
 
 const (
-	nasaBaseURL      = "https://e4ftl01.cr.usgs.gov/MEASURES/NASADEM_HGT.001/2000.02.11/NASADEM_HGT_"
+	nasaBaseURL      = "https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/NASADEM_HGT.001/"
+	filenameBase     = "NASADEM_HGT_"
 	heightmapPattern = "[ns]\\d{2}[ew]\\d{3}"
 )
 
 type Credentials struct {
-	Username string
-	Password string
+	Token string
 }
 
 // Returns the users credentials after prompting and storing them securly
-func promptCredentials() (Credentials, error) {
-	var creds Credentials
-	reader := bufio.NewReader(os.Stdin)
-
-	fmt.Println("Enter your Earthdata Credentials.")
-	fmt.Print("Username: ")
-	username, err := reader.ReadString('\n')
-	if err != nil {
-		return creds, fmt.Errorf("failed to read username: %v", err)
+func loadCredentials() (Credentials, error) {
+	token := os.Getenv("EARTHDATA_TOKEN")
+	if token == "" {
+		return Credentials{}, fmt.Errorf("EARTHDATA_TOKEN environment variable not set")
 	}
-	username = strings.TrimSpace(username)
-
-	fmt.Print("Password: ")
-	passwordBytes, err := term.ReadPassword(0)
-	if err != nil {
-		return creds, fmt.Errorf("failed to read password: %v", err)
-	}
-	password := string(passwordBytes)
-	fmt.Println() // Add a newline after the password input
 
 	return Credentials{
-		Username: username,
-		Password: password,
+		Token: token,
 	}, nil
 }
 
@@ -65,42 +46,23 @@ func createClient() (*http.Client, error) {
 
 	return &http.Client{
 		Jar: jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse // Don't follow redirects automatically
-		},
 	}, nil
 }
 
-// Returns the *http.response and error
-// Must close response body
-func getResponse(client *http.Client, url string) (*http.Response, error) {
-	var resp *http.Response
-
-	resp, err := client.Get(url)
-	if err != nil {
-		return resp, fmt.Errorf("failed to send request: %v", err)
-	}
-
-	return resp, nil
-}
-
-// Returns the response headers last location, error
-// Attempts to authenticate the user with the last given url
-func attemptAuthenticate(client *http.Client, url string, creds Credentials) (string, error) {
+func getResponse(client *http.Client, url string, creds Credentials) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
+		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
-	req.SetBasicAuth(creds.Username, creds.Password)
+	req.Header.Add("Authorization", "Bearer "+creds.Token)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send request: %v", err)
+		return nil, fmt.Errorf("failed to send request: %v", err)
 	}
-	defer resp.Body.Close()
 
-	return resp.Header.Get("Location"), nil
+	return resp, nil
 }
 
 // Downloads the responses body to the specified filepath
@@ -132,35 +94,16 @@ func heightmapToURL(heightmap string) (string, error) {
 	if !matched {
 		return "", fmt.Errorf("bad heightmap format: %s", heightmap)
 	}
-	return nasaBaseURL + heightmap + ".zip", nil
-}
-
-// Authenticates the client by attempting to authenticate multiple times
-func authenticate(client *http.Client, url, location string, creds Credentials) error {
-	//creds, err := promptCredentials()
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get credentials: %v", err)
-	// }
-	var err error
-
-	// Attempt authentication
-	for range 3 {
-		location, err = attemptAuthenticate(client, location, creds)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate at \"%v\": %v", location, err)
-		}
-		if location == url {
-			return nil // We redirected back to the original url, success
-		}
-	}
-
-	return fmt.Errorf("failed to authenticate %v, redirected to %v", url, location)
+	// The full URL should look like this:
+	// https://data.lpdaac.earthdatacloud.nasa.gov/lp-prod-protected/NASADEM_HGT.001/NASADEM_HGT_n48w123/NASADEM_HGT_n48w123.zip
+	filename := filenameBase + heightmap
+	return nasaBaseURL + filename + "/" + filename + ".zip", nil
 }
 
 // attempts to download the given url
 // on the user to defer response.Body.Close()
-func attemptDownload(client *http.Client, filepath, url string, creds Credentials) error {
-	resp, err := getResponse(client, url)
+func attemptDownload(client *http.Client, creds Credentials, filepath, url string) error {
+	resp, err := getResponse(client, url, creds)
 	if err != nil {
 		return fmt.Errorf("failed to get response: %v", err)
 	}
@@ -174,28 +117,9 @@ func attemptDownload(client *http.Client, filepath, url string, creds Credential
 		} else {
 			return nil
 		}
+	} else {
+		return fmt.Errorf("failed to download file, status code: %d", resp.StatusCode)
 	}
-
-	// Follow redirects to authenticate
-	location := resp.Header.Get("Location")
-	authenticate(client, url, location, creds)
-
-	// Retries the download after authenticating
-	resp, err = getResponse(client, url)
-	if err != nil {
-		return fmt.Errorf("failed to get response: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// Download if good status code
-	if resp.StatusCode == http.StatusOK {
-		err = downloadResponse(resp, filepath)
-		if err != nil {
-			return fmt.Errorf("failed to download file: %v", err)
-		}
-	}
-
-	return nil
 }
 
 // Downloads the selection of heightmaps to directoryPath
@@ -207,6 +131,11 @@ func DownloadHeightmaps(heightmaps []string, directoryPath, username, password s
 		os.Exit(1)
 	}
 
+	creds, err := loadCredentials()
+	if err != nil {
+		return fmt.Errorf("failed to get credentials: %v", err)
+	}
+
 	for _, heightmap := range heightmaps {
 		fmt.Printf("Downloading: %s\n", heightmap)
 		heightmapURL, err := heightmapToURL(heightmap)
@@ -214,14 +143,8 @@ func DownloadHeightmaps(heightmaps []string, directoryPath, username, password s
 			return fmt.Errorf("failed to convert heightmap to url: %v", err)
 		}
 
-		filepath1 := directoryPath + heightmap + ".zip"
-		creds := Credentials{
-			Username: username,
-			Password: password,
-		}
-		absPath, err := filepath.Abs(filepath1)
-		fmt.Println("Absolute path:", absPath)
-		err = attemptDownload(client, filepath1, heightmapURL, creds)
+		filepath := directoryPath + heightmap + ".zip"
+		err = attemptDownload(client, creds, filepath, heightmapURL)
 		if err != nil {
 			return fmt.Errorf("failed to download heightmap: %v", err)
 		}
