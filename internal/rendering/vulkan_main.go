@@ -3,8 +3,11 @@ package rendering
 
 import (
 	"fmt"
+	"image"
+	"image/png"
 	"log"
 	"math"
+	"os"
 	"time"
 	"unsafe"
 
@@ -142,9 +145,9 @@ func (app *Application) NextFrame() {
 }
 
 func (app *Application) RenderCapture() {
-	app.makeOneshotPool()
-
 	app.NextFrame()
+
+	app.makeOneshotPool()
 
 	app.oneshotCmd(func(cmd vk.CommandBuffer) {
 		barrier := vk.ImageMemoryBarrier{
@@ -175,7 +178,118 @@ func (app *Application) RenderCapture() {
 		)
 	})
 
-	app.NextFrame()
+	imgBytes := app.cfg.CaptureWidth * app.cfg.CaptureHeight * 4
+	dev := app.Context().Device()
+
+	stagingBuf, stagingMem, err := app.createBuffer(
+		vk.BufferUsageFlags(vk.BufferUsageTransferDstBit),
+		vk.MemoryPropertyFlags(vk.MemoryPropertyHostVisibleBit|vk.MemoryPropertyHostCoherentBit),
+		vk.DeviceSize(imgBytes),
+	)
+	if err != nil {
+		log.Fatalf("failed to create staging buffer: %v", err)
+	}
+	defer func() {
+		vk.DestroyBuffer(dev, stagingBuf, nil)
+		vk.FreeMemory(dev, stagingMem, nil)
+	}()
+
+	app.oneshotCmd(func(cmd vk.CommandBuffer) {
+		region := vk.BufferImageCopy{
+			BufferOffset:      0,
+			BufferRowLength:   0, // 0 = tightly packed
+			BufferImageHeight: 0,
+			ImageSubresource: vk.ImageSubresourceLayers{
+				AspectMask:     vk.ImageAspectFlags(vk.ImageAspectColorBit),
+				MipLevel:       0,
+				BaseArrayLayer: 0,
+				LayerCount:     1,
+			},
+			ImageOffset: vk.Offset3D{X: 0, Y: 0, Z: 0},
+			ImageExtent: vk.Extent3D{Width: app.cfg.CaptureWidth, Height: app.cfg.CaptureHeight, Depth: 1},
+		}
+		vk.CmdCopyImageToBuffer(cmd, app.oneshotImage, vk.ImageLayoutTransferSrcOptimal, stagingBuf, 1, []vk.BufferImageCopy{region})
+	})
+	if err != nil {
+		log.Fatalf("failed to copy image to buffer: %v", err)
+	}
+
+	var data unsafe.Pointer
+	if res := vk.MapMemory(dev, stagingMem, 0, vk.DeviceSize(imgBytes), 0, &data); res != vk.Success {
+		log.Fatalf("failed to map staging buffer memory: %v", as.NewError(res))
+	}
+	defer vk.UnmapMemory(dev, stagingMem)
+
+	// Vulkan default is RGBA8. image/png expects RGBA premultiplied not required;
+	// compose an *image.RGBA and copy rows.
+	// Build a Go slice view over the mapped memory:
+	raw := unsafe.Slice((*byte)(data), imgBytes)
+
+	img := image.NewRGBA(image.Rect(0, 0, int(app.cfg.CaptureWidth), int(app.cfg.CaptureHeight)))
+	rowBytes := int(app.cfg.CaptureWidth) * 4
+	for y := 0; y < int(app.cfg.CaptureHeight); y++ {
+		src := raw[y*rowBytes : (y+1)*rowBytes]
+		dst := img.Pix[y*img.Stride : y*img.Stride+rowBytes]
+		copy(dst, src)
+	}
+
+	f, err := os.Create("out.png")
+	if err != nil {
+		log.Fatalf("failed to create output file: %v", err)
+	}
+	defer f.Close()
+
+	if err := png.Encode(f, img); err != nil {
+		log.Fatalf("failed to encode png: %v", err)
+	}
+}
+
+func (app *Application) createBuffer(
+	usage vk.BufferUsageFlags,
+	props vk.MemoryPropertyFlags,
+	size vk.DeviceSize,
+) (vk.Buffer, vk.DeviceMemory, error) {
+	dev := app.Context().Device()
+
+	bufInfo := vk.BufferCreateInfo{
+		SType:       vk.StructureTypeBufferCreateInfo,
+		Size:        size,
+		Usage:       usage,
+		SharingMode: vk.SharingModeExclusive,
+	}
+	var buf vk.Buffer
+	if res := vk.CreateBuffer(dev, &bufInfo, nil, &buf); res != vk.Success {
+		return nil, nil, vk.Error(res)
+	}
+
+	var memReqs vk.MemoryRequirements
+	vk.GetBufferMemoryRequirements(dev, buf, &memReqs)
+	memReqs.Deref()
+	memProps := app.Context().Platform().MemoryProperties()
+	memTypeIndex, ok := as.FindRequiredMemoryTypeFallback(memProps,
+		vk.MemoryPropertyFlagBits(memReqs.MemoryTypeBits), vk.MemoryPropertyFlagBits(props))
+	if !ok {
+		vk.DestroyBuffer(dev, buf, nil)
+		log.Fatalf("failed to find suitable memory type for buffer (required: %v)", props)
+		return nil, nil, vk.Error(vk.ErrorValidationFailed)
+	}
+
+	alloc := vk.MemoryAllocateInfo{
+		SType:           vk.StructureTypeMemoryAllocateInfo,
+		AllocationSize:  memReqs.Size,
+		MemoryTypeIndex: memTypeIndex,
+	}
+	var mem vk.DeviceMemory
+	if res := vk.AllocateMemory(dev, &alloc, nil, &mem); res != vk.Success {
+		vk.DestroyBuffer(dev, buf, nil)
+		return nil, nil, vk.Error(res)
+	}
+	if res := vk.BindBufferMemory(dev, buf, mem, 0); res != vk.Success {
+		vk.FreeMemory(dev, mem, nil)
+		vk.DestroyBuffer(dev, buf, nil)
+		return nil, nil, vk.Error(res)
+	}
+	return buf, mem, nil
 }
 
 func (app *Application) makeOneshotPool() {
