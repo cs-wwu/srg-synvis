@@ -52,6 +52,14 @@ func NewApplication(cfg models.AppConfig) *Application {
 	return app
 }
 
+func (app *Application) VulkanMode() as.VulkanMode {
+	if app.cfg.CaptureOnly {
+		return as.VulkanGraphics
+	} else {
+		return as.DefaultVulkanMode // graphics + compute + present
+	}
+}
+
 func (app *Application) VulkanContextCleanup() error {
 	fmt.Println()
 

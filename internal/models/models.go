@@ -25,6 +25,9 @@ type AppConfig struct {
 	UncapFPS               bool    // Uncap FPS for performance testing
 	BenchmarkMode          bool    // Enable benchmark mode for performance tracking
 
+	// Render the world to a file and exit.
+	CaptureOnly bool
+
 	// Debug settings
 	DebugMode bool // Enable debug mode
 }
