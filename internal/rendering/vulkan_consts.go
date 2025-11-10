@@ -57,6 +57,13 @@ type Application struct {
 	skyboxIndexMemory  vk.DeviceMemory
 	skyboxIndexCount   uint32
 
+	// Only set when rendering for a capture
+	oneshotImage         vk.Image
+	oneshotDepthImage    vk.Image
+	oneshotFramebuffer   vk.Framebuffer
+	oneshotDescriptorSet vk.DescriptorSet
+	oneshotCommandPool   vk.CommandPool
+
 	frameCount int
 
 	ubo UniformBufferObject

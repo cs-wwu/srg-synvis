@@ -141,6 +141,91 @@ func (app *Application) NextFrame() {
 	}
 }
 
+func (app *Application) RenderCapture() {
+	app.makeOneshotPool()
+
+	app.NextFrame()
+
+	app.oneshotCmd(func(cmd vk.CommandBuffer) {
+		barrier := vk.ImageMemoryBarrier{
+			SType:               vk.StructureTypeImageMemoryBarrier,
+			SrcAccessMask:       vk.AccessFlags(vk.AccessColorAttachmentWriteBit),
+			DstAccessMask:       vk.AccessFlags(vk.AccessTransferReadBit),
+			OldLayout:           vk.ImageLayoutUndefined,
+			NewLayout:           vk.ImageLayoutTransferSrcOptimal,
+			SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
+			DstQueueFamilyIndex: vk.QueueFamilyIgnored,
+			Image:               app.oneshotImage,
+			SubresourceRange: vk.ImageSubresourceRange{
+				AspectMask:     vk.ImageAspectFlags(vk.ImageAspectColorBit),
+				BaseMipLevel:   0,
+				LevelCount:     1,
+				BaseArrayLayer: 0,
+				LayerCount:     1,
+			},
+		}
+		vk.CmdPipelineBarrier(
+			cmd,
+			vk.PipelineStageFlags(vk.PipelineStageColorAttachmentOutputBit),
+			vk.PipelineStageFlags(vk.PipelineStageTransferBit),
+			0,
+			0, nil,
+			0, nil,
+			1, []vk.ImageMemoryBarrier{barrier},
+		)
+	})
+
+	app.NextFrame()
+}
+
+func (app *Application) makeOneshotPool() {
+	cmdPoolInfo := vk.CommandPoolCreateInfo{
+		SType:            vk.StructureTypeCommandPoolCreateInfo,
+		Flags:            vk.CommandPoolCreateFlags(vk.CommandPoolCreateTransientBit | vk.CommandPoolCreateResetCommandBufferBit),
+		QueueFamilyIndex: app.Context().Platform().GraphicsQueueFamilyIndex(),
+	}
+	var pool vk.CommandPool
+	if res := vk.CreateCommandPool(app.Context().Device(), &cmdPoolInfo, nil, &pool); res != vk.Success {
+		log.Fatalf("failed to create oneshot command pool: %v", as.NewError(res))
+	}
+
+	app.oneshotCommandPool = pool
+}
+
+func (app *Application) oneshotCmd(body func(cmd vk.CommandBuffer)) {
+	allocInfo := vk.CommandBufferAllocateInfo{
+		SType:              vk.StructureTypeCommandBufferAllocateInfo,
+		CommandPool:        app.oneshotCommandPool,
+		Level:              vk.CommandBufferLevelPrimary,
+		CommandBufferCount: 1,
+	}
+	var cmds = make([]vk.CommandBuffer, 1)
+	if res := vk.AllocateCommandBuffers(app.Context().Device(), &allocInfo, cmds); res != vk.Success {
+		log.Fatalln("failed to allocate oneshot command buffer:", as.NewError(res))
+	}
+	cmd := cmds[0]
+	begin := vk.CommandBufferBeginInfo{
+		SType: vk.StructureTypeCommandBufferBeginInfo,
+		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageOneTimeSubmitBit),
+	}
+	vk.BeginCommandBuffer(cmd, &begin)
+	body(cmd)
+	if res := vk.EndCommandBuffer(cmd); res != vk.Success {
+		log.Fatalln("failed to end command buffer:", as.NewError(res))
+	}
+	submit := vk.SubmitInfo{
+		SType:              vk.StructureTypeSubmitInfo,
+		CommandBufferCount: 1,
+		PCommandBuffers:    []vk.CommandBuffer{cmd},
+	}
+	queue := app.Context().Platform().GraphicsQueue()
+	if res := vk.QueueSubmit(queue, 1, []vk.SubmitInfo{submit}, vk.NullFence); res != vk.Success {
+		log.Fatalln("failed to submit oneshot command buffer:", as.NewError(res))
+	}
+	vk.QueueWaitIdle(queue)
+	vk.FreeCommandBuffers(app.Context().Device(), app.oneshotCommandPool, 1, []vk.CommandBuffer{cmd})
+}
+
 // called every frame by asche
 // note : we use a ubo mapped to keep track of memory which saves some steps here,
 // but goes against as.createBuffer

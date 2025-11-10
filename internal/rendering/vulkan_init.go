@@ -64,8 +64,12 @@ func (app *Application) VulkanLayers() []string {
 }
 
 func (app *Application) VulkanDeviceExtensions() []string {
-	return []string{
-		"VK_KHR_swapchain",
+	if app.cfg.CaptureOnly {
+		return nil
+	} else {
+		return []string{
+			"VK_KHR_swapchain",
+		}
 	}
 }
 
@@ -250,6 +254,40 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		OrPanic(err)
 	}
 
+	tex := app.prepareTexture(uint32(width), uint32(height), TextureFormat, tiling, vk.ImageLayoutPreinitialized, usage, memoryProps)
+
+	hostVisible := memoryProps&vk.MemoryPropertyHostVisibleBit != 0
+	if hostVisible {
+		var layout vk.SubresourceLayout
+		vk.GetImageSubresourceLayout(dev, tex.image, &vk.ImageSubresource{
+			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
+		}, &layout)
+		layout.Deref()
+
+		data, width, height, sourceStride, err := loadTextureData(path)
+		OrPanic(err)
+		if len(data) > 0 {
+			var pData unsafe.Pointer
+			ret := vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
+			if IsError(ret) {
+				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
+				return tex
+			}
+
+			// Use row-by-row copy to respect GPU memory layout
+			copyTextureData(pData, data, width, height, sourceStride, int(layout.RowPitch))
+
+			vk.UnmapMemory(dev, tex.mem)
+		}
+	}
+	return tex
+}
+
+func (app *Application) prepareTexture(width, height uint32, format vk.Format,
+	tiling vk.ImageTiling, layout vk.ImageLayout, usage vk.ImageUsageFlagBits, memoryProps vk.MemoryPropertyFlagBits) *Texture {
+
+	dev := app.Context().Device()
+
 	tex := &Texture{
 		texWidth:    int32(width),
 		texHeight:   int32(height),
@@ -260,14 +298,14 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	imageCreateInfo := vk.ImageCreateInfo{
 		SType:         vk.StructureTypeImageCreateInfo,
 		ImageType:     vk.ImageType2d,
-		Format:        TextureFormat,
+		Format:        format,
 		Extent:        vk.Extent3D{Width: uint32(width), Height: uint32(height), Depth: 1},
 		MipLevels:     1,
 		ArrayLayers:   1,
 		Samples:       1,
 		Tiling:        tiling,
 		Usage:         vk.ImageUsageFlags(usage),
-		InitialLayout: vk.ImageLayoutPreinitialized,
+		InitialLayout: layout,
 	}
 
 	ret := vk.CreateImage(dev, &imageCreateInfo, nil, &image)
@@ -293,30 +331,6 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 	ret = vk.BindImageMemory(dev, tex.image, tex.mem, 0)
 	OrPanic(as.NewError(ret))
 
-	hostVisible := memoryProps&vk.MemoryPropertyHostVisibleBit != 0
-	if hostVisible {
-		var layout vk.SubresourceLayout
-		vk.GetImageSubresourceLayout(dev, tex.image, &vk.ImageSubresource{
-			AspectMask: vk.ImageAspectFlags(vk.ImageAspectColorBit),
-		}, &layout)
-		layout.Deref()
-
-		data, width, height, sourceStride, err := loadTextureData(path)
-		OrPanic(err)
-		if len(data) > 0 {
-			var pData unsafe.Pointer
-			ret = vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
-			if IsError(ret) {
-				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
-				return tex
-			}
-
-			// Use row-by-row copy to respect GPU memory layout
-			copyTextureData(pData, data, width, height, sourceStride, int(layout.RowPitch))
-
-			vk.UnmapMemory(dev, tex.mem)
-		}
-	}
 	return tex
 }
 
@@ -476,7 +490,7 @@ func (app *Application) prepareTextures() {
 
 		var view vk.ImageView
 		ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
-			SType:    vk.StructureTypeSamplerCreateInfo,
+			SType:    vk.StructureTypeImageViewCreateInfo,
 			Image:    tex.image,
 			ViewType: vk.ImageViewType2d,
 			Format:   TextureFormat,
@@ -668,6 +682,14 @@ func (app *Application) Dimensions() *as.SwapchainDimensions {
 func (app *Application) prepareRenderPass() {
 	dev := app.Context().Device()
 	var renderPass vk.RenderPass
+
+	var finalLayout vk.ImageLayout
+	if app.cfg.CaptureOnly {
+		finalLayout = vk.ImageLayoutTransferSrcOptimal
+	} else {
+		finalLayout = vk.ImageLayoutPresentSrc
+	}
+
 	ret := vk.CreateRenderPass(dev, &vk.RenderPassCreateInfo{
 		SType:           vk.StructureTypeRenderPassCreateInfo,
 		AttachmentCount: 2,
@@ -679,7 +701,7 @@ func (app *Application) prepareRenderPass() {
 			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
 			StencilStoreOp: vk.AttachmentStoreOpDontCare,
 			InitialLayout:  vk.ImageLayoutUndefined,
-			FinalLayout:    vk.ImageLayoutPresentSrc,
+			FinalLayout:    finalLayout,
 		}, {
 			Format:         app.depth.format,
 			Samples:        vk.SampleCount1Bit,
@@ -703,35 +725,48 @@ func (app *Application) prepareRenderPass() {
 				Layout:     vk.ImageLayoutDepthStencilAttachmentOptimal,
 			},
 		}},
+		DependencyCount: 1,
+		PDependencies: []vk.SubpassDependency{{
+			SrcSubpass:    vk.SubpassExternal,
+			DstSubpass:    0,
+			SrcStageMask:  vk.PipelineStageFlags(vk.PipelineStageTopOfPipeBit),
+			SrcAccessMask: vk.AccessFlags(0),
+			DstStageMask:  vk.PipelineStageFlags(vk.PipelineStageColorAttachmentOutputBit),
+			DstAccessMask: vk.AccessFlags(vk.AccessColorAttachmentWriteBit),
+		}},
 	}, nil, &renderPass)
 	OrPanic(as.NewError(ret))
 	app.renderPass = renderPass
 }
 
-func (app *Application) prepareFramebuffer() {
+func (app *Application) prepareOneshot() {
 	if !app.cfg.CaptureOnly {
 		log.Fatalln("prepareFramebuffer should only be called when in capture-only mode")
 	}
 
+	dev := app.Context().Device()
 	format := app.Dimensions().Format
 
-	var image vk.Image
-	vk.CreateImage(app.Context().Device(), &vk.ImageCreateInfo{
-		SType:       vk.StructureTypeImageCreateInfo,
-		ImageType:   vk.ImageType2d,
-		Format:      format,
-		Extent:      vk.Extent3D{Width: app.cfg.CaptureWidth, Height: app.cfg.CaptureHeight, Depth: 1},
-		MipLevels:   1,
-		ArrayLayers: 1,
-		Samples:     vk.SampleCount1Bit,
-		Tiling:      vk.ImageTilingOptimal,
-		Usage:       vk.ImageUsageFlags(vk.ImageUsageColorAttachmentBit | vk.ImageUsageTransferSrcBit),
-	}, nil, &image)
+	image := app.prepareTexture(app.cfg.CaptureWidth, app.cfg.CaptureHeight,
+		format,
+		vk.ImageTilingOptimal,
+		vk.ImageLayoutUndefined,
+		vk.ImageUsageFlagBits(vk.ImageUsageColorAttachmentBit|vk.ImageUsageTransferSrcBit),
+		vk.MemoryPropertyFlagBits(vk.MemoryPropertyDeviceLocalBit))
+	app.oneshotImage = image.image
+
+	depthImage := app.prepareTexture(app.cfg.CaptureWidth, app.cfg.CaptureHeight,
+		DepthFormat,
+		vk.ImageTilingOptimal,
+		vk.ImageLayoutUndefined,
+		vk.ImageUsageFlagBits(vk.ImageUsageDepthStencilAttachmentBit),
+		vk.MemoryPropertyFlagBits(vk.MemoryPropertyDeviceLocalBit))
+	app.oneshotDepthImage = depthImage.image
 
 	var imageView vk.ImageView
-	vk.CreateImageView(app.Context().Device(), &vk.ImageViewCreateInfo{
-		SType:    vk.StructureTypeSamplerCreateInfo,
-		Image:    image,
+	vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
+		SType:    vk.StructureTypeImageViewCreateInfo,
+		Image:    app.oneshotImage,
 		ViewType: vk.ImageViewType2d,
 		Format:   format,
 		Components: vk.ComponentMapping{
@@ -747,17 +782,52 @@ func (app *Application) prepareFramebuffer() {
 		},
 	}, nil, &imageView)
 
+	var depthView vk.ImageView
+	vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
+		SType:    vk.StructureTypeImageViewCreateInfo,
+		Image:    app.oneshotDepthImage,
+		ViewType: vk.ImageViewType2d,
+		Format:   DepthFormat,
+		Components: vk.ComponentMapping{
+			R: vk.ComponentSwizzleR,
+			G: vk.ComponentSwizzleG,
+			B: vk.ComponentSwizzleB,
+			A: vk.ComponentSwizzleA,
+		},
+		SubresourceRange: vk.ImageSubresourceRange{
+			AspectMask: vk.ImageAspectFlags(vk.ImageAspectDepthBit),
+			LevelCount: 1,
+			LayerCount: 1,
+		},
+	}, nil, &depthView)
+
 	fbInfo := vk.FramebufferCreateInfo{
 		SType:           vk.StructureTypeFramebufferCreateInfo,
 		RenderPass:      app.renderPass,
-		AttachmentCount: 1,
-		PAttachments:    []vk.ImageView{imageView},
+		AttachmentCount: 2,
+		PAttachments:    []vk.ImageView{imageView, depthView},
 		Width:           app.cfg.CaptureWidth,
 		Height:          app.cfg.CaptureHeight,
 		Layers:          1,
 	}
 	var framebuffer vk.Framebuffer
 	vk.CreateFramebuffer(app.Context().Device(), &fbInfo, nil, &framebuffer)
+
+	var descPool vk.DescriptorPool
+	ret := vk.CreateDescriptorPool(dev, &vk.DescriptorPoolCreateInfo{
+		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
+		MaxSets:       1,
+		PoolSizeCount: 2,
+		PPoolSizes: []vk.DescriptorPoolSize{{
+			Type:            vk.DescriptorTypeUniformBuffer,
+			DescriptorCount: 1,
+		}, {
+			Type:            vk.DescriptorTypeCombinedImageSampler,
+			DescriptorCount: 1,
+		}},
+	}, nil, &descPool)
+	OrPanic(as.NewError(ret))
+	app.descPool = descPool
 }
 
 func (app *Application) prepareSkyboxCube() {
@@ -1469,6 +1539,11 @@ func (app *Application) preparePipeline() {
 }
 
 func (app *Application) prepareDescriptorPool() {
+	if app.cfg.CaptureOnly {
+		// There is no swapchain in capture-only, so we just do this in `prepareOneshot`.
+		return
+	}
+
 	dev := app.Context().Device()
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	var descPool vk.DescriptorPool
@@ -1536,6 +1611,11 @@ func (app *Application) prepareDescriptorSet() {
 }
 
 func (app *Application) prepareFramebuffers() {
+	if app.cfg.CaptureOnly {
+		// There is no swapchain, so we do this in `prepareOneshot`.
+		return
+	}
+
 	dev := app.Context().Device()
 	swapchainImageResources := app.Context().SwapchainImageResources()
 
@@ -1584,7 +1664,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareRenderPass()
 	// Make a framebuffer instead of using the swapchain in capture-only mode.
 	if app.cfg.CaptureOnly {
-		app.prepareFramebuffer()
+		app.prepareOneshot()
 	}
 	app.preparePipeline()
 	app.prepareSkyboxCube()

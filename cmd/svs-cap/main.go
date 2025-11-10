@@ -39,5 +39,5 @@ func main() {
 	app := rendering.NewApplication(config)
 	as.NewPlatform(app)
 
-	app.NextFrame()
+	app.RenderCapture()
 }
