@@ -23,6 +23,8 @@ func main() {
 	config.CameraStartDir = linmath.Vec3([]float32{0, 0, -1})
 
 	config.CaptureOnly = true
+	config.CaptureWidth = 1024
+	config.CaptureHeight = 1024
 
 	err := vk.SetDefaultGetInstanceProcAddr()
 	if err != nil {
@@ -34,4 +36,6 @@ func main() {
 
 	app := rendering.NewApplication(config)
 	as.NewPlatform(app)
+
+	app.NextFrame()
 }

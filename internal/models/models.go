@@ -26,7 +26,9 @@ type AppConfig struct {
 	BenchmarkMode          bool    // Enable benchmark mode for performance tracking
 
 	// Render the world to a file and exit.
-	CaptureOnly bool
+	CaptureOnly   bool
+	CaptureWidth  uint32
+	CaptureHeight uint32
 
 	// Debug settings
 	DebugMode bool // Enable debug mode

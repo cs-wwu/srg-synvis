@@ -109,8 +109,10 @@ func (app *Application) NextFrame() {
 	app.frameCount++
 
 	// Update the camera and UBO
-	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-	app.camera.ProcessInput(app.WindowHandle)
+	if !app.cfg.CaptureOnly {
+		app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
+		app.camera.ProcessInput(app.WindowHandle)
+	}
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
@@ -123,7 +125,9 @@ func (app *Application) NextFrame() {
 	app.RoadStreamer.UpdatePos(app.camera.Position())
 	app.ObstructionStreamer.UpdatePos(app.camera.Position())
 
-	app.camera.ProcessInput(app.WindowHandle)
+	if !app.cfg.CaptureOnly {
+		app.camera.ProcessInput(app.WindowHandle)
+	}
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
