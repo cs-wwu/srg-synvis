@@ -61,6 +61,12 @@ actual class DownloadManager {
                 bboxArgs.add("${box.North},${box.West},${box.South},${box.East}")
             }
 
+        // val projectRoot = File(System.getProperty("user.dir")).parentFile?.parentFile
+        //     ?: throw IllegalStateException("Could not determine project root")
+
+        // val outputDirectory = File(projectRoot, "assets/maps")
+        // outputDirectory.mkdirs()
+
             val command = buildList {
                 add(binaryPath)
                 add("-out")
