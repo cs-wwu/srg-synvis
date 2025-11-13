@@ -12,15 +12,6 @@ import (
 	as "github.com/vulkan-go/asche"
 )
 
-type GeoJSON struct {
-	Features []Feature `json:"features"`
-}
-
-type Feature struct {
-	Properties AirspaceProperties `json:"properties"`
-	Geometry   Geometry           `json:"geometry"`
-}
-
 type AirspaceProperties struct {
 	Name     string `json:"NAME"`
 	Class    string `json:"CLASS"`
@@ -29,7 +20,14 @@ type AirspaceProperties struct {
 	GlobalId string `json:"GLOBAL_ID"`
 }
 
+type Feature struct {
+	Type       string             `json:"type"`
+	Properties AirspaceProperties `json:"properties"`
+	Geometry   Geometry           `json:"geometry"`
+}
+
 type Geometry struct {
+	Type        string        `json:"type"`
 	Coordinates [][][]float64 `json:"coordinates"`
 }
 
@@ -159,13 +157,12 @@ func ChunkGeoJson(inputFile string) {
 		log.Printf("ChunkGeoJson: error opening GeoJson file %s: %v", inputFile, err)
 		return
 	}
-	var geojson GeoJSON
+	var geojson FeatureCollection
 	err = json.Unmarshal(fileData, &geojson)
 	if err != nil {
 		log.Printf("ChunkGeoJson: error unmarshaling GeoJson file %s: %v", inputFile, err)
 		return
 	}
-	// Make sure output directory exists ONCE
 	dataDir := filepath.Join(outDir, "data")
 	if err := os.MkdirAll(dataDir, 0755); err != nil {
 		log.Printf("error creating output directory: %v", err)
@@ -174,21 +171,16 @@ func ChunkGeoJson(inputFile string) {
 	features := geojson.Features
 	for _, feature := range features {
 		avgLat, avgLon := determineChunk(feature.Geometry)
-		// Use absolute values and proper formatting
-
 		chunkFileName := fmt.Sprintf("%s%v%s%v.geojson", "n", math.Abs(float64(avgLat)), "w", math.Abs(float64(avgLon)))
 		chunkFilePath := filepath.Join(dataDir, chunkFileName)
-		// Read existing FeatureCollection or create new one
 		var fc FeatureCollection
 		if _, err := os.Stat(chunkFilePath); os.IsNotExist(err) {
-			// File doesn't exist → start with proper FeatureCollection structure
 			fc = FeatureCollection{
 				Type:     "FeatureCollection",
 				Features: []Feature{},
 			}
 			fmt.Printf("Creating new file: %s\n", chunkFilePath)
 		} else {
-			// File exists → read and unmarshal existing JSON
 			data, err := os.ReadFile(chunkFilePath)
 			if err != nil {
 				log.Printf("cannot read existing file %s: %v", chunkFilePath, err)
@@ -201,7 +193,6 @@ func ChunkGeoJson(inputFile string) {
 			}
 			fmt.Printf("Appending to existing file: %s\n", chunkFilePath)
 		}
-		// Add feature if it doesn't already exist
 		if !containsFeature(&fc, feature) {
 			fc.Features = append(fc.Features, feature)
 			fmt.Printf("  Added feature: %s (total: %d)\n",
@@ -209,13 +200,11 @@ func ChunkGeoJson(inputFile string) {
 		} else {
 			fmt.Printf("  Feature already exists: %s\n", feature.Properties.Name)
 		}
-		// Marshal ENTIRE FeatureCollection to JSON
 		outData, err := json.MarshalIndent(fc, "", "  ")
 		if err != nil {
 			log.Printf("cannot marshal FeatureCollection: %v", err)
 			continue
 		}
-		// Write complete JSON to file (overwrites entire file)
 		if err := os.WriteFile(chunkFilePath, outData, 0644); err != nil {
 			log.Printf("cannot write to file %s: %v", chunkFilePath, err)
 			continue
