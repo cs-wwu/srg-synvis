@@ -13,9 +13,14 @@ import kotlin.io.path.absolutePathString
 actual class DownloadManager {
     private fun getBundledBinaryPath(): String {
         val os = System.getProperty("os.name").lowercase()
+        val arch = System.getProperty("os.arch").lowercase()
+
         val binaryName = when {
             os.contains("win") -> "download.exe"
-            else -> "download-linux"
+            os.contains("linux") && (arch.contains("arm64") || arch.contains("aarch")) -> "download-linux-arm64"
+            os.contains("linux") && arch.contains("armv7") -> "download-linux-armv7"
+            os.contains("linux") -> "download-linux-x64"
+            else -> throw IllegalStateException("Unsupported platform: $os ($arch)")
         }
 
         // Get resource as stream from bundled resources
