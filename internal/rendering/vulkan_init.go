@@ -611,10 +611,13 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 }
 
 func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
-	//ChunkGeoJson("assets/chunks/airspace/data/Class_Airspace(1).geojson")
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
-	//airspaceFile := "assets/chunks/airspace/data/Class_Airspace(1).geojson"
+
+	// These files will end up in a data file similar to roads, but wanted to check in the data
+	// for draft PR to make it less painful to test
+	airspaceFile := "assets/chunks/airspace/Class_Airspace.geojson"
+	//airspaceFile := "assets/chunks/airspace/" + mapPos + ".geojson"
+	//airspaceFile := "assets/chunks/airspace/n48w123.geojson"
 	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
 	if err != nil {
@@ -624,6 +627,7 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	err = json.Unmarshal(file, &geojson)
 	if err != nil {
 		log.Printf("vulkan: error unmarshaling airspace %s: %v", airspaceFile, err)
+		return nil
 	}
 
 	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
