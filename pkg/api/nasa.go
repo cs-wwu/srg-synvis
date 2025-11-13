@@ -123,7 +123,7 @@ func attemptDownload(client *http.Client, creds Credentials, filepath, url strin
 }
 
 // Downloads the selection of heightmaps to directoryPath
-func DownloadHeightmaps(heightmaps []string, directoryPath, username, password string) error {
+func DownloadHeightmaps(heightmaps []string, directoryPath string) error {
 	// Create a client
 	client, err := createClient()
 	if err != nil {
@@ -144,6 +144,7 @@ func DownloadHeightmaps(heightmaps []string, directoryPath, username, password s
 		}
 
 		filepath := directoryPath + heightmap + ".zip"
+		fmt.Printf("at: %s\n", filepath)
 		err = attemptDownload(client, creds, filepath, heightmapURL)
 		if err != nil {
 			return fmt.Errorf("failed to download heightmap: %v", err)
