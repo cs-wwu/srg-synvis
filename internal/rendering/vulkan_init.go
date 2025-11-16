@@ -612,12 +612,8 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 
 func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
+	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
 
-	// These files will end up in a data file similar to roads, but wanted to check in the data
-	// for draft PR to make it less painful to test
-	airspaceFile := "assets/chunks/airspace/Class_Airspace.geojson"
-	//airspaceFile := "assets/chunks/airspace/" + mapPos + ".geojson"
-	//airspaceFile := "assets/chunks/airspace/n48w123.geojson"
 	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
 	if err != nil {
@@ -641,11 +637,11 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 
 	instances := make([]AirspaceInstance, len(geojson.Features))
 	for i, airspace := range geojson.Features {
-		renderAirspace(builder, airspace, [4]float32{0.8, 0.2, 0.5, 0.1})
+		renderAirspace(builder, airspace, [4]float32{0.8, 0.2, 0.5, 0.3})
 		instances[i] = AirspaceInstance{
 			LowerAlt: float32(airspace.Properties.LowerVal),
 			UpperAlt: float32(airspace.Properties.UpperVal),
-			Color:    [4]float32{0.8, 0.2, 0.5, 0.1},
+			Color:    [4]float32{0.8, 0.2, 0.5, 0.3},
 		}
 	}
 
