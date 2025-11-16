@@ -138,13 +138,13 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 	}
 
 	// Fan triangulation from first vertex
-	for i := 1; i < n-1; i++ {
-		builder.addTriangle(bottomIds[0], bottomIds[i], bottomIds[i+1])
-		builder.addTriangle(topIds[0], topIds[i+1], topIds[i])
+	for i := range n - 2 {
+		builder.addTriangle(bottomIds[0], bottomIds[i+1], bottomIds[i+2])
+		builder.addTriangle(topIds[0], topIds[i+2], topIds[i+1])
 	}
 
 	// build walls
-	for i := 0; i < n; i++ {
+	for i := range n {
 		nextI := (i + 1) % n
 		builder.addTriangle(bottomIds[i], topIds[i], bottomIds[nextI])
 		builder.addTriangle(topIds[i], topIds[nextI], bottomIds[nextI])
