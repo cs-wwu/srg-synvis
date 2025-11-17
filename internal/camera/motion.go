@@ -1,6 +1,8 @@
 package camera
 
 import (
+	"math"
+
 	"github.com/ungerik/go3d/float64/quaternion"
 	"github.com/ungerik/go3d/float64/vec3"
 	lin "github.com/xlab/linmath"
@@ -174,6 +176,156 @@ func (mh *MotionHandler) GetMotionState() MotionState {
 			Up:    up,
 		},
 	}
+}
+
+// t is the progress along a spline at a given moment
+func (mh *MotionHandler) CentCatmullRom(t float32) *lin.Vec3 {
+	splineData := mh.splineManager.currentSplineData
+	p0 := splineData.p0
+	p1 := splineData.p1
+	p2 := splineData.p2
+	p3 := splineData.p3
+
+	// Knots are functions of position and progress along spline
+	// given by t_i+1 = (P_i+1 - P_i)^0.5 + t_i
+	t0 := float32(0.0)
+	t1 := mh.GetT(p0, p1, t0)
+	t2 := mh.GetT(p1, p2, t1)
+	t3 := mh.GetT(p2, p3, t2)
+
+	// Interpolation is done between P1 and P2
+	// Map given progress into the space between P1 and P2
+	// We use knots to represent these positions in spline math
+	t = t1 + (t2-t1)*t
+
+	// Compute A (A1, A2, A3), 1st level interpolation
+	f1 := (t1 - t) / (t1 - t0)
+	f2 := (t - t0) / (t1 - t0)
+	a1 := LerpVec3(*p0, *p1, f1, f2)
+
+	f1 = (t2 - t) / (t2 - t1)
+	f2 = (t - t1) / (t2 - t1)
+	a2 := LerpVec3(*p1, *p2, f1, f2)
+
+	f1 = (t3 - t) / (t3 - t2)
+	f2 = (t - t2) / (t3 - t2)
+	a3 := LerpVec3(*p2, *p3, f1, f2)
+
+	// Compute B1 and B2. 2nd level interpolation
+	f1 = (t2 - t) / (t2 - t0)
+	f2 = (t - t0) / (t2 - t0)
+	b1 := LerpVec3(a1, a2, f1, f2)
+
+	f1 = (t3 - t) / (t3 - t1)
+	f2 = (t - t1) / (t3 - t1)
+	b2 := LerpVec3(a2, a3, f1, f2)
+
+	f1 = (t2 - t) / (t2 - t1)
+	f2 = (t - t1) / (t2 - t1)
+	c := LerpVec3(b1, b2, f1, f2)
+
+	return &c
+}
+
+func (mh *MotionHandler) GetT(a, b *lin.Vec3, t float32) float32 {
+	dx := b[0] - a[0]
+	dy := b[1] - a[1]
+	dz := b[2] - a[2]
+	dist := math.Sqrt(float64(dx*dx + dy*dy + dz*dz))
+	return t + float32(math.Pow(dist, 0.5))
+}
+
+func LerpVec3(a, b lin.Vec3, f1, f2 float32) lin.Vec3 {
+	return lin.Vec3{
+		f1*a[0] + f2*b[0],
+		f1*a[1] + f2*b[1],
+		f1*a[2] + f2*b[2],
+	}
+}
+
+func Lerp(a, b, t float32) float32 {
+	return a + (b-a)*t
+}
+
+// Spherically interpolate between two pre-normalized vectors
+func Slerp(dir1, dir2 *lin.Vec3, t float32) *lin.Vec3 {
+	if t < 0 {
+		t = 0
+	}
+	if t > 1 {
+		t = 1
+	}
+
+	dot := Clamp(Dot(dir1, dir2), -1.0, 1.0)
+	theta := float32(math.Acos(float64(dot)))
+	sinTheta := float32(math.Sin(float64(theta)))
+
+	w1 := float32(math.Sin(float64((1-t)*theta))) / sinTheta
+	w2 := float32(math.Sin(float64(t*theta))) / sinTheta
+
+	return &lin.Vec3{
+		dir1[0]*w1 + dir2[0]*w2,
+		dir1[1]*w1 + dir2[1]*w2,
+		dir1[2]*w1 + dir2[2]*w2,
+	}
+}
+
+func GetMagnitude3D(v *lin.Vec3) float32 {
+	a := v[0]
+	b := v[1]
+	c := v[2]
+	squareSum := float64(a*a + b*b + c*c)
+	return float32(math.Sqrt(squareSum))
+}
+
+func GetNormalizedVector3D(v *lin.Vec3) *lin.Vec3 {
+	magnitude := GetMagnitude3D(v)
+	normX := v[0] / magnitude
+	normY := v[1] / magnitude
+	normZ := v[2] / magnitude
+	return &lin.Vec3{
+		normX,
+		normY,
+		normZ,
+	}
+}
+
+// Get unsigned angle using dot and cross product of last 2 position vectors
+func SignedAngle(p1, p2, axis *lin.Vec3) float32 {
+	p1Normalized := GetNormalizedVector3D(p1)
+	p2Normalized := GetNormalizedVector3D(p2)
+
+	// We use the dot product of the last two position vectors to determine
+	// the angle between them
+	dotprod := float64(Clamp(Dot(p1Normalized, p2Normalized), -1.0, 1.0))
+	angle := math.Acos(dotprod) * (180.0 / math.Pi) // return in degrees
+
+	// Determine the sign of this angle using cross product
+	var cross lin.Vec3
+	cross.MultCross(p1Normalized, p2Normalized)
+	sign := Dot(axis, &cross)
+
+	if sign < 0 {
+		angle = -angle
+	}
+	return float32(angle)
+}
+
+// I don't think our vector library contains operations for dot products
+// Let me know if I'm wrong
+func Dot(v1, v2 *lin.Vec3) float32 {
+	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
+}
+
+// Dot product returns float32, protect against floating point error
+func Clamp(val, min, max float32) float32 {
+	if val < min {
+		return min
+	}
+	if val > max {
+		return max
+	}
+	return val
 }
 
 // Future: Plane Mode Motion Physics
