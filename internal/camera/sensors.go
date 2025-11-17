@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	lin "github.com/xlab/linmath"
 
 	"github.com/stratoberry/go-gpsd"
 	"github.com/westphae/geomag/pkg/egm96"
@@ -17,8 +19,18 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera      *CameraImpl
-	testingMode bool // When true, skips smoothing for deterministic test results
+	camera        *CameraImpl
+	testingMode   bool         // When true, skips smoothing for deterministic test results
+	gpsRecordings []GPSReading // rolling buffer of raw position readings
+}
+
+// Stores lat, long, and alt and the time the reading thereof occurred.
+// Time will be useful for retroactive path construction
+// for interpolation and other future additions
+type GPSReading struct {
+	position lin.Vec3
+	occurred time.Time
+	velocity lin.Vec3
 }
 
 // SetTestingMode enables or disables the testing mode
@@ -37,6 +49,8 @@ func NewSensorManager(camera *CameraImpl) *SensorManager {
 
 // StartGPS connects to the GPSD service and gets lat, lon, and alt with TPV report
 // Runs as a separate goroutine
+// TODO: GPS functions should not handle camera movement. Should only provide the data
+// required to determine positon or to predict position.
 func (sm *SensorManager) StartGPS() error {
 	// Connect to GPSD
 	gps, err := gpsd.Dial("localhost:2947")
@@ -46,43 +60,30 @@ func (sm *SensorManager) StartGPS() error {
 	}
 	defer gps.Close()
 
-	// Store previous data in case of GPS fix issues
-	pos := sm.camera.Position()
-	oldX := pos[0]
-	oldY := pos[1]
-	oldZ := pos[2]
-	var xdif, ydif, zdif float32
+	// Set up position tracking for recorded positions, not predicted ones.
+	// For interpolation, only a small buffer will be needed for splines
+	// TODO: for testing + iteration, we need an unfixed length to generate a path
+	if len(sm.gpsRecordings) == 0 {
+		initialPos := sm.camera.Position()
+		sm.gpsRecordings = append(sm.gpsRecordings, GPSReading{
+			position: initialPos,
+			occurred: time.Now(),
+			velocity: lin.Vec3{0, 0, 0},
+		})
+	}
+	log.Println("Setup: Initial position recorded.")
 
 	// Set up the TPV function that will run indefinitely
 	tpvFilter := func(r any) {
 		report := r.(*gpsd.TPVReport)
-		// Convert GPS coordinates to world coordinates
-		newY := float32(report.Alt) * HEIGHT_CONVERSION
-		newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
 
-		// Check if data is faulty, if so, assume position based on history
+		// Check if data has arrived or is faulty.
 		if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
 			log.Println("GPS: No fix, using predicted position based on previous movement")
-			newX = oldX + xdif
-			newY = oldY + ydif
-			newZ = oldZ + zdif
+			return
+		} else {
+			sm.pushGPS(report)
 		}
-
-		// Apply smoothing to reduce GPS jitter (skip in testing mode)
-		if !sm.testingMode {
-			newX, newY, newZ = Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
-		}
-
-		// Update camera position
-		sm.camera.updatePosition(newX, newZ, newY)
-
-		// Log movement delta for prediction
-		xdif = newX - oldX
-		ydif = newY - oldY
-		zdif = newZ - oldZ
-		oldX = newX
-		oldY = newY
-		oldZ = newZ
 	}
 
 	// Add the filter and start watching
@@ -91,7 +92,6 @@ func (sm *SensorManager) StartGPS() error {
 	// Start watching event stream
 	done := gps.Watch()
 	<-done
-
 	return nil
 }
 
@@ -239,6 +239,78 @@ func (sm *SensorManager) SetSensorData(data SensorData) {
 		sm.camera.setOrientation(data.Yaw, data.Pitch, data.Roll)
 		sm.camera.motionHandler.ApplyAbsoluteRotation(data.Yaw, data.Pitch, data.Roll)
 	}
+}
+
+// Push a reading based off TPV report (overwrites oldest when full)
+// Ensure a valid update has been delivered before you call this!
+func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
+	lastReading := sm.gpsRecordings[len(sm.gpsRecordings)-1] // TODO: catch this, could be out of bounds
+	// Convert GPS coordinates to world coordinates
+	newY := float32(report.Alt) * HEIGHT_CONVERSION
+	newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
+	currPos := lin.Vec3{newX, newY, newZ}
+	oldPos := lastReading.position
+	// cache position, occurred time, and velocity
+	// TODO: Check sub order for bug?
+	var deltaPos lin.Vec3
+	deltaPos.Sub(&currPos, &oldPos) // arg1 - arg2, result stored in first arg
+	// time
+	currTime := time.Now()
+	deltaTime := currTime.Sub(lastReading.occurred)
+	deltaSeconds := float32(deltaTime.Seconds())
+	// vel
+	var currVel lin.Vec3
+	currVel.Scale(&deltaPos, 1.0/deltaSeconds)
+	reading := GPSReading{
+		position: currPos,
+		occurred: time.Now(),
+		velocity: currVel,
+	}
+	// Our spline only uses 3 points, so roll back if already there
+	if len(sm.gpsRecordings) >= 3 {
+		sm.gpsRecordings = append(sm.gpsRecordings[1:], reading)
+		sm.camera.motionHandler.FeedGPSUpdate()
+	} else {
+		sm.gpsRecordings = append(sm.gpsRecordings, reading)
+	}
+	// Update interarrival time
+	if len(sm.gpsRecordings) >= 2 {
+		sm.camera.motionHandler.splineManager.averageGPSInterval = deltaSeconds
+	}
+}
+
+// FeedGPSUpdate refreshes the spline after each new GPS reading.
+func (mh *MotionHandler) FeedGPSUpdate() {
+	// Need 3 GPS readings to start predicting
+	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
+		return
+	}
+	spline := mh.splineManager
+	// left shift predictions, space for new
+	copy(spline.predictions[0:], spline.predictions[1:])
+
+	// Initialize predictions on first run
+	if spline.predictions[0] == nil {
+		for i := range spline.predictions {
+			pos := mh.PredictPosition(float32(i) * 0.5)
+			spline.predictions[i] = pos
+
+		}
+	}
+	// Predict 2 new positions based on current average gps interval
+	pred1 := mh.PredictPosition(1.0 * spline.averageGPSInterval)
+	pred2 := mh.PredictPosition(2.0 * spline.averageGPSInterval)
+	// fill newest predictions in final 2 spots
+	spline.predictions[2] = pred1
+	spline.predictions[3] = pred2
+	// bring spline prediction points current
+	spline.currentSplineData = &SplineData{
+		p0: spline.predictions[0],
+		p1: spline.predictions[1],
+		p2: spline.predictions[2],
+		p3: spline.predictions[3],
+	}
+	spline.splineStartTime = time.Now()
 }
 
 func Smoother32(new1, old1, new2, old2, new3, old3 float32) (float32, float32, float32) {
