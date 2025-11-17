@@ -2,6 +2,7 @@ package camera
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"time"
 
@@ -197,6 +198,7 @@ func (c *CameraImpl) EnableSensors(sensorScript string) error {
 
 // Update performs any per-frame updates
 func (c *CameraImpl) Update(deltaTime float32) {
+	log.Println("Updating camera position")
 	mh := c.motionHandler
 	if mh == nil || mh.splineManager == nil {
 		return
