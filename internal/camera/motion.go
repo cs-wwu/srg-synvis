@@ -2,15 +2,47 @@ package camera
 
 import (
 	"math"
+	"time"
 
 	"github.com/ungerik/go3d/float64/quaternion"
 	"github.com/ungerik/go3d/float64/vec3"
 	lin "github.com/xlab/linmath"
 )
 
+const DEAD_RECKONING_TIMEOUT = 5
+
 // MotionHandler handles camera movement and rotation calculations
 type MotionHandler struct {
-	camera *CameraImpl
+	camera        *CameraImpl
+	splineManager *SplineManager
+}
+
+// Keeps track of the state of the spline in real space
+type SplineManager struct {
+	stalling           bool
+	averageGPSInterval float32
+	timeSinceLastGPS   float32
+	currentVelocity    *lin.Vec3
+	predictions        []*lin.Vec3
+	currentSplineData  *SplineData
+	splineStartTime    time.Time
+}
+
+// Data container for the actual spline (mathematical representation)
+type SplineData struct {
+	p0              *lin.Vec3
+	p1              *lin.Vec3
+	p2              *lin.Vec3
+	p3              *lin.Vec3
+	splineStartTime float32
+}
+
+// Information for ensuring turning modulates position prediction
+type TurnInfo struct {
+	turnRadius float32
+	angularVel float32  // degrees/second
+	curvedDir  lin.Vec3 // curving in direction of, normalized
+	damping    float32
 }
 
 // Quaternion-based rotation vectors for consistent calculations
@@ -20,10 +52,25 @@ var (
 	qStartCameraRight = vec3.Cross(&qStartCameraUp, &qStartCameraFront)
 )
 
+const (
+	minTurnRadius             = float32(1.0)
+	sharpTurnThreshold        = float32(60.0) // degrees/second
+	dampingMin                = float32(0.25)
+	dampingMax                = float32(0.6)
+	curveTightnessFactor      = float32(0.8)
+	windingDetectionThreshold = float32(20.0) // degrees/second
+	minTimeDelta              = float32(0.0001)
+)
+
 // NewMotionHandler creates a new motion handler
 func NewMotionHandler(camera *CameraImpl) *MotionHandler {
 	return &MotionHandler{
 		camera: camera,
+		splineManager: &SplineManager{
+			averageGPSInterval: 1.0,
+			currentVelocity:    &lin.Vec3{},
+			predictions:        make([]*lin.Vec3, 4),
+		},
 	}
 }
 
@@ -178,6 +225,150 @@ func (mh *MotionHandler) GetMotionState() MotionState {
 	}
 }
 
+func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
+	currPos := mh.GetMotionState().Position
+	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
+		return &currPos
+	}
+	gps1 := mh.camera.sensorManager.gpsRecordings[0]
+	gps2 := mh.camera.sensorManager.gpsRecordings[1]
+
+	// we use basic kinematic equations to predict the position of the aircraft
+	// tempered with some prediction for turning angles
+	// without considering turns, prediction would only consider the forward vector
+	v1 := gps1.velocity
+	v2 := gps2.velocity
+
+	if GetMagnitude3D(&v2) < .01 {
+		return &gps2.position
+	}
+
+	var deltaVel lin.Vec3
+	deltaVel.Sub(&v1, &v2)
+
+	// deltaseconds is to calculate the acceleration between our two positions
+	// note that this is not the same as predicted time!
+	deltaTime := gps2.occurred.Sub(gps1.occurred)
+	deltaSeconds := float32(deltaTime.Seconds())
+
+	// final pos = initial pos + 1/2 a*t^2
+	// on average, GPS readings come in every second
+	// To smooth for noise or loss, we keep a rolling average and
+	// use that as a factor in predicting future positions
+	var accel lin.Vec3
+	accel.Scale(&deltaVel, 1.0/deltaSeconds)
+	predTime := mh.splineManager.averageGPSInterval * futureSeconds
+
+	// var turn = CalculateTurn(v1, v2, accel, v2.magnitude);
+	turn := mh.CalculateTurn(&v1, &v2, &accel)
+
+	// If we are turning, predict position differently than if
+	// we are moving in a straight line
+	if math.Abs(float64(turn.angularVel)) > 1.0 {
+		return mh.PredictCurved(&gps2.position, &v2, &turn, predTime)
+	}
+
+	// x_f = x_0 + vt + at^2. or, to find the predicted position,
+	// sum the original position, the velocity term, and the acceleration term
+	var velTerm, accelTerm, offset, predicted lin.Vec3
+	velTerm.Scale(&v2, predTime)
+	accelTerm.Scale(&accel, 0.5*predTime*predTime)
+	offset.Add(&velTerm, &accelTerm)
+	predicted.Add(&gps1.position, &offset)
+
+	return &predicted
+}
+
+// Here we use the information generated from turn calculation for position prediction
+// Admittedtly this is a lot less straightforward and probably pretty expensive, may be able to do better
+func (mh *MotionHandler) PredictCurved(start, vel *lin.Vec3, turn *TurnInfo, t float32) *lin.Vec3 {
+	speed := GetMagnitude3D(vel)
+	arc := speed * t
+	radiansTraveled := arc / turn.turnRadius
+
+	toRotate := float64(radiansTraveled) * math.Copysign(1, float64(turn.angularVel))
+	axis := vec3.T{0, 1, 0} // up
+	quat := quaternion.FromAxisAngle(&axis, toRotate)
+
+	// Quaternions use vec3.T, we have been using lin.Vec3. Convert accordingly
+	convertedDir := vec3.T{
+		float64(turn.curvedDir[0]),
+		float64(turn.curvedDir[1]),
+		float64(turn.curvedDir[2]),
+	}
+	tngTemp := quat.RotatedVec3(&convertedDir) // vec3.T
+	tangent := lin.Vec3{float32(tngTemp[0]), float32(tngTemp[1]), float32(tngTemp[2])}
+
+	var hOffset lin.Vec3
+	hOffset.Scale(GetNormalizedVector3D(&tangent), arc)
+	vOffset := vel[1] * t
+
+	return &lin.Vec3{
+		start[0] + hOffset[0],
+		start[1] + vOffset,
+		start[2] + hOffset[2],
+	}
+}
+
+// This compares the orientation of the two most recent readings to extrapolate
+// information about the current curve/turn to project future position(s)
+func (mh *MotionHandler) CalculateTurn(v1, v2, accel *lin.Vec3) TurnInfo {
+	var info TurnInfo
+
+	// For the turn, we ignore the vertical component and just
+	// consider x and z orientation
+	dir1 := GetNormalizedVector3D(&lin.Vec3{v1[0], 0, v1[2]})
+	dir2 := GetNormalizedVector3D(&lin.Vec3{v2[0], 0, v2[2]})
+
+	// float angle = Vector3.SignedAngle(dir1, dir2, Vector3.up);
+	// The Y axis is given by 0, 1, 0
+	angle := SignedAngle(dir1, dir2, &lin.Vec3{0, 1, 0})
+	info.angularVel = angle / mh.splineManager.averageGPSInterval
+
+	// TODO: Really need to refactor these floats. Just want to move on for now
+	turnRatio := math.Abs(float64(info.angularVel)) / float64(sharpTurnThreshold)
+
+	sharpness := float32(math.Min(1.0, math.Max(0.0, turnRatio)))
+	winding := math.Abs(float64(info.angularVel)) > float64(windingDetectionThreshold)
+
+	// TODO: A lot of these are magic numbers from when I was prototyping before I serialized
+	// fields. We can make these modular for different aircraft later on
+	if winding {
+		info.damping = Lerp(dampingMin*1.5, dampingMax*0.7, sharpness)
+	} else {
+		info.damping = Lerp(dampingMin, dampingMax, sharpness)
+	}
+
+	// Determine the direction to move in as a function of
+	// whether or not we are in a winding path or entering a
+	// sharp turn (determined currently by magic nums)
+	rawCurvedDir := Slerp(dir1, dir2, info.damping)
+	info.curvedDir = *GetNormalizedVector3D(rawCurvedDir)
+
+	// speed is simply the magnitude of a vector
+	speed := GetMagnitude3D(v2)
+
+	// Finally, we keep information about the turning radius between these two positions
+	// We use information about acceleration along X/Z and the directions of movement logged
+	// when those positions occurred
+	hSquares := float64(accel[0]*accel[0] + accel[2]*accel[2])
+	hAccel := float32(math.Sqrt(hSquares))
+	if hAccel > 0.001 {
+		info.turnRadius = max(minTurnRadius, (speed*speed)/hAccel)
+	} else {
+		// If no hAccel, turn radius can be represented by a really large number
+		info.turnRadius = 100000.0
+	}
+
+	if sharpness > 0.2 {
+		info.turnRadius *= curveTightnessFactor
+	}
+
+	return info
+}
+
+// Spline functions
+
 // t is the progress along a spline at a given moment
 func (mh *MotionHandler) CentCatmullRom(t float32) *lin.Vec3 {
 	splineData := mh.splineManager.currentSplineData
@@ -242,6 +433,8 @@ func LerpVec3(a, b lin.Vec3, f1, f2 float32) lin.Vec3 {
 		f1*a[2] + f2*b[2],
 	}
 }
+
+// Vector, angle, and general helpers
 
 func Lerp(a, b, t float32) float32 {
 	return a + (b-a)*t
