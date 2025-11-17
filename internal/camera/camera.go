@@ -197,8 +197,36 @@ func (c *CameraImpl) EnableSensors(sensorScript string) error {
 
 // Update performs any per-frame updates
 func (c *CameraImpl) Update(deltaTime float32) {
-	// Currently no per-frame updates needed
-	// This is where future plane mode physics could go
+	mh := c.motionHandler
+	if mh == nil || mh.splineManager == nil {
+		return
+	}
+
+	sm := mh.splineManager
+	sd := sm.currentSplineData
+	if sd == nil {
+		return // No spline yet
+	}
+
+	// Calculate elapsed time since spline start
+	elapsed := float32(time.Since(sm.splineStartTime).Seconds())
+
+	// Normalize to [0, 1] based on average GPS interval
+	t := elapsed / sm.averageGPSInterval
+
+	var newPos lin.Vec3
+	if t < 1.0 {
+		// Interpolate position on Catmull-Rom spline
+		newPos = *c.motionHandler.CentCatmullRom(t)
+	} else {
+		// Past end of spline: dead reckon using current velocity
+		dt := float32(time.Since(sm.splineStartTime).Seconds())
+		var delta lin.Vec3
+		delta.Scale(sm.currentVelocity, dt)
+		newPos.Add(&(*sd.p3), &delta)
+	}
+	// Update camera position in world space
+	c.updatePosition(newPos[0], newPos[2], newPos[1])
 }
 
 // GetPositionString returns a human-readable position string
