@@ -49,8 +49,6 @@ func NewSensorManager(camera *CameraImpl) *SensorManager {
 
 // StartGPS connects to the GPSD service and gets lat, lon, and alt with TPV report
 // Runs as a separate goroutine
-// TODO: GPS functions should not handle camera movement. Should only provide the data
-// required to determine positon or to predict position.
 func (sm *SensorManager) StartGPS() error {
 	// Connect to GPSD
 	gps, err := gpsd.Dial("localhost:2947")
@@ -78,6 +76,8 @@ func (sm *SensorManager) StartGPS() error {
 		report := r.(*gpsd.TPVReport)
 
 		// Check if data has arrived or is faulty.
+		// When GPS is updated, a the spline by which we interpolate position will be edited
+		// and new predictions for future positions will be generated.
 		if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
 			log.Println("GPS: No fix, using predicted position based on previous movement")
 			return
