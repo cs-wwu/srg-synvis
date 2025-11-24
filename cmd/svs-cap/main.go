@@ -16,6 +16,13 @@ func init() {
 	log.SetFlags(log.Lshortfile)
 }
 
+const (
+	ARC_DEGREES_TO_MINUTES = 60.0
+	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
+
+	METERS_TO_WORLD = 1852.0 / ARC_DEGREES_TO_MINUTES
+)
+
 func main() {
 	var config models.AppConfig
 
@@ -27,6 +34,9 @@ func main() {
 	config.CaptureOnly = true
 	config.CaptureWidth = 1024
 	config.CaptureHeight = 1024
+
+	config.RenderDistance = (150.0 * 1000.0) / METERS_TO_WORLD
+	config.Fov = 70
 
 	err := vk.SetDefaultGetInstanceProcAddr()
 	if err != nil {
