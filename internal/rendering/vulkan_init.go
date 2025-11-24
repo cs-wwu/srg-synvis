@@ -683,6 +683,13 @@ func (app *Application) prepareRenderPass() {
 	dev := app.Context().Device()
 	var renderPass vk.RenderPass
 
+	var format vk.Format
+	if app.cfg.CaptureOnly {
+		format = TextureFormat
+	} else {
+		format = app.Dimensions().Format
+	}
+
 	var finalLayout vk.ImageLayout
 	if app.cfg.CaptureOnly {
 		finalLayout = vk.ImageLayoutTransferSrcOptimal
@@ -694,7 +701,7 @@ func (app *Application) prepareRenderPass() {
 		SType:           vk.StructureTypeRenderPassCreateInfo,
 		AttachmentCount: 2,
 		PAttachments: []vk.AttachmentDescription{{
-			Format:         app.Dimensions().Format,
+			Format:         format,
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpStore,
@@ -745,7 +752,7 @@ func (app *Application) prepareOneshot() {
 	}
 
 	dev := app.Context().Device()
-	format := app.Dimensions().Format
+	format := TextureFormat
 
 	image := app.prepareTexture(app.cfg.CaptureWidth, app.cfg.CaptureHeight,
 		format,
