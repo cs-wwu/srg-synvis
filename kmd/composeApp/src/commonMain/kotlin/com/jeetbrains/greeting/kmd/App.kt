@@ -1,8 +1,8 @@
 package com.jeetbrains.greeting.kmd
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+// import androidx.compose.animation.AnimatedVisibility
+// import androidx.compose.foundation.Image
+// import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,27 +17,24 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
+// import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+// import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
-
 import kmd.composeapp.generated.resources.Res
 import kmd.composeapp.generated.resources.compose_multiplatform
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 data class BoundingBox(val North: Int, val South: Int, val East: Int, val West: Int)
 data class Region(val State: String, val box: BoundingBox)
-
 
 fun USregions() = listOf(
     Region("AL", BoundingBox(36, 30, -84, -89)),
@@ -105,7 +102,7 @@ fun App(regions: List<Region> = USregions()) {
     MaterialTheme {
         var showRegion by remember { mutableStateOf(false) }
         var selectedRegions by remember { mutableStateOf(setOf<String>()) }
-        var selectedBoxes by remember {mutableStateOf(setOf<BoundingBox>())}
+        var selectedBoxes by remember { mutableStateOf(setOf<BoundingBox>()) }
         val coroutineScope = rememberCoroutineScope()
 
         // status text

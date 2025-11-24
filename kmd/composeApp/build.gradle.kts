@@ -8,6 +8,18 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.ktlint)
+}
+
+ktlint {
+    verbose.set(true)
+    outputToConsole.set(true)
+    coloredOutput.set(true)
+    filter {
+        exclude("**/build/generated/**")
+        exclude("**/generated/**")
+    }
+    // disabledRules.set(setOf("standard:max-line-length")) // Disable specific rules
 }
 
 kotlin {
