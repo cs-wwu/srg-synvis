@@ -1680,7 +1680,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// Initialize command buffers
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
-		app.updateCommandBuffer(res, res.CommandBuffer())
+		app.updateCommandBuffer(res.Framebuffer(), res.DescriptorSet(), res.CommandBuffer())
 	}
 
 	platform := app.Context().Platform()

@@ -366,14 +366,13 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	vk.UnmapMemory(dev, res.UniformMemory())
 
 	// New command buffer update logic
-	cmd := res.CommandBuffer()
-	app.updateCommandBuffer(res, cmd)
+	app.updateCommandBuffer(res.Framebuffer(), res.DescriptorSet(), res.CommandBuffer())
 
 	app.statsTracker.EndRender()
 	return nil
 }
 
-func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd vk.CommandBuffer) {
+func (app *Application) updateCommandBuffer(framebuffer vk.Framebuffer, descriptorSet vk.DescriptorSet, cmd vk.CommandBuffer) {
 	// Wait for command buffer to complete before reusing
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
@@ -391,7 +390,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBeginRenderPass(cmd, &vk.RenderPassBeginInfo{
 		SType:       vk.StructureTypeRenderPassBeginInfo,
 		RenderPass:  app.renderPass,
-		Framebuffer: res.Framebuffer(),
+		Framebuffer: framebuffer,
 		RenderArea: vk.Rect2D{
 			Offset: vk.Offset2D{X: 0, Y: 0},
 			Extent: vk.Extent2D{Width: app.width, Height: app.height},
@@ -415,7 +414,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// FIRST DRAW THE SKYBOX
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.skyboxPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		0, 1, []vk.DescriptorSet{descriptorSet}, 0, nil)
 
 	// Bind skybox buffers
 	vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.skyboxVertexBuffer}, []vk.DeviceSize{0})
@@ -428,7 +427,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	if app.camera.MapView() {
 		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
 		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+			0, 1, []vk.DescriptorSet{descriptorSet}, 0, nil)
 		vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{app.planeVertexBuffer}, []vk.DeviceSize{0})
 		vk.CmdBindIndexBuffer(cmd, app.planeIndexBuffer, 0, vk.IndexTypeUint32)
 		vk.CmdDrawIndexed(cmd, app.planeIndexCount, 1, 0, 0, 0)
@@ -437,7 +436,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// THEN DRAW THE TERRAIN (as before)
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.pipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		0, 1, []vk.DescriptorSet{descriptorSet}, 0, nil)
 
 	chunks := app.StreamManager.GetRenderableChunks()
 	vertexCount := 0
@@ -460,7 +459,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	// Draw roads
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		0, 1, []vk.DescriptorSet{descriptorSet}, 0, nil)
 
 	app.RoadStreamer.Lock()
 	for _, roadSquare := range app.RoadStreamer.Chunks {
