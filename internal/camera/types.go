@@ -67,9 +67,12 @@ type Camera interface {
 	EnableSensors(sensorScript string) error
 
 	// Updates and info
-	Update(deltaTime float32)
+	Update()
 	GetPositionString() string
 	GetViewVectors() string
+
+	// Debugging
+	StartMockGPS(path []lin.Vec3, updateInterval time.Duration)
 
 	MapView() bool
 }

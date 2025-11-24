@@ -531,7 +531,7 @@ func TestCameraUpdate(t *testing.T) {
 	cam := NewCamera(testConfig)
 
 	// Test that update doesn't crash
-	cam.Update(1.0 / 60.0) // 60 FPS delta time
+	cam.Update() // deltaTime not necessary. Unless we think it is?
 
 	// Currently Update doesn't do much, but this ensures the interface works
 	pos := cam.Position()

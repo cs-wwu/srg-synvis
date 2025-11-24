@@ -230,8 +230,8 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
 		return &currPos
 	}
-	gps1 := mh.camera.sensorManager.gpsRecordings[0]
-	gps2 := mh.camera.sensorManager.gpsRecordings[1]
+	gps1 := mh.camera.sensorManager.gpsRecordings[1]
+	gps2 := mh.camera.sensorManager.gpsRecordings[2]
 
 	// we use basic kinematic equations to predict the position of the aircraft
 	// tempered with some prediction for turning angles
@@ -244,7 +244,7 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	}
 
 	var deltaVel lin.Vec3
-	deltaVel.Sub(&v1, &v2)
+	deltaVel.Sub(&v2, &v1) // correct order?
 
 	// deltaseconds is to calculate the acceleration between our two positions
 	// note that this is not the same as predicted time!
@@ -267,7 +267,6 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	if math.Abs(float64(turn.angularVel)) > 1.0 {
 		return mh.PredictCurved(&gps2.position, &v2, &turn, predTime)
 	}
-
 	// x_f = x_0 + vt + at^2. or, to find the predicted position,
 	// sum the original position, the velocity term, and the acceleration term
 	var velTerm, accelTerm, offset, predicted lin.Vec3
@@ -363,7 +362,6 @@ func (mh *MotionHandler) CalculateTurn(v1, v2, accel *lin.Vec3) TurnInfo {
 	if sharpness > 0.2 {
 		info.turnRadius *= curveTightnessFactor
 	}
-
 	return info
 }
 

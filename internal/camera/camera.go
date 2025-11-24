@@ -197,8 +197,7 @@ func (c *CameraImpl) EnableSensors(sensorScript string) error {
 }
 
 // Update performs any per-frame updates
-func (c *CameraImpl) Update(deltaTime float32) {
-	log.Println("Updating camera position")
+func (c *CameraImpl) Update() {
 	mh := c.motionHandler
 	if mh == nil || mh.splineManager == nil {
 		return
@@ -229,6 +228,12 @@ func (c *CameraImpl) Update(deltaTime float32) {
 	}
 	// Update camera position in world space
 	c.updatePosition(newPos[0], newPos[2], newPos[1])
+	log.Printf("INTERPOLATED | X: %f, Y: %f, Z: %f\n", newPos[0], newPos[1], newPos[2])
+}
+
+// Starts mock GPS, interpolation testing
+func (c *CameraImpl) StartMockGPS(path []lin.Vec3, updateInterval time.Duration) {
+	go c.sensorManager.StartMockGPS(path, updateInterval)
 }
 
 // GetPositionString returns a human-readable position string

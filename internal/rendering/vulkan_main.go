@@ -37,6 +37,14 @@ func NewApplication(cfg models.AppConfig) *Application {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
+
+	if cfg.UseGPS {
+		// Start from the configured camera position
+		startPos := cfg.CameraStartPos
+		testPath := camera.GenerateTestFlightPathFrom(startPos)
+		cam.StartMockGPS(testPath, 3*time.Second)
+		log.Println("Started mock GPS for testing")
+	}
 	app := &Application{
 		camera:       cam,
 		Gps:          cfg.UseGPS,
@@ -103,7 +111,7 @@ func (app *Application) NextFrame() {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.camera.ProcessInput(app.WindowHandle)
-	app.camera.Update(1.0) // TODO: this is a hack to bypass error...do we even need dt?
+	app.camera.Update()
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings

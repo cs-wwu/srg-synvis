@@ -285,6 +285,7 @@ func (mh *MotionHandler) FeedGPSUpdate() {
 	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
 		return
 	}
+	log.Println("New GPS update")
 	spline := mh.splineManager
 	// left shift predictions, space for new
 	copy(spline.predictions[0:], spline.predictions[1:])
@@ -298,9 +299,11 @@ func (mh *MotionHandler) FeedGPSUpdate() {
 		}
 	}
 	// Predict 2 new positions based on current average gps interval
-	pred1 := mh.PredictPosition(1.0 * spline.averageGPSInterval)
-	pred2 := mh.PredictPosition(2.0 * spline.averageGPSInterval)
+	pred1 := mh.PredictPosition(1.0)
+	pred2 := mh.PredictPosition(2.0)
 	// fill newest predictions in final 2 spots
+	cameraPos := *mh.camera.pos
+	spline.predictions[1] = &cameraPos
 	spline.predictions[2] = pred1
 	spline.predictions[3] = pred2
 	// bring spline prediction points current
