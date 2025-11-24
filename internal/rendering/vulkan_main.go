@@ -149,33 +149,106 @@ func (app *Application) RenderCapture() {
 
 	app.makeOneshotPool()
 
-	app.oneshotCmd(func(cmd vk.CommandBuffer) {
-		barrier := vk.ImageMemoryBarrier{
-			SType:               vk.StructureTypeImageMemoryBarrier,
-			SrcAccessMask:       vk.AccessFlags(vk.AccessColorAttachmentWriteBit),
-			DstAccessMask:       vk.AccessFlags(vk.AccessTransferReadBit),
-			OldLayout:           vk.ImageLayoutUndefined,
-			NewLayout:           vk.ImageLayoutTransferSrcOptimal,
-			SrcQueueFamilyIndex: vk.QueueFamilyIgnored,
-			DstQueueFamilyIndex: vk.QueueFamilyIgnored,
-			Image:               app.oneshotImage,
-			SubresourceRange: vk.ImageSubresourceRange{
-				AspectMask:     vk.ImageAspectFlags(vk.ImageAspectColorBit),
-				BaseMipLevel:   0,
-				LevelCount:     1,
-				BaseArrayLayer: 0,
-				LayerCount:     1,
+	var framebuffer vk.Framebuffer
+	vk.CreateFramebuffer(app.Context().Device(), &vk.FramebufferCreateInfo{
+		SType:           vk.StructureTypeFramebufferCreateInfo,
+		RenderPass:      app.renderPass,
+		AttachmentCount: 2,
+		PAttachments:    []vk.ImageView{app.oneshotImageView, app.oneshotDepthImageView},
+		Width:           app.cfg.CaptureWidth,
+		Height:          app.cfg.CaptureHeight,
+		Layers:          1,
+	}, nil, &framebuffer)
+	app.oneshotFramebuffer = framebuffer
+
+	var descPool vk.DescriptorPool
+	vk.CreateDescriptorPool(app.Context().Device(), &vk.DescriptorPoolCreateInfo{
+		SType:         vk.StructureTypeDescriptorPoolCreateInfo,
+		MaxSets:       1,
+		PoolSizeCount: 2,
+		PPoolSizes: []vk.DescriptorPoolSize{
+			{
+				Type:            vk.DescriptorTypeUniformBuffer,
+				DescriptorCount: 1,
 			},
+			{
+				Type:            vk.DescriptorTypeCombinedImageSampler,
+				DescriptorCount: 1,
+			},
+		},
+	}, nil, &descPool)
+
+	var descSet vk.DescriptorSet
+	vk.AllocateDescriptorSets(app.Context().Device(), &vk.DescriptorSetAllocateInfo{
+		SType:              vk.StructureTypeDescriptorSetAllocateInfo,
+		DescriptorPool:     descPool,
+		DescriptorSetCount: 1,
+		PSetLayouts:        []vk.DescriptorSetLayout{app.descLayout},
+	}, &descSet)
+	app.oneshotDescriptorSet = descSet
+
+	texInfos := make([]vk.DescriptorImageInfo, 0, len(app.textures))
+	for _, tex := range app.textures {
+		texInfos = append(texInfos, vk.DescriptorImageInfo{
+			Sampler:     tex.sampler,
+			ImageView:   tex.view,
+			ImageLayout: vk.ImageLayoutGeneral,
+		})
+	}
+
+	memProps := app.Context().Platform().MemoryProperties()
+	dataRaw := app.ubo.Data()
+	ubo := as.CreateBuffer(app.Context().Device(), memProps, dataRaw, vk.BufferUsageUniformBufferBit)
+
+	vk.UpdateDescriptorSets(app.Context().Device(), 2, []vk.WriteDescriptorSet{{
+		SType:           vk.StructureTypeWriteDescriptorSet,
+		DstBinding:      0,
+		DstSet:          descSet,
+		DescriptorCount: 1,
+		DescriptorType:  vk.DescriptorTypeUniformBuffer,
+		PBufferInfo: []vk.DescriptorBufferInfo{{
+			Offset: 0,
+			Range:  vk.DeviceSize(UBOSize),
+			Buffer: ubo.Buffer,
+		}},
+	}, {
+		SType:           vk.StructureTypeWriteDescriptorSet,
+		DstBinding:      1,
+		DstSet:          descSet,
+		DescriptorCount: uint32(len(texEnabled)),
+		DescriptorType:  vk.DescriptorTypeCombinedImageSampler,
+		PImageInfo:      texInfos,
+	}}, 0, nil)
+
+	temp := new(lin.Mat4x4)
+	temp.Invert(&app.ubo.Model)
+	app.ubo.NormalM.Transpose(temp)
+
+	{
+		data := app.ubo.Data()
+		var pData unsafe.Pointer
+		ret := vk.MapMemory(app.Context().Device(), ubo.Memory, 0, vk.DeviceSize(len(data)), 0, &pData)
+		OrPanic(as.NewError(ret))
+
+		n := vk.Memcopy(pData, data)
+		if n != len(data) {
+			log.Fatalf("vulkan: failed to copy data, %d != %d", n, len(data))
 		}
-		vk.CmdPipelineBarrier(
-			cmd,
-			vk.PipelineStageFlags(vk.PipelineStageColorAttachmentOutputBit),
-			vk.PipelineStageFlags(vk.PipelineStageTransferBit),
-			0,
-			0, nil,
-			0, nil,
-			1, []vk.ImageMemoryBarrier{barrier},
-		)
+		vk.UnmapMemory(app.Context().Device(), ubo.Memory)
+	}
+
+	for {
+		time.Sleep(50 * time.Millisecond)
+		// TODO: Make this much, much smarter
+		if len(app.StreamManager.GetRenderableChunks()) >= 3000 {
+			break
+		}
+	}
+
+	app.oneshotCmd(func(cmd vk.CommandBuffer) {
+		app.width = app.cfg.CaptureWidth
+		app.height = app.cfg.CaptureHeight
+		app.updateCommandBuffer(app.oneshotFramebuffer, app.oneshotDescriptorSet, cmd)
 	})
 
 	imgBytes := app.cfg.CaptureWidth * app.cfg.CaptureHeight * 4
@@ -365,24 +438,30 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	}
 	vk.UnmapMemory(dev, res.UniformMemory())
 
-	// New command buffer update logic
-	app.updateCommandBuffer(res.Framebuffer(), res.DescriptorSet(), res.CommandBuffer())
+	app.buildSimultaneousCommandBuffer(res)
 
 	app.statsTracker.EndRender()
 	return nil
 }
 
-func (app *Application) updateCommandBuffer(framebuffer vk.Framebuffer, descriptorSet vk.DescriptorSet, cmd vk.CommandBuffer) {
+func (app *Application) buildSimultaneousCommandBuffer(res *as.SwapchainImageResources) {
 	// Wait for command buffer to complete before reusing
 	dev := app.Context().Device()
 	vk.DeviceWaitIdle(dev)
 
-	ret := vk.BeginCommandBuffer(cmd, &vk.CommandBufferBeginInfo{
+	ret := vk.BeginCommandBuffer(res.CommandBuffer(), &vk.CommandBufferBeginInfo{
 		SType: vk.StructureTypeCommandBufferBeginInfo,
 		Flags: vk.CommandBufferUsageFlags(vk.CommandBufferUsageSimultaneousUseBit),
 	})
 	OrPanic(as.NewError(ret))
 
+	app.updateCommandBuffer(res.Framebuffer(), res.DescriptorSet(), res.CommandBuffer())
+
+	ret = vk.EndCommandBuffer(res.CommandBuffer())
+	OrPanic(as.NewError(ret))
+}
+
+func (app *Application) updateCommandBuffer(framebuffer vk.Framebuffer, descriptorSet vk.DescriptorSet, cmd vk.CommandBuffer) {
 	clearValues := make([]vk.ClearValue, 2)
 	clearValues[1].SetDepthStencil(1, 0)
 	clearValues[0].SetColor([]float32{0.0, 0.0, 0.0, 1.0}) // Black background as fallback
@@ -487,6 +566,4 @@ func (app *Application) updateCommandBuffer(framebuffer vk.Framebuffer, descript
 	app.ObstructionStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
-	ret = vk.EndCommandBuffer(cmd)
-	OrPanic(as.NewError(ret))
 }

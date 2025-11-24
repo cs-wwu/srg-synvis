@@ -781,6 +781,7 @@ func (app *Application) prepareOneshot() {
 			LayerCount: 1,
 		},
 	}, nil, &imageView)
+	app.oneshotImageView = imageView
 
 	var depthView vk.ImageView
 	vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
@@ -800,6 +801,7 @@ func (app *Application) prepareOneshot() {
 			LayerCount: 1,
 		},
 	}, nil, &depthView)
+	app.oneshotDepthImageView = depthView
 
 	fbInfo := vk.FramebufferCreateInfo{
 		SType:           vk.StructureTypeFramebufferCreateInfo,
@@ -1680,7 +1682,7 @@ func (app *Application) VulkanContextPrepare() error {
 	// Initialize command buffers
 	swapchainImageResources := app.Context().SwapchainImageResources()
 	for _, res := range swapchainImageResources {
-		app.updateCommandBuffer(res.Framebuffer(), res.DescriptorSet(), res.CommandBuffer())
+		app.buildSimultaneousCommandBuffer(res)
 	}
 
 	platform := app.Context().Platform()
