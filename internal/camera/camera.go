@@ -2,7 +2,6 @@ package camera
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"time"
 
@@ -23,6 +22,10 @@ type CameraImpl struct {
 	speed       float32 // Camera speed
 	sensitivity float32 // Camera sensitivity
 
+	// Motion parameters
+	prevPos    *lin.Vec3
+	planePitch float32 // Pitch angle of the plane based on movement
+
 	// Orientation tracking (for sensors)
 	pitch float64 // Pitch relative to start
 	yaw   float64 // Yaw relative to start
@@ -41,6 +44,9 @@ type CameraImpl struct {
 
 	northView          bool
 	northButtonPressed bool
+
+	prevPosTime time.Time
+	smoothedVel lin.Vec3
 }
 
 var (
@@ -50,6 +56,10 @@ var (
 	MAP_NORTH = lin.Vec3{0.0, 0.0, 1.0}
 	// Distance above the plane to be in the map view.
 	MAP_OFFSET = float32(10.0)
+	// Threshold for camera movement to actually update viewport
+	ROTATION_THRESHOLD = float32(1e-3)
+	// Smoothing for above rotation threshold
+	ROTATION_DAMPING = float32(0.075)
 )
 
 // NewCamera creates and initializes a new Camera
@@ -113,6 +123,7 @@ func (c *CameraImpl) MapView() bool {
 // ViewMatrix returns the camera's view matrix
 func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 	if c.mapView {
+		// your existing map view code
 		up := lin.Vec3{}
 		up.Scale(&MAP_UP, MAP_OFFSET)
 		eye := *c.pos
@@ -130,9 +141,28 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 
 		result.LookAt(&eye, c.pos, &forward)
 	} else {
+		// base horizontal direction from camera front
+		base := lin.Vec3{c.front[0], 0, c.front[2]}
+		if base[0]*base[0]+base[2]*base[2] < 1e-8 {
+			base = lin.Vec3{0, 0, 1}
+		}
+		base.Norm(&base)
+
+		// apply planePitch: nose up/down
+		cosP := float32(math.Cos(float64(c.planePitch)))
+		sinP := float32(math.Sin(float64(c.planePitch)))
+
+		dir := lin.Vec3{
+			base[0] * cosP, // keep horizontal X scaled by cos(pitch)
+			sinP,           // vertical component from pitch
+			base[2] * cosP, // keep horizontal Z scaled by cos(pitch)
+		}
+
 		target := lin.Vec3{}
-		target.Add(c.pos, c.front)
-		result.LookAt(c.pos, &target, c.up)
+		target.Add(c.pos, &dir)
+
+		worldUp := lin.Vec3{0, 1, 0}
+		result.LookAt(c.pos, &target, &worldUp)
 	}
 	return
 }
@@ -145,7 +175,7 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 	// Face forwards.
 	result.RotateX(result, math.Pi/2)
 
-	// Scale the plane up (NB: `lin.Mat4x4.Scale` does not scale correctly!)
+	// Scale the plane up
 	scale := float32(5)
 	result.Mult(result, &lin.Mat4x4{
 		{scale, 0, 0, 0},
@@ -168,7 +198,7 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 	}
 
 	lookAt := lin.Mat4x4{}
-	lookAt.LookAt(&lin.Vec3{0, 0, 0}, &forward, c.up)
+	lookAt.LookAt(&lin.Vec3{0, 0, 0}, &forward, &lin.Vec3{0, 1, 0})
 	tmp := lin.Mat4x4{}
 	tmp.Transpose(&lookAt)
 	result.Mult(result, &tmp)
@@ -196,7 +226,6 @@ func (c *CameraImpl) EnableSensors(sensorScript string) error {
 	return nil
 }
 
-// Update performs any per-frame updates
 func (c *CameraImpl) Update() {
 	mh := c.motionHandler
 	if mh == nil || mh.splineManager == nil {
@@ -204,31 +233,87 @@ func (c *CameraImpl) Update() {
 	}
 
 	sm := mh.splineManager
-	sd := sm.currentSplineData
-	if sd == nil {
-		return // No spline yet
+	if sm.currentSplineData == nil {
+		return
 	}
 
-	// Calculate elapsed time since spline start
 	elapsed := float32(time.Since(sm.splineStartTime).Seconds())
-
-	// Normalize to [0, 1] based on average GPS interval
 	t := elapsed / sm.averageGPSInterval
 
 	var newPos lin.Vec3
 	if t < 1.0 {
-		// Interpolate position on Catmull-Rom spline
-		newPos = *c.motionHandler.CentCatmullRom(t)
+		pos := mh.CentCatmullRom(t, sm.currentSplineData)
+		newPos = *pos
 	} else {
-		// Past end of spline: dead reckon using current velocity
-		dt := float32(time.Since(sm.splineStartTime).Seconds())
+		// Dead reckon from p2
+		dt := elapsed - sm.averageGPSInterval
 		var delta lin.Vec3
 		delta.Scale(sm.currentVelocity, dt)
-		newPos.Add(&(*sd.p3), &delta)
+		newPos.Add(sm.currentSplineData.p2, &delta)
 	}
-	// Update camera position in world space
+
 	c.updatePosition(newPos[0], newPos[2], newPos[1])
-	log.Printf("INTERPOLATED | X: %f, Y: %f, Z: %f\n", newPos[0], newPos[1], newPos[2])
+
+	// Update the forward vector of the camera/eye
+	cur := c.Position()
+	if c.prevPos == nil {
+		c.prevPos = &lin.Vec3{cur[0], cur[1], cur[2]}
+	} else {
+		var d lin.Vec3
+		d.Sub(&cur, c.prevPos)
+
+		// Calculate horizontal distance for pitch calculation
+		horizontalDist := float32(math.Sqrt(float64(d[0]*d[0] + d[2]*d[2])))
+
+		// Calculate pitch from vertical movement (smoothed)
+		if horizontalDist > ROTATION_THRESHOLD {
+			targetPitch := float32(math.Atan2(float64(d[1]), float64(horizontalDist)))
+			// Smooth the pitch
+			c.planePitch = c.planePitch + (targetPitch-c.planePitch)*ROTATION_DAMPING
+		}
+
+		d[1] = 0 // flatten to horizontal
+
+		if d[0]*d[0]+d[2]*d[2] > ROTATION_THRESHOLD {
+			d.Norm(&d)
+			smoothedView := lin.Vec3{
+				(*c.front)[0] + (d[0]-(*c.front)[0])*ROTATION_DAMPING,
+				(*c.front)[1] + (d[1]-(*c.front)[1])*ROTATION_DAMPING,
+				(*c.front)[2] + (d[2]-(*c.front)[2])*ROTATION_DAMPING,
+			}
+			smoothedView.Norm(&smoothedView)
+
+			worldUp := lin.Vec3{0, 1, 0}
+			right := lin.Vec3{}
+			right.MultCross(&smoothedView, &worldUp)
+			right.Norm(&right)
+			up := lin.Vec3{}
+			up.MultCross(&right, &smoothedView)
+			up.Norm(&up)
+			c.updateVectors(smoothedView, right, up)
+		}
+
+		// Smoother motion with rolling average for velocity
+		if c.prevPos != nil {
+			dt := float32(time.Since(c.prevPosTime).Seconds())
+			if dt > 0.001 {
+				frameVel := lin.Vec3{
+					(cur[0] - c.prevPos[0]) / dt,
+					(cur[1] - c.prevPos[1]) / dt,
+					(cur[2] - c.prevPos[2]) / dt,
+				}
+				const alpha = float32(0.5)
+				c.smoothedVel[0] = alpha*frameVel[0] + (1-alpha)*c.smoothedVel[0]
+				c.smoothedVel[1] = alpha*frameVel[1] + (1-alpha)*c.smoothedVel[1]
+				c.smoothedVel[2] = alpha*frameVel[2] + (1-alpha)*c.smoothedVel[2]
+			}
+		}
+		// update baseline for next frame
+		(*c.prevPos)[0] = cur[0]
+		(*c.prevPos)[1] = cur[1]
+		(*c.prevPos)[2] = cur[2]
+		c.prevPosTime = time.Now()
+	}
 }
 
 // Starts mock GPS, interpolation testing

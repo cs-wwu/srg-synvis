@@ -26,6 +26,9 @@ type SplineManager struct {
 	predictions        []*lin.Vec3
 	currentSplineData  *SplineData
 	splineStartTime    time.Time
+	blendStartPos      *lin.Vec3 // camera position when new spline was created
+	prevSplineData     *SplineData
+	blendProgress      float32
 }
 
 // Data container for the actual spline (mathematical representation)
@@ -239,6 +242,12 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	v1 := gps1.velocity
 	v2 := gps2.velocity
 
+	const epsZ = float32(1e-3)
+	if float32(math.Abs(float64(v1[2]))) < epsZ && float32(math.Abs(float64(v2[2]))) < epsZ {
+		v1[2] = 0
+		v2[2] = 0
+	}
+
 	if GetMagnitude3D(&v2) < .01 {
 		return &gps2.position
 	}
@@ -250,6 +259,13 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	// note that this is not the same as predicted time!
 	deltaTime := gps2.occurred.Sub(gps1.occurred)
 	deltaSeconds := float32(deltaTime.Seconds())
+	if deltaSeconds < minTimeDelta { // minTimeDelta is defined above in this file
+		if mh.splineManager.averageGPSInterval > 0 {
+			deltaSeconds = mh.splineManager.averageGPSInterval
+		} else {
+			deltaSeconds = 1.0
+		}
+	}
 
 	// final pos = initial pos + 1/2 a*t^2
 	// on average, GPS readings come in every second
@@ -257,6 +273,16 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	// use that as a factor in predicting future positions
 	var accel lin.Vec3
 	accel.Scale(&deltaVel, 1.0/deltaSeconds)
+	// cap absurd acceleration spikes
+	const maxAccel = float32(80.0)
+	if GetMagnitude3D(&accel) > maxAccel {
+		n := GetNormalizedVector3D(&accel)
+		accel = lin.Vec3{n[0] * maxAccel, n[1] * maxAccel, n[2] * maxAccel}
+	}
+	// keep accel.z consistent with z clamp
+	if float32(math.Abs(float64(v2[2]))) < epsZ {
+		accel[2] = 0
+	}
 	predTime := mh.splineManager.averageGPSInterval * futureSeconds
 
 	// var turn = CalculateTurn(v1, v2, accel, v2.magnitude);
@@ -273,7 +299,7 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float32) *lin.Vec3 {
 	velTerm.Scale(&v2, predTime)
 	accelTerm.Scale(&accel, 0.5*predTime*predTime)
 	offset.Add(&velTerm, &accelTerm)
-	predicted.Add(&gps1.position, &offset)
+	predicted.Add(&gps2.position, &offset)
 
 	return &predicted
 }
@@ -353,7 +379,11 @@ func (mh *MotionHandler) CalculateTurn(v1, v2, accel *lin.Vec3) TurnInfo {
 	hSquares := float64(accel[0]*accel[0] + accel[2]*accel[2])
 	hAccel := float32(math.Sqrt(hSquares))
 	if hAccel > 0.001 {
-		info.turnRadius = max(minTurnRadius, (speed*speed)/hAccel)
+		if (speed*speed)/hAccel > minTurnRadius {
+			info.turnRadius = (speed * speed) / hAccel
+		} else {
+			info.turnRadius = minTurnRadius
+		}
 	} else {
 		// If no hAccel, turn radius can be represented by a really large number
 		info.turnRadius = 100000.0
@@ -368,12 +398,11 @@ func (mh *MotionHandler) CalculateTurn(v1, v2, accel *lin.Vec3) TurnInfo {
 // Spline functions
 
 // t is the progress along a spline at a given moment
-func (mh *MotionHandler) CentCatmullRom(t float32) *lin.Vec3 {
-	splineData := mh.splineManager.currentSplineData
-	p0 := splineData.p0
-	p1 := splineData.p1
-	p2 := splineData.p2
-	p3 := splineData.p3
+func (mh *MotionHandler) CentCatmullRom(t float32, data *SplineData) *lin.Vec3 {
+	p0 := data.p0
+	p1 := data.p1
+	p2 := data.p2
+	p3 := data.p3
 
 	// Knots are functions of position and progress along spline
 	// given by t_i+1 = (P_i+1 - P_i)^0.5 + t_i

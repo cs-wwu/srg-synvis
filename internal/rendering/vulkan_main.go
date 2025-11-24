@@ -41,8 +41,8 @@ func NewApplication(cfg models.AppConfig) *Application {
 	if cfg.UseGPS {
 		// Start from the configured camera position
 		startPos := cfg.CameraStartPos
-		testPath := camera.GenerateTestFlightPathFrom(startPos)
-		cam.StartMockGPS(testPath, 3*time.Second)
+		testPath := camera.GenerateScriptedPath(startPos, 100.0, 1*time.Second)
+		cam.StartMockGPS(testPath, 1*time.Second)
 		log.Println("Started mock GPS for testing")
 	}
 	app := &Application{
@@ -111,6 +111,9 @@ func (app *Application) NextFrame() {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.camera.ProcessInput(app.WindowHandle)
+	if app.camera.MapView() {
+		app.camera.PlaneMatrix((&app.ubo.PlaneDirection))
+	}
 	app.camera.Update()
 	app.updateUBO()
 

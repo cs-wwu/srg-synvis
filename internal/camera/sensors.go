@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os/exec"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/westphae/geomag/pkg/wmm"
 )
 
-const DAMP = 0.9 // Smoothing factor for sensor data
+const DAMP = 0.95 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
@@ -178,8 +179,11 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 
 	// Convert world coordinates to GPS for magnetic model
 	// Note: This assumes coords package has the inverse function
-	lat := float64(-pos[2]) / 3600.0           // Convert arcseconds to degrees
-	lon := float64(pos[0]) / 3600.0            // Convert arcseconds to degrees
+	// lat := float64(-pos[2]) / 3600.0           // Convert arcseconds to degrees
+	// lon := float64(pos[0]) / 3600.0            // Convert arcseconds to degrees
+	lat32, lon32 := coords.WorldToGPSFloat(pos[0], pos[2])
+	lat := float64(lat32)
+	lon := float64(lon32)
 	alt := float64(pos[1]) / HEIGHT_CONVERSION // Convert to meters
 
 	// Create location for magnetic model
@@ -245,75 +249,302 @@ func (sm *SensorManager) SetSensorData(data SensorData) {
 // Ensure a valid update has been delivered before you call this!
 func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
 	lastReading := sm.gpsRecordings[len(sm.gpsRecordings)-1] // TODO: catch this, could be out of bounds
+
 	// Convert GPS coordinates to world coordinates
 	newY := float32(report.Alt) * HEIGHT_CONVERSION
 	newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
 	currPos := lin.Vec3{newX, newY, newZ}
 	oldPos := lastReading.position
+
 	// cache position, occurred time, and velocity
 	// TODO: Check sub order for bug?
 	var deltaPos lin.Vec3
 	deltaPos.Sub(&currPos, &oldPos) // arg1 - arg2, result stored in first arg
+
 	// time
 	currTime := time.Now()
 	deltaTime := currTime.Sub(lastReading.occurred)
 	deltaSeconds := float32(deltaTime.Seconds())
+	if deltaSeconds < 0.01 {
+		deltaSeconds = 0.05
+	}
+
 	// vel
 	var currVel lin.Vec3
 	currVel.Scale(&deltaPos, 1.0/deltaSeconds)
+
+	// Construct the reading to be used for future reference
 	reading := GPSReading{
 		position: currPos,
-		occurred: time.Now(),
+		occurred: currTime,
 		velocity: currVel,
 	}
+
 	// Our spline only uses 3 points, so roll back if already there
+	// Construct new spline iff buffer is now full. otherwise just add new reading
 	if len(sm.gpsRecordings) >= 3 {
 		sm.gpsRecordings = append(sm.gpsRecordings[1:], reading)
 		sm.camera.motionHandler.FeedGPSUpdate()
 	} else {
 		sm.gpsRecordings = append(sm.gpsRecordings, reading)
 	}
+
 	// Update interarrival time
 	if len(sm.gpsRecordings) >= 2 {
-		sm.camera.motionHandler.splineManager.averageGPSInterval = deltaSeconds
+		mma := &sm.camera.motionHandler.splineManager.averageGPSInterval
+		if *mma <= 0 {
+			*mma = deltaSeconds
+		} else {
+			*mma = 0.8**mma + 0.2*deltaSeconds
+		}
 	}
+	log.Println("New GPS update.")
 }
 
-// FeedGPSUpdate refreshes the spline after each new GPS reading.
 func (mh *MotionHandler) FeedGPSUpdate() {
-	// Need 3 GPS readings to start predicting
 	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
 		return
 	}
-	log.Println("New GPS update")
+
 	spline := mh.splineManager
-	// left shift predictions, space for new
-	copy(spline.predictions[0:], spline.predictions[1:])
+	g := mh.camera.sensorManager.gpsRecordings
 
-	// Initialize predictions on first run
-	if spline.predictions[0] == nil {
-		for i := range spline.predictions {
-			pos := mh.PredictPosition(float32(i) * 0.5)
-			spline.predictions[i] = pos
+	// Where camera actually is
+	camPos := mh.camera.Position()
+	camPosPtr := &lin.Vec3{camPos[0], camPos[1], camPos[2]}
 
-		}
+	// Current velocity from GPS
+	v2 := g[2].velocity
+	spline.currentVelocity = &v2
+
+	camVel := mh.camera.smoothedVel
+	if GetMagnitude3D(&camVel) < 0.1 {
+		camVel = v2 // fallback to GPS velocity if smoothed is too small
 	}
-	// Predict 2 new positions based on current average gps interval
+
+	// Compute p0 so tangent at p1 matches current velocity
+	speed := GetMagnitude3D(&camVel)
+	var p0 lin.Vec3
+	if speed > 0.1 {
+		// Step backward from camera position along velocity direction
+		backDist := speed * spline.averageGPSInterval
+		velDir := GetNormalizedVector3D(&camVel)
+		p0 = lin.Vec3{
+			camPos[0] - velDir[0]*backDist,
+			camPos[1] - velDir[1]*backDist,
+			camPos[2] - velDir[2]*backDist,
+		}
+	} else {
+		// Fallback if stationary
+		p0 = g[1].position
+	}
+
+	// Predictions for p2, p3
 	pred1 := mh.PredictPosition(1.0)
 	pred2 := mh.PredictPosition(2.0)
-	// fill newest predictions in final 2 spots
-	cameraPos := *mh.camera.pos
-	spline.predictions[1] = &cameraPos
-	spline.predictions[2] = pred1
-	spline.predictions[3] = pred2
-	// bring spline prediction points current
+
 	spline.currentSplineData = &SplineData{
-		p0: spline.predictions[0],
-		p1: spline.predictions[1],
-		p2: spline.predictions[2],
-		p3: spline.predictions[3],
+		p0: &p0,       // synthetic control point matching velocity
+		p1: camPosPtr, // camera position (start)
+		p2: pred1,     // predicted (end)
+		p3: pred2,     // far prediction (exit tangent control)
 	}
 	spline.splineStartTime = time.Now()
+}
+
+func (sm *SensorManager) StartMockGPS(path []lin.Vec3, updateInterval time.Duration) {
+	if sm == nil || len(path) == 0 {
+		return
+	}
+	log.Println("Starting mock GPS with determined path")
+
+	// Initialize if empty
+	if len(sm.gpsRecordings) == 0 {
+		sm.gpsRecordings = append(sm.gpsRecordings, GPSReading{
+			position: path[0],
+			occurred: time.Now(),
+			velocity: lin.Vec3{0, 0, 0},
+		})
+	}
+
+	// baselines for Δ comparisons
+	var lastGPS *lin.Vec3
+	var lastPlane *lin.Vec3
+
+	for i := 1; i < len(path); i++ {
+		time.Sleep(updateInterval)
+
+		// Calculate velocity
+		var velocity lin.Vec3
+		deltaPos := lin.Vec3{}
+		deltaPos.Sub(&path[i], &path[i-1])
+		velocity.Scale(&deltaPos, 1.0/float32(updateInterval.Seconds()))
+
+		// Create mock reading
+		reading := GPSReading{
+			position: path[i],
+			occurred: time.Now(),
+			velocity: velocity,
+		}
+
+		// ΔGPS / ΔPlane / instantaneous error logging (BEFORE appending)
+		if lastGPS == nil {
+			p := path[i-1]
+			lastGPS = &lin.Vec3{p[0], p[1], p[2]}
+		}
+		if lastPlane == nil && sm.camera != nil {
+			p := sm.camera.Position()
+			lastPlane = &lin.Vec3{p[0], p[1], p[2]}
+		}
+
+		// ΔGPS since previous GPS tick
+		dGPS := lin.Vec3{}
+		dGPS.Sub(&reading.position, lastGPS)
+		gpsDist := float32(math.Sqrt(float64(dGPS[0]*dGPS[0] + dGPS[1]*dGPS[1] + dGPS[2]*dGPS[2])))
+
+		// ΔPlane (camera) since previous GPS tick
+		planeNow := lin.Vec3{}
+		if sm.camera != nil {
+			p := sm.camera.Position()
+			planeNow = lin.Vec3{p[0], p[1], p[2]}
+		}
+		dPlane := lin.Vec3{}
+		if lastPlane != nil {
+			dPlane.Sub(&planeNow, lastPlane)
+		}
+		planeDist := float32(math.Sqrt(float64(dPlane[0]*dPlane[0] + dPlane[1]*dPlane[1] + dPlane[2]*dPlane[2])))
+
+		// Instantaneous error between plane and current GPS
+		errVec := lin.Vec3{}
+		errVec.Sub(&planeNow, &reading.position)
+		errDist := float32(math.Sqrt(float64(errVec[0]*errVec[0] + errVec[1]*errVec[1] + errVec[2]*errVec[2])))
+
+		// Speeds (units/sec) over the GPS interval
+		dt := float32(updateInterval.Seconds())
+		gpsSpeed := gpsDist / dt
+		planeSpeed := planeDist / dt
+
+		log.Printf(
+			"\n#%d: ΔGPS=(%.2f,%.2f,%.2f)|%.2f\nΔPlane=(%.2f,%.2f,%.2f)|%.2f\nErr=(%.2f,%.2f,%.2f)|%.2f\nvGPS=%.2f u/s\nvPlane=%.2f u/s",
+			i, dGPS[0], dGPS[1], dGPS[2], gpsDist,
+			dPlane[0], dPlane[1], dPlane[2], planeDist,
+			errVec[0], errVec[1], errVec[2], errDist,
+			gpsSpeed, planeSpeed,
+		)
+
+		// advance baselines
+		*lastGPS = reading.position
+		*lastPlane = planeNow
+		// --- end logging block ---
+
+		// Push like real GPS (rolling buffer of 3)
+		sm.gpsRecordings = append(sm.gpsRecordings, reading)
+		if len(sm.gpsRecordings) > 3 {
+			sm.gpsRecordings = sm.gpsRecordings[1:]
+		}
+
+		// Trigger spline update when we have 3+ readings
+		if len(sm.gpsRecordings) >= 3 && sm.camera != nil && sm.camera.motionHandler != nil {
+			sm.camera.motionHandler.FeedGPSUpdate()
+		}
+
+		log.Printf("Mock GPS [%d/%d]: pos=(%.1f, %.1f, %.1f), vel=(%.1f, %.1f, %.1f)\n\n",
+			i, len(path)-1,
+			path[i][0], path[i][1], path[i][2],
+			velocity[0], velocity[1], velocity[2])
+	}
+	log.Println("Mock GPS path completed")
+}
+
+// Returns a flight path that emulates feeding GPS updates live
+// This has been very useful for testing position interpolation without a pi
+func GenerateScriptedPath(start lin.Vec3, speedMPH float32, dt time.Duration) []lin.Vec3 {
+	path := []lin.Vec3{}
+	cur := start
+	step := func(dx, dy, dz float32) {
+		cur = lin.Vec3{cur[0] + dx, cur[1] + dy, cur[2] + dz}
+		path = append(path, cur)
+	}
+
+	// Parameters
+	const fastHoriz = 60.0
+	const normHoriz = 35.0
+	const climbSlope = 0.2679491924311227 // tan(15°)
+
+	// 1) Really fast north for 10 seconds (−Z)
+	for i := 0; i < 10; i++ {
+		step(0, 0, -fastHoriz)
+	}
+
+	// 2) Bank east slowly: north (0,−1) → east (+1,0)
+	for i := 0; i < 10; i++ {
+		t := float32(i+1) / 10.0
+		dirX := +t
+		dirZ := -(1.0 - t)
+		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
+		dirX /= len
+		dirZ /= len
+		step(dirX*normHoriz, 0, dirZ*normHoriz)
+	}
+
+	// 3) Fully east for 10 seconds (+X)
+	for i := 0; i < 10; i++ {
+		step(+normHoriz, 0, 0)
+	}
+
+	// 4) 15° climb east for 5 seconds
+	for i := 0; i < 5; i++ {
+		dx := float32(+normHoriz)
+		dy := dx * float32(climbSlope)
+		step(dx, dy, 0)
+	}
+
+	// 5) Maintain 15° climb, curve CCW east→south (+X → +Z)
+	for i := 0; i < 10; i++ {
+		t := float32(i+1) / 10.0
+		dirX := +1.0 - t
+		dirZ := +t
+		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
+		dirX /= len
+		dirZ /= len
+		h := float32(normHoriz)
+		dx := dirX * h
+		dz := dirZ * h
+		dy := h * float32(climbSlope)
+		step(dx, dy, dz)
+	}
+
+	// 6) Gentle undulation heading south (+Z)
+	for i := 0; i < 10; i++ {
+		phase := float64(i) * (2 * math.Pi / 10.0)
+		dy := float32(math.Sin(phase)) * 5.0
+		step(0, dy, normHoriz)
+	}
+
+	// 7) Stronger undulation, still south
+	for i := 0; i < 5; i++ {
+		phase := float64(i) * (2 * math.Pi / 5.0)
+		dy := float32(math.Sin(phase)) * 10.0
+		step(0, dy, normHoriz)
+	}
+
+	// 8) Gradual turn south → west (+Z → −X)
+	for i := 0; i < 5; i++ {
+		t := float32(i+1) / 5.0
+		dirX := -t
+		dirZ := +1.0 - t
+		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
+		dirX /= len
+		dirZ /= len
+		step(dirX*normHoriz, 0, dirZ*normHoriz)
+	}
+
+	// 9) Fully west 5 seconds (−X)
+	for i := 0; i < 5; i++ {
+		step(-normHoriz, 0, 0)
+	}
+
+	return path
 }
 
 func Smoother32(new1, old1, new2, old2, new3, old3 float32) (float32, float32, float32) {
