@@ -159,6 +159,12 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		}
 		first = false
 
+		recording.Logger.Log(&recording.EventHatOrientation{
+			Pitch: pitch,
+			Roll:  roll,
+			Yaw:   yaw,
+		})
+
 		// Update camera orientation
 		sm.camera.setOrientation(yaw, pitch, roll)
 

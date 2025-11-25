@@ -51,6 +51,16 @@ func (e *EventGpsPoint) Name() string {
 	return "gps"
 }
 
+type EventHatOrientation struct {
+	Pitch float64 `json:"pitch"`
+	Roll  float64 `json:"roll"`
+	Yaw   float64 `json:"yaw"`
+}
+
+func (e *EventHatOrientation) Name() string {
+	return "hat"
+}
+
 func (r *Record) MarshalJSON() ([]byte, error) {
 	// NB: Different from in UnmarshalJSON, because we know the type of r.Event here.
 	type RecordData struct {
