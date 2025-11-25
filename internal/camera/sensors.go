@@ -273,6 +273,7 @@ func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
 	var currVel lin.Vec3
 	currVel.Scale(&deltaPos, 1.0/deltaSeconds)
 
+	// TEMPNOTE: position, time occurred, and velocity should be sufficient for data logging
 	// Construct the reading to be used for future reference
 	reading := GPSReading{
 		position: currPos,
@@ -284,14 +285,14 @@ func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
 	// Construct new spline iff buffer is now full. otherwise just add new reading
 	if len(sm.gpsRecordings) >= 3 {
 		sm.gpsRecordings = append(sm.gpsRecordings[1:], reading)
-		sm.camera.motionHandler.FeedGPSUpdate()
+		sm.camera.motionHandler.FeedGPSUpdate() // TEMPNOTE: Ignore anything using FeedGPS as it calls the actual spline/interpolation logic
 	} else {
 		sm.gpsRecordings = append(sm.gpsRecordings, reading)
 	}
 
 	// Update interarrival time
 	if len(sm.gpsRecordings) >= 2 {
-		mma := &sm.camera.motionHandler.splineManager.averageGPSInterval
+		mma := &sm.camera.motionHandler.splineManager.averageGPSInterval // TEMPNOTE: Ignore splinemanager
 		if *mma <= 0 {
 			*mma = deltaSeconds
 		} else {
@@ -352,6 +353,7 @@ func (mh *MotionHandler) FeedGPSUpdate() {
 	spline.splineStartTime = time.Now()
 }
 
+// TODO: This should be a test case, not inlined in sensors.
 func (sm *SensorManager) StartMockGPS(path []lin.Vec3, updateInterval time.Duration) {
 	if sm == nil || len(path) == 0 {
 		return
