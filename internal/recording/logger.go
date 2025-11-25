@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"time"
 )
 
 const FileName = "recording.json"
@@ -34,8 +35,13 @@ func (pl *PositionLogger) Close() error {
 	return pl.file.Close()
 }
 
-func (pl *PositionLogger) Log(record *Record) error {
-	if err := pl.encoder.Encode(record); err != nil {
+func (pl *PositionLogger) Log(event Event) error {
+	record := Record{
+		Timestamp: &Timestamp{time.Now()},
+		Event:     event,
+	}
+
+	if err := pl.encoder.Encode(&record); err != nil {
 		return err
 	}
 	return pl.writer.Flush()
