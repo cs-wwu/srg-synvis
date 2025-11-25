@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/recording"
 
 	"github.com/stratoberry/go-gpsd"
 	"github.com/westphae/geomag/pkg/egm96"
@@ -75,6 +76,14 @@ func (sm *SensorManager) StartGPS() error {
 
 		// Update camera position
 		sm.camera.updatePosition(newX, newZ, newY)
+
+		// Log it!
+		recording.Logger.Log(&recording.EventGpsPoint{
+			Latitude:  float64(report.Lat),
+			Longitude: float64(report.Lon),
+			Altitude:  float64(report.Alt),
+			Speed:     float64(report.Speed),
+		})
 
 		// Log movement delta for prediction
 		xdif = newX - oldX

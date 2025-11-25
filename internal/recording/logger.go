@@ -9,6 +9,16 @@ import (
 
 const FileName = "recording.json"
 
+var Logger *PositionLogger = nil
+
+func init() {
+	var err error
+	Logger, err = NewLogger()
+	if err != nil {
+		panic(err)
+	}
+}
+
 type PositionLogger struct {
 	file    *os.File
 	writer  *bufio.Writer
