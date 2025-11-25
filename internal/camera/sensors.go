@@ -153,17 +153,17 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 			log.Printf("Warning: Could not apply magnetic declination: %v", err)
 		}
 
-		// Apply smoothing to reduce sensor noise
-		if !first {
-			yaw, roll, pitch = Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
-		}
-		first = false
-
 		recording.Logger.Log(&recording.EventHatOrientation{
 			Pitch: pitch,
 			Roll:  roll,
 			Yaw:   yaw,
 		})
+
+		// Apply smoothing to reduce sensor noise
+		if !first {
+			yaw, roll, pitch = Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
+		}
+		first = false
 
 		// Update camera orientation
 		sm.camera.setOrientation(yaw, pitch, roll)
