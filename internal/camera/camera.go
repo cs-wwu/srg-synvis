@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/glfw/v3.4/glfw"
 	lin "github.com/xlab/linmath"
 )
 

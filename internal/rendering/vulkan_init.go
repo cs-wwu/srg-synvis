@@ -14,12 +14,14 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
+
+	"github.com/elokore/cimgui-go-vulkan/backend"
+	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	// as "github.com/vulkan-go/asche"
@@ -1335,14 +1337,26 @@ func (app *Application) VulkanContextPrepare() error {
 	}
 
 	platform := app.Context().Platform()
-	app.UIRenderer = ui.NewUIRenderer(
+	app.CimguiBackend, _ = backend.CreateBackend(glfwvulkanbackend.NewGLFWBackend())
+	app.CimguiBackend.AttachToExistingWindow(
+		app.WindowHandle,
 		platform.Instance(),
 		platform.Device(),
 		platform.PhysicalDevice(),
 		platform.GraphicsQueue(),
 		app.pipelineCache,
 		platform.GraphicsQueueFamilyIndex(),
+		app.Context().SwapchainImageResources(),
+		app.Context().SwapchainDimensions(),
 	)
+	// app.UIRenderer = ui.NewUIRenderer(
+	// 	platform.Instance(),
+	// 	platform.Device(),
+	// 	platform.PhysicalDevice(),
+	// 	platform.GraphicsQueue(),
+	// 	app.pipelineCache,
+	// 	platform.GraphicsQueueFamilyIndex(),
+	// )
 
 	return nil
 }

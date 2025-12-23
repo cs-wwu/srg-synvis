@@ -8,7 +8,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )
@@ -44,13 +44,6 @@ func runApplication(config models.AppConfig) error {
 	dim := app.Context().SwapchainDimensions()
 	frameDelay, refreshRate := getRefreshRate(monitor)
 	log.Printf("Initialized %s with %+v swapchain, %d FPS", app.VulkanAppName(), dim, refreshRate)
-
-	// Init UI Renderer
-	app.UIRenderer.InitRenderPass(
-		app.Context().SwapchainImageResources(),
-		app.Context().SwapchainDimensions(),
-	)
-	app.UIRenderer.AttachToWindow(window)
 
 	// Start the main render loop
 	runMainLoop(app, window, platform, frameDelay)
@@ -181,17 +174,12 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 
-	var altitiude float32 = 0
 	var speed float32 = 0
-	var heading float32 = 0
-	app.UIRenderer.Altimeter("Altitude (Ft)", &altitiude)
-	app.UIRenderer.Speedometer("Speed (KTS)", &speed)
-	app.UIRenderer.CompassRibbon("Compass", &heading)
 
 	for {
 		select {
 		case <-exitC:
-			app.UIRenderer.Destroy()
+			//app.UIRenderer.Destroy()
 			app.Destroy()
 			platform.Destroy()
 			window.Destroy()
@@ -213,10 +201,6 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			if outdated {
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
-
-			heading = 0
-			altitiude = app.Camera.Position()[1]
-			app.UIRenderer.Render(imageIdx)
 
 			_, err = app.Context().PresentImage(imageIdx)
 			if err != nil {

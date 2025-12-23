@@ -6,8 +6,11 @@ import (
 	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/elokore/cimgui-go-vulkan/backend"
+	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/glfw/v3.4/glfw"
+
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 )
@@ -62,6 +65,7 @@ type Application struct {
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 	UIRenderer    *ui.UIRenderer
+	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
 	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
 
