@@ -15,7 +15,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	as "github.com/vulkan-go/asche"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"

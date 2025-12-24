@@ -5,9 +5,9 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
+	as "github.com/vulkan-go/asche"
 
 	"github.com/elokore/glfw/v3.4/glfw"
 

@@ -16,7 +16,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/vulkan-go/asche"
 
 	vk "github.com/vulkan-go/vulkan"
 )

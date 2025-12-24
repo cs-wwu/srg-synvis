@@ -10,7 +10,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	as "github.com/vulkan-go/asche"
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/elokore/glfw/v3.4/glfw"

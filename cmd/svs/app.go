@@ -6,7 +6,9 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	as "github.com/vulkan-go/asche"
+
+	"github.com/elokore/cimgui-go-vulkan/imgui"
 
 	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
@@ -201,6 +203,12 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			if outdated {
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
+
+			app.CimguiBackend.NewFrame(imageIdx)
+			imgui.Begin("TestFrame")
+			imgui.End()
+			app.CimguiBackend.RenderFrame(imageIdx)
+			imgui.UpdatePlatformWindows()
 
 			_, err = app.Context().PresentImage(imageIdx)
 			if err != nil {

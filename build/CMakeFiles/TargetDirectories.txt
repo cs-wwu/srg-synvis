@@ -1,0 +1,3 @@
+/home/weston/srg-synvis/build/CMakeFiles/ImGuiUI.dir
+/home/weston/srg-synvis/build/CMakeFiles/edit_cache.dir
+/home/weston/srg-synvis/build/CMakeFiles/rebuild_cache.dir
