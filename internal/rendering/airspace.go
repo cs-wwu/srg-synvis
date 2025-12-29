@@ -211,6 +211,7 @@ func ChunkGeoJson(inputFile string) {
 		}
 	}
 }
+
 func containsFeature(fc *FeatureCollection, f Feature) bool {
 	for _, existing := range fc.Features {
 		if existing.Properties.GlobalId == f.Properties.GlobalId {
@@ -219,6 +220,7 @@ func containsFeature(fc *FeatureCollection, f Feature) bool {
 	}
 	return false
 }
+
 func determineChunk(coords Geometry) (lat, lon int) {
 	if len(coords.Coordinates) == 0 || len(coords.Coordinates[0]) == 0 {
 		return 0, 0
