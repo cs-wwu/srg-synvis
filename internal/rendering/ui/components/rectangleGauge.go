@@ -17,7 +17,7 @@ const (
 
 type RectangleGauge struct {
 	ui.UIComponent
-	TestValue     float32
+	Value         float32
 	MeterRange    float32
 	Interval      float32
 	MajorInterval float32
@@ -26,7 +26,7 @@ type RectangleGauge struct {
 
 func NewRectangleGauge() *RectangleGauge {
 	return &RectangleGauge{
-		TestValue:     0.0,
+		Value:         0.0,
 		MeterRange:    500,
 		Interval:      20,
 		MajorInterval: 100,
@@ -36,7 +36,7 @@ func NewRectangleGauge() *RectangleGauge {
 
 // Called every frame
 func (gauge *RectangleGauge) Render() {
-	gauge.TestValue += 5
+	gauge.Value += 5
 	window_size := imgui.Vec2{X: 75, Y: 300}
 	half_height := window_size.Y / 2
 	value_per_pixel := float32(gauge.MeterRange) / window_size.Y
@@ -46,7 +46,7 @@ func (gauge *RectangleGauge) Render() {
 	imgui.BeginV("RectangleGauge", nil, imgui.WindowFlagsNoTitleBar|imgui.WindowFlagsNoResize)
 
 	canvas_pos := imgui.WindowPos()
-	value_at_top := gauge.TestValue + value_per_pixel*half_height
+	value_at_top := gauge.Value + value_per_pixel*half_height
 	rounded_top_value := float32(math.Floor(float64(value_at_top/gauge.Interval))) * gauge.Interval
 	top_dash_pos_y := canvas_pos.Y + float32(math.Abs(float64(rounded_top_value-value_at_top)))/value_per_pixel
 	dash_count := gauge.MeterRange / gauge.Interval
@@ -137,7 +137,7 @@ func (gauge *RectangleGauge) Render() {
 		imgui.ColorConvertFloat4ToU32(imgui.NewVec4(0, 0, 0, 255)),
 	)
 
-	meterText := strconv.FormatInt(int64(gauge.TestValue), 10)
+	meterText := strconv.FormatInt(int64(gauge.Value), 10)
 	meterTextWidth := imgui.CalcTextSize(meterText).X
 	var textPosX float32
 
