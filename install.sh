@@ -59,31 +59,6 @@ if [ -z "$GO_VERSION" ]; then
     error_exit "Could not determine Go version from go.mod"
 fi
 
-# Install ImGui
-echo -e "${GREEN}Installing ImGui v$IMGUI_VERSION...${NC}"
-rm -r "$IMGUI_INSTALL_DIR"
-mkdir -p "$TEMP_IMGUI_DIR"
-mkdir -p "$IMGUI_INSTALL_DIR"
-mkdir -p "$IMGUI_INSTALL_DIR/backends"
-IMGUI_URL="https://github.com/ocornut/imgui/archive/refs/tags/v$IMGUI_VERSION.tar.gz"
-wget -q -O "$TEMP_IMGUI_DIR/source.tar.gz" "$IMGUI_URL" || error_exit "Failed to download Imgui"
-tar -xzf "$TEMP_IMGUI_DIR/source.tar.gz" -C "$TEMP_IMGUI_DIR" || error_exit "Failed to extract Imgui"
-EXTRACTED_IMGUI="$TEMP_IMGUI_DIR/imgui-$IMGUI_VERSION"
-find "$EXTRACTED_IMGUI" -maxdepth 1 -type f -not -name ".*" -exec cp {} "$IMGUI_INSTALL_DIR/" \;
-cp "$EXTRACTED_IMGUI/backends/imgui_impl_glfw.cpp" "$IMGUI_INSTALL_DIR/backends"
-cp "$EXTRACTED_IMGUI/backends/imgui_impl_glfw.h" "$IMGUI_INSTALL_DIR/backends"
-cp "$EXTRACTED_IMGUI/backends/imgui_impl_vulkan.cpp" "$IMGUI_INSTALL_DIR/backends"
-cp "$EXTRACTED_IMGUI/backends/imgui_impl_vulkan.h" "$IMGUI_INSTALL_DIR/backends"
-rm -r "$TEMP_IMGUI_DIR"
-
-#Build ImGui
-rm -r "imgui-build"
-mkdir "imgui-build"
-cd imgui-build
-cmake ..
-make
-cd ..
-
 # Check if Go is already installed and version is sufficient
 if command -v go >/dev/null 2>&1; then
     CURRENT_GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
