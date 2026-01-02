@@ -39,3 +39,26 @@ experimemtal/vulkan/shape/VulkanTest
 internal/rendering/ui/build
 imgui.ini
 pkg/imgui
+# Environment file
+.env
+
+# KMD add-ons
+*.iml
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+.idea
+.DS_Store
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+node_modules/

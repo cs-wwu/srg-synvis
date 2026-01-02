@@ -72,7 +72,7 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		orPanic(err)
 		validationLayers, missing = checkExisting(actualValidationLayers, requiredValidationLayers)
 		if missing > 0 {
-			log.Println("vulkan warning: missing", missing, "required validation layers during init")
+			log.Fatalln("vulkan error: missing", missing, "required validation layers during init")
 		}
 	}
 
@@ -108,17 +108,16 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 	}
 
 	// Find a suitable GPU
-	var gpuCount uint32
-	ret = vk.EnumeratePhysicalDevices(p.instance, &gpuCount, nil)
+	var deviceCount uint32
+	ret = vk.EnumeratePhysicalDevices(p.instance, &deviceCount, nil)
 	orPanic(NewError(ret))
-	if gpuCount == 0 {
+	if deviceCount == 0 {
 		return nil, errors.New("vulkan error: no GPU devices found")
 	}
-	gpus := make([]vk.PhysicalDevice, gpuCount)
-	ret = vk.EnumeratePhysicalDevices(p.instance, &gpuCount, gpus)
+	devices := make([]vk.PhysicalDevice, deviceCount)
+	ret = vk.EnumeratePhysicalDevices(p.instance, &deviceCount, devices)
 	orPanic(NewError(ret))
-	// get the first one, multiple GPUs not supported yet
-	p.gpu = gpus[0]
+	p.gpu = pickDevice(devices)
 	vk.GetPhysicalDeviceProperties(p.gpu, &p.gpuProperties)
 	p.gpuProperties.Deref()
 	vk.GetPhysicalDeviceMemoryProperties(p.gpu, &p.memoryProperties)
@@ -280,6 +279,35 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		p.context.prepare(false)
 	}
 	return p, nil
+}
+
+func pickDevice(devices []vk.PhysicalDevice) vk.PhysicalDevice {
+	bestIndex := 0
+	bestPriority := 0
+	props := make([]vk.PhysicalDeviceProperties, len(devices))
+
+	for i, device := range devices {
+		vk.GetPhysicalDeviceProperties(device, &props[i])
+		props[i].Deref()
+
+		props := props[i]
+
+		priority := 0
+		switch props.DeviceType {
+		case vk.PhysicalDeviceTypeDiscreteGpu:
+			priority += 1000
+		case vk.PhysicalDeviceTypeIntegratedGpu:
+			priority += 100
+		}
+
+		if priority > bestPriority {
+			bestPriority = priority
+			bestIndex = i
+		}
+	}
+
+	log.Printf("Selected device %d: %s", bestIndex, props[bestIndex].DeviceName)
+	return devices[bestIndex]
 }
 
 type basePlatform struct {

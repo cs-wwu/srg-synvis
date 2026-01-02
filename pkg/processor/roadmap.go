@@ -2,6 +2,7 @@ package processor
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	"google.golang.org/protobuf/proto"
@@ -56,6 +58,8 @@ var widths = map[string]float64{
 	"taxiway":  2,
 }
 
+var ErrRateLimited = errors.New("rate limited by OSM")
+
 // Make an api request to overpass-api, process the data into and overpassResponse data type
 func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 	bounds := "(" + strconv.Itoa(lat) + "," + strconv.Itoa(lon) + "," + strconv.Itoa(lat+1) + "," + strconv.Itoa(lon+1) + ");"
@@ -77,13 +81,18 @@ func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 	(._;>;);
 	out body;
 	`
-	log.Printf("Posting request to osm at %v,%v...\n", lat, lon)
 	var osmData OverpassResponse
 	resp, err := http.Post(OSMURL, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
 	if err != nil {
 		return osmData, fmt.Errorf("failed to make post request to %v: %w", OSMURL, err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return osmData, ErrRateLimited
+	} else if resp.StatusCode != http.StatusOK {
+		return osmData, fmt.Errorf("received non-200 response: %d", resp.StatusCode)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -170,7 +179,10 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 		return fmt.Errorf("error creating output directory %s: %v", outputDir, err)
 	}
 
-	channels := make([]chan error, 0)
+	// OSM takes a couple seconds per request, so process them in sequence.
+	// Doing them in parallel hits all the rate limits.
+	//
+	// See https://dev.overpass-api.de/overpass-doc/en/preface/commons.html
 	for _, heightmap := range heightmaps {
 		// Convert the heightmap string to a coordinate pair
 		coords, err := ParseHeightmapToCoords(heightmap)
@@ -179,18 +191,9 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 			continue
 		}
 
-		channel := make(chan error)
-		go func() {
-			channel <- generateRoadSquare(outputDir, coords[0], coords[1])
-		}()
-		channels = append(channels, channel)
-	}
-
-	// Block on all the threads.
-	for i, channel := range channels {
-		err := <-channel
+		err = generateRoadSquare(outputDir, coords[0], coords[1])
 		if err != nil {
-			log.Printf("Error generating road square for %s: %v", heightmaps[i], err)
+			log.Printf("Error generating road square for %s: %v", heightmap, err)
 			continue
 		}
 	}
@@ -199,7 +202,24 @@ func GenerateRoadProtobufs(heightmaps []string) error {
 }
 
 func generateRoadSquare(outputDir string, lat int, lon int) error {
-	osmData, err := MakeRoadApiRequest(lat, lon)
+	attempts := 0
+	delay := 1.0
+	var osmData OverpassResponse
+	var err error
+	for attempts < 10 {
+		log.Printf("Posting request to osm at %v,%v...\n", lat, lon)
+		osmData, err = MakeRoadApiRequest(lat, lon)
+		if err == nil {
+			break
+		} else if errors.Is(err, ErrRateLimited) {
+			log.Printf("Rate limit from OSM, retrying in %v\n", time.Duration(delay)*time.Second)
+			time.Sleep(time.Duration(delay) * time.Second)
+			delay *= 2.0
+			attempts++
+		} else {
+			return err
+		}
+	}
 	if err != nil {
 		return err
 	}

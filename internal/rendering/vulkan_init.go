@@ -11,6 +11,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strconv"
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
@@ -65,8 +66,20 @@ func (app *Application) VulkanDeviceExtensions() []string {
 }
 
 func (app *Application) VulkanSwapchainDimensions() *as.SwapchainDimensions {
+	width, _ := strconv.ParseUint(os.Getenv("SYVIS_WINDOW_WIDTH"), 10, 32)
+	if width <= 0 || width > 10000 {
+		width = DEFAULT_WINDOW_WIDTH
+	}
+
+	height, _ := strconv.ParseUint(os.Getenv("SYVIS_WINDOW_HEIGHT"), 10, 32)
+	if height <= 0 || height > 10000 {
+		height = DEFAULT_WINDOW_HEIGHT
+	}
+
 	return &as.SwapchainDimensions{
-		Width: WINDOW_WIDTH, Height: WINDOW_HEIGHT, Format: vk.FormatB8g8r8a8Unorm,
+		Width:  uint32(width),
+		Height: uint32(height),
+		Format: vk.FormatB8g8r8a8Unorm,
 	}
 }
 

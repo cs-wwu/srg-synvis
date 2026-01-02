@@ -3,7 +3,6 @@ package camera
 import (
 	"fmt"
 	"math"
-	"sync"
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
@@ -18,11 +17,6 @@ type CameraImpl struct {
 	up    *lin.Vec3 // Up Direction of the camera
 	front *lin.Vec3 // Front direction of the camera
 	right *lin.Vec3 // Right direction of the Camera
-
-	// Thread safety
-	frontMutex sync.Mutex // Mutex for updating the front vector
-	posMutex   sync.Mutex // Mutex for updating the position vector
-	upMutex    sync.Mutex // Mutex for updating the up vector
 
 	// Camera parameters
 	speed       float32 // Camera speed
@@ -43,13 +37,16 @@ type CameraImpl struct {
 
 	mapView          bool
 	mapButtonPressed bool
+
+	northView          bool
+	northButtonPressed bool
 }
 
 var (
 	// A vector pointing up in the map view.
 	MAP_UP = lin.Vec3{0.0, 1.0, 0.0}
 	// The direction facing upwards on the screen in the map view.
-	MAP_NORTH = lin.Vec3{0.0, 0.0, -1.0}
+	MAP_NORTH = lin.Vec3{0.0, 0.0, 1.0}
 	// Distance above the plane to be in the map view.
 	MAP_OFFSET = float32(10.0)
 )
@@ -105,8 +102,6 @@ func NewCamera(config CameraConfig) Camera {
 
 // Position returns the current camera position
 func (c *CameraImpl) Position() lin.Vec3 {
-	c.posMutex.Lock()
-	defer c.posMutex.Unlock()
 	return *c.pos
 }
 
@@ -125,7 +120,18 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 		up.Scale(&MAP_UP, MAP_OFFSET)
 		eye := *c.pos
 		eye.Add(c.pos, &up)
-		result.LookAt(&eye, c.pos, &MAP_NORTH)
+
+		forward := lin.Vec3{}
+		if c.northView {
+			forward = MAP_NORTH
+		} else {
+			forward = *c.front
+			forward[0] = -forward[0]
+			forward[1] = -forward[1]
+			forward[2] = -forward[2]
+		}
+
+		result.LookAt(&eye, c.pos, &forward)
 	} else {
 		target := lin.Vec3{}
 		target.Add(c.pos, c.front)
@@ -154,8 +160,18 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 	// Move it towards the camera.
 	result[3][2] = -CAMERA_TO_PLANE_DISTANCE
 
+	forward := lin.Vec3{}
+	if c.northView {
+		forward = *c.front
+		forward[0] = -forward[0]
+		forward[1] = -forward[1]
+		forward[2] = -forward[2]
+	} else {
+		forward = MAP_NORTH
+	}
+
 	lookAt := lin.Mat4x4{}
-	lookAt.LookAt(&lin.Vec3{0, 0, 0}, c.front, c.up)
+	lookAt.LookAt(&lin.Vec3{0, 0, 0}, &forward, c.up)
 	tmp := lin.Mat4x4{}
 	tmp.Transpose(&lookAt)
 	result.Mult(result, &tmp)
@@ -163,9 +179,7 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 
 // SetPosition sets the camera position
 func (c *CameraImpl) SetPosition(newPos lin.Vec3) {
-	c.posMutex.Lock()
 	*c.pos = newPos
-	c.posMutex.Unlock()
 }
 
 // ProcessInput handles input from the window
@@ -211,47 +225,33 @@ func (c *CameraImpl) GetViewVectors() string {
 
 // updatePosition updates the camera position (thread-safe)
 func (c *CameraImpl) updatePosition(newX, newZ, newY float32) {
-	c.posMutex.Lock()
 	(*c.pos)[0] = newX
 	(*c.pos)[2] = newZ
 	(*c.pos)[1] = newY
-	c.posMutex.Unlock()
 }
 
 // addPosition adds to the camera position (thread-safe)
 func (c *CameraImpl) addPosition(delta lin.Vec3) {
-	c.posMutex.Lock()
 	c.pos.Add(c.pos, &delta)
-	c.posMutex.Unlock()
 }
 
 // subPosition subtracts from the camera position (thread-safe)
 func (c *CameraImpl) subPosition(delta lin.Vec3) {
-	c.posMutex.Lock()
 	c.pos.Sub(c.pos, &delta)
-	c.posMutex.Unlock()
 }
 
 // updateVectors updates the camera orientation vectors (thread-safe)
 func (c *CameraImpl) updateVectors(front, right, up lin.Vec3) {
-	c.frontMutex.Lock()
-	c.upMutex.Lock()
 	*c.front = front
 	*c.right = right
 	*c.up = up
-	c.upMutex.Unlock()
-	c.frontMutex.Unlock()
 }
 
 // getVectors returns copies of the current vectors (thread-safe)
 func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
-	c.frontMutex.Lock()
-	c.upMutex.Lock()
 	front = *c.front
 	right = *c.right
 	up = *c.up
-	c.upMutex.Unlock()
-	c.frontMutex.Unlock()
 	return
 }
 

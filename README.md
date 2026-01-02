@@ -98,6 +98,38 @@ sudo ./install.sh
 
 5. Run `vkcube` and `go run cmd/svs/main.go` to test installation
 
+## Downloading data
+
+If you need to download more data than what's checked in, the `download`
+command should be used. We currently source data from two places:
+
+- NASA: This is the heightmap data used to render the terrain.
+- OSM: This provides the street and obstruction data.
+
+The downloader script (at `./cmd/download`) has a few common flags:
+
+- `-bbox`: Set a bounding box in lat/lon coordinates to download.
+- `-region`: A comma-separated list of 1-degree coordinate squares to download.
+- `-preset`: Set a preset region (currently `washington` or `bellingham`)
+
+### OSM Data
+
+OSM data does not require authentication, so you can simply run the downloader
+with a region (note that OSM has strict rate limits, so this will take a while):
+```
+go run ./cmd/download -osm -preset washington
+```
+
+### NASA Data
+
+To download NASA data, create an EarthData account at `https://urs.earthdata.nasa.gov`.
+Once you have an account, create a token in the `Generate Token` page. Store
+that token in the `EARTHDATA_TOKEN` environment variable, and then run the
+downloader:
+```
+go run ./cmd/download -nasa -preset washington
+```
+
 ## Guidelines
 
 - Check in code to the repo, including experimental investigations
