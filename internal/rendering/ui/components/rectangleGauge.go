@@ -36,7 +36,6 @@ func NewRectangleGauge() *RectangleGauge {
 
 // Called every frame
 func (gauge *RectangleGauge) Render() {
-	gauge.Value += 5
 	window_size := imgui.Vec2{X: 75, Y: 300}
 	half_height := window_size.Y / 2
 	value_per_pixel := float32(gauge.MeterRange) / window_size.Y
