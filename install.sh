@@ -7,9 +7,6 @@
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
-TEMP_IMGUI_DIR="/tmp/imgui-download"
-IMGUI_VERSION="1.92.3"
-IMGUI_INSTALL_DIR="pkg/imgui"
 
 # Function to print error and exit
 error_exit() {

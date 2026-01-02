@@ -3,7 +3,6 @@ package rendering
 import (
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
-	ui "github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
@@ -64,7 +63,6 @@ type Application struct {
 	Camera        camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
-	UIRenderer    *ui.UIRenderer
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
 	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
