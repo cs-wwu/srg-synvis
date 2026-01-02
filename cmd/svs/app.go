@@ -6,10 +6,12 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
+	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	as "github.com/vulkan-go/asche"
 
 	"github.com/elokore/cimgui-go-vulkan/imgui"
 
+	_ "github.com/cs-wwu/srg-synvis/internal/rendering/ui/menus"
 	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
@@ -181,7 +183,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	for {
 		select {
 		case <-exitC:
-			//app.UIRenderer.Destroy()
+			app.CimguiBackend.Cleanup()
 			app.Destroy()
 			platform.Destroy()
 			window.Destroy()
@@ -205,8 +207,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			}
 
 			app.CimguiBackend.NewFrame(imageIdx)
-			imgui.Begin("TestFrame")
-			imgui.End()
+			ui.RenderUI()
 			app.CimguiBackend.RenderFrame(imageIdx)
 			imgui.UpdatePlatformWindows()
 
