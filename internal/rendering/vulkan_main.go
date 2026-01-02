@@ -95,14 +95,14 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
-func (app *Application) NextFrame(speedPtr *float32) {
+func (app *Application) NextFrame() {
 	app.statsTracker.StartFrame()
 
 	app.frameCount++
 
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-	app.Camera.ProcessInput(app.WindowHandle, speedPtr)
+	app.Camera.ProcessInput(app.WindowHandle)
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
@@ -114,7 +114,7 @@ func (app *Application) NextFrame(speedPtr *float32) {
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 	app.RoadStreamer.UpdatePos(app.Camera.Position())
 
-	app.Camera.ProcessInput(app.WindowHandle, speedPtr)
+	app.Camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers

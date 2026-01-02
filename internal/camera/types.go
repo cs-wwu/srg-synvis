@@ -62,7 +62,7 @@ type Camera interface {
 	PlaneMatrix(*lin.Mat4x4)
 
 	// Input processing
-	ProcessInput(window *glfw.Window, speedPtr *float32)
+	ProcessInput(window *glfw.Window)
 
 	// Hardware integration
 	EnableGPS() error

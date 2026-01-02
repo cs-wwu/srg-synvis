@@ -178,8 +178,6 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 
-	var speed float32 = 0
-
 	for {
 		select {
 		case <-exitC:
@@ -196,7 +194,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				continue
 			}
 			glfw.PollEvents()
-			app.NextFrame(&speed)
+			app.NextFrame()
 
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			if err != nil {

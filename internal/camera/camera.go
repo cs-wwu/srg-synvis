@@ -183,8 +183,8 @@ func (c *CameraImpl) SetPosition(newPos lin.Vec3) {
 }
 
 // ProcessInput handles input from the window
-func (c *CameraImpl) ProcessInput(window *glfw.Window, speedPtr *float32) {
-	c.inputProcessor.ProcessInput(window, speedPtr)
+func (c *CameraImpl) ProcessInput(window *glfw.Window) {
+	c.inputProcessor.ProcessInput(window)
 }
 
 // EnableGPS starts GPS integration

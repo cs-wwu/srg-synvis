@@ -5,22 +5,22 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui/components"
 )
 
-type TestWindow struct {
+type FlightInstruments struct {
 	ui.UIComponent
 	Gauge *components.RectangleGauge
 }
 
-func NewTestWindow() *TestWindow {
-	return &TestWindow{
+func NewFlightInstruments() *FlightInstruments {
+	return &FlightInstruments{
 		Gauge: components.NewRectangleGauge(),
 	}
 }
 
-func (window *TestWindow) Render() {
+func (window *FlightInstruments) Render() {
 	window.Gauge.Render()
 }
 
 func init() {
-	window := NewTestWindow()
+	window := NewFlightInstruments()
 	ui.RegisterUIComponent(window)
 }
