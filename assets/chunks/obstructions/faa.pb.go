@@ -198,7 +198,7 @@ func file_faa_proto_init() {
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
-			GoPackagePath: reflect.TypeFor(x{}).PkgPath(),
+			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_faa_proto_rawDesc), len(file_faa_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   2,
