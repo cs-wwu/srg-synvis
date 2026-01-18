@@ -1,6 +1,8 @@
 package rendering
 
 import (
+	"log"
+	"math"
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
@@ -9,6 +11,62 @@ import (
 )
 
 var second_global int
+var obsMap = map[string]int{
+	"AG EQUIP":           10,
+	"AMUSEMENT PARK":     10,
+	"ANTENNA":            3,
+	"ARCH":               10,
+	"BLDG-TWR":           10,
+	"BRIDGE":             2,
+	"BLDG":               2,
+	"CABLE CAR":          15, // Cannot find a single existence of this tag in the data - thus, do not know if "CABLE CAR" is accurate string
+	"CATENARY":           10,
+	"CTRL TWR":           1,
+	"COOL TWR":           1,
+	"CRANE":              3,
+	"DAM":                2,
+	"DOME":               10,
+	"ELEC SYS":           10,
+	"ELEVATOR":           10,
+	"FENCE":              10, // same as catenary, but connected to ground?
+	"GATE":               10, // same as fence?
+	"GEN UTIL":           10,
+	"GRAIN ELEVATOR":     10, // elongated building
+	"HANGAR":             2,
+	"HEAT COOL SYSTEM":   10,
+	"LANDFILL":           2,
+	"LIGHTHOUSE":         15, // same deal as cable car
+	"MET":                1,
+	"MONUMENT":           10, // special case here?
+	"NATURAL GAS SYSTEM": 10,
+	"NAVAID":             10, // potentially 1? look up
+	"PIPELINE PIPE":      10, // potentially same deal as fence
+	"PLANT":              10,
+	"POLE":               1,
+	"POWER PLANT":        2, // check on this
+	"REFINERY":           2, // same as power plant
+	"RIG":                2,
+	"SHIP":               10,
+	"SIGN":               10,
+	"SILO":               1,
+	"SOLAR PANELS":       2,
+	"SPIRE":              1,
+	"STACK":              1,
+	"STADIUM":            2,
+	"TANK":               2,  // tentative - check this one
+	"BALLOON":            10, // i don't even know for this one...
+	"TETRAHEDRON":        15, // same deal as cable car and lighthouse
+	"TOWER":              1,
+	"TRAMWAY":            2,  // potentially discard since this should be taken care of by roads?
+	"TRAMWAY PYLON":      15, // same deal as tetrahedron, cable car, lighthouse
+	"T-L TWR":            1,
+	"UTILITY POLE":       3,  // small one
+	"VERTICAL STRUCTURE": 2,  // check this - DOF doesn't say what this is...
+	"WALL":               10, // same as fence
+	"WIND INDICATOR":     10,
+	"WINDMILL":           1, // inverted pyramid?
+	"WINDSOCK":           1,
+}
 
 type ObstructionBuilder struct {
 	heightInfo *HeightInfo
@@ -38,21 +96,76 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
 	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color for now {0.8, 0.5, 0.2}
 
+	// Get obstruction shape
+	obsShape := obsMap[obstruction.Type]
+	if obsShape == 0 {
+		log.Fatalf("Unaccounted for shape found: %s", obstruction.Type) // This shouldn't be fatal in v1, but good to keep for now
+	}
+
+	// Get obstruction quantity
+	obsNum := obstruction.Quantity
+
+	// Assign radius based on quantity
+	obsRadius := float32(OBSTRUCTION_BASE_RADIUS / obsNum)
+
+	// If obstruction of type 3: make radius smallers
+	if obsShape == 3 {
+		obsRadius /= 2
+		obsShape = 1
+	}
+
 	// TODO: In future, this could render different shapes for different obstructions
 	// For now, it's a rectangle for building or tower, and a pyramid for everything else
-	builder.renderObstructionShape(obstruction)
-}
-
-func (builder *ObstructionBuilder) renderObstructionShape(obstruction *pb.FAAPoint) {
-
+	// builder.renderObstructionShape(obstruction, obsShape)
 	x := toWorldLon(obstruction)
 	z := toWorldLat(obstruction)
 	height := toWorldHeight(obstruction)
+	if int(obsNum) == 1 {
+		// Render as usual
+		builder.renderObstructionShape(x, z, height, obsShape, obsRadius)
+	} else {
+		// Otherwise, we must account for quantity
+		chunkRadians := 2. / obsNum
+		for i := 0; i < int(obsNum); i++ {
+			// Split a fictionalized 'circle' around the central point into a number of lines appropriate to how many obstructions there are
+			// Obstructions are rendered at the points along this line (with smaller radii)
+			radian := chunkRadians * float64(i)
+			xAdjustment := OBSTRUCTION_BASE_RADIUS * math.Cos(radian*math.Pi)
+			zAdjustment := OBSTRUCTION_BASE_RADIUS * math.Sin(radian*math.Pi)
+			if radian > 0.5 && radian < 1 || radian > 1.5 && radian < 2 {
+				// switch x and z adjustments
+				temp := xAdjustment
+				xAdjustment = zAdjustment
+				zAdjustment = temp
+			}
+			if radian > 0.5 && radian < 1.5 {
+				// we are subtracting from x
+				x -= float32(xAdjustment)
+			} else {
+				// we are adding to x
+				x += float32(xAdjustment)
+			}
+			if radian < 1. {
+				// we are adding to z
+				z += float32(zAdjustment)
+			} else {
+				// we are subtracting from z
+				z -= float32(zAdjustment)
+			}
 
-	xMin := x - OBSTRUCTION_BASE_RADIUS
-	xMax := x + OBSTRUCTION_BASE_RADIUS
-	zMin := z - OBSTRUCTION_BASE_RADIUS
-	zMax := z + OBSTRUCTION_BASE_RADIUS
+			// Build obstruction with adjusted location vals
+			builder.renderObstructionShape(x, z, height, obsShape, obsRadius)
+
+		}
+	}
+
+}
+
+func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, height float32, shape int, radius float32) {
+	xMin := x - radius
+	xMax := x + radius
+	zMin := z - radius
+	zMax := z + radius
 
 	// We make four base points
 	b0 := builder.addPoint(vec2.T{float32(xMax), float32(zMax)})
@@ -60,8 +173,14 @@ func (builder *ObstructionBuilder) renderObstructionShape(obstruction *pb.FAAPoi
 	b2 := builder.addPoint(vec2.T{float32(xMin), float32(zMin)})
 	b3 := builder.addPoint(vec2.T{float32(xMax), float32(zMin)})
 
-	if obstruction.Type != "TOWER" && obstruction.Type != "BLDG" {
+	// Unmapped shapes are now pyramids
+	if shape == 10 {
+		shape = 1
+	}
 
+	switch shape {
+	case 1:
+		// This is a typical pyramid
 		// Custom height for apex points
 		a0 := builder.addVertex(ObstructionVertex{
 			Position: vec3.T{float32(x), float32(height), float32(z)},
@@ -73,8 +192,8 @@ func (builder *ObstructionBuilder) renderObstructionShape(obstruction *pb.FAAPoi
 		builder.addTriangle(a0, b2, b1)
 		builder.addTriangle(a0, b3, b2)
 		builder.addTriangle(a0, b0, b3)
-
-	} else {
+	case 2:
+		// This is a rectangular building
 		// Four apex points
 		a0 := builder.addVertex(ObstructionVertex{
 			Position: vec3.T{float32(xMax), float32(height), float32(zMax)},
@@ -105,6 +224,8 @@ func (builder *ObstructionBuilder) renderObstructionShape(obstruction *pb.FAAPoi
 		// Top of tower
 		builder.addTriangle(a1, a3, a2)
 		builder.addTriangle(a3, a1, a0)
+	default:
+		log.Printf("Error: got shape type of %d", shape)
 	}
 }
 

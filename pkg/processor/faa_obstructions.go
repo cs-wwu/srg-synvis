@@ -33,6 +33,8 @@ const (
 	lonSecStart = 55
 	lonSecEnd   = 60
 
+	obsStart = 62
+	obsEnd   = 81 //TODO: potentially 80?
 	hgtStart = 84
 	hgtEnd   = 89
 	eleStart = 90
@@ -40,10 +42,11 @@ const (
 )
 
 type FAAPoint struct {
-	Lat    float64
-	Lon    float64
-	Height float64
-	Type   string
+	Lat      float64
+	Lon      float64
+	Height   float64
+	Type     string
+	Quantity float64
 }
 
 type ObsSquare struct {
@@ -88,7 +91,9 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		lonSec := strings.TrimSpace(line[lonSecStart:lonSecEnd])
 		lonHem := strings.TrimSpace(line[lonSecEnd : lonSecEnd+1])
 
-		obsType := strings.TrimSpace(line[62:81])
+		obsType := strings.TrimSpace(line[obsStart:obsEnd])
+		quantity := strings.TrimSpace(line[81:82])
+
 		heightStr := strings.TrimSpace(line[hgtStart:hgtEnd])
 		eleStr := strings.TrimSpace(line[eleStart:eleEnd])
 
@@ -98,13 +103,14 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		lonDegVal, err4 := strconv.Atoi(lonDeg)
 		lonMinVal, err5 := strconv.Atoi(lonMin)
 		lonSecVal, err6 := strconv.ParseFloat(lonSec, 64)
+		quantityVal, err7 := strconv.Atoi(quantity)
 
-		elevation, err7 := strconv.ParseFloat(eleStr, 64)
-		height, err8 := strconv.ParseFloat(heightStr, 64)
+		elevation, err8 := strconv.ParseFloat(eleStr, 64)
+		height, err9 := strconv.ParseFloat(heightStr, 64)
 
 		// Skip line if any parsing errors
 		if err1 != nil || err2 != nil || err3 != nil || err4 != nil ||
-			err5 != nil || err6 != nil || err7 != nil || err8 != nil {
+			err5 != nil || err6 != nil || err7 != nil || err8 != nil || err9 != nil {
 			continue
 		}
 
@@ -119,10 +125,11 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		ele := elevation + height
 
 		obs := FAAPoint{
-			Lat:    lat,
-			Lon:    lon,
-			Height: ele,
-			Type:   obsType,
+			Lat:      lat,
+			Lon:      lon,
+			Height:   ele,
+			Type:     obsType,
+			Quantity: float64(quantityVal),
 		}
 
 		squareKey := generateSquareKey(lat, lon)
@@ -158,10 +165,11 @@ func saveToProtobufs(squareBuffers map[string]*ObsSquare) error {
 
 		for _, obs := range square.Records {
 			pbObs := &pb.FAAPoint{
-				Lat:    obs.Lat,
-				Lon:    obs.Lon,
-				Height: obs.Height,
-				Type:   obs.Type,
+				Lat:      obs.Lat,
+				Lon:      obs.Lon,
+				Height:   obs.Height,
+				Type:     obs.Type,
+				Quantity: obs.Quantity,
 			}
 			pbSquare.Obstructions = append(pbSquare.Obstructions, pbObs)
 		}
@@ -296,9 +304,8 @@ func parseCurrencyDate(file *os.File) (time.Time, error) {
 	return currencyTime, err
 }
 
-// this file assumes that the data is already downloaded and just needs to be parsed
 // GenerateObsData puts FAA DOF data into coordinate buffers that are written to files
-func GenerateObsData() {
+func GenerateObsData() error {
 	// Check for file existence and date modified
 	filePath := "./assets/DOF_Files/DOF.DAT"
 	file, err := os.Open(filePath)
@@ -306,7 +313,7 @@ func GenerateObsData() {
 	if err == nil {
 		fileCurrencyDate, err := parseCurrencyDate(file)
 		if err != nil {
-			fmt.Println("Error parsing file currency", err)
+			return fmt.Errorf("Error parsing file currency: %v", err)
 		}
 		currentTime := time.Now()
 		daysSinceUpdate = (currentTime.Sub(fileCurrencyDate)).Hours() / 24
@@ -318,18 +325,19 @@ func GenerateObsData() {
 		// File either doesn't exist, or is outdated
 		err = downloadFAADOF(filePath)
 		if err != nil {
-			fmt.Println("Error downloading DOF data", err)
+			return fmt.Errorf("Error downloading DOF data: %v", err)
 		}
 	}
 
 	squareBuffers := make(map[string]*ObsSquare)
 	err = parseDOFFile(filePath, squareBuffers)
 	if err != nil {
-		fmt.Println("Error parsing file", err)
+		return fmt.Errorf("Error parsing file: %v", err)
 	}
 
 	err = saveToProtobufs(squareBuffers)
 	if err != nil {
-		fmt.Printf("Error writing results: %v\n", err)
+		return fmt.Errorf("Error writing results: %v", err)
 	}
+	return nil
 }

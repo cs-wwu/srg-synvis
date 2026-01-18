@@ -4,7 +4,7 @@
 // 	protoc        v6.31.1
 // source: faa.proto
 
-package obs
+package obstructions
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -27,6 +27,7 @@ type FAAPoint struct {
 	Lon           float64                `protobuf:"fixed64,2,opt,name=lon,proto3" json:"lon,omitempty"`
 	Height        float64                `protobuf:"fixed64,3,opt,name=height,proto3" json:"height,omitempty"`
 	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Quantity      float64                `protobuf:"fixed64,5,opt,name=quantity,proto3" json:"quantity,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -87,6 +88,13 @@ func (x *FAAPoint) GetType() string {
 		return x.Type
 	}
 	return ""
+}
+
+func (x *FAAPoint) GetQuantity() float64 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
 }
 
 type ObstructionSquare struct {
@@ -153,16 +161,17 @@ var File_faa_proto protoreflect.FileDescriptor
 
 const file_faa_proto_rawDesc = "" +
 	"\n" +
-	"\tfaa.proto\x12\x03obs\"Z\n" +
+	"\tfaa.proto\x12\x03obs\"v\n" +
 	"\bFAAPoint\x12\x10\n" +
 	"\x03lat\x18\x01 \x01(\x01R\x03lat\x12\x10\n" +
 	"\x03lon\x18\x02 \x01(\x01R\x03lon\x12\x16\n" +
 	"\x06height\x18\x03 \x01(\x01R\x06height\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\"x\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1a\n" +
+	"\bquantity\x18\x05 \x01(\x01R\bquantity\"x\n" +
 	"\x11ObstructionSquare\x12\x17\n" +
 	"\alat_deg\x18\x01 \x01(\x05R\x06latDeg\x12\x17\n" +
 	"\alon_deg\x18\x02 \x01(\x05R\x06lonDeg\x121\n" +
-	"\fobstructions\x18\x03 \x03(\v2\r.obs.FAAPointR\fobstructionsB)Z'github.com/cs-wwu/srg-synvis/assets/obsb\x06proto3"
+	"\fobstructions\x18\x03 \x03(\v2\r.obs.FAAPointR\fobstructionsB9Z7github.com/cs-wwu/srg-synvis/assets/chunks/obstructionsb\x06proto3"
 
 var (
 	file_faa_proto_rawDescOnce sync.Once
