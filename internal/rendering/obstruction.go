@@ -10,7 +10,6 @@ import (
 	"github.com/ungerik/go3d/vec3"
 )
 
-var second_global int
 var obsMap = map[string]int{
 	"AG EQUIP":           10,
 	"AMUSEMENT PARK":     10,
@@ -28,23 +27,23 @@ var obsMap = map[string]int{
 	"DOME":               10,
 	"ELEC SYS":           10,
 	"ELEVATOR":           10,
-	"FENCE":              10, // same as catenary, but connected to ground?
-	"GATE":               10, // same as fence?
+	"FENCE":              10,
+	"GATE":               10,
 	"GEN UTIL":           10,
-	"GRAIN ELEVATOR":     10, // elongated building
+	"GRAIN ELEVATOR":     10,
 	"HANGAR":             2,
 	"HEAT COOL SYSTEM":   10,
 	"LANDFILL":           2,
-	"LIGHTHOUSE":         15, // same deal as cable car
+	"LIGHTHOUSE":         15, // Not found in data
 	"MET":                1,
-	"MONUMENT":           10, // special case here?
+	"MONUMENT":           10,
 	"NATURAL GAS SYSTEM": 10,
-	"NAVAID":             10, // potentially 1? look up
-	"PIPELINE PIPE":      10, // potentially same deal as fence
+	"NAVAID":             10,
+	"PIPELINE PIPE":      10,
 	"PLANT":              10,
 	"POLE":               1,
-	"POWER PLANT":        2, // check on this
-	"REFINERY":           2, // same as power plant
+	"POWER PLANT":        2,
+	"REFINERY":           2,
 	"RIG":                2,
 	"SHIP":               10,
 	"SIGN":               10,
@@ -53,18 +52,18 @@ var obsMap = map[string]int{
 	"SPIRE":              1,
 	"STACK":              1,
 	"STADIUM":            2,
-	"TANK":               2,  // tentative - check this one
-	"BALLOON":            10, // i don't even know for this one...
-	"TETRAHEDRON":        15, // same deal as cable car and lighthouse
+	"TANK":               2,
+	"BALLOON":            10,
+	"TETRAHEDRON":        15, // Not found in data
 	"TOWER":              1,
-	"TRAMWAY":            2,  // potentially discard since this should be taken care of by roads?
-	"TRAMWAY PYLON":      15, // same deal as tetrahedron, cable car, lighthouse
+	"TRAMWAY":            2,
+	"TRAMWAY PYLON":      15, // Not found in data
 	"T-L TWR":            1,
-	"UTILITY POLE":       3,  // small one
-	"VERTICAL STRUCTURE": 2,  // check this - DOF doesn't say what this is...
-	"WALL":               10, // same as fence
+	"UTILITY POLE":       3,
+	"VERTICAL STRUCTURE": 2,
+	"WALL":               10,
 	"WIND INDICATOR":     10,
-	"WINDMILL":           1, // inverted pyramid?
+	"WINDMILL":           1,
 	"WINDSOCK":           1,
 }
 
@@ -77,7 +76,7 @@ type ObstructionBuilder struct {
 }
 
 const (
-	OBSTRUCTION_BASE_RADIUS = 3.0 // This could (and should) change in the future
+	OBSTRUCTION_BASE_RADIUS = 3.0
 )
 
 func toWorldLon(obstruction *pb.FAAPoint) float32 {
@@ -94,12 +93,12 @@ func toWorldHeight(obstruction *pb.FAAPoint) float32 {
 
 func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
-	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color for now {0.8, 0.5, 0.2}
+	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color
 
 	// Get obstruction shape
 	obsShape := obsMap[obstruction.Type]
 	if obsShape == 0 {
-		log.Fatalf("Unaccounted for shape found: %s", obstruction.Type) // This shouldn't be fatal in v1, but good to keep for now
+		log.Printf("Unaccounted for shape found: %s", obstruction.Type)
 	}
 
 	// Get obstruction quantity
@@ -114,9 +113,6 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 		obsShape = 1
 	}
 
-	// TODO: In future, this could render different shapes for different obstructions
-	// For now, it's a rectangle for building or tower, and a pyramid for everything else
-	// builder.renderObstructionShape(obstruction, obsShape)
 	x := toWorldLon(obstruction)
 	z := toWorldLat(obstruction)
 	height := toWorldHeight(obstruction)
@@ -231,7 +227,6 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 
 func (builder *ObstructionBuilder) addPoint(point vec2.T) uint32 {
 	height := builder.heightInfo.Height(float32(point[0]), float32(point[1]))
-	// height += 1.0
 	return builder.addVertex(ObstructionVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},
 		Color:    builder.color,

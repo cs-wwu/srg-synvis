@@ -1384,9 +1384,9 @@ func (app *Application) preparePipeline() {
 		}},
 	}}
 	pipeline := make([]vk.Pipeline, 1)
-	// TODO: When obstructions and roads are rendered simultaneously, program tends to crash at this stage
-	// Temporary fix: sleep for 20 m/s. In future this needs to actually be fixed
-	time.Sleep(200000000)
+	// TODO: When obstructions and roads are rendered simultaneously, program occasionally crashes at this stage
+	// Temporary fix: sleep for 15 m/s. In future this should actually be fixed
+	time.Sleep(150000000)
 	ret = vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, pipelineCreateInfos, nil, pipeline)
 	OrPanic(as.NewError(ret))
 	app.pipeline = pipeline[0]
