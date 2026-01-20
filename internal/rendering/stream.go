@@ -509,14 +509,14 @@ func (sm *StreamManager) Stats() string {
 	stateStats := sm.stateManager.GetStats()
 	workerStats := sm.workerPool.Stats()
 
-	var stringBuilder strings.Builder
+	var sb strings.Builder
 	for state, count := range stateStats {
-		if stringBuilder.Len() > 0 {
-			stringBuilder.WriteString(", ")
+		if sb.Len() > 0 {
+			sb.WriteString(", ")
 		}
-		fmt.Fprintf(&stringBuilder, "%s:%d", state, count)
+		fmt.Fprintf(&sb, "%s:%d", state, count)
 	}
-	stateStatsStr := stringBuilder.String()
+	stateStatsStr := sb.String()
 
 	sm.renderMutex.RLock()
 	renderableCount := len(sm.renderableChunks)
@@ -532,20 +532,22 @@ func (sm *StreamManager) GetDetailedStateStats() string {
 	allChunks := sm.stateManager.GetAllChunks()
 	workerStats := sm.workerPool.Stats()
 
-	result := fmt.Sprintf("Chunk State Statistics (Total: %d chunks):\n", sm.stateManager.Count())
-	result += "=========================================\n"
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Chunk State Statistics (Total: %d chunks):\n", sm.stateManager.Count()))
+	sb.WriteString("=========================================\n")
 
 	for state := streaming.StateUnloaded; state <= streaming.StateEvicting; state++ {
 		count := stats[state]
-		result += fmt.Sprintf("  %s: %d chunks\n", state, count)
+		sb.WriteString(fmt.Sprintf("  %s: %d chunks\n", state, count))
 	}
 
 	// Add worker information
-	result += "\nWorker Status:\n"
-	result += fmt.Sprintf("  Running: %v\n", sm.IsRunning())
-	result += fmt.Sprintf("  Workers: %d\n", workerStats.NumWorkers)
-	result += fmt.Sprintf("  Load Queue: %d jobs\n", workerStats.LoadQueueSize)
-	result += fmt.Sprintf("  Evict Queue: %d jobs\n", workerStats.EvictQueueSize)
+	sb.WriteString("\nWorker Status:\n")
+	sb.WriteString(fmt.Sprintf("  Running: %v\n", sm.IsRunning()))
+	sb.WriteString(fmt.Sprintf("  Workers: %d\n", workerStats.NumWorkers))
+	sb.WriteString(fmt.Sprintf("  Load Queue: %d jobs\n", workerStats.LoadQueueSize))
+	sb.WriteString(fmt.Sprintf("  Evict Queue: %d jobs\n", workerStats.EvictQueueSize))
 
 	// Show some example chunks in each state
 	stateExamples := make(map[streaming.ChunkState][]*streaming.ChunkRecord)
@@ -553,26 +555,26 @@ func (sm *StreamManager) GetDetailedStateStats() string {
 		stateExamples[chunk.State] = append(stateExamples[chunk.State], chunk)
 	}
 
-	result += "\nSample chunks by state:\n"
+	sb.WriteString("\nSample chunks by state:\n")
 	for state, chunks := range stateExamples {
 		if len(chunks) > 0 {
-			result += fmt.Sprintf("  %s: ", state)
+			sb.WriteString(fmt.Sprintf("  %s: ", state))
 			maxShow := 3
 			for i, chunk := range chunks {
 				if i >= maxShow {
-					result += fmt.Sprintf("... (%d more)", len(chunks)-maxShow)
+					sb.WriteString(fmt.Sprintf("... (%d more)", len(chunks)-maxShow))
 					break
 				}
 				if i > 0 {
-					result += ", "
+					sb.WriteString(", ")
 				}
-				result += fmt.Sprintf("%v(LOD:%d,P:%.1f)", chunk.GridCoord, chunk.LODLevel, chunk.Priority)
+				sb.WriteString(fmt.Sprintf("%v(LOD:%d,P:%.1f)", chunk.GridCoord, chunk.LODLevel, chunk.Priority))
 			}
-			result += "\n"
+			sb.WriteString("\n")
 		}
 	}
 
-	return result
+	return sb.String()
 }
 
 // Destroy cleans up resources
