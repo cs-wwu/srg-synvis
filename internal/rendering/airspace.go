@@ -13,11 +13,11 @@ import (
 )
 
 type AirspaceProperties struct {
-	Name     string `json:"NAME"`
-	Class    string `json:"CLASS"`
-	UpperVal int    `json:"UPPER_VAL"` // Altitude ceiling
-	LowerVal int    `json:"LOWER_VAL"` // Altitude floor
-	GlobalId string `json:"GLOBAL_ID"`
+	Name            string `json:"NAME"`
+	Class           string `json:"CLASS"`
+	AltitudeCeiling int    `json:"UPPER_VAL"` // Altitude ceiling
+	AltitudeFloor   int    `json:"LOWER_VAL"` // Altitude floor
+	GlobalId        string `json:"GLOBAL_ID"`
 }
 
 type Feature struct {
@@ -123,8 +123,8 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		y := float32(-lat * ARC_DEGREES_TO_SECONDS)
 
 		height := builder.heightInfo.Height(x, y)
-		lowerAlt := props.LowerVal + int(height) + 10
-		upperAlt := props.UpperVal
+		lowerAlt := props.AltitudeFloor + int(height) + 10
+		upperAlt := props.AltitudeCeiling
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
 			Position: [3]float32{float32(x), float32(lowerAlt), float32(y)},
