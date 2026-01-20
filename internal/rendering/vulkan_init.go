@@ -1567,15 +1567,15 @@ func (app *Application) prepareAirspaceStencilPipeline() {
 			DepthWriteEnable:      vk.True,
 			DepthCompareOp:        vk.CompareOpLessOrEqual,
 			DepthBoundsTestEnable: vk.False,
-			StencilTestEnable:     vk.True, // Enable stencil testing
+			StencilTestEnable:     vk.True,
 			Front: vk.StencilOpState{
 				FailOp:      vk.StencilOpKeep,
-				PassOp:      vk.StencilOpKeep, // CHANGED: Don't modify stencil
+				PassOp:      vk.StencilOpKeep,
 				DepthFailOp: vk.StencilOpKeep,
-				CompareOp:   vk.CompareOpEqual, // CHANGED: Only render where stencil == Reference
+				CompareOp:   vk.CompareOpEqual,
 				CompareMask: 0xFF,
-				WriteMask:   0x00, // CHANGED: Don't write to stencil
-				Reference:   1,    // Only render where stencil value is 1
+				WriteMask:   0x00,
+				Reference:   1,
 			},
 			Back: vk.StencilOpState{
 				FailOp:      vk.StencilOpKeep,
