@@ -5,7 +5,8 @@ import (
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
-	"github.com/ungerik/go3d/float64/vec2"
+	dvec2 "github.com/ungerik/go3d/float64/vec2"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -22,12 +23,12 @@ const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 
-	ROAD_OFFSET            = float32(1.0)
+	ROAD_OFFSET            = 1.0
 	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
 )
 
-func toWorld(point *pb.Point) vec2.T {
-	return vec2.T{
+func toWorld(point *pb.Point) dvec2.T {
+	return dvec2.T{
 		point.Lon * ARC_DEGREES_TO_SECONDS,
 		-point.Lat * ARC_DEGREES_TO_SECONDS,
 	}
@@ -56,7 +57,7 @@ var ROAD_TYPES = map[string]RoadType{
 }
 
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
-	points := make([]vec2.T, len(road.Points))
+	points := make([]dvec2.T, len(road.Points))
 	for i, point := range road.Points {
 		points[i] = toWorld(point)
 	}
@@ -116,7 +117,7 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 			norm2.Scale(-1.0)
 		}
 
-		angle := math.Acos(vec2.Dot(&dir1, &dir2))
+		angle := math.Acos(dvec2.Dot(&dir1, &dir2))
 		half_angle := (math.Pi - angle) / 2
 		radius := distance / math.Tan(half_angle)
 		if radius > distance*2 {
@@ -141,7 +142,7 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 			norm_scaled = norm.Scaled(distance - width/2)
 			inside := origin.Subed(&norm_scaled)
 
-			var left, right vec2.T
+			var left, right dvec2.T
 			if lefthanded {
 				left = inside
 				right = outside
@@ -180,19 +181,19 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	}
 }
 
-func perpendicular(v vec2.T) vec2.T {
-	return vec2.T{-v[1], v[0]}
+func perpendicular(v dvec2.T) dvec2.T {
+	return dvec2.T{-v[1], v[0]}
 }
 
-func slerp(a, b vec2.T, t float64) vec2.T {
-	angle := math.Acos(vec2.Dot(&a, &b))
+func slerp(a, b dvec2.T, t float64) dvec2.T {
+	angle := math.Acos(dvec2.Dot(&a, &b))
 	f1 := math.Sin(angle*(1-t)) / math.Sin(angle)
 	f2 := math.Sin(angle*t) / math.Sin(angle)
-	return vec2.T{a[0]*f1 + b[0]*f2, a[1]*f1 + b[1]*f2}
+	return dvec2.T{a[0]*f1 + b[0]*f2, a[1]*f1 + b[1]*f2}
 }
 
 // This is the Ramer-Douglas-Peucker algorithm for line simplification.
-func simplify(points []vec2.T, epsilon float64) []vec2.T {
+func simplify(points []dvec2.T, epsilon float64) []dvec2.T {
 	if len(points) < 3 {
 		return points
 	}
@@ -216,10 +217,10 @@ func simplify(points []vec2.T, epsilon float64) []vec2.T {
 		return append(left[:len(left)-1], right...)
 	}
 
-	return []vec2.T{points[0], points[len(points)-1]}
+	return []dvec2.T{points[0], points[len(points)-1]}
 }
 
-func perpendicularDistance(pt, lineStart, lineEnd vec2.T) float64 {
+func perpendicularDistance(pt, lineStart, lineEnd dvec2.T) float64 {
 	if lineStart == lineEnd {
 		dx := pt[0] - lineStart[0]
 		dy := pt[1] - lineStart[1]
@@ -239,11 +240,11 @@ func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
 	}
 }
 
-func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
-	height := r.heightInfo.Height(float32(point[0]), float32(point[1]))
+func (r *RoadBuilder) addPoint(point dvec2.T) uint32 {
+	height := r.heightInfo.Height(point[0], point[1])
 	height += ROAD_OFFSET
 	return r.addVertex(RoadVertex{
-		Position: vec3.T{float32(point[0]), height, float32(point[1])},
+		Position: dvec3.T{point[0], height, point[1]},
 		Color:    r.color,
 	})
 }

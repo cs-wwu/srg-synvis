@@ -1066,7 +1066,7 @@ func (app *Application) prepareRoadPipeline() {
 				{
 					Binding:  0,
 					Location: 0,
-					Format:   vk.FormatR32g32b32Sfloat,
+					Format:   vk.FormatR64g64b64Sfloat,
 					Offset:   0,
 				},
 				// Color
@@ -1074,7 +1074,7 @@ func (app *Application) prepareRoadPipeline() {
 					Binding:  0,
 					Location: 1,
 					Format:   vk.FormatR32g32b32Sfloat,
-					Offset:   4 * 3,
+					Offset:   8 * 3,
 				},
 			},
 		},
@@ -1294,7 +1294,7 @@ func (app *Application) preparePipeline() {
 		{
 			Binding:  0,
 			Location: 0,
-			Format:   vk.FormatR32g32b32Sfloat,
+			Format:   vk.FormatR64g64b64Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
 		},
 		{

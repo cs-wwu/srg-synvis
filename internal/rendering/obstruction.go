@@ -6,7 +6,8 @@ import (
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
-	"github.com/ungerik/go3d/vec2"
+	dvec2 "github.com/ungerik/go3d/float64/vec2"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -114,7 +115,7 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 	obsNum := obstruction.Quantity
 
 	// Assign radius based on quantity
-	obsRadius := float32(OBSTRUCTION_BASE_RADIUS / obsNum)
+	obsRadius := OBSTRUCTION_BASE_RADIUS / obsNum
 
 	// If obstruction small pyramid: make radius smaller
 	if obsShape == PyramidSmall {
@@ -122,9 +123,9 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 		obsShape = Pyramid
 	}
 
-	x := toWorldLon(obstruction)
-	z := toWorldLat(obstruction)
-	height := toWorldHeight(obstruction)
+	x := float64(toWorldLon(obstruction))
+	z := float64(toWorldLat(obstruction))
+	height := float64(toWorldHeight(obstruction))
 	if int(obsNum) == 1 {
 		// Render as usual
 		builder.renderObstructionShape(x, z, height, obsShape, obsRadius)
@@ -145,17 +146,17 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 			}
 			if radian > 0.5 && radian < 1.5 {
 				// we are subtracting from x
-				x -= float32(xAdjustment)
+				x -= xAdjustment
 			} else {
 				// we are adding to x
-				x += float32(xAdjustment)
+				x += xAdjustment
 			}
 			if radian < 1. {
 				// we are adding to z
-				z += float32(zAdjustment)
+				z += zAdjustment
 			} else {
 				// we are subtracting from z
-				z -= float32(zAdjustment)
+				z -= zAdjustment
 			}
 
 			// Build obstruction with adjusted location vals
@@ -166,17 +167,17 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
 }
 
-func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, height float32, shape Shape, radius float32) {
+func (builder *ObstructionBuilder) renderObstructionShape(x float64, z float64, height float64, shape Shape, radius float64) {
 	xMin := x - radius
 	xMax := x + radius
 	zMin := z - radius
 	zMax := z + radius
 
 	// We make four base points
-	b0 := builder.addPoint(vec2.T{float32(xMax), float32(zMax)})
-	b1 := builder.addPoint(vec2.T{float32(xMin), float32(zMax)})
-	b2 := builder.addPoint(vec2.T{float32(xMin), float32(zMin)})
-	b3 := builder.addPoint(vec2.T{float32(xMax), float32(zMin)})
+	b0 := builder.addPoint(dvec2.T{xMax, zMax})
+	b1 := builder.addPoint(dvec2.T{xMin, zMax})
+	b2 := builder.addPoint(dvec2.T{xMin, zMin})
+	b3 := builder.addPoint(dvec2.T{xMax, zMin})
 
 	// Unmapped shapes are now pyramids
 	if shape == Unmapped {
@@ -188,7 +189,7 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 		// This is a typical pyramid
 		// Custom height for apex points
 		a0 := builder.addVertex(ObstructionVertex{
-			Position: vec3.T{float32(x), float32(height), float32(z)},
+			Position: dvec3.T{x, height, z},
 			Color:    builder.color,
 		})
 
@@ -201,19 +202,19 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 		// This is a rectangular building
 		// Four apex points
 		a0 := builder.addVertex(ObstructionVertex{
-			Position: vec3.T{float32(xMax), float32(height), float32(zMax)},
+			Position: dvec3.T{xMax, height, zMax},
 			Color:    builder.color,
 		})
 		a1 := builder.addVertex(ObstructionVertex{
-			Position: vec3.T{float32(xMin), float32(height), float32(zMax)},
+			Position: dvec3.T{xMin, height, zMax},
 			Color:    builder.color,
 		})
 		a2 := builder.addVertex(ObstructionVertex{
-			Position: vec3.T{float32(xMin), float32(height), float32(zMin)},
+			Position: dvec3.T{xMin, height, zMin},
 			Color:    builder.color,
 		})
 		a3 := builder.addVertex(ObstructionVertex{
-			Position: vec3.T{float32(xMax), float32(height), float32(zMin)},
+			Position: dvec3.T{xMax, height, zMin},
 			Color:    builder.color,
 		})
 		// Sides of tower
@@ -234,10 +235,10 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 	}
 }
 
-func (builder *ObstructionBuilder) addPoint(point vec2.T) uint32 {
-	height := builder.heightInfo.Height(float32(point[0]), float32(point[1]))
+func (builder *ObstructionBuilder) addPoint(point dvec2.T) uint32 {
+	height := builder.heightInfo.Height(point[0], point[1])
 	return builder.addVertex(ObstructionVertex{
-		Position: vec3.T{float32(point[0]), height, float32(point[1])},
+		Position: dvec3.T{point[0], height, point[1]},
 		Color:    builder.color,
 	})
 }

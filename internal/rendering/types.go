@@ -3,27 +3,28 @@ package rendering
 import (
 	"unsafe"
 
-	"github.com/ungerik/go3d/vec3"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	vec3 "github.com/ungerik/go3d/vec3"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
 type Vertex struct {
-	Position lin.Vec3
-	TexCoord lin.Vec3
-	Normal   lin.Vec3
+	Position dvec3.T
+	TexCoord vec3.T
+	Normal   vec3.T
 }
 
 // NB: This gets cast to a byte slice, so it must have the exact same bytes
 // that the shader expects.
 type RoadVertex struct {
-	Position vec3.T
+	Position dvec3.T
 	Color    vec3.T
 }
 
 type ObstructionVertex struct {
-	Position vec3.T
+	Position dvec3.T
 	Color    vec3.T
 }
 
