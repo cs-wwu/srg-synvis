@@ -193,28 +193,6 @@ func (a *BucketAllocator) Destroy() {
 	}
 }
 
-// Stats returns memory usage statistics.
-func (a *BucketAllocator) Stats() AllocatorStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	stats := AllocatorStats{}
-
-	for i := range a.buckets {
-		bucket := &a.buckets[i]
-		bucket.mu.Lock()
-		stats.TotalSize += uint32(bucket.size)
-		allocatedSize := uint32(len(bucket.allocations)) * uint32(bucket.chunkSize)
-		stats.UsedSize += allocatedSize
-		stats.Allocations += len(bucket.allocations)
-		bucket.mu.Unlock()
-	}
-
-	stats.FreeSize = stats.TotalSize - stats.UsedSize
-
-	return stats
-}
-
 // Helper function to create buffer and allocate memory.
 // TODO: this function takes ~120ms per bucket if needed,
 // refactor to using single buffer, and subdiving it into the buckets myself
