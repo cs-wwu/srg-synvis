@@ -738,8 +738,8 @@ func (app *Application) prepareRenderPass() {
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpDontCare,
-			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
-			StencilStoreOp: vk.AttachmentStoreOpDontCare,
+			StencilLoadOp:  vk.AttachmentLoadOpClear,
+			StencilStoreOp: vk.AttachmentStoreOpStore,
 			InitialLayout:  vk.ImageLayoutUndefined,
 			FinalLayout:    vk.ImageLayoutDepthStencilAttachmentOptimal,
 		}},
@@ -1401,6 +1401,144 @@ func (app *Application) prepareAirspacePipeline() {
 			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
 			AttachmentCount: 1,
 			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask:      0x0,
+				BlendEnable:         vk.True,
+				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
+				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
+				ColorBlendOp:        vk.BlendOpAdd,
+				SrcAlphaBlendFactor: vk.BlendFactorOne,
+				DstAlphaBlendFactor: vk.BlendFactorZero,
+				AlphaBlendOp:        vk.BlendOpAdd,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.True,
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.True,
+			Front: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpReplace,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpAlways,
+				CompareMask: 0xFF,
+				WriteMask:   0xFF,
+				Reference:   1,
+			},
+			Back: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpReplace,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpAlways,
+				CompareMask: 0xFF,
+				WriteMask:   0xFF,
+				Reference:   1,
+			},
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	airspacePipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, airspacePipeline)
+	OrPanic(as.NewError(ret))
+	app.airspacePipeline = airspacePipeline[0]
+}
+
+func (app *Application) prepareAirspaceStencilPipeline() {
+	dev := app.Context().Device()
+
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.vert.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.frag.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
+
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    uint32(unsafe.Sizeof(AirspaceVertex{})),
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 2,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
+
+				{
+					Binding:  0,
+					Location: 0,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   0,
+				},
+				{
+					Binding:  0,
+					Location: 1,
+					Format:   vk.FormatR32g32b32a32Sfloat,
+					Offset:   12,
+				},
+			},
+		},
+
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+
+			DepthBiasEnable: vk.False,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
 				ColorWriteMask:      0xF,
 				BlendEnable:         vk.True,
 				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
@@ -1429,7 +1567,25 @@ func (app *Application) prepareAirspacePipeline() {
 			DepthWriteEnable:      vk.True,
 			DepthCompareOp:        vk.CompareOpLessOrEqual,
 			DepthBoundsTestEnable: vk.False,
-			StencilTestEnable:     vk.False,
+			StencilTestEnable:     vk.True, // Enable stencil testing
+			Front: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpKeep, // CHANGED: Don't modify stencil
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpEqual, // CHANGED: Only render where stencil == Reference
+				CompareMask: 0xFF,
+				WriteMask:   0x00, // CHANGED: Don't write to stencil
+				Reference:   1,    // Only render where stencil value is 1
+			},
+			Back: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpKeep,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpEqual,
+				CompareMask: 0xFF,
+				WriteMask:   0x00,
+				Reference:   1,
+			},
 		},
 
 		StageCount: 2,
@@ -1446,10 +1602,10 @@ func (app *Application) prepareAirspacePipeline() {
 		}},
 	}
 
-	airspacePipeline := make([]vk.Pipeline, 1)
-	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, airspacePipeline)
+	airspaceStencilPipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, airspaceStencilPipeline)
 	OrPanic(as.NewError(ret))
-	app.airspacePipeline = airspacePipeline[0]
+	app.airspaceStencilPipeline = airspaceStencilPipeline[0]
 }
 
 func (app *Application) preparePipeline() {
@@ -1712,6 +1868,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.preparePlaneModel()
 	app.preparePlanePipeline()
 	app.prepareAirspacePipeline()
+	app.prepareAirspaceStencilPipeline()
 	app.prepareRoadPipeline()
 	app.prepareObstructionPipeline()
 	app.prepareDescriptorPool()
