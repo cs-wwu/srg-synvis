@@ -1420,7 +1420,7 @@ func copyTextureData(dst unsafe.Pointer, src []byte, width, height, sourceStride
 		dstOffset := row * destStride
 
 		// Convert destination offset to unsafe.Pointer
-		dstRow := unsafe.Pointer(uintptr(dst) + uintptr(dstOffset))
+		dstRow := unsafe.Add(dst, dstOffset)
 
 		// Copy a single row (width * 4 bytes for RGBA)
 		bytesPerPixel := 4

@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
@@ -508,13 +509,14 @@ func (sm *StreamManager) Stats() string {
 	stateStats := sm.stateManager.GetStats()
 	workerStats := sm.workerPool.Stats()
 
-	stateStatsStr := ""
+	var stringBuilder strings.Builder
 	for state, count := range stateStats {
-		if stateStatsStr != "" {
-			stateStatsStr += ", "
+		if stringBuilder.Len() > 0 {
+			stringBuilder.WriteString(", ")
 		}
-		stateStatsStr += fmt.Sprintf("%s:%d", state, count)
+		fmt.Fprintf(&stringBuilder, "%s:%d", state, count)
 	}
+	stateStatsStr := stringBuilder.String()
 
 	sm.renderMutex.RLock()
 	renderableCount := len(sm.renderableChunks)
