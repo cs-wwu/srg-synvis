@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
