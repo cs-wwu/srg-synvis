@@ -5,14 +5,14 @@
 layout(binding = 1) uniform sampler2D texSampler;
 
 layout(std140, binding = 0) uniform UBO {
-    mat4 model;
-    mat4 view;
+    dmat4 model;
+    dmat4 view;
     mat4 proj;
     mat4 normalM;
-    mat4 planeDirection;
+    dmat4 planeDirection;
     vec3 lightDir;
     float renderDistance;
-    vec3 cameraPos;
+    dvec3 cameraPos;
     float time;
     float disableWarnings;
     float disableFog;
@@ -241,7 +241,7 @@ void main() {
         // Disable warnings is 1.0, run the code if disableWarnings is 0.0
         if (ubo.disableWarnings < 0.5) {
             // Apply warning coloring based on height relative to camera position
-            float warningOpacity = getTerrainWarningOpacity(worldPos.y, ubo.cameraPos.y);
+            float warningOpacity = getTerrainWarningOpacity(worldPos.y, float(ubo.cameraPos.y));
             
             // Add red warning overlay only when terrain is at or near camera height
             if (warningOpacity > 0.0) {

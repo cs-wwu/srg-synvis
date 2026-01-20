@@ -48,9 +48,9 @@ func (sm *SensorManager) StartGPS() error {
 
 	// Store previous data in case of GPS fix issues
 	pos := sm.camera.Position()
-	oldX := pos[0]
-	oldY := pos[1]
-	oldZ := pos[2]
+	oldX := float32(pos[0])
+	oldY := float32(pos[1])
+	oldZ := float32(pos[2])
 	var xdif, ydif, zdif float32
 
 	// Set up the TPV function that will run indefinitely
@@ -58,6 +58,7 @@ func (sm *SensorManager) StartGPS() error {
 		report := r.(*gpsd.TPVReport)
 		// Convert GPS coordinates to world coordinates
 		newY := float32(report.Alt) * HEIGHT_CONVERSION
+		// FIXME: Use float64 for all GPS math!!!!!!!
 		newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
 
 		// Check if data is faulty, if so, assume position based on history
@@ -74,7 +75,7 @@ func (sm *SensorManager) StartGPS() error {
 		}
 
 		// Update camera position
-		sm.camera.updatePosition(newX, newZ, newY)
+		sm.camera.updatePosition(float64(newX), float64(newZ), float64(newY))
 
 		// Log movement delta for prediction
 		xdif = newX - oldX
@@ -206,7 +207,7 @@ func (sm *SensorManager) GetSensorData() SensorData {
 	yaw, pitch, roll := sm.camera.getOrientation()
 
 	// Convert position back to GPS coordinates for the data structure
-	lat, lon := coords.WorldToGPSFloat(pos[0], pos[2])
+	lat, lon := coords.WorldToGPSFloat(float32(pos[0]), float32(pos[2]))
 	alt := pos[1] / HEIGHT_CONVERSION
 
 	return SensorData{
@@ -230,9 +231,9 @@ func (sm *SensorManager) SetSensorData(data SensorData) {
 		// Convert GPS to world coordinates
 		worldX, worldZ := coords.GPSToWorld(float32(data.GPSPosition.Latitude),
 			float32(data.GPSPosition.Longitude))
-		worldY := float32(data.GPSPosition.Altitude) * HEIGHT_CONVERSION
+		worldY := data.GPSPosition.Altitude * HEIGHT_CONVERSION
 
-		sm.camera.updatePosition(worldX, worldZ, worldY)
+		sm.camera.updatePosition(float64(worldX), float64(worldZ), worldY)
 	}
 
 	if data.IMUValid {

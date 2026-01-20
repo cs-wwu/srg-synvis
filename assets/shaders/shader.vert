@@ -3,22 +3,22 @@
 #extension GL_ARB_shading_language_420pack : enable
 
 layout(std140, binding = 0) uniform UBO {
-    mat4 model;
-    mat4 view;
+    dmat4 model;
+    dmat4 view;
     mat4 proj;
     mat4 normalM;
-    mat4 planeDirection;
+    dmat4 planeDirection;
     vec3 lightDir;
     float renderDistance;
-    vec3 cameraPos;
+    dvec3 cameraPos;
     float time;
     float disableWarnings;
     float disableFog;
 } ubo;
 
-layout(location = 0) in dvec3 inPosition;
-layout(location = 1) in vec3 inTexCoord;
-layout(location = 2) in vec3 inNormal;
+layout(location = 0) in dvec3 inPosition; // NB: Double takes up positions 0 and 1
+layout(location = 2) in vec3 inTexCoord;
+layout(location = 3) in vec3 inNormal;
 
 const float AMBIENT = 0.15;      // Ambient light intensity
 const float FOG_OFFSET = 0.75;   // How far to start the fog from the renderDistance
@@ -35,9 +35,9 @@ out gl_PerVertex {
 
 void main() 
 {
-    vec4 worldPosition = ubo.model * vec4(inPosition, 1.0);
-    vec4 viewPosition = ubo.view * worldPosition;
-    gl_Position = ubo.proj * viewPosition;
+    dvec4 worldPosition = ubo.model * dvec4(inPosition, 1.0);
+    dvec4 viewPosition = ubo.view * worldPosition;
+    gl_Position = ubo.proj * vec4(viewPosition);
 
     // Transform normal to world space
     vec3 worldNormal = normalize(mat3(ubo.normalM) * inNormal);
@@ -55,8 +55,8 @@ void main()
     } else {
         // Fog enabled - calculate fog based on distance and height
         float fogStart = ubo.renderDistance * FOG_OFFSET;
-        float distance = length(viewPosition.xyz);
-        float heightFactor = smoothstep(0.0, 2000.0, worldPosition.y);
+        float distance = float(length(viewPosition.xyz));
+        float heightFactor = smoothstep(0.0, 2000.0, float(worldPosition.y));
 
         // Calculate base fog factor
         fogFactor = 1.0 - clamp((distance - fogStart) / (ubo.renderDistance - fogStart), 0.0, 1.0);
@@ -68,5 +68,5 @@ void main()
 
     fragColor = intense * vec3(1.0);
     fragTexCoord = inTexCoord.xyz;
-    worldPos = worldPosition.xyz;
+    worldPos = vec3(worldPosition.xyz);
 }

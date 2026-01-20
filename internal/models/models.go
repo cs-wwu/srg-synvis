@@ -1,7 +1,7 @@
 package models
 
 import (
-	lin "github.com/xlab/linmath"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 )
 
 // AppConfig holds all application configuration settings
@@ -14,9 +14,9 @@ type AppConfig struct {
 	MonitorNum int
 
 	// Camera settings
-	Fov            float32  // Field of view in Y direction
-	CameraStartPos lin.Vec3 // Starting position in world coordinates
-	CameraStartDir lin.Vec3 // Starting direction vector (normalized)
+	Fov            float32 // Field of view in Y direction
+	CameraStartPos dvec3.T // Starting position in world coordinates
+	CameraStartDir dvec3.T // Starting direction vector (normalized)
 
 	// Rendering settings
 	RenderDistance         float32 // Maximum render distance
