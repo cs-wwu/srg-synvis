@@ -646,8 +646,8 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	for i, airspace := range geojson.Features {
 		renderAirspace(builder, airspace, airspaceColors[airspace.Properties.Class])
 		instances[i] = AirspaceInstance{
-			LowerAlt: float32(airspace.Properties.LowerVal),
-			UpperAlt: float32(airspace.Properties.UpperVal),
+			LowerAlt: float32(airspace.Properties.AltitudeFloor),
+			UpperAlt: float32(airspace.Properties.AltitudeCeiling),
 			Color:    airspaceColors[airspace.Properties.Class],
 		}
 	}
