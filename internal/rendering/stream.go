@@ -414,16 +414,17 @@ func (sm *StreamManager) queueMissingChunks() {
 func (sm *StreamManager) queueDistantChunksForEviction() {
 	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
 
-	// Find chunks to evict (furthest from camera first)
 	for _, record := range readyChunks {
-		// Calculate distance from current camera position
 		chunkWorldPos := sm.chunkSelector.GridToWorld(record.GridCoord)
 		dx := chunkWorldPos[0] - sm.lastCameraPos[0]
 		dz := chunkWorldPos[1] - sm.lastCameraPos[1]
-		distance := dx*dx + dz*dz // Use squared distance for efficiency
+		distance_squared := dx*dx + dz*dz
 
-		// If chunk is far and not in frustum, queue for eviction
-		if distance > sm.cfg.RenderDistance*sm.cfg.RenderDistance*0.5 {
+		// Remove chunks that are 10% outside of render distance. This
+		// avoids reloading chunks frequently that are right on the edge
+		// of visiblity.
+		threshold := sm.cfg.RenderDistance * 1.1
+		if distance_squared > threshold*threshold {
 			sm.workerPool.QueueEvictJob(record.GridCoord, record.Priority)
 		}
 	}
