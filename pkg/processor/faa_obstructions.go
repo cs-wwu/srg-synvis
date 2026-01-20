@@ -18,7 +18,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Constants for column offsets in DOF.DATA
 const (
+	headerStart = 18
+	headerEnd   = 26
+
 	latDegStart = 35
 	latDegEnd   = 37
 	latMinStart = 38
@@ -34,7 +38,7 @@ const (
 	lonSecEnd   = 60
 
 	obsStart = 62
-	obsEnd   = 81 //TODO: potentially 80?
+	obsEnd   = 81
 	hgtStart = 84
 	hgtEnd   = 89
 	eleStart = 90
@@ -297,15 +301,15 @@ func parseCurrencyDate(file *os.File) (time.Time, error) {
 	scanner.Scan()
 	header := scanner.Text()
 
-	currencyString := strings.TrimSpace(header[18:26]) // Header date starts at col 18, ends at col 26
-	formatString := "01/02/06"                         // Stored month/day/year
+	currencyString := strings.TrimSpace(header[headerStart:headerEnd])
+	formatString := "01/02/06" // Stored month/day/year
 	currencyTime, err := time.Parse(formatString, currencyString)
 
 	return currencyTime, err
 }
 
-// GenerateObsData puts FAA DOF data into coordinate buffers that are written to files
-func GenerateObsData() error {
+// GenerateObstructionData puts FAA DOF data into coordinate buffers that are written to files
+func GenerateObstructionData() error {
 	// Check for file existence and date modified
 	filePath := "./assets/DOF_Files/DOF.DAT"
 	file, err := os.Open(filePath)

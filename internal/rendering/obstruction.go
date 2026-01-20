@@ -10,61 +10,70 @@ import (
 	"github.com/ungerik/go3d/vec3"
 )
 
-var obsMap = map[string]int{
-	"AG EQUIP":           10,
-	"AMUSEMENT PARK":     10,
-	"ANTENNA":            3,
-	"ARCH":               10,
-	"BLDG-TWR":           10,
-	"BRIDGE":             2,
-	"BLDG":               2,
-	"CABLE CAR":          15, // Cannot find a single existence of this tag in the data - thus, do not know if "CABLE CAR" is accurate string
-	"CATENARY":           10,
-	"CTRL TWR":           1,
-	"COOL TWR":           1,
-	"CRANE":              3,
-	"DAM":                2,
-	"DOME":               10,
-	"ELEC SYS":           10,
-	"ELEVATOR":           10,
-	"FENCE":              10,
-	"GATE":               10,
-	"GEN UTIL":           10,
-	"GRAIN ELEVATOR":     10,
-	"HANGAR":             2,
-	"HEAT COOL SYSTEM":   10,
-	"LANDFILL":           2,
-	"LIGHTHOUSE":         15, // Not found in data
-	"MET":                1,
-	"MONUMENT":           10,
-	"NATURAL GAS SYSTEM": 10,
-	"NAVAID":             10,
-	"PIPELINE PIPE":      10,
-	"PLANT":              10,
-	"POLE":               1,
-	"POWER PLANT":        2,
-	"REFINERY":           2,
-	"RIG":                2,
-	"SHIP":               10,
-	"SIGN":               10,
-	"SILO":               1,
-	"SOLAR PANELS":       2,
-	"SPIRE":              1,
-	"STACK":              1,
-	"STADIUM":            2,
-	"TANK":               2,
-	"BALLOON":            10,
-	"TETRAHEDRON":        15, // Not found in data
-	"TOWER":              1,
-	"TRAMWAY":            2,
-	"TRAMWAY PYLON":      15, // Not found in data
-	"T-L TWR":            1,
-	"UTILITY POLE":       3,
-	"VERTICAL STRUCTURE": 2,
-	"WALL":               10,
-	"WIND INDICATOR":     10,
-	"WINDMILL":           1,
-	"WINDSOCK":           1,
+type Shape int
+
+const (
+	Pyramid Shape = iota
+	Building
+	PyramidSmall
+	Unmapped
+)
+
+var obsShapesMap = map[string]Shape{
+	"AG EQUIP":           Unmapped,
+	"AMUSEMENT PARK":     Unmapped,
+	"ANTENNA":            PyramidSmall,
+	"ARCH":               Unmapped,
+	"BLDG-TWR":           Unmapped,
+	"BRIDGE":             Building,
+	"BLDG":               Building,
+	"CABLE CAR":          Unmapped, // Cannot find a single existence of this tag in the data - thus, do not know if "CABLE CAR" is accurate string
+	"CATENARY":           Unmapped,
+	"CTRL TWR":           Pyramid,
+	"COOL TWR":           Pyramid,
+	"CRANE":              PyramidSmall,
+	"DAM":                Building,
+	"DOME":               Unmapped,
+	"ELEC SYS":           Unmapped,
+	"ELEVATOR":           Unmapped,
+	"FENCE":              Unmapped,
+	"GATE":               Unmapped,
+	"GEN UTIL":           Unmapped,
+	"GRAIN ELEVATOR":     Unmapped,
+	"HANGAR":             Building,
+	"HEAT COOL SYSTEM":   Unmapped,
+	"LANDFILL":           Building,
+	"LIGHTHOUSE":         Unmapped, // Not found in data
+	"MET":                Pyramid,
+	"MONUMENT":           Unmapped,
+	"NATURAL GAS SYSTEM": Unmapped,
+	"NAVAID":             Unmapped,
+	"PIPELINE PIPE":      Unmapped,
+	"PLANT":              Unmapped,
+	"POLE":               Pyramid,
+	"POWER PLANT":        Building,
+	"REFINERY":           Building,
+	"RIG":                Building,
+	"SHIP":               Unmapped,
+	"SIGN":               Unmapped,
+	"SILO":               Pyramid,
+	"SOLAR PANELS":       Unmapped,
+	"SPIRE":              Pyramid,
+	"STACK":              Pyramid,
+	"STADIUM":            Building,
+	"TANK":               Building,
+	"BALLOON":            Unmapped,
+	"TETRAHEDRON":        Unmapped, // Not found in data
+	"TOWER":              Pyramid,
+	"TRAMWAY":            Building,
+	"TRAMWAY PYLON":      Unmapped, // Not found in data
+	"T-L TWR":            Pyramid,
+	"UTILITY POLE":       PyramidSmall,
+	"VERTICAL STRUCTURE": Building,
+	"WALL":               Unmapped,
+	"WIND INDICATOR":     PyramidSmall,
+	"WINDMILL":           Unmapped,
+	"WINDSOCK":           PyramidSmall,
 }
 
 type ObstructionBuilder struct {
@@ -96,8 +105,8 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color
 
 	// Get obstruction shape
-	obsShape := obsMap[obstruction.Type]
-	if obsShape == 0 {
+	obsShape, ok := obsShapesMap[obstruction.Type]
+	if !ok {
 		log.Printf("Unaccounted for shape found: %s", obstruction.Type)
 	}
 
@@ -107,10 +116,10 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 	// Assign radius based on quantity
 	obsRadius := float32(OBSTRUCTION_BASE_RADIUS / obsNum)
 
-	// If obstruction of type 3: make radius smallers
-	if obsShape == 3 {
+	// If obstruction small pyramid: make radius smaller
+	if obsShape == PyramidSmall {
 		obsRadius /= 2
-		obsShape = 1
+		obsShape = Pyramid
 	}
 
 	x := toWorldLon(obstruction)
@@ -157,7 +166,7 @@ func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
 }
 
-func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, height float32, shape int, radius float32) {
+func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, height float32, shape Shape, radius float32) {
 	xMin := x - radius
 	xMax := x + radius
 	zMin := z - radius
@@ -170,12 +179,12 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 	b3 := builder.addPoint(vec2.T{float32(xMax), float32(zMin)})
 
 	// Unmapped shapes are now pyramids
-	if shape == 10 {
-		shape = 1
+	if shape == Unmapped {
+		shape = Pyramid
 	}
 
 	switch shape {
-	case 1:
+	case Pyramid:
 		// This is a typical pyramid
 		// Custom height for apex points
 		a0 := builder.addVertex(ObstructionVertex{
@@ -188,7 +197,7 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 		builder.addTriangle(a0, b2, b1)
 		builder.addTriangle(a0, b3, b2)
 		builder.addTriangle(a0, b0, b3)
-	case 2:
+	case Building:
 		// This is a rectangular building
 		// Four apex points
 		a0 := builder.addVertex(ObstructionVertex{
@@ -221,7 +230,7 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 		builder.addTriangle(a1, a3, a2)
 		builder.addTriangle(a3, a1, a0)
 	default:
-		log.Printf("Error: got shape type of %d", shape)
+		log.Fatalf("Error: got shape type of %d", shape)
 	}
 }
 

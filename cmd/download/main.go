@@ -360,7 +360,7 @@ func main() {
 	}
 
 	if cfg.useFAA {
-		if err := processor.GenerateObsData(); err != nil {
+		if err := processor.GenerateObstructionData(); err != nil {
 			log.Printf("Failed to download FAA data: %v", err)
 		}
 	}
