@@ -377,11 +377,8 @@ func (sm *StreamManager) handleCameraUpdate(newPos lin.Vec2) {
 
 // periodicUpdate runs maintenance tasks
 func (sm *StreamManager) periodicUpdate() {
-	// Queue missing chunks for loading
 	sm.queueMissingChunks()
-
-	// Check for chunks that need eviction (when memory is getting full)
-	sm.checkMemoryPressure()
+	sm.queueDistantChunksForEviction()
 }
 
 // updateChunkSelection updates which chunks should be loaded
@@ -410,17 +407,6 @@ func (sm *StreamManager) queueMissingChunks() {
 
 		// Queue through WorkerPool
 		sm.workerPool.QueueLoadJob(spec, chunkMapCoord)
-	}
-}
-
-// checkMemoryPressure evicts chunks when memory usage is high
-func (sm *StreamManager) checkMemoryPressure() {
-	stats := sm.bucketAllocator.Stats()
-
-	// If memory usage > 85%, start evicting distant chunks
-	usagePercent := float32(stats.UsedSize) / float32(stats.TotalSize)
-	if usagePercent > 0.85 {
-		sm.queueDistantChunksForEviction()
 	}
 }
 
