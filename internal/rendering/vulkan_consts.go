@@ -44,8 +44,9 @@ type Application struct {
 	planeIndexCount   uint32
 
 	//Airspaces
-	AirspaceStreamer *streaming.DegreeChunkStreamer[*Airspace]
-	airspacePipeline vk.Pipeline
+	AirspaceStreamer        *streaming.DegreeChunkStreamer[*Airspace]
+	airspacePipeline        vk.Pipeline
+	airspaceStencilPipeline vk.Pipeline
 
 	// Roads
 	roadPipeline vk.Pipeline
@@ -93,6 +94,6 @@ var texEnabled = []string{
 }
 
 const (
-	DepthFormat   = vk.FormatD16Unorm
+	DepthFormat   = vk.FormatD24UnormS8Uint
 	TextureFormat = vk.FormatR8g8b8a8Unorm
 )
