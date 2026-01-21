@@ -3,7 +3,7 @@ package camera
 import (
 	"time"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/glfw/v3.4/glfw"
 	lin "github.com/xlab/linmath"
 )
 
@@ -55,6 +55,8 @@ type GPSPosition struct {
 type Camera interface {
 	// Position and orientation
 	Position() lin.Vec3
+	Speed() float32
+	getOrientation() (float64, float64, float64)
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
 	PlaneMatrix(*lin.Mat4x4)

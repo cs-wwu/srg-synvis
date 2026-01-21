@@ -67,6 +67,7 @@ func NewBucketAllocator(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProp
 	if totalMemory == 0 {
 		panic("No device-local heap found")
 	}
+
 	budget := vk.DeviceSize(float64(totalMemory) * 0.5) // safety margin
 	fmt.Printf("Total device-local memory: %.1fMB\n", float32(totalMemory)/(1024*1024))
 	fmt.Printf("Allocated memory budget: %.1fMB\n", float32(budget)/(1024*1024))
@@ -191,28 +192,6 @@ func (a *BucketAllocator) Destroy() {
 		vk.FreeMemory(*a.device, bucket.memory, nil)
 		vk.DestroyBuffer(*a.device, bucket.buffer, nil)
 	}
-}
-
-// Stats returns memory usage statistics.
-func (a *BucketAllocator) Stats() AllocatorStats {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-
-	stats := AllocatorStats{}
-
-	for i := range a.buckets {
-		bucket := &a.buckets[i]
-		bucket.mu.Lock()
-		stats.TotalSize += uint32(bucket.size)
-		allocatedSize := uint32(len(bucket.allocations)) * uint32(bucket.chunkSize)
-		stats.UsedSize += allocatedSize
-		stats.Allocations += len(bucket.allocations)
-		bucket.mu.Unlock()
-	}
-
-	stats.FreeSize = stats.TotalSize - stats.UsedSize
-
-	return stats
 }
 
 // Helper function to create buffer and allocate memory.

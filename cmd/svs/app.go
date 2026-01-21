@@ -6,9 +6,13 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
+	as "github.com/vulkan-go/asche"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/cimgui-go-vulkan/imgui"
+
+	_ "github.com/cs-wwu/srg-synvis/internal/rendering/ui/menus"
+	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )
@@ -177,6 +181,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	for {
 		select {
 		case <-exitC:
+			app.CimguiBackend.Cleanup()
 			app.Destroy()
 			platform.Destroy()
 			window.Destroy()
@@ -198,6 +203,12 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 			if outdated {
 				log.Printf("Failed to acquire next image: (idx: %v, outdated: %v)", imageIdx, outdated)
 			}
+
+			app.CimguiBackend.NewFrame(imageIdx)
+			ui.RenderUI()
+			app.CimguiBackend.RenderFrame(imageIdx)
+			imgui.UpdatePlatformWindows()
+
 			_, err = app.Context().PresentImage(imageIdx)
 			if err != nil {
 				panic(err)
