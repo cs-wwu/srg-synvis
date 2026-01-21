@@ -1,20 +1,25 @@
 package components
 
 import (
+	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/elokore/cimgui-go-vulkan/imgui"
 )
 
+// TODO what other values do we want?
 type SettingBar struct {
 	ui.UIComponent
-	Open      bool
-	DebugMode bool
+	DebugMode      bool
+	DisableFog     bool
+	RenderDistance float32
 }
 
 func NewSettingBar() *SettingBar {
+	var config models.AppConfig
 	return &SettingBar{
-		Open:      false,
-		DebugMode: false,
+		DebugMode:      config.DebugMode,
+		DisableFog:     config.DisableFog,
+		RenderDistance: config.RenderDistance,
 	}
 }
 
@@ -28,61 +33,33 @@ func (bar *SettingBar) Render() {
 		canvasPos.Y-50,
 	))
 
-	// Closed state: small settings button
-	if !bar.Open {
-		imgui.SetNextWindowSize(imgui.NewVec2(100, 40))
-
-		imgui.BeginV(
-			"SettingsButton",
-			nil,
-			imgui.WindowFlagsNoTitleBar|
-				imgui.WindowFlagsNoResize|
-				imgui.WindowFlagsNoMove|
-				imgui.WindowFlagsNoScrollbar,
-		)
-
-		if imgui.Button("Settings") {
-			bar.Open = true
-		}
-
-		imgui.End()
-		return
-	}
-
-	// Open state: settings panel
+	// Open state: settings panel dropdown
 	imgui.SetNextWindowSize(imgui.NewVec2(180, 120))
-
 	imgui.PushStyleColorVec4(
 		imgui.ColWindowBg,
 		imgui.NewVec4(0.1, 0.1, 0.1, 0.9),
 	)
-
 	imgui.BeginV(
 		"SettingsPanel",
 		nil,
 		imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove,
 	)
 
-	// Header row
-	imgui.Text("Settings")
-	imgui.SameLine()
-	if imgui.SmallButton("X") {
-		bar.Open = false
-	}
-
 	imgui.Separator()
 
-	// Debug mode toggle
+	// Setting Options
 	if imgui.Checkbox("Debug Mode", &bar.DebugMode) {
-		// Optional: react immediately when debug mode changes
+		// possibility: react immediately when debug mode changes
 	}
+	imgui.Checkbox("Disable Fog", &bar.DisableFog)
+	imgui.InputFloat("Render Distance", &bar.RenderDistance)
 
-	// Visual indicator
-	if bar.DebugMode {
-		imgui.TextColored(imgui.NewVec4(0, 1, 0, 1), "Debug: ON")
-	} else {
-		imgui.TextColored(imgui.NewVec4(1, 0, 0, 1), "Debug: OFF")
-	}
+	// Text indicator
+	// if bar.DebugMode {
+	// 	imgui.TextColored(imgui.NewVec4(0, 1, 0, 1), "Debug: ON")
+	// } else {
+	// 	imgui.TextColored(imgui.NewVec4(1, 0, 0, 1), "Debug: OFF")
+	// }
 
 	imgui.End()
 	imgui.PopStyleColor()
