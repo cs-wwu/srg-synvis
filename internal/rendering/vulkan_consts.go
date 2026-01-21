@@ -58,7 +58,7 @@ type Application struct {
 
 	ubo UniformBufferObject
 
-	cfg models.AppConfig
+	Cfg models.AppConfig
 
 	camera        camera.Camera
 	StreamManager *StreamManager

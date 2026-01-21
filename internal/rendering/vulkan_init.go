@@ -33,7 +33,7 @@ import (
 // This file is for vulkan initialization
 
 func (app *Application) IsUncappedFPS() bool {
-	return app.cfg.UncapFPS
+	return app.Cfg.UncapFPS
 }
 
 func (app *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
@@ -51,8 +51,8 @@ func (app *Application) VulkanAppName() string {
 
 func (app *Application) VulkanLayers() []string {
 	validationLayers := []string{}
-	if app.cfg.DebugMode {
-		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
+	if app.Cfg.DebugMode {
+	validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
 	} else {
 		log.Println("vulkan: debug mode is off, not using validation layers")
 	}
@@ -90,14 +90,14 @@ func (app *Application) SetSwapchainDimensions(dim *as.SwapchainDimensions) {
 
 func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
-	if app.cfg.DebugMode {
+	if app.Cfg.DebugMode {
 		extensions = append(extensions, "VK_EXT_debug_report")
 	}
 	return extensions
 }
 
 func (app *Application) VulkanPresentMode() vk.PresentMode {
-	if app.cfg.UncapFPS {
+	if app.Cfg.UncapFPS {
 		return vk.PresentModeImmediate
 	}
 	return vk.PresentModeMailbox
@@ -129,17 +129,17 @@ func (app *Application) initUBO() {
 	app.ubo.Model.Identity()
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
-	app.ubo.RenderDistance = app.cfg.RenderDistance
-	log.Printf("vulkan: render distance: %f", app.cfg.RenderDistance)
+	app.ubo.RenderDistance = app.Cfg.RenderDistance
+	log.Printf("vulkan: render distance: %f", app.Cfg.RenderDistance)
 
 	// Fix the logic to match shader expectations
-	if app.cfg.DisableTerrainWarnings {
+	if app.Cfg.DisableTerrainWarnings {
 		app.ubo.DisableWarnings = 1.0 // 1.0 = disabled
 	} else {
 		app.ubo.DisableWarnings = 0.0 // 0.0 = enabled
 	}
 
-	if app.cfg.DisableFog {
+	if app.Cfg.DisableFog {
 		app.ubo.DisableFog = 1.0 // 1.0 = disabled
 		log.Printf("Disabling fog\n")
 	} else {
@@ -171,7 +171,7 @@ func (app *Application) updateUBO() {
 
 		app.camera.PlaneMatrix(&app.ubo.PlaneDirection)
 	} else {
-		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
+		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.Cfg.Fov), aspectRatio, 1.0, app.Cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1
 	}
 	app.ubo.View = app.camera.ViewMatrix()
@@ -1323,7 +1323,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize StreamManager
-	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
+	app.StreamManager = NewStreamManager(&dev, &memProps, app.Cfg)
 	app.StreamManager.UpdateCameraPosition(app.camera.Position())
 	app.StreamManager.Start()
 

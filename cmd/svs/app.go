@@ -175,6 +175,8 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 		frameDelay = time.Millisecond
 	}
 
+	ui.DeliverApp(app)
+
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
 

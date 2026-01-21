@@ -2,6 +2,7 @@ package components
 
 import (
 	"github.com/cs-wwu/srg-synvis/internal/models"
+	"github.com/cs-wwu/srg-synvis/internal/rendering"
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/elokore/cimgui-go-vulkan/imgui"
 )
@@ -12,6 +13,7 @@ type SettingBar struct {
 	DebugMode      bool
 	DisableFog     bool
 	RenderDistance float32
+	app *rendering.Application
 }
 
 func NewSettingBar() *SettingBar {
@@ -20,7 +22,15 @@ func NewSettingBar() *SettingBar {
 		DebugMode:      config.DebugMode,
 		DisableFog:     config.DisableFog,
 		RenderDistance: config.RenderDistance,
+		app: nil,
 	}
+}
+
+func (bar *SettingBar) UpdateSettingBar(app *rendering.Application) {
+	bar.app = app
+	bar.DebugMode = app.Cfg.DebugMode
+	bar.DisableFog = app.Cfg.DisableFog
+	bar.RenderDistance = app.Cfg.RenderDistance
 }
 
 // Called every frame
@@ -49,10 +59,14 @@ func (bar *SettingBar) Render() {
 
 	// Setting Options
 	if imgui.Checkbox("Debug Mode", &bar.DebugMode) {
-		// possibility: react immediately when debug mode changes
+		bar.app.Cfg.DebugMode = bar.DebugMode
 	}
-	imgui.Checkbox("Disable Fog", &bar.DisableFog)
-	imgui.InputFloat("Render Distance", &bar.RenderDistance)
+	if imgui.Checkbox("Disable Fog", &bar.DisableFog) {
+		bar.app.Cfg.DisableFog = bar.DisableFog
+	}
+	if imgui.InputFloat("Render Distance", &bar.RenderDistance) {
+		bar.app.Cfg.RenderDistance = bar.RenderDistance
+	}
 
 	// Text indicator
 	// if bar.DebugMode {

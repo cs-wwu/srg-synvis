@@ -1,6 +1,7 @@
 package menus
 
 import (
+	"github.com/cs-wwu/srg-synvis/internal/rendering"
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui/components"
 )
@@ -21,6 +22,10 @@ func NewFlightInstruments() *FlightInstruments {
 func (window *FlightInstruments) Render() {
 	window.Gauge.Render()
 	window.Bar.Render()
+}
+
+func (window *FlightInstruments) UseApp(app *rendering.Application) {
+	window.Bar.UpdateSettingBar(app)
 }
 
 func init() {

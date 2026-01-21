@@ -20,32 +20,32 @@ import (
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication(cfg models.AppConfig) *Application {
+func NewApplication(Cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:    cfg.CameraStartPos,
-		StartDir:    cfg.CameraStartDir,
-		EnableGPS:   cfg.UseGPS,
-		EnableHat:   cfg.UseHat,
+		StartPos:    Cfg.CameraStartPos,
+		StartDir:    Cfg.CameraStartDir,
+		EnableGPS:   Cfg.UseGPS,
+		EnableHat:   Cfg.UseHat,
 		DecimalYear: time.Now(),
 	}
 	cam := camera.NewCamera(cameraConfig)
 
 	// Enable hardware if needed (moved here for cleaner initialization)
-	if cfg.UseHat {
+	if Cfg.UseHat {
 		if err := cam.EnableSensors("./internal/camera/hat.py"); err != nil {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
 	app := &Application{
 		camera:       cam,
-		Gps:          cfg.UseGPS,
-		Hat:          cfg.UseHat,
-		cfg:          cfg,
+		Gps:          Cfg.UseGPS,
+		Hat:          Cfg.UseHat,
+		Cfg:          Cfg,
 		statsTracker: NewStatsTracker(1000, 5*time.Second),
 	}
 
-	if cfg.BenchmarkMode {
+	if Cfg.BenchmarkMode {
 		app.statsTracker.Enable()
 	}
 
@@ -117,7 +117,7 @@ func (app *Application) NextFrame() {
 	app.camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
-		app.cfg.DebugMode,                 // validation layers
+		app.Cfg.DebugMode,                 // validation layers
 		app.Context().PresentModeString(), // or get from present mode
 		3,                                 // frame lag
 	)
