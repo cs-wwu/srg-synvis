@@ -11,7 +11,7 @@ require (
 )
 
 require (
-	github.com/elokore/cimgui-go-vulkan v0.0.0-20251227031838-f36a9dc5c55c
+	github.com/elokore/cimgui-go-vulkan v0.0.0-20260121015643-83ae24cbf143
 	github.com/stratoberry/go-gpsd v1.3.0
 	github.com/ungerik/go3d v0.0.0-20240502073936-1137f6adf7e9
 	github.com/vulkan-go/asche v0.0.0-20190912134304-d4b318b67e07
