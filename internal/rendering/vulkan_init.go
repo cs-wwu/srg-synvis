@@ -11,8 +11,9 @@ import (
 	"log"
 	"math"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strconv"
-	"time"
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
@@ -577,6 +578,10 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 
 	for _, obstruction := range obstructionSquare.Obstructions {
 		buildObstruction(builder, obstruction)
+	}
+
+	if len(builder.vertices) == 0 || len(builder.indices) == 0 || len(obstructionSquare.Obstructions) == 0 {
+		return nil
 	}
 
 	vertices := as.CreateBuffer(
@@ -1385,8 +1390,9 @@ func (app *Application) preparePipeline() {
 	}}
 	pipeline := make([]vk.Pipeline, 1)
 	// TODO: When obstructions and roads are rendered simultaneously, program occasionally crashes at this stage
-	// Temporary fix: sleep for 15 m/s. In future this should actually be fixed
-	time.Sleep(150000000)
+	// Temporary fix: garbage collect and free memory
+	runtime.GC()
+	debug.FreeOSMemory()
 	ret = vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, pipelineCreateInfos, nil, pipeline)
 	OrPanic(as.NewError(ret))
 	app.pipeline = pipeline[0]

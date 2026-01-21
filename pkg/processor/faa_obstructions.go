@@ -39,6 +39,8 @@ const (
 
 	obsStart = 62
 	obsEnd   = 81
+	qtyStart = 81
+	qtyEnd   = 82
 	hgtStart = 84
 	hgtEnd   = 89
 	eleStart = 90
@@ -96,7 +98,7 @@ func parseDOFFile(filePath string, squareBuffers map[string]*ObsSquare) error {
 		lonHem := strings.TrimSpace(line[lonSecEnd : lonSecEnd+1])
 
 		obsType := strings.TrimSpace(line[obsStart:obsEnd])
-		quantity := strings.TrimSpace(line[81:82])
+		quantity := strings.TrimSpace(line[qtyStart:qtyEnd])
 
 		heightStr := strings.TrimSpace(line[hgtStart:hgtEnd])
 		eleStr := strings.TrimSpace(line[eleStart:eleEnd])
