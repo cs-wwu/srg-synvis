@@ -34,6 +34,11 @@ go.work
 # Vulkan out file
 experimemtal/vulkan/shape/VulkanTest
 
+#Imgui Build
+/imgui-build
+internal/rendering/ui/build
+imgui.ini
+pkg/imgui
 # Environment file
 .env
 
