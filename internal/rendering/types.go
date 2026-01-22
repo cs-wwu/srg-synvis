@@ -3,8 +3,8 @@ package rendering
 import (
 	"unsafe"
 
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"github.com/ungerik/go3d/vec3"
+	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )

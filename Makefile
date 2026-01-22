@@ -43,4 +43,3 @@ help:
 	@echo "  help       - Show this help message"
 
 .PHONY: all shaders clean run build-run help
-
