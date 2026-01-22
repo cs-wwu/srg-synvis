@@ -17,6 +17,7 @@ const (
 
 type RectangleGauge struct {
 	ui.UIComponent
+	Label         string
 	Value         float32
 	MeterRange    float32
 	Interval      float32
@@ -24,8 +25,9 @@ type RectangleGauge struct {
 	DashSide      DashSide
 }
 
-func NewRectangleGauge() *RectangleGauge {
+func NewRectangleGauge(label string) *RectangleGauge {
 	return &RectangleGauge{
+		Label:         label,
 		Value:         0.0,
 		MeterRange:    500,
 		Interval:      20,
@@ -42,7 +44,7 @@ func (gauge *RectangleGauge) Render() {
 
 	imgui.SetNextWindowSize(window_size)
 	imgui.PushStyleColorVec4(imgui.ColWindowBg, imgui.NewVec4(0.5, 0.5, 0.5, 0.6))
-	imgui.BeginV("RectangleGauge", nil, imgui.WindowFlagsNoTitleBar|imgui.WindowFlagsNoResize)
+	imgui.BeginV(gauge.Label, nil, imgui.WindowFlagsNoTitleBar|imgui.WindowFlagsNoResize)
 
 	canvas_pos := imgui.WindowPos()
 	value_at_top := gauge.Value + value_per_pixel*half_height
@@ -162,8 +164,8 @@ func (gauge *RectangleGauge) Render() {
 	imgui.SetNextWindowPos(imgui.NewVec2(canvas_pos.X, canvas_pos.Y+window_size.Y))
 	imgui.PushStyleColorVec4(imgui.ColWindowBg, imgui.NewVec4(0.5, 0.5, 0.5, 0.6))
 
-	imgui.BeginV("TitleWindow", nil, label_window_flags)
-	imgui.TextWrapped("Altitude (Ft)")
+	imgui.BeginV(gauge.Label+"TitleWindow", nil, label_window_flags)
+	imgui.TextWrapped(gauge.Label)
 	imgui.End()
 	imgui.PopStyleColor()
 

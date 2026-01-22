@@ -95,6 +95,10 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
+func (app *Application) GetCamera() camera.Camera {
+	return app.camera
+}
+
 func (app *Application) NextFrame() {
 	app.statsTracker.StartFrame()
 

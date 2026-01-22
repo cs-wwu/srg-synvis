@@ -9,19 +9,22 @@ import (
 type FlightInstruments struct {
 	ui.UIComponent
 	Gauge *components.RectangleGauge
+	app   *rendering.Application
 }
 
 func NewFlightInstruments() *FlightInstruments {
 	return &FlightInstruments{
-		Gauge: components.NewRectangleGauge(),
+		Gauge: components.NewRectangleGauge("Altitude (m)"),
 	}
 }
 
 func (window *FlightInstruments) Render() {
+	window.Gauge.Value = window.app.GetCamera().Position()[1]
 	window.Gauge.Render()
 }
 
 func (window *FlightInstruments) UseApp(app *rendering.Application) {
+	window.app = app
 }
 
 func init() {
