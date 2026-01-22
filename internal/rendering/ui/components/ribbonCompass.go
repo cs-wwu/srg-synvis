@@ -42,11 +42,11 @@ func map_to_360_range(x float32) float32 {
 
 func (compass *RibbonCompass) Render() {
 	windowFlags := imgui.WindowFlagsNoTitleBar | imgui.WindowFlagsNoResize
-	windowSize := compass.Size.ToAbsoluteSize()
+	windowSize := compass.Size.ToSize()
 	var halfWidth float32 = windowSize.X / 2
 	var degreesPerPixel float32 = compass.DisplayRange / windowSize.X
 
-	imgui.SetNextWindowPos(compass.Position.ToAbsolutePosition())
+	imgui.SetNextWindowPos(compass.Position.ToPosWithAnchor(compass.AnchorPoint, &compass.Size))
 	imgui.SetNextWindowSize(windowSize)
 	imgui.PushStyleColorVec4(imgui.ColWindowBg, imgui.NewVec4(0.5, 0.5, 0.5, 0.6))
 	imgui.BeginV("RibbonCompass", nil, windowFlags)
