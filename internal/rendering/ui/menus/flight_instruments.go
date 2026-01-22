@@ -16,7 +16,7 @@ type FlightInstruments struct {
 func NewFlightInstruments() *FlightInstruments {
 	return &FlightInstruments{
 		Gauge:   components.NewRectangleGauge("Altitude (m)"),
-		Compass: components.NewRibbonCompass(),
+		Compass: components.NewRibbonCompass(*ui.UDimFromScale(0.5, 0.5), *ui.UDimFromPixels(300, 45)),
 	}
 }
 

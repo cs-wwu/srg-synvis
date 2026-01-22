@@ -11,14 +11,20 @@ import (
 
 type RibbonCompass struct {
 	ui.UIComponent
+	AnchorPoint         imgui.Vec2
+	Position            ui.UDim
+	Size                ui.UDim
 	HeadingDegrees      float32
 	DegreeInterval      float32
 	DegreeMajorInterval float32
 	DisplayRange        float32
 }
 
-func NewRibbonCompass() *RibbonCompass {
+func NewRibbonCompass(position ui.UDim, size ui.UDim) *RibbonCompass {
 	return &RibbonCompass{
+		AnchorPoint:         imgui.NewVec2(0.5, 0.5),
+		Position:            position,
+		Size:                size,
 		HeadingDegrees:      0.0,
 		DegreeInterval:      5,
 		DegreeMajorInterval: 10,
@@ -36,11 +42,11 @@ func map_to_360_range(x float32) float32 {
 
 func (compass *RibbonCompass) Render() {
 	windowFlags := imgui.WindowFlagsNoTitleBar | imgui.WindowFlagsNoResize
-	windowSize := imgui.NewVec2(300, 45)
+	windowSize := compass.Size.ToAbsoluteSize()
 	var halfWidth float32 = windowSize.X / 2
 	var degreesPerPixel float32 = compass.DisplayRange / windowSize.X
 
-	//imgui.SetNextWindowPos(imgui.NewVec2(200, 200))
+	imgui.SetNextWindowPos(compass.Position.ToAbsolutePosition())
 	imgui.SetNextWindowSize(windowSize)
 	imgui.PushStyleColorVec4(imgui.ColWindowBg, imgui.NewVec4(0.5, 0.5, 0.5, 0.6))
 	imgui.BeginV("RibbonCompass", nil, windowFlags)
