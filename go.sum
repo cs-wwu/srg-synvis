@@ -1,15 +1,5 @@
-github.com/elokore/cimgui-go-vulkan v0.0.0-20251224102619-f417eab72b92 h1:xXck7Ji1GpW5HhjqevreFTTbJ1dgWpqv4jxs1PWsqnQ=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20251224102619-f417eab72b92/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
 github.com/elokore/cimgui-go-vulkan v0.0.0-20251227031838-f36a9dc5c55c h1:rb1zcbXJR7Abepuhu4hsqp4f9WPHloAUclQAf9Bkphg=
 github.com/elokore/cimgui-go-vulkan v0.0.0-20251227031838-f36a9dc5c55c/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260120185924-0503bfe2170c h1:30HpT2yhJ6FquUURW565HR7BJcaAdfhixkB0p9c9m+Y=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260120185924-0503bfe2170c/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121002552-b920eff62a32 h1:GB/toA79995mJAfW4hmjNQkczuOwT6aXUuXlQhWm3P4=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121002552-b920eff62a32/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121005802-0873cee834e2 h1:eyJncUpopiECKbnUWjSci3s9kcgVZfU6o34z6ajlbnE=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121005802-0873cee834e2/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121015643-83ae24cbf143 h1:LuhtV/ZvpOBqEM4qMoCp2udrsgH9rA/giBMncFAOaOE=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121015643-83ae24cbf143/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
 github.com/elokore/glfw/v3.4/glfw v0.0.0-20251221231958-c1dc85df2170 h1:8erI7Buk8dSAVxBmQxiTnJDESbIoEesxEN8ZzjZcOE0=
 github.com/elokore/glfw/v3.4/glfw v0.0.0-20251221231958-c1dc85df2170/go.mod h1:uDdZ02tbI9khxEJbHKBCgnCgbe6Wxjjf5oG9eQjvFRw=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
@@ -30,10 +20,6 @@ github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40 h1:FmU7+0eD5GaZzxlbNx
 github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40/go.mod h1:W1rLjlRa7JX2fcoZ4tb3ZkxuwI6pEX/JkDLPxe1/R1g=
 golang.org/x/net v0.42.0 h1:jzkYrhi3YQWD6MLBJcsklgQsoAcw89EcZbJw8Z614hs=
 golang.org/x/net v0.42.0/go.mod h1:FF1RA5d3u7nAYA4z2TkclSCKh68eSXtiFwcWQpPXdt8=
-golang.org/x/sys v0.36.0 h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=
-golang.org/x/sys v0.36.0/go.mod h1:OgkHotnGiDImocRcuBABYBEXf8A9a87e/uXjp9XT3ks=
-golang.org/x/term v0.33.0 h1:NuFncQrRcaRvVmgRkvM3j/F00gWIAlcmlB8ACEKmGIg=
-golang.org/x/term v0.33.0/go.mod h1:s18+ql9tYWp1IfpV9DmCtQDDSRBUjKaw9M1eAv5UeF0=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 google.golang.org/protobuf v1.33.0 h1:uNO2rsAINq/JlFpSdYEKIZ0uKD/R9cpdv0T+yoGwGmI=
