@@ -5,8 +5,9 @@ import (
 	"math"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	"github.com/ungerik/go3d/vec3"
 	vk "github.com/vulkan-go/vulkan"
-	lin "github.com/xlab/linmath"
 )
 
 const (
@@ -47,9 +48,9 @@ func newHeightInfo(data []uint16) *HeightInfo {
 	}
 }
 
-func (h *HeightInfo) Height(x, z float32) float32 {
-	localX := math.Mod(math.Mod(float64(x), 3600)+3600, 3600)
-	localZ := math.Mod(math.Mod(float64(z), 3600)+3600, 3600)
+func (h *HeightInfo) Height(x, z float64) float64 {
+	localX := math.Mod(math.Mod(x, 3600)+3600, 3600)
+	localZ := math.Mod(math.Mod(z, 3600)+3600, 3600)
 
 	a := h.getLocal(int(localX), int(localZ))
 	b := h.getLocal(int(localX+1), int(localZ))
@@ -62,18 +63,18 @@ func (h *HeightInfo) Height(x, z float32) float32 {
 	return lerp(lerp(a, b, fractX), lerp(c, d, fractX), fractZ)
 }
 
-func lerp(a, b float32, t float64) float32 {
-	return a + (b-a)*float32(t)
+func lerp(a, b float64, t float64) float64 {
+	return a + (b-a)*t
 }
 
-func (h *HeightInfo) getLocal(x, z int) float32 {
+func (h *HeightInfo) getLocal(x, z int) float64 {
 	if (x < 0 || x >= MAP_LENGTH) || (z < 0 || z >= MAP_LENGTH) {
 		return 0.0
 	}
 
 	value := h.heightData[z*MAP_LENGTH+x]
 	// normalize from 0-65535 to -32768 to 32767
-	return float32(int(value)-32768) * HEIGHT_SCALE
+	return float64(int(value)-32768) * HEIGHT_SCALE
 }
 
 // Loads a specific chunk into memory, x and z are the upper-left corner of
@@ -116,8 +117,8 @@ func CalculateChunkVertices(heightInfo *HeightInfo, waterData []uint8, chunk *Ch
 
 			idx := z*verticesPerSide + x
 			chunk.Vertices[idx] = Vertex{
-				Position: lin.Vec3{float32(worldX), height, float32(worldZ)},
-				TexCoord: lin.Vec3{
+				Position: dvec3.T{float64(worldX), height, float64(worldZ)},
+				TexCoord: vec3.T{
 					float32(localX) / float32(MAP_LENGTH),
 					float32(localZ) / float32(MAP_LENGTH),
 					float32(isWater),
@@ -171,15 +172,26 @@ func CalculateChunkNormals(chunk *Chunk) {
 	for z := range verticesPerSide - 1 {
 		for x := range verticesPerSide - 1 {
 			idx := z*verticesPerSide + x
-			current := chunk.Vertices[idx].Position
-			right := chunk.Vertices[idx+1].Position
-			down := chunk.Vertices[idx+verticesPerSide].Position
+			current := vec3.T{
+				float32(chunk.Vertices[idx].Position[0]),
+				float32(chunk.Vertices[idx].Position[1]),
+				float32(chunk.Vertices[idx].Position[2]),
+			}
+			right := vec3.T{
+				float32(chunk.Vertices[idx+1].Position[0]),
+				float32(chunk.Vertices[idx+1].Position[1]),
+				float32(chunk.Vertices[idx+1].Position[2]),
+			}
+			down := vec3.T{
+				float32(chunk.Vertices[idx+verticesPerSide].Position[0]),
+				float32(chunk.Vertices[idx+verticesPerSide].Position[1]),
+				float32(chunk.Vertices[idx+verticesPerSide].Position[2]),
+			}
 
-			var normal, a, b lin.Vec3
-			a.Sub(&down, &current)
-			b.Sub(&right, &current)
-			normal.MultCross(&a, &b)
-			normal.Norm(&normal)
+			down.Sub(&current)
+			right.Sub(&current)
+			normal := vec3.Cross(&down, &right)
+			normal.Normalize()
 
 			chunk.Vertices[idx].Normal = normal
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -327,8 +328,8 @@ func (sm *StreamManager) IsRunning() bool {
 }
 
 // UpdateCameraPosition updates the camera position (non-blocking)
-func (sm *StreamManager) UpdateCameraPosition(pos lin.Vec3) {
-	newCameraPos := lin.Vec2{pos[0], pos[2]}
+func (sm *StreamManager) UpdateCameraPosition(pos dvec3.T) {
+	newCameraPos := lin.Vec2{float32(pos[0]), float32(pos[2])}
 
 	// Non-blocking send to channel
 	select {
@@ -390,7 +391,7 @@ func (sm *StreamManager) updateChunkSelection() {
 	near := float32(1.0)
 	frustum := spatial.NewFrustumFromCamera(
 		sm.lastCameraPos,
-		sm.cfg.CameraStartDir[1],
+		float32(sm.cfg.CameraStartDir[1]),
 		sm.cfg.Fov,
 		near,
 		sm.cfg.RenderDistance,

@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
-	lin "github.com/xlab/linmath"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 )
 
 const (
@@ -65,9 +65,9 @@ func parseConfig() models.AppConfig {
 	return config
 }
 
-func parsePosition(posString string) lin.Vec3 {
+func parsePosition(posString string) dvec3.T {
 	// Default position
-	pos := lin.Vec3{-441970, 700, -171900}
+	pos := dvec3.T{-441970, 700, -171900}
 
 	parts := strings.Split(posString, ",")
 	if len(parts) != 3 {
@@ -87,16 +87,16 @@ func parsePosition(posString string) lin.Vec3 {
 	log.Printf("Starting position: lat=%v, lon=%v, height=%v", lat, lon, height)
 
 	// Convert to arcseconds (Vulkan logic)
-	return lin.Vec3{
-		float32(lon * ARC_DEGREES_TO_SECONDS),             // longitude to arcseconds
-		float32(height * (ARC_DEGREES_TO_MINUTES / 1852)), // meters to arcseconds
-		float32(-lat * ARC_DEGREES_TO_SECONDS),            // latitude to arcseconds (flipped for vulkan coords)
+	return dvec3.T{
+		lon * ARC_DEGREES_TO_SECONDS,             // longitude to arcseconds
+		height * (ARC_DEGREES_TO_MINUTES / 1852), // meters to arcseconds
+		-lat * ARC_DEGREES_TO_SECONDS,            // latitude to arcseconds (flipped for vulkan coords)
 	}
 }
 
-func parseDirection(dirString string) lin.Vec3 {
+func parseDirection(dirString string) dvec3.T {
 	// Default direction (looking forward)
-	dir := lin.Vec3{0, 0, -1}
+	dir := dvec3.T{0, 0, -1}
 
 	parts := strings.Split(dirString, ",")
 	if len(parts) != 3 {
@@ -114,10 +114,10 @@ func parseDirection(dirString string) lin.Vec3 {
 	}
 
 	// Create and normalize the direction vector
-	parsedDir := lin.Vec3{float32(x), float32(y), float32(z)}
+	parsedDir := dvec3.T{x, y, z}
 
 	// Check for zero vector
-	length := float32(math.Sqrt(float64(parsedDir[0]*parsedDir[0] + parsedDir[1]*parsedDir[1] + parsedDir[2]*parsedDir[2])))
+	length := math.Sqrt(float64(parsedDir[0]*parsedDir[0] + parsedDir[1]*parsedDir[1] + parsedDir[2]*parsedDir[2]))
 	if length < 0.001 {
 		log.Printf("Warning: Direction vector too small '%s', using default direction", dirString)
 		return dir
