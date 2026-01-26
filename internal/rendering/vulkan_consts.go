@@ -46,6 +46,9 @@ type Application struct {
 	// Roads
 	roadPipeline vk.Pipeline
 
+	// Obstructions
+	obstructionPipeline vk.Pipeline
+
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
 	skyboxVertexBuffer vk.Buffer
@@ -66,6 +69,8 @@ type Application struct {
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
 	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
+
+	ObstructionStreamer *streaming.DegreeChunkStreamer[*ObstructionSquare]
 
 	Gps bool
 	Hat bool
