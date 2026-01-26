@@ -612,7 +612,7 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 
 func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspace/" + mapPos + ".geojson"
+	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
 
 	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
@@ -636,12 +636,6 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	builder := newAirspaceBuilder(heightInfo)
 
 	instances := make([]AirspaceInstance, len(geojson.Features))
-
-	airspaceColors := map[string][4]float32{
-		"B": {0.0, 0.0, 0.5, 0.3},
-		"C": {0.8, 0.0, 0.8, 0.3},
-		"D": {0.0, 0.0, 1.0, 0.25},
-	}
 
 	for i, airspace := range geojson.Features {
 		renderAirspace(builder, airspace, airspaceColors[airspace.Properties.Class])

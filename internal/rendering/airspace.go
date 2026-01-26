@@ -1,12 +1,6 @@
 package rendering
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
-	"math"
-	"os"
-	"path/filepath"
 	"unsafe"
 
 	as "github.com/vulkan-go/asche"
@@ -149,100 +143,4 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		builder.addTriangle(bottomIds[i], topIds[i], bottomIds[nextI])
 		builder.addTriangle(topIds[i], topIds[nextI], bottomIds[nextI])
 	}
-}
-
-func ChunkGeoJson(inputFile string) {
-	fileData, err := FileToBytesChecked(inputFile)
-	if err != nil {
-		log.Printf("ChunkGeoJson: error opening GeoJson file %s: %v", inputFile, err)
-		return
-	}
-	var geojson FeatureCollection
-	err = json.Unmarshal(fileData, &geojson)
-	if err != nil {
-		log.Printf("ChunkGeoJson: error unmarshaling GeoJson file %s: %v", inputFile, err)
-		return
-	}
-	dataDir := filepath.Join(outDir, "data")
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		log.Printf("error creating output directory: %v", err)
-		return
-	}
-	features := geojson.Features
-	for _, feature := range features {
-		avgLat, avgLon := determineChunk(feature.Geometry)
-		chunkFileName := fmt.Sprintf("%s%v%s%v.geojson", "n", math.Abs(float64(avgLat)), "w", math.Abs(float64(avgLon)))
-		chunkFilePath := filepath.Join(dataDir, chunkFileName)
-		var fc FeatureCollection
-		if _, err := os.Stat(chunkFilePath); os.IsNotExist(err) {
-			fc = FeatureCollection{
-				Type:     "FeatureCollection",
-				Features: []Feature{},
-			}
-			fmt.Printf("Creating new file: %s\n", chunkFilePath)
-		} else {
-			data, err := os.ReadFile(chunkFilePath)
-			if err != nil {
-				log.Printf("cannot read existing file %s: %v", chunkFilePath, err)
-				continue
-			}
-			if err := json.Unmarshal(data, &fc); err != nil {
-				log.Printf("cannot unmarshal existing file %s: %v", chunkFilePath, err)
-				log.Printf("File content preview: %s", string(data[:min(200, len(data))]))
-				continue
-			}
-			fmt.Printf("Appending to existing file: %s\n", chunkFilePath)
-		}
-		if !containsFeature(&fc, feature) {
-			fc.Features = append(fc.Features, feature)
-			fmt.Printf("  Added feature: %s (total: %d)\n",
-				feature.Properties.Name, len(fc.Features))
-		} else {
-			fmt.Printf("  Feature already exists: %s\n", feature.Properties.Name)
-		}
-		outData, err := json.MarshalIndent(fc, "", "  ")
-		if err != nil {
-			log.Printf("cannot marshal FeatureCollection: %v", err)
-			continue
-		}
-		if err := os.WriteFile(chunkFilePath, outData, 0644); err != nil {
-			log.Printf("cannot write to file %s: %v", chunkFilePath, err)
-			continue
-		}
-	}
-}
-
-func containsFeature(fc *FeatureCollection, f Feature) bool {
-	for _, existing := range fc.Features {
-		if existing.Properties.GlobalId == f.Properties.GlobalId {
-			return true
-		}
-	}
-	return false
-}
-
-func determineChunk(coords Geometry) (lat, lon int) {
-	if len(coords.Coordinates) == 0 || len(coords.Coordinates[0]) == 0 {
-		return 0, 0
-	}
-	outerRing := coords.Coordinates[0]
-	n := len(outerRing)
-	// Skip the last point if it's a closed ring (first == last)
-	if n > 1 && outerRing[0][0] == outerRing[n-1][0] &&
-		outerRing[0][1] == outerRing[n-1][1] {
-		n = n - 1
-	}
-	if n == 0 {
-		return 0, 0
-	}
-	latTotal := 0.0
-	lonTotal := 0.0
-	for i := 0; i < n; i++ {
-		// GeoJSON is [longitude, latitude, altitude]
-		lonTotal += outerRing[i][0]
-		latTotal += outerRing[i][1]
-	}
-	// Return as integers (floor)
-	return int(math.Floor(latTotal / float64(n))),
-		int(math.Floor(lonTotal / float64(n)))
 }
