@@ -9,6 +9,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	dmat4 "github.com/ungerik/go3d/float64/mat4"
 	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	lin "github.com/xlab/linmath"
 )
 
 // CameraImpl implements the Camera interface
@@ -20,12 +21,12 @@ type CameraImpl struct {
 	right dvec3.T // Right direction of the Camera
 
 	// Camera parameters
-	speed       float32 // Camera speed
-	sensitivity float32 // Camera sensitivity
+	speed       float64 // Camera speed
+	sensitivity float64 // Camera sensitivity
 
 	// Motion parameters
-	prevPos    *lin.Vec3
-	planePitch float32 // Pitch angle of the plane based on movement
+	prevPos    dvec3.T
+	planePitch float64 // Pitch angle of the plane based on movement
 
 	// Orientation tracking (for sensors)
 	pitch float64 // Pitch relative to start
@@ -47,7 +48,7 @@ type CameraImpl struct {
 	northButtonPressed bool
 
 	prevPosTime time.Time
-	smoothedVel lin.Vec3
+	smoothedVel dvec3.T
 }
 
 var (
@@ -56,36 +57,41 @@ var (
 	// The direction facing upwards on the screen in the map view.
 	MAP_NORTH = dvec3.T{0.0, 0.0, 1.0}
 	// Distance above the plane to be in the map view.
-<<<<<<< HEAD
-	MAP_OFFSET = float32(10.0)
-	// Threshold for camera movement to actually update viewport
-	ROTATION_THRESHOLD = float32(1e-3)
-	// Smoothing for above rotation threshold
-	ROTATION_DAMPING = float32(0.075)
-=======
 	MAP_OFFSET = 10.0
->>>>>>> origin/use-float64
+	// Threshold for camera movement to actually update viewport
+	ROTATION_THRESHOLD = float64(1e-3)
+	// Smoothing for above rotation threshold
+	ROTATION_DAMPING = float64(0.075)
 )
+
+func dvec3FromLinVec3(v *lin.Vec3) dvec3.T {
+	converted := dvec3.T{
+		float64((*v)[0]),
+		float64((*v)[1]),
+		float64((*v)[2]),
+	}
+	return converted
+}
 
 // NewCamera creates and initializes a new Camera
 func NewCamera(config CameraConfig) Camera {
 	// Initialize position and direction vectors
-	pos := config.StartPos
+	pos := dvec3FromLinVec3(&config.StartPos)
 
 	// Calculate initial vectors based on start direction
-	front := config.StartDir
+	front := dvec3FromLinVec3(&config.StartDir)
 	front.Normalize()
 
-	right := dvec3.Cross(&front, &START_CAMERA_UP)
+	camStartUp := dvec3FromLinVec3(&START_CAMERA_UP)
+	right := dvec3.Cross(&front, &camStartUp)
 	right.Normalize()
 
 	up := dvec3.Cross(&right, &front)
 	up.Normalize()
 
 	// Set defaults if not provided
-	speed := CAMERA_SPEED
-
-	sensitivity := LOOK_SENSITIVITY
+	speed := float64(CAMERA_SPEED)
+	sensitivity := float64(LOOK_SENSITIVITY)
 
 	// Create camera instance
 	camera := &CameraImpl{
@@ -124,21 +130,12 @@ func (c *CameraImpl) MapView() bool {
 }
 
 // ViewMatrix returns the camera's view matrix
-func (c *CameraImpl) ViewMatrix() dmat4.T {
+func (c *CameraImpl) ViewMatrix() (result dmat4.T) {
 	if c.mapView {
-<<<<<<< HEAD
-		// your existing map view code
-		up := lin.Vec3{}
-		up.Scale(&MAP_UP, MAP_OFFSET)
-		eye := *c.pos
-		eye.Add(c.pos, &up)
-=======
 		up := MAP_UP
 		up.Scale(MAP_OFFSET)
 		eye := c.pos
 		eye.Add(&up)
->>>>>>> origin/use-float64
-
 		forward := dvec3.T{}
 		if c.northView {
 			forward = MAP_NORTH
@@ -148,38 +145,13 @@ func (c *CameraImpl) ViewMatrix() dmat4.T {
 			forward[1] = -forward[1]
 			forward[2] = -forward[2]
 		}
-
-		return LookAt(&eye, &c.pos, &forward)
+		result = LookAt(&eye, &c.pos, &forward)
 	} else {
-<<<<<<< HEAD
-		// base horizontal direction from camera front
-		base := lin.Vec3{c.front[0], 0, c.front[2]}
-		if base[0]*base[0]+base[2]*base[2] < 1e-8 {
-			base = lin.Vec3{0, 0, 1}
-		}
-		base.Norm(&base)
-
-		// apply planePitch: nose up/down
-		cosP := float32(math.Cos(float64(c.planePitch)))
-		sinP := float32(math.Sin(float64(c.planePitch)))
-
-		dir := lin.Vec3{
-			base[0] * cosP, // keep horizontal X scaled by cos(pitch)
-			sinP,           // vertical component from pitch
-			base[2] * cosP, // keep horizontal Z scaled by cos(pitch)
-		}
-
-		target := lin.Vec3{}
-		target.Add(c.pos, &dir)
-
-		worldUp := lin.Vec3{0, 1, 0}
-		result.LookAt(c.pos, &target, &worldUp)
-=======
 		target := c.pos
 		target.Add(&c.front)
 		return LookAt(&c.pos, &target, &c.up)
->>>>>>> origin/use-float64
 	}
+	return
 }
 
 func LookAt(eye, target, up *dvec3.T) dmat4.T {
@@ -219,13 +191,8 @@ func (c *CameraImpl) PlaneMatrix(result *dmat4.T) {
 	result.AssignEulerRotation(math.Pi/2, 0, 0)
 
 	// Scale the plane up
-<<<<<<< HEAD
-	scale := float32(5)
-	result.Mult(result, &lin.Mat4x4{
-=======
 	scale := 5.0
 	result.AssignMul(result, &dmat4.T{
->>>>>>> origin/use-float64
 		{scale, 0, 0, 0},
 		{0, scale, 0, 0},
 		{0, 0, scale, 0},
@@ -244,18 +211,9 @@ func (c *CameraImpl) PlaneMatrix(result *dmat4.T) {
 	} else {
 		forward = MAP_NORTH
 	}
-
-<<<<<<< HEAD
-	lookAt := lin.Mat4x4{}
-	lookAt.LookAt(&lin.Vec3{0, 0, 0}, &forward, &lin.Vec3{0, 1, 0})
-	tmp := lin.Mat4x4{}
-	tmp.Transpose(&lookAt)
-	result.Mult(result, &tmp)
-=======
 	lookAt := LookAt(&dvec3.T{0, 0, 0}, &forward, &c.up)
 	lookAt.Transpose()
 	result.AssignMul(result, &lookAt)
->>>>>>> origin/use-float64
 }
 
 // SetPosition sets the camera position
@@ -291,94 +249,87 @@ func (c *CameraImpl) Update() {
 		return
 	}
 
-	elapsed := float32(time.Since(sm.splineStartTime).Seconds())
+	elapsed := time.Since(sm.splineStartTime).Seconds()
 	t := elapsed / sm.averageGPSInterval
 
-	var newPos lin.Vec3
+	var newPos dvec3.T
 	if t < 1.0 {
 		pos := mh.CentCatmullRom(t, sm.currentSplineData)
-		newPos = *pos
+		newPos = pos
 	} else {
-		// Dead reckon from p2
+		// TODO this is not even dead reckoning yet
 		dt := elapsed - sm.averageGPSInterval
-		var delta lin.Vec3
-		delta.Scale(sm.currentVelocity, dt)
-		newPos.Add(sm.currentSplineData.p2, &delta)
+		delta :=
+			newPos.Add(sm.currentSplineData.p2, delta)
 	}
-
 	c.updatePosition(newPos[0], newPos[2], newPos[1])
 
-	// Update the forward vector of the camera/eye
+	// Update the forward vector of the camera
 	cur := c.Position()
 	if c.prevPos == nil {
-		c.prevPos = &lin.Vec3{cur[0], cur[1], cur[2]}
+		c.prevPos = dvec3.T{cur[0], cur[1], cur[2]}
+		c.prevPosTime = time.Now()
 	} else {
-		var d lin.Vec3
-		d.Sub(&cur, c.prevPos)
-
+		deltaPos := dvec3.Sub(&cur, &c.prevPos)
 		// Calculate horizontal distance for pitch calculation
-		horizontalDist := float32(math.Sqrt(float64(d[0]*d[0] + d[2]*d[2])))
+		horizontalDist := math.Sqrt(float64(deltaPos[0]*deltaPos[0] + deltaPos[2]*deltaPos[2]))
 
 		// Calculate pitch from vertical movement (smoothed)
 		if horizontalDist > ROTATION_THRESHOLD {
-			targetPitch := float32(math.Atan2(float64(d[1]), float64(horizontalDist)))
+			targetPitch := math.Atan2(float64(deltaPos[1]), float64(horizontalDist))
 			// Smooth the pitch
 			c.planePitch = c.planePitch + (targetPitch-c.planePitch)*ROTATION_DAMPING
 		}
 
-		d[1] = 0 // flatten to horizontal
+		deltaPos[1] = 0 // flatten to horizontal
 
-		if d[0]*d[0]+d[2]*d[2] > ROTATION_THRESHOLD {
-			d.Norm(&d)
-			smoothedView := lin.Vec3{
-				(*c.front)[0] + (d[0]-(*c.front)[0])*ROTATION_DAMPING,
-				(*c.front)[1] + (d[1]-(*c.front)[1])*ROTATION_DAMPING,
-				(*c.front)[2] + (d[2]-(*c.front)[2])*ROTATION_DAMPING,
+		if deltaPos[0]*deltaPos[0]+deltaPos[2]*deltaPos[2] > ROTATION_THRESHOLD {
+			deltaPos = deltaPos.Normalized()
+			smoothedView := dvec3.T{
+				(c.front)[0] + (deltaPos[0]-(c.front)[0])*ROTATION_DAMPING,
+				(c.front)[1] + (deltaPos[1]-(c.front)[1])*ROTATION_DAMPING,
+				(c.front)[2] + (deltaPos[2]-(c.front)[2])*ROTATION_DAMPING,
 			}
-			smoothedView.Norm(&smoothedView)
+			smoothedView = smoothedView.Normalized()
 
-			worldUp := lin.Vec3{0, 1, 0}
-			right := lin.Vec3{}
-			right.MultCross(&smoothedView, &worldUp)
-			right.Norm(&right)
-			up := lin.Vec3{}
-			up.MultCross(&right, &smoothedView)
-			up.Norm(&up)
+			right := dvec3.Cross(&smoothedView, &MAP_UP)
+			right = right.Normalized()
+
+			up := dvec3.Cross(&right, &smoothedView)
+			up = up.Normalized()
+
 			c.updateVectors(smoothedView, right, up)
 		}
 
-		// Smoother motion with rolling average for velocity
-		if c.prevPos != nil {
-			dt := float32(time.Since(c.prevPosTime).Seconds())
-			if dt > 0.001 {
-				frameVel := lin.Vec3{
-					(cur[0] - c.prevPos[0]) / dt,
-					(cur[1] - c.prevPos[1]) / dt,
-					(cur[2] - c.prevPos[2]) / dt,
-				}
-				const alpha = float32(0.5)
-				c.smoothedVel[0] = alpha*frameVel[0] + (1-alpha)*c.smoothedVel[0]
-				c.smoothedVel[1] = alpha*frameVel[1] + (1-alpha)*c.smoothedVel[1]
-				c.smoothedVel[2] = alpha*frameVel[2] + (1-alpha)*c.smoothedVel[2]
+		dt := time.Since(c.prevPosTime).Seconds()
+		if dt > 0.001 {
+			frameVel := dvec3.T{
+				(cur[0] - c.prevPos[0]) / dt,
+				(cur[1] - c.prevPos[1]) / dt,
+				(cur[2] - c.prevPos[2]) / dt,
 			}
+			c.smoothedVel[0] = 0.5*frameVel[0] + (0.5)*c.smoothedVel[0]
+			c.smoothedVel[1] = 0.5*frameVel[1] + (0.5)*c.smoothedVel[1]
+			c.smoothedVel[2] = 0.5*frameVel[2] + (0.5)*c.smoothedVel[2]
 		}
+
 		// update baseline for next frame
-		(*c.prevPos)[0] = cur[0]
-		(*c.prevPos)[1] = cur[1]
-		(*c.prevPos)[2] = cur[2]
+		c.prevPos[0] = cur[0]
+		c.prevPos[1] = cur[1]
+		c.prevPos[2] = cur[2]
 		c.prevPosTime = time.Now()
 	}
 }
 
 // Starts mock GPS, interpolation testing
-func (c *CameraImpl) StartMockGPS(path []lin.Vec3, updateInterval time.Duration) {
+func (c *CameraImpl) StartMockGPS(path []dvec3.T, updateInterval time.Duration) {
 	go c.sensorManager.StartMockGPS(path, updateInterval)
 }
 
 // GetPositionString returns a human-readable position string
 func (c *CameraImpl) GetPositionString() string {
 	pos := c.Position()
-	gpsCoords := coords.WorldToGPS(float32(pos[0]), float32(pos[2]))
+	gpsCoords := coords.WorldToGPS(pos[0], pos[2])
 	return fmt.Sprintf("World: (%.1f, %.1f, %.1f), GPS: %s",
 		pos[0], pos[1], pos[2], gpsCoords)
 }
@@ -393,7 +344,7 @@ func (c *CameraImpl) GetViewVectors() string {
 
 // Internal methods for component access
 
-// updatePosition updates the camera position
+// updatePosition updates the camera position (thread-safe)
 func (c *CameraImpl) updatePosition(newX, newZ, newY float64) {
 	c.pos[0] = newX
 	c.pos[2] = newZ
@@ -410,14 +361,14 @@ func (c *CameraImpl) subPosition(delta dvec3.T) {
 	c.pos.Sub(&delta)
 }
 
-// updateVectors updates the camera orientation vectors
+// updateVectors updates the camera orientation vectors (thread-safe)
 func (c *CameraImpl) updateVectors(front, right, up dvec3.T) {
 	c.front = front
 	c.right = right
 	c.up = up
 }
 
-// getVectors returns copies of the current vectors
+// getVectors returns copies of the current vectors (thread-safe)
 func (c *CameraImpl) getVectors() (front, right, up dvec3.T) {
 	front = c.front
 	right = c.right
