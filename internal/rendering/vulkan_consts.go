@@ -97,3 +97,10 @@ const (
 	DepthFormat   = vk.FormatD24UnormS8Uint
 	TextureFormat = vk.FormatR8g8b8a8Unorm
 )
+
+var airspaceColors = map[string][4]float32{
+	"A": {0.8, 0.0, 0.0, 0.4},  // Red - highest priority controlled airspace
+	"B": {0.0, 0.0, 0.5, 0.3},  // Dark blue - major airport terminal areas
+	"C": {0.8, 0.0, 0.8, 0.3},  // Magenta - medium airport areas
+	"D": {0.0, 0.0, 1.0, 0.25}, // Blue - smaller controlled airports
+}

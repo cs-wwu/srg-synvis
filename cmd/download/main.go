@@ -29,10 +29,16 @@ type Config struct {
 	useOSM  bool
 	useFAA  bool
 
+	// FAA source selection
+	useFAAObstructions bool
+	useFAAAirspace     bool
+
 	// Region selection
-	region    string // Custom region string (e.g., "n48w123,n48w122")
-	boundBox  string // Bounding box for area (e.g., "48.5,-123.5,47.5,-122.5")
-	usePreset string // Preset region name (e.g., "washington", "bellingham")
+	region     string // Custom region string (e.g., "n48w123,n48w122")
+	boundBox   string // Bounding box for area (e.g., "48.5,-123.5,47.5,-122.5")
+	usePreset  string // Preset region name (e.g., "washington", "bellingham")
+	faaStates  string // States to filter by for FAA airspace data
+	faaClasses string // Classes of airspace to filter by for FAA airspace data
 
 	// Output options
 	outputDir    string
@@ -79,10 +85,16 @@ func parseFlags() *Config {
 	flag.BoolVar(&cfg.useOSM, "osm", false, "Download OpenStreetMap data")
 	flag.BoolVar(&cfg.useFAA, "faa", false, "Download FAA airport/navigation data")
 
+	// FAA source flags
+	flag.BoolVar(&cfg.useFAAObstructions, "obs", false, "Download FAA obstruction data")
+	flag.BoolVar(&cfg.useFAAAirspace, "air", false, "Download FAA airspace data")
+
 	// Region selection flags
 	flag.StringVar(&cfg.region, "region", "", "Comma-separated list of region codes (e.g., 'n48w123,n48w122')")
 	flag.StringVar(&cfg.boundBox, "bbox", "", "Bounding box coordinates (e.g., '49,-125,45,-118') in format 'n, e, s, w'")
 	flag.StringVar(&cfg.usePreset, "preset", "", fmt.Sprintf("Use preset region: %v", getPresetNames()))
+	flag.StringVar(&cfg.faaStates, "faaStates", "", "States for airspace (e.g., 'WA,OR,CA')")
+	flag.StringVar(&cfg.faaClasses, "faaClasses", "", "Airspace classes (e.g., 'B,C,D')")
 
 	// Output option flags
 	flag.StringVar(&cfg.outputDir, "out", "assets/maps/", "Output directory for downloaded files")
@@ -100,6 +112,10 @@ func validateConfig(cfg *Config) error {
 		return fmt.Errorf("at least one data source must be selected (-nasa, -osm, or -faa)")
 	}
 
+	if cfg.useFAA && (!cfg.useFAAAirspace && !cfg.useFAAObstructions) {
+		return fmt.Errorf("at least one FAA source must be selected (-obs or -air)")
+	}
+
 	// Check if exactly one region selection method is used
 	regionMethods := 0
 	if cfg.region != "" {
@@ -112,10 +128,10 @@ func validateConfig(cfg *Config) error {
 		regionMethods++
 	}
 
-	if regionMethods == 0 {
+	if regionMethods == 0 && !cfg.useFAA {
 		return fmt.Errorf("must specify region using -region, -bbox, or -preset")
 	}
-	if regionMethods > 1 {
+	if regionMethods > 1 && !cfg.useFAA {
 		return fmt.Errorf("can only use one region selection method (-region, -bbox, or -preset)")
 	}
 
@@ -360,8 +376,27 @@ func main() {
 	}
 
 	if cfg.useFAA {
+<<<<<<< HEAD
 		if err := processor.GenerateObstructionData(); err != nil {
 			log.Printf("Failed to download FAA data: %v", err)
+=======
+		if cfg.useFAAAirspace {
+			// Turn user specified filters into filters for query
+			airspaceStates := strings.Fields(strings.ToUpper(strings.ReplaceAll(cfg.faaStates, ",", " ")))
+			airspaceClasses := strings.Fields(strings.ToUpper(strings.ReplaceAll(cfg.faaClasses, ",", " ")))
+			airspaceFilters, err := api.NewAirspaceFilter(airspaceStates, airspaceClasses)
+			if err != nil {
+				log.Printf("Failed to download FAA Airspace data: %v", err)
+				return
+			}
+			log.Printf("Downloading airspaces with filters: %s", airspaceFilters)
+			err = api.DownloadAndChunkAirspaces(airspaceFilters)
+			if err != nil {
+				log.Printf("Failed to download FAA Airspace data: %v", err)
+			}
+		} else {
+			// use obstructions
+>>>>>>> d05998e (added downloading for FAA airspaces)
 		}
 	}
 
