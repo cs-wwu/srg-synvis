@@ -1,6 +1,8 @@
 package rendering
 
 import (
+	"time"
+
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
@@ -47,6 +49,8 @@ type Application struct {
 	AirspaceStreamer        *streaming.DegreeChunkStreamer[*Airspace]
 	airspacePipeline        vk.Pipeline
 	airspaceStencilPipeline vk.Pipeline
+	currentAirspace         *Feature
+	lastAirspaceCheck       time.Time
 
 	// Roads
 	roadPipeline vk.Pipeline
@@ -103,4 +107,7 @@ var airspaceColors = map[string][4]float32{
 	"B": {0.0, 0.0, 0.5, 0.3},  // Dark blue - major airport terminal areas
 	"C": {0.8, 0.0, 0.8, 0.3},  // Magenta - medium airport areas
 	"D": {0.0, 0.0, 1.0, 0.25}, // Blue - smaller controlled airports
+	"E": {0.5, 0.5, 0.5, 0.15}, // Gray - controlled airspace (transparent)
+	"F": {0.0, 0.5, 0.0, 0.2},  // Green - special use (rare in US)
+	"G": {0.3, 0.3, 0.3, 0.1},  // Light gray - uncontrolled (very transparent)
 }

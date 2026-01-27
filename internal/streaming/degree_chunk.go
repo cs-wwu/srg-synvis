@@ -79,3 +79,14 @@ func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
 		}
 	}
 }
+
+func (d *DegreeChunkStreamer[T]) GetLoaded() []T {
+	d.Lock()
+	defer d.Unlock()
+
+	chunks := make([]T, 0, len(d.Chunks))
+	for _, chunk := range d.Chunks {
+		chunks = append(chunks, chunk)
+	}
+	return chunks
+}

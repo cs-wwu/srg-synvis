@@ -620,6 +620,7 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		log.Printf("vulkan: error loading airspace %s: %v", airspaceFile, err)
 		return nil
 	}
+
 	err = json.Unmarshal(file, &geojson)
 	if err != nil {
 		log.Printf("vulkan: error unmarshaling airspace %s: %v", airspaceFile, err)
@@ -631,10 +632,9 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil
 	}
+
 	heightInfo := newHeightInfo(mapData.HeightData)
-
 	builder := newAirspaceBuilder(heightInfo)
-
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
 	for i, airspace := range geojson.Features {
@@ -652,7 +652,6 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		builder.vertexBytes(),
 		vk.BufferUsageVertexBufferBit,
 	)
-
 	indices := as.CreateBuffer(
 		app.Context().Device(),
 		app.Context().Platform().MemoryProperties(),
@@ -664,6 +663,7 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		vertices:   vertices,
 		indices:    indices,
 		indexCount: uint32(len(builder.indices)),
+		features:   geojson.Features,
 	}
 }
 
@@ -1852,6 +1852,7 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
 	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+	app.currentAirspace = nil
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
