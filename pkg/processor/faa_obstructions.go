@@ -313,6 +313,11 @@ func parseCurrencyDate(file *os.File) (time.Time, error) {
 // GenerateObstructionData puts FAA DOF data into coordinate buffers that are written to files
 func GenerateObstructionData() error {
 	// Check for file existence and date modified
+	err := os.MkdirAll("./assets/DOF_Files/", 0755)
+	if err != nil {
+		return fmt.Errorf("Error creating directory: %v", err)
+	}
+
 	filePath := "./assets/DOF_Files/DOF.DAT"
 	file, err := os.Open(filePath)
 	daysSinceUpdate := 0.0
