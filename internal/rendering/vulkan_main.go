@@ -38,11 +38,12 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera:       cam,
-		Gps:          cfg.UseGPS,
-		Hat:          cfg.UseHat,
-		cfg:          cfg,
-		statsTracker: NewStatsTracker(1000, 5*time.Second),
+		camera:            cam,
+		Gps:               cfg.UseGPS,
+		Hat:               cfg.UseHat,
+		cfg:               cfg,
+		statsTracker:      NewStatsTracker(1000, 5*time.Second),
+		lastAirspaceCheck: time.Now(),
 	}
 
 	if cfg.BenchmarkMode {
@@ -114,8 +115,16 @@ func (app *Application) NextFrame() {
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 	app.RoadStreamer.UpdatePos(app.camera.Position())
 	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+
+	// Check current airspace periodically
+	if time.Since(app.lastAirspaceCheck) > 100*time.Millisecond {
+		app.UpdateCurrentAirspace()
+		app.lastAirspaceCheck = time.Now()
+	}
 
 	app.camera.ProcessInput(app.WindowHandle)
+
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
