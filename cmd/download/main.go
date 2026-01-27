@@ -376,10 +376,6 @@ func main() {
 	}
 
 	if cfg.useFAA {
-<<<<<<< HEAD
-		if err := processor.GenerateObstructionData(); err != nil {
-			log.Printf("Failed to download FAA data: %v", err)
-=======
 		if cfg.useFAAAirspace {
 			// Turn user specified filters into filters for query
 			airspaceStates := strings.Fields(strings.ToUpper(strings.ReplaceAll(cfg.faaStates, ",", " ")))
@@ -395,16 +391,17 @@ func main() {
 				log.Printf("Failed to download FAA Airspace data: %v", err)
 			}
 		} else {
-			// use obstructions
->>>>>>> d05998e (added downloading for FAA airspaces)
+			if err := processor.GenerateObstructionData(); err != nil {
+				log.Printf("Failed to download FAA data: %v", err)
+			}
 		}
-	}
 
-	if cfg.useOSM {
-		if err := processor.GenerateRoadProtobufs(heightmaps); err != nil {
-			log.Printf("Failed to download OSM data: %v", err)
+		if cfg.useOSM {
+			if err := processor.GenerateRoadProtobufs(heightmaps); err != nil {
+				log.Printf("Failed to download OSM data: %v", err)
+			}
 		}
-	}
 
-	log.Printf("Finished Downloading\n")
+		log.Printf("Finished Downloading\n")
+	}
 }
