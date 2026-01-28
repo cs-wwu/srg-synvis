@@ -29,7 +29,7 @@ fi
 if [ "$EUID" -eq 0 ]; then
     echo -e "${GREEN}Installing Vulkan dependencies...${NC}"
     apt update || error_exit "Failed to update apt"
-    apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev \
+    apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-utility-libraries-dev spirv-tools libglfw3-dev \
         libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxrandr-dev ||
         error_exit "Failed to install Vulkan dependencies"
 
