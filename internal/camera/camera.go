@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/elokore/glfw/v3.4/glfw"
+	"github.com/go-gl/glfw/v3.3/glfw"
 	lin "github.com/xlab/linmath"
 )
 
@@ -103,10 +103,6 @@ func NewCamera(config CameraConfig) Camera {
 // Position returns the current camera position
 func (c *CameraImpl) Position() lin.Vec3 {
 	return *c.pos
-}
-
-func (c *CameraImpl) Speed() float32 {
-	return c.speed
 }
 
 func (c *CameraImpl) MapView() bool {

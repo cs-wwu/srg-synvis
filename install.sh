@@ -77,7 +77,6 @@ wget -q "$GO_URL" -O "/tmp/${GO_FILENAME}" || error_exit "Failed to download Go"
 tar -C "$GO_INSTALL_DIR" -xzf "/tmp/${GO_FILENAME}" || error_exit "Failed to extract Go"
 rm "/tmp/${GO_FILENAME}"
 
-
 # Detect shell and update PATH
 SHELL_TYPE=$(basename "$SHELL")
 SHELL_RC=""

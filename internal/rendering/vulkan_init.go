@@ -18,16 +18,13 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
-	as "github.com/vulkan-go/asche"
+	as "github.com/cs-wwu/srg-synvis/pkg/asche"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
 
 	obspb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
 	roadpb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
-
-	"github.com/elokore/cimgui-go-vulkan/backend"
-	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
 
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
@@ -1534,29 +1531,6 @@ func (app *Application) VulkanContextPrepare() error {
 	for _, res := range swapchainImageResources {
 		app.updateCommandBuffer(res, res.CommandBuffer())
 	}
-
-	platform := app.Context().Platform()
-	app.CimguiBackend, _ = backend.CreateBackend(glfwvulkanbackend.NewGLFWBackend())
-	app.CimguiBackend.AttachToExistingWindow(
-		app.WindowHandle,
-		platform.Instance(),
-		platform.Device(),
-		platform.PhysicalDevice(),
-		platform.GraphicsQueue(),
-		app.pipelineCache,
-		platform.GraphicsQueueFamilyIndex(),
-		app.Context().SwapchainImageResources(),
-		app.Context().SwapchainDimensions(),
-	)
-	// app.UIRenderer = ui.NewUIRenderer(
-	// 	platform.Instance(),
-	// 	platform.Device(),
-	// 	platform.PhysicalDevice(),
-	// 	platform.GraphicsQueue(),
-	// 	app.pipelineCache,
-	// 	platform.GraphicsQueueFamilyIndex(),
-	// )
-
 	return nil
 }
 
@@ -1632,7 +1606,7 @@ func copyTextureData(dst unsafe.Pointer, src []byte, width, height, sourceStride
 		dstOffset := row * destStride
 
 		// Convert destination offset to unsafe.Pointer
-		dstRow := unsafe.Add(dst, uintptr(dstOffset))
+		dstRow := unsafe.Pointer(uintptr(dst) + uintptr(dstOffset))
 
 		// Copy a single row (width * 4 bytes for RGBA)
 		bytesPerPixel := 4
