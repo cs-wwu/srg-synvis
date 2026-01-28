@@ -130,6 +130,22 @@ downloader:
 go run ./cmd/download -nasa -preset washington
 ```
 
+#### Airspace Data
+Downloads controlled airspace boundaries (Class B, C, D, etc.) from the FAA's
+Airspace GeoJSON API. You can filter by state and airspace class:
+```
+go run ./cmd/download -faa -air -faaStates "WA,OR,CA" -faaClasses "B,C,D"
+```
+If no filters are specified, all Class B, C, and D airspace nationwide will be downloaded.
+
+#### Obstruction Data
+Downloads the FAA's Digital Obstacle File (DOF), which contains towers, buildings,
+and other obstructions to aviation:
+```
+go run ./cmd/download -faa -obs
+```
+The DOF data is updated every 56 days and covers the entire United States.
+
 ## Guidelines
 
 - Check in code to the repo, including experimental investigations
