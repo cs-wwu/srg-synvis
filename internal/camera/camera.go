@@ -214,13 +214,13 @@ func (c *CameraImpl) Update(deltaTime float32) {
 	// This is where future plane mode physics could go
 
 	// Calculate Speed
-	// var posDelta lin.Vec3
-	// currentPos := *c.pos
+	var posDelta lin.Vec3
+	currentPos := *c.pos
 
-	// posDelta.Sub(&currentPos, &c.lastFramePos)
-	// distance := posDelta.Len()
-	// c.measuredSpeed = distance / deltaTime
-	// c.lastFramePos = currentPos
+	posDelta.Sub(&currentPos, &c.lastFramePos)
+	distance := posDelta.Len()
+	c.measuredSpeed = distance / deltaTime
+	c.lastFramePos = currentPos
 }
 
 // GetPositionString returns a human-readable position string
