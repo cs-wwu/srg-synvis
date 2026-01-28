@@ -72,6 +72,8 @@ type Camera interface {
 	Update(deltaTime float32)
 	GetPositionString() string
 	GetViewVectors() string
+	GetBasis() []lin.Vec3
+	MeasureSpeed() float32
 
 	MapView() bool
 }

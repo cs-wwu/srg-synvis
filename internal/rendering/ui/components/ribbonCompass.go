@@ -22,7 +22,7 @@ type RibbonCompass struct {
 
 func NewRibbonCompass(position ui.UDim, size ui.UDim) *RibbonCompass {
 	return &RibbonCompass{
-		AnchorPoint:         imgui.NewVec2(0.5, 0.5),
+		AnchorPoint:         imgui.NewVec2(0, 0),
 		Position:            position,
 		Size:                size,
 		HeadingDegrees:      0.0,

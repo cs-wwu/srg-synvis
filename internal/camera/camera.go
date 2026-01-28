@@ -13,14 +13,16 @@ import (
 // CameraImpl implements the Camera interface
 type CameraImpl struct {
 	// Position and orientation vectors
-	pos   *lin.Vec3 // (x, y, z)
-	up    *lin.Vec3 // Up Direction of the camera
-	front *lin.Vec3 // Front direction of the camera
-	right *lin.Vec3 // Right direction of the Camera
+	pos          *lin.Vec3 // (x, y, z)
+	lastFramePos lin.Vec3
+	up           *lin.Vec3 // Up Direction of the camera
+	front        *lin.Vec3 // Front direction of the camera
+	right        *lin.Vec3 // Right direction of the Camera
 
 	// Camera parameters
-	speed       float32 // Camera speed
-	sensitivity float32 // Camera sensitivity
+	measuredSpeed float32
+	speed         float32 // Camera speed
+	sensitivity   float32 // Camera sensitivity
 
 	// Orientation tracking (for sensors)
 	pitch float64 // Pitch relative to start
@@ -72,19 +74,22 @@ func NewCamera(config CameraConfig) Camera {
 	speed := CAMERA_SPEED
 
 	sensitivity := LOOK_SENSITIVITY
+	lastPos := lin.Vec3{pos[0], pos[1], pos[2]}
 
 	// Create camera instance
 	camera := &CameraImpl{
-		pos:         &pos,
-		up:          &up,
-		front:       &front,
-		right:       &right,
-		speed:       speed,
-		sensitivity: sensitivity,
-		decimalYear: config.DecimalYear,
-		pitch:       0.0,
-		roll:        0.0,
-		yaw:         0.0,
+		pos:           &pos,
+		lastFramePos:  lastPos,
+		up:            &up,
+		front:         &front,
+		right:         &right,
+		speed:         speed,
+		measuredSpeed: 0,
+		sensitivity:   sensitivity,
+		decimalYear:   config.DecimalYear,
+		pitch:         0.0,
+		roll:          0.0,
+		yaw:           0.0,
 	}
 
 	// Initialize component managers
@@ -199,10 +204,23 @@ func (c *CameraImpl) EnableSensors(sensorScript string) error {
 	return nil
 }
 
+func (c *CameraImpl) MeasureSpeed() float32 {
+	return c.measuredSpeed
+}
+
 // Update performs any per-frame updates
 func (c *CameraImpl) Update(deltaTime float32) {
 	// Currently no per-frame updates needed
 	// This is where future plane mode physics could go
+
+	// Calculate Speed
+	// var posDelta lin.Vec3
+	// currentPos := *c.pos
+
+	// posDelta.Sub(&currentPos, &c.lastFramePos)
+	// distance := posDelta.Len()
+	// c.measuredSpeed = distance / deltaTime
+	// c.lastFramePos = currentPos
 }
 
 // GetPositionString returns a human-readable position string
@@ -219,6 +237,11 @@ func (c *CameraImpl) GetViewVectors() string {
 		c.up[0], c.up[1], c.up[2],
 		c.front[0], c.front[1], c.front[2],
 		c.right[0], c.right[1], c.right[2])
+}
+
+// Returns basis vectors in an array ordered: Up, Front, Right
+func (c *CameraImpl) GetBasis() []lin.Vec3 {
+	return []lin.Vec3{*c.up, *c.front, *c.right}
 }
 
 // Internal methods for component access
