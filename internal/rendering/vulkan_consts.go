@@ -80,8 +80,8 @@ type Application struct {
 
 const (
 	MAPS_PATH             = "assets/maps/"
-	DEFAULT_WINDOW_WIDTH  = 800
-	DEFAULT_WINDOW_HEIGHT = 480
+	DEFAULT_WINDOW_WIDTH  = 1200
+	DEFAULT_WINDOW_HEIGHT = 600
 )
 
 var texEnabled = []string{
