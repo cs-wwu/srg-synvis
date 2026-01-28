@@ -30,7 +30,7 @@ func parseConfig() models.AppConfig {
 	renderDistance := flag.Float64("render-distance", 150.0, "Maximum render distance in kilometers")
 
 	// Enhanced position flag
-	startPosString := flag.String("pos", "48.5,-123.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
+	startPosString := flag.String("pos", "48.5,-122.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
 	startDirString := flag.String("dir", "0,0,-1", "Starting Camera Direction (x,y,z)")
 	fov := flag.Float64("fov", 60.0, "Field of view (degrees)")
 

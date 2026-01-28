@@ -22,6 +22,11 @@ type RoadVertex struct {
 	Color    vec3.T
 }
 
+type ObstructionVertex struct {
+	Position vec3.T
+	Color    vec3.T
+}
+
 const VertexSize = int(unsafe.Sizeof(Vertex{}))
 
 func (v *Vertex) Data() []byte {
@@ -76,6 +81,12 @@ type Texture struct {
 }
 
 type RoadSquare struct {
+	vertices   *as.Buffer
+	indices    *as.Buffer
+	indexCount uint32
+}
+
+type ObstructionSquare struct {
 	vertices   *as.Buffer
 	indices    *as.Buffer
 	indexCount uint32
