@@ -97,6 +97,10 @@ func (air *AirspaceBuilder) indexBytes() []byte {
 	return unsafe.Slice((*byte)(unsafe.Pointer(&air.indices[0])), size)
 }
 
+func toWorldHeightAirspace(height float32) float32 {
+	return float32((height * 0.3048) * (ARC_DEGREES_TO_MINUTES / 1852)) // feet to meters to arcseconds
+}
+
 func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32) {
 	coords := feature.Geometry
 	props := feature.Properties
@@ -116,8 +120,8 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		x := float32(lon * ARC_DEGREES_TO_SECONDS)
 		y := float32(-lat * ARC_DEGREES_TO_SECONDS)
 		height := builder.heightInfo.Height(x, y)
-		lowerAlt := props.AltitudeFloor + int(height) + 10
-		upperAlt := props.AltitudeCeiling
+		lowerAlt := toWorldHeightAirspace(float32(props.AltitudeFloor + int(height) + 10))
+		upperAlt := toWorldHeightAirspace(float32(props.AltitudeCeiling))
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
 			Position: [3]float32{float32(x), float32(lowerAlt), float32(y)},

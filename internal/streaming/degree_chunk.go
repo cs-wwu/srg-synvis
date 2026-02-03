@@ -52,7 +52,6 @@ func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T]
 				streamer.Lock()
 				streamer.Chunks[pos] = chunk
 				delete(streamer.pending, pos)
-				delete(streamer.pending, pos)
 				streamer.Unlock()
 			}
 		}()
