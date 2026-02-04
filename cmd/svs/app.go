@@ -128,13 +128,16 @@ func createWindow(app *rendering.Application, monitor *glfw.Monitor, videoMode *
 		Format: vk.FormatB8g8r8a8Unorm,
 	})
 
-	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Vulkan SVS", monitor, nil)
+	// Create window without monitor first (workaround for glfw fork issue)
+	window, err := glfw.CreateWindow(windowWidth, windowHeight, "Vulkan SVS", nil, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	// Additional fullscreen setup
+	// Set fullscreen via SetMonitor if a monitor was specified
 	if monitor != nil {
+		window.SetMonitor(monitor, 0, 0, videoMode.Width, videoMode.Height, videoMode.RefreshRate)
+
 		// Force window to front and focus
 		window.Show()
 		window.Focus()
