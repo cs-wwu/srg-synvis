@@ -13,7 +13,7 @@ type SettingsMenu struct {
 
 func NewSettingsMenu() *SettingsMenu {
 	return &SettingsMenu{
-		Bar: components.NewSettingBar(),
+		Bar: components.NewSettingBar(*ui.NewUDim(.75, 0, 0, 10), *ui.UDimFromPixels(300, 45)),
 	}
 }
 

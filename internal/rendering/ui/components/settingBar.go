@@ -9,6 +9,9 @@ import (
 
 type SettingBar struct {
 	ui.UIComponent
+	AnchorPoint         imgui.Vec2
+	Position            ui.UDim
+	Size                ui.UDim
 	DebugMode      bool
 	DisableFog     bool
 	UseGPS		   bool
@@ -17,9 +20,12 @@ type SettingBar struct {
 	app *rendering.Application
 }
 
-func NewSettingBar() *SettingBar {
+func NewSettingBar(position ui.UDim, size ui.UDim) *SettingBar {
 	var config models.AppConfig
 	return &SettingBar{
+		AnchorPoint:         imgui.NewVec2(0, 0),
+		Position:            position,
+		Size:                size,
 		DebugMode:      config.DebugMode,
 		DisableFog:     config.DisableFog,
 		RenderDistance: config.RenderDistance,
@@ -41,12 +47,7 @@ func (bar *SettingBar) UpdateSettingBar(app *rendering.Application) {
 // Called every frame
 func (bar *SettingBar) Render() {
 	// Base positioning
-	canvasPos := imgui.WindowPos()
-	// TODO change hard-coded values: trying to get on top left of screen
-	imgui.SetNextWindowPos(imgui.NewVec2(
-		canvasPos.X+500,
-		canvasPos.Y-50,
-	))
+	imgui.SetNextWindowPos(bar.Position.ToPosWithAnchor(bar.AnchorPoint, &bar.Size))
 
 	// Open state: settings panel dropdown
 	imgui.SetNextWindowSize(imgui.NewVec2(180, 120))
