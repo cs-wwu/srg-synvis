@@ -103,6 +103,11 @@ func (app *Application) NextFrame() {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.camera.ProcessInput(app.WindowHandle)
+	if (app.Cfg.DisableFog) {
+		app.ubo.DisableFog = 1.0
+	} else {
+		app.ubo.DisableFog = 0.0
+	}
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings

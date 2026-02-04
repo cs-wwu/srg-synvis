@@ -7,11 +7,12 @@ import (
 	"github.com/elokore/cimgui-go-vulkan/imgui"
 )
 
-// TODO what other values do we want?
 type SettingBar struct {
 	ui.UIComponent
 	DebugMode      bool
 	DisableFog     bool
+	UseGPS		   bool
+	UseHat		   bool
 	RenderDistance float32
 	app *rendering.Application
 }
@@ -22,6 +23,8 @@ func NewSettingBar() *SettingBar {
 		DebugMode:      config.DebugMode,
 		DisableFog:     config.DisableFog,
 		RenderDistance: config.RenderDistance,
+		UseGPS:			config.UseGPS,
+		UseHat:			config.UseHat,
 		app: nil,
 	}
 }
@@ -31,6 +34,8 @@ func (bar *SettingBar) UpdateSettingBar(app *rendering.Application) {
 	bar.DebugMode = app.Cfg.DebugMode
 	bar.DisableFog = app.Cfg.DisableFog
 	bar.RenderDistance = app.Cfg.RenderDistance
+	bar.UseGPS = app.Cfg.UseHat
+	bar.UseHat = app.Cfg.UseHat
 }
 
 // Called every frame
@@ -63,7 +68,10 @@ func (bar *SettingBar) Render() {
 	}
 	if imgui.Checkbox("Disable Fog", &bar.DisableFog) {
 		bar.app.Cfg.DisableFog = bar.DisableFog
+		// todo this needs to update app.ubo
 	}
+	imgui.Checkbox("Use GPS", &bar.UseGPS)
+	imgui.Checkbox("Use Hat", &bar.UseHat)
 	if imgui.InputFloat("Render Distance", &bar.RenderDistance) {
 		bar.app.Cfg.RenderDistance = bar.RenderDistance
 	}
