@@ -37,6 +37,9 @@ func NewApplication(Cfg models.AppConfig) *Application {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
+	if Cfg.UseGPS {
+		cam.EnableGPS()
+	}
 	app := &Application{
 		camera:       cam,
 		Gps:          Cfg.UseGPS,

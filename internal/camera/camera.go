@@ -1,6 +1,7 @@
 package camera
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -91,11 +92,6 @@ func NewCamera(config CameraConfig) Camera {
 	camera.inputProcessor = NewInputProcessor(camera)
 	camera.sensorManager = NewSensorManager(camera)
 	camera.motionHandler = NewMotionHandler(camera)
-
-	// Start hardware integration if requested
-	if config.EnableGPS {
-		go camera.sensorManager.StartGPS()
-	}
 
 	return camera
 }
@@ -189,7 +185,10 @@ func (c *CameraImpl) ProcessInput(window *glfw.Window) {
 
 // EnableGPS starts GPS integration
 func (c *CameraImpl) EnableGPS() error {
-	go c.sensorManager.StartGPS()
+	ctx, cancel := context.WithCancel(context.Background())
+	c.sensorManager.ctxGPS = ctx
+	c.sensorManager.cancelGPS = cancel
+	go c.sensorManager.StartGPS(ctx)
 	return nil
 }
 

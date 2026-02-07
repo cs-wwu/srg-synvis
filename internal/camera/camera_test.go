@@ -336,7 +336,7 @@ func TestGPSNoFix(t *testing.T) {
 	impl.sensorManager.SetTestingMode(true)
 
 	// Start GPS in background
-	go impl.sensorManager.StartGPS()
+	cam.EnableGPS()
 
 	// Wait a moment then send no-fix data
 	time.Sleep(100 * time.Millisecond)
@@ -364,11 +364,7 @@ func TestGPSValidFix(t *testing.T) {
 	impl.sensorManager.SetTestingMode(true)
 
 	// Start GPS in background
-	done := make(chan bool)
-	go func() {
-		impl.sensorManager.StartGPS()
-		done <- true
-	}()
+	cam.EnableGPS()
 
 	// Wait a moment then send valid GPS data
 	time.Sleep(100 * time.Millisecond)

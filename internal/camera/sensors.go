@@ -2,6 +2,7 @@ package camera
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -19,6 +20,8 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 type SensorManager struct {
 	camera      *CameraImpl
 	testingMode bool // When true, skips smoothing for deterministic test results
+	ctxGPS		context.Context
+	cancelGPS	context.CancelFunc
 }
 
 // SetTestingMode enables or disables the testing mode
@@ -32,19 +35,21 @@ func NewSensorManager(camera *CameraImpl) *SensorManager {
 	return &SensorManager{
 		camera:      camera,
 		testingMode: false,
+		ctxGPS:		 nil,
+		cancelGPS:	 nil,
 	}
 }
 
 // StartGPS connects to the GPSD service and gets lat, lon, and alt with TPV report
 // Runs as a separate goroutine
-func (sm *SensorManager) StartGPS() error {
+func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	// Connect to GPSD
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
 		log.Println("Failed to connect to GPSD:", err)
 		return err
 	}
-	defer gps.Close()
+	// defer gps.Close()
 
 	// Store previous data in case of GPS fix issues
 	pos := sm.camera.Position()
@@ -92,7 +97,15 @@ func (sm *SensorManager) StartGPS() error {
 	done := gps.Watch()
 	<-done
 
-	return nil
+	select {
+	case <-ctx.Done():
+		log.Println("GPS: context cancelled, stopping GPS")
+		gps.Close() 
+		return ctx.Err()
+	case <-done:
+		log.Println("GPS: watch ended")
+		return nil
+	}
 }
 
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
