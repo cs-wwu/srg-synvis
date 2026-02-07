@@ -66,7 +66,9 @@ type Camera interface {
 
 	// Hardware integration
 	EnableGPS() error
+	CancelGPS() error
 	EnableSensors(sensorScript string) error
+	CancelSensors() error
 
 	// Updates and info
 	Update(deltaTime float32)

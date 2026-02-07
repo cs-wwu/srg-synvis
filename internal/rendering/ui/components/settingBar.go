@@ -71,8 +71,20 @@ func (bar *SettingBar) Render() {
 		bar.app.Cfg.DisableFog = bar.DisableFog
 		// todo this needs to update app.ubo
 	}
-	imgui.Checkbox("Use GPS", &bar.UseGPS)
-	imgui.Checkbox("Use Hat", &bar.UseHat)
+	if imgui.Checkbox("Use GPS", &bar.UseGPS) {
+		if (bar.UseGPS) {
+			bar.app.Camera.EnableGPS()
+		} else {
+			bar.app.Camera.CancelGPS()
+		}
+	}
+	if imgui.Checkbox("Use Hat", &bar.UseHat) {
+		if (bar.UseHat) {
+			bar.app.Camera.EnableSensors("./internal/camera/hat.py")
+		} else {
+			bar.app.Camera.CancelSensors()
+		}
+	}
 	if imgui.InputFloat("Render Distance", &bar.RenderDistance) {
 		bar.app.Cfg.RenderDistance = bar.RenderDistance
 	}

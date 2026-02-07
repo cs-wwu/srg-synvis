@@ -22,6 +22,8 @@ type SensorManager struct {
 	testingMode bool // When true, skips smoothing for deterministic test results
 	ctxGPS		context.Context
 	cancelGPS	context.CancelFunc
+	ctxHat		context.Context
+	cancelHat	context.CancelFunc
 }
 
 // SetTestingMode enables or disables the testing mode
@@ -37,6 +39,8 @@ func NewSensorManager(camera *CameraImpl) *SensorManager {
 		testingMode: false,
 		ctxGPS:		 nil,
 		cancelGPS:	 nil,
+		ctxHat:		 nil,
+		cancelHat:	 nil,
 	}
 }
 
@@ -111,7 +115,7 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
-func (sm *SensorManager) StartSensors(filename string) Mode {
+func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode {
 	cmd := exec.Command("python3", filename)
 
 	// Create a pipe for standard output
@@ -128,12 +132,23 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		return StartCommand
 	}
 
+	defer func() {
+		_ = cmd.Wait()
+	}()
+
 	first := true
 	var oldYaw, oldRoll, oldPitch float64
 
 	// Read the output from the pipe
 	reader := bufio.NewReader(stdout)
 	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Sensors: context cancelled, stopping sensor reader")
+			// return ctx.Err()
+			break
+		default:
+		}
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			log.Println("Error reading sensor data:", err)
@@ -176,11 +191,11 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 	}
 
 	// Wait for the command to finish
-	err = cmd.Wait()
-	if err != nil {
-		log.Println("Error waiting for sensor command:", err)
-		return Waiting
-	}
+	// err = cmd.Wait()
+	// if err != nil {
+	// 	log.Println("Error waiting for sensor command:", err)
+	// 	return Waiting
+	// }
 
 	return Waiting
 }

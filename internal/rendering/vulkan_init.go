@@ -155,7 +155,7 @@ func (app *Application) initUBO() {
 func (app *Application) updateUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
 
-	if app.camera.MapView() {
+	if app.Camera.MapView() {
 		ortho := lin.Mat4x4{}
 
 		// TODO: Zoom? Currently, 1000x1000 points are visible in the map view.
@@ -173,12 +173,12 @@ func (app *Application) updateUBO() {
 		app.ubo.Projection.Mult(&correction, &ortho)
 		app.ubo.Projection[1][1] *= -1
 
-		app.camera.PlaneMatrix(&app.ubo.PlaneDirection)
+		app.Camera.PlaneMatrix(&app.ubo.PlaneDirection)
 	} else {
 		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.Cfg.Fov), aspectRatio, 1.0, app.Cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1
 	}
-	app.ubo.View = app.camera.ViewMatrix()
+	app.ubo.View = app.Camera.ViewMatrix()
 }
 
 // Prepare depth buffers
@@ -1506,14 +1506,14 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Initialize StreamManager
 	app.StreamManager = NewStreamManager(&dev, &memProps, app.Cfg)
-	app.StreamManager.UpdateCameraPosition(app.camera.Position())
+	app.StreamManager.UpdateCameraPosition(app.Camera.Position())
 	app.StreamManager.Start()
 
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
+	app.RoadStreamer.UpdatePos(app.Camera.Position())
 
 	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
-	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()

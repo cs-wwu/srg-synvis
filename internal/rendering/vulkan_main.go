@@ -41,7 +41,7 @@ func NewApplication(Cfg models.AppConfig) *Application {
 		cam.EnableGPS()
 	}
 	app := &Application{
-		camera:       cam,
+		Camera:       cam,
 		Gps:          Cfg.UseGPS,
 		Hat:          Cfg.UseHat,
 		Cfg:          Cfg,
@@ -105,7 +105,7 @@ func (app *Application) NextFrame() {
 
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-	app.camera.ProcessInput(app.WindowHandle)
+	app.Camera.ProcessInput(app.WindowHandle)
 	if (app.Cfg.DisableFog) {
 		app.ubo.DisableFog = 1.0
 	} else {
@@ -114,16 +114,16 @@ func (app *Application) NextFrame() {
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
-	cameraPos := app.camera.Position()
+	cameraPos := app.Camera.Position()
 	app.ubo.CameraPos = cameraPos
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
-	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.RoadStreamer.UpdatePos(app.Camera.Position())
+	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 
-	app.camera.ProcessInput(app.WindowHandle)
+	app.Camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.Cfg.DebugMode,                 // validation layers
@@ -222,7 +222,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
 
 	// Draw the plane
-	if app.camera.MapView() {
+	if app.Camera.MapView() {
 		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
 		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)

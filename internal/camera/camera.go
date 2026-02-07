@@ -192,9 +192,24 @@ func (c *CameraImpl) EnableGPS() error {
 	return nil
 }
 
+// Terminates the GPS integration
+func (c *CameraImpl) CancelGPS() error {
+	c.sensorManager.cancelGPS()
+	return nil
+}
+
 // EnableSensors starts sensor integration with the specified script
 func (c *CameraImpl) EnableSensors(sensorScript string) error {
-	go c.sensorManager.StartSensors(sensorScript)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.sensorManager.ctxHat = ctx
+	c.sensorManager.cancelHat = cancel
+	go c.sensorManager.StartSensors(sensorScript, ctx)
+	return nil
+}
+
+// Terimates the Sensor integration
+func (c *CameraImpl) CancelSensors() error {
+	c.sensorManager.cancelHat()
 	return nil
 }
 
