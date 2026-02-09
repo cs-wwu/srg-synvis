@@ -99,7 +99,7 @@ func (app *Application) VulkanContextCleanup() error {
 }
 
 func (app *Application) GetCamera() camera.Camera {
-	return app.camera
+	return app.Camera
 }
 
 func (app *Application) NextFrame(deltaTime time.Duration) {
@@ -135,7 +135,7 @@ func (app *Application) NextFrame(deltaTime time.Duration) {
 		3,                                 // frame lag
 	)
 
-	app.camera.Update(float32(deltaTime.Seconds()))
+	app.Camera.Update(float32(deltaTime.Seconds()))
 
 	// Report if needed
 	if app.statsTracker.ShouldReport() {
