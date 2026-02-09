@@ -136,8 +136,8 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		}
 
 		// Invert pitch for correct orientation
-		pitch = -pitch
-		pitch = pitch - 3.14159/2
+		// pitch = -pitch
+		pitch = pitch + 3.14159/2
 
 		// Apply magnetic declination correction
 		if err := sm.applyMagneticDeclination(&yaw); err != nil {
