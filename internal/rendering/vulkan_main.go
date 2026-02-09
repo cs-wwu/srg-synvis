@@ -66,6 +66,8 @@ func (app *Application) VulkanContextCleanup() error {
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
+	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
+	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
 
 	// Skybox resources
 	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)

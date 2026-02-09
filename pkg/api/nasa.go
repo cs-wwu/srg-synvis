@@ -27,7 +27,7 @@ type Credentials struct {
 
 // Returns the users credentials after prompting and storing them securly
 func loadCredentials() (Credentials, error) {
-	token := "eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6Im5hdmNyaXMiLCJleHAiOjE3NzU1MDk3MzksImlhdCI6MTc3MDMyNTczOSwiaXNzIjoiaHR0cHM6Ly91cnMuZWFydGhkYXRhLm5hc2EuZ292IiwiaWRlbnRpdHlfcHJvdmlkZXIiOiJlZGxfb3BzIiwiYWNyIjoiZWRsIiwiYXNzdXJhbmNlX2xldmVsIjozfQ.S5kgKBWbXJjdVr_vfCkD_mLf8JrzXukTCYlh8v8sg4UIyRbRUIGPfIqif1UHBmgIsWLl7CnTTYecF4bDmqvWokhvz8B1MmCUUbyZxex60iqS4qgGDdsjoKN2JW6NIfGoLFL2owkA1gbnD7ltGaJv3NvpazXcgJcN5edDVXVSz5fZtnSh32zZYEKttoaMV19kiGh77Glo05nnbrygHUoqT0aDM7Ym6bfDOuQ_YmSzfEenaaZpIif1FijjZLWzhRzE7ZEyqttqDXe7mEHMmiVk7MClR8m4k82xBRGGttv6oSJ8yqDPI6a-_uWNTDEvS2Z4tQ-ufo9-VU0jQVI1kuJZeA"
+	token := os.Getenv("EARTHDATA_TOKEN")
 	if token == "" {
 		return Credentials{}, fmt.Errorf("EARTHDATA_TOKEN environment variable not set")
 	}
