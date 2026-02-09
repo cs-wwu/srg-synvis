@@ -4,7 +4,7 @@ package ui
 	UDim stands for Universal Dimension. It provides an easy way for us to describe the position or size of some 2D element on the screen
 	in terms of pixels, % of screen size or both.
 
-	When applying a UDim object to an imgui element. Call ToPosition() or ToSize() and it will return an imgui.Vec2 in raw pixels
+	When applying a UDim object to an imgui element. Call ToWindowPosition() or ToSize()() and it will return an imgui.Vec2 in raw pixels
 	that can be used for positioning or sizing the element.
 
 	For positioning, UDim also supports the use of anchor points. Normally when positioning a UI object, you are setting the position of the top left corner of the object.

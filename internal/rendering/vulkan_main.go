@@ -98,7 +98,11 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
-func (app *Application) NextFrame() {
+func (app *Application) GetCamera() camera.Camera {
+	return app.camera
+}
+
+func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.statsTracker.StartFrame()
 
 	app.frameCount++
@@ -130,6 +134,8 @@ func (app *Application) NextFrame() {
 		app.Context().PresentModeString(), // or get from present mode
 		3,                                 // frame lag
 	)
+
+	app.camera.Update(float32(deltaTime.Seconds()))
 
 	// Report if needed
 	if app.statsTracker.ShouldReport() {
