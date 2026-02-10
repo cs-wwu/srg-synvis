@@ -146,7 +146,8 @@ func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode
 		case <-ctx.Done():
 			log.Println("Sensors: context cancelled, stopping sensor reader")
 			// return ctx.Err()
-			break
+			// break
+			return Waiting
 		default:
 		}
 		input, err := reader.ReadString('\n')
@@ -222,8 +223,8 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	// Apply declination correction (magnetic to true heading)
 	*yaw = *yaw + mag.D()
 
-	log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
-		mag.D(), lat, lon)
+	// log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
+	//	mag.D(), lat, lon)
 
 	return nil
 }

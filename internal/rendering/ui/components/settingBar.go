@@ -40,7 +40,7 @@ func (bar *SettingBar) UpdateSettingBar(app *rendering.Application) {
 	bar.DebugMode = app.Cfg.DebugMode
 	bar.DisableFog = app.Cfg.DisableFog
 	bar.RenderDistance = app.Cfg.RenderDistance
-	bar.UseGPS = app.Cfg.UseHat
+	bar.UseGPS = app.Cfg.UseGPS
 	bar.UseHat = app.Cfg.UseHat
 }
 
@@ -69,7 +69,6 @@ func (bar *SettingBar) Render() {
 	}
 	if imgui.Checkbox("Disable Fog", &bar.DisableFog) {
 		bar.app.Cfg.DisableFog = bar.DisableFog
-		// todo this needs to update app.ubo
 	}
 	if imgui.Checkbox("Use GPS", &bar.UseGPS) {
 		if (bar.UseGPS) {
@@ -78,6 +77,7 @@ func (bar *SettingBar) Render() {
 			bar.app.Camera.CancelGPS()
 		}
 	}
+	// TODO second re-enable doesn't work 
 	if imgui.Checkbox("Use Hat", &bar.UseHat) {
 		if (bar.UseHat) {
 			bar.app.Camera.EnableSensors("./internal/camera/hat.py")
