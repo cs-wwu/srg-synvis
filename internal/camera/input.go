@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/elokore/glfw/v3.4/glfw"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	lin "github.com/xlab/linmath"
 )
 
@@ -46,42 +47,36 @@ func (ip *InputProcessor) ProcessInput(window *glfw.Window) {
 
 // processMovementInput handles WASD movement and vertical controls
 func (ip *InputProcessor) processMovementInput(window *glfw.Window) {
-	tmp := lin.Vec3{}
+	tmp := dvec3.T{}
 	front, _, up := ip.camera.getVectors()
-	speed := ip.camera.speed
+	speed := float64(ip.camera.speed)
 
 	// Forward/Backward movement
 	if window.GetKey(glfw.KeyW) == glfw.Press { // Move Forward
-		tmp.Scale(&front, speed)
-		ip.camera.addPosition(tmp)
+		ip.camera.addPosition(front.Scaled(speed))
 	}
 	if window.GetKey(glfw.KeyS) == glfw.Press { // Move Backward
-		tmp.Scale(&front, speed)
-		ip.camera.subPosition(tmp)
+		ip.camera.subPosition(front.Scaled(speed))
 	}
 
 	// Left/Right strafe movement
 	if window.GetKey(glfw.KeyA) == glfw.Press { // Move Left
-		tmp.MultCross(&front, &up)
-		tmp.Norm(&tmp)
-		tmp.Scale(&tmp, speed)
-		ip.camera.subPosition(tmp)
+		tmp = dvec3.Cross(&front, &up)
+		tmp.Normalize()
+		ip.camera.subPosition(tmp.Scaled(speed))
 	}
 	if window.GetKey(glfw.KeyD) == glfw.Press { // Move Right
-		tmp.MultCross(&front, &up)
-		tmp.Norm(&tmp)
-		tmp.Scale(&tmp, speed)
-		ip.camera.addPosition(tmp)
+		tmp = dvec3.Cross(&front, &up)
+		tmp.Normalize()
+		ip.camera.addPosition(tmp.Scaled(speed))
 	}
 
 	// Vertical movement
 	if window.GetKey(glfw.KeySpace) == glfw.Press { // Move Up
-		tmp.Scale(&up, speed)
-		ip.camera.addPosition(tmp)
+		ip.camera.addPosition(up.Scaled(speed))
 	}
 	if window.GetKey(glfw.KeyLeftControl) == glfw.Press { // Move Down
-		tmp.Scale(&up, speed)
-		ip.camera.subPosition(tmp)
+		ip.camera.subPosition(up.Scaled(speed))
 	}
 
 	// Toggle map mode

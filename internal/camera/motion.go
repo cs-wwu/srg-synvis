@@ -3,6 +3,7 @@ package camera
 import (
 	"github.com/ungerik/go3d/float64/quaternion"
 	"github.com/ungerik/go3d/float64/vec3"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	lin "github.com/xlab/linmath"
 )
 
@@ -47,9 +48,9 @@ func (mh *MotionHandler) ApplyAbsoluteRotation(yaw, pitch, roll float64) {
 	qUp.Normalize()
 
 	// Convert to linmath vectors and update camera
-	front := lin.Vec3{float32(qFront[0]), float32(qFront[1]), float32(qFront[2])}
-	right := lin.Vec3{float32(qRight[0]), float32(qRight[1]), float32(qRight[2])}
-	up := lin.Vec3{float32(qUp[0]), float32(qUp[1]), float32(qUp[2])}
+	front := dvec3.T{qFront[0], qFront[1], qFront[2]}
+	right := dvec3.T{qRight[0], qRight[1], qRight[2]}
+	up := dvec3.T{qUp[0], qUp[1], qUp[2]}
 
 	mh.camera.updateVectors(front, right, up)
 	mh.camera.setOrientation(yaw, pitch, roll)
@@ -85,9 +86,9 @@ func (mh *MotionHandler) ApplyRelativeRotation(yaw, pitch, roll float64) {
 	qUp.Normalize()
 
 	// Convert back to linmath vectors and update camera
-	newFront := lin.Vec3{float32(qFront[0]), float32(qFront[1]), float32(qFront[2])}
-	newRight := lin.Vec3{float32(qRight[0]), float32(qRight[1]), float32(qRight[2])}
-	newUp := lin.Vec3{float32(qUp[0]), float32(qUp[1]), float32(qUp[2])}
+	newFront := dvec3.T{qFront[0], qFront[1], qFront[2]}
+	newRight := dvec3.T{qRight[0], qRight[1], qRight[2]}
+	newUp := dvec3.T{qUp[0], qUp[1], qUp[2]}
 
 	mh.camera.updateVectors(newFront, newRight, newUp)
 }
@@ -125,8 +126,8 @@ func (mh *MotionHandler) ResetOrientation() {
 	mh.camera.setOrientation(0, 0, 0)
 
 	// Reset to initial vectors
-	front := lin.Vec3{0, 0, -1}
-	right := lin.Vec3{1, 0, 0}
+	front := dvec3.T{0, 0, -1}
+	right := dvec3.T{1, 0, 0}
 	up := START_CAMERA_UP
 
 	mh.camera.updateVectors(front, right, up)
@@ -154,7 +155,7 @@ func (mh *MotionHandler) GetMotionState() MotionState {
 	front, right, up := mh.camera.getVectors()
 
 	return MotionState{
-		Position: pos,
+		Position: lin.Vec3{float32(pos[0]), float32(pos[1]), float32(pos[2])},
 		Orientation: struct {
 			Yaw   float64
 			Pitch float64
@@ -169,9 +170,9 @@ func (mh *MotionHandler) GetMotionState() MotionState {
 			Right lin.Vec3
 			Up    lin.Vec3
 		}{
-			Front: front,
-			Right: right,
-			Up:    up,
+			Front: lin.Vec3{float32(front[0]), float32(front[1]), float32(front[2])},
+			Right: lin.Vec3{float32(right[0]), float32(right[1]), float32(right[2])},
+			Up:    lin.Vec3{float32(up[0]), float32(up[1]), float32(up[2])},
 		},
 	}
 }

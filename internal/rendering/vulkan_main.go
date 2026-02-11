@@ -140,7 +140,12 @@ func (app *Application) VulkanContextInvalidate(imageIdx int) error {
 	res := app.Context().SwapchainImageResources()[imageIdx]
 
 	temp := new(lin.Mat4x4)
-	temp.Invert(&app.ubo.Model)
+	temp.Invert(&lin.Mat4x4{
+		lin.Vec4{float32(app.ubo.Model[0][0]), float32(app.ubo.Model[0][1]), float32(app.ubo.Model[0][2]), float32(app.ubo.Model[0][3])},
+		lin.Vec4{float32(app.ubo.Model[1][0]), float32(app.ubo.Model[1][1]), float32(app.ubo.Model[1][2]), float32(app.ubo.Model[1][3])},
+		lin.Vec4{float32(app.ubo.Model[2][0]), float32(app.ubo.Model[2][1]), float32(app.ubo.Model[2][2]), float32(app.ubo.Model[2][3])},
+		lin.Vec4{float32(app.ubo.Model[3][0]), float32(app.ubo.Model[3][1]), float32(app.ubo.Model[3][2]), float32(app.ubo.Model[3][3])},
+	})
 	app.ubo.NormalM.Transpose(temp)
 
 	data := app.ubo.Data()

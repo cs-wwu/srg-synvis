@@ -29,6 +29,7 @@ import (
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
 
+	dmat4 "github.com/ungerik/go3d/float64/mat4"
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -110,6 +111,7 @@ func (app *Application) VulkanPresentMode() vk.PresentMode {
 func (app *Application) VulkanDeviceFeatures() []vk.PhysicalDeviceFeatures {
 	return []vk.PhysicalDeviceFeatures{
 		{
+			ShaderFloat64: vk.True,
 			//  MultiDrawIndirect: vk.True, // Multiple Indirect Draw Calls
 		},
 	}
@@ -130,7 +132,7 @@ func (app *Application) VulkanCommandPoolCreateInfo(queueFamilyIndex uint32) vk.
 func (app *Application) initUBO() {
 	app.updateUBO()
 
-	app.ubo.Model.Identity()
+	app.ubo.Model = dmat4.Ident
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
 	app.ubo.RenderDistance = app.cfg.RenderDistance
@@ -1062,19 +1064,19 @@ func (app *Application) prepareRoadPipeline() {
 			}},
 			VertexAttributeDescriptionCount: 2,
 			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
-				// Position
+				// Position (double, takes up two locations)
 				{
 					Binding:  0,
 					Location: 0,
-					Format:   vk.FormatR32g32b32Sfloat,
+					Format:   vk.FormatR64g64b64Sfloat,
 					Offset:   0,
 				},
 				// Color
 				{
 					Binding:  0,
-					Location: 1,
+					Location: 2,
 					Format:   vk.FormatR32g32b32Sfloat,
-					Offset:   4 * 3,
+					Offset:   8 * 3,
 				},
 			},
 		},
@@ -1291,21 +1293,24 @@ func (app *Application) preparePipeline() {
 	}
 
 	attributeDescriptions := []vk.VertexInputAttributeDescription{
+		// Position (double, takes up two locations)
 		{
 			Binding:  0,
 			Location: 0,
-			Format:   vk.FormatR32g32b32Sfloat,
+			Format:   vk.FormatR64g64b64Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
 		},
-		{
-			Binding:  0,
-			Location: 1,
-			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
-		},
+		// Texture coordinate
 		{
 			Binding:  0,
 			Location: 2,
+			Format:   vk.FormatR32g32b32Sfloat,
+			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
+		},
+		// Normal
+		{
+			Binding:  0,
+			Location: 3,
 			Format:   vk.FormatR32g32b32Sfloat,
 			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
 		},

@@ -3,27 +3,29 @@ package rendering
 import (
 	"unsafe"
 
-	"github.com/ungerik/go3d/vec3"
+	dmat4 "github.com/ungerik/go3d/float64/mat4"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	vec3 "github.com/ungerik/go3d/vec3"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
 
 type Vertex struct {
-	Position lin.Vec3
-	TexCoord lin.Vec3
-	Normal   lin.Vec3
+	Position dvec3.T
+	TexCoord vec3.T
+	Normal   vec3.T
 }
 
 // NB: This gets cast to a byte slice, so it must have the exact same bytes
 // that the shader expects.
 type RoadVertex struct {
-	Position vec3.T
+	Position dvec3.T
 	Color    vec3.T
 }
 
 type ObstructionVertex struct {
-	Position vec3.T
+	Position dvec3.T
 	Color    vec3.T
 }
 
@@ -43,17 +45,21 @@ func (u *Index) Data() []byte {
 }
 
 type UniformBufferObject struct {
-	Model           lin.Mat4x4 // object to world space
-	View            lin.Mat4x4 // world to camera space
+	Model           dmat4.T    // object to world space
+	View            dmat4.T    // world to camera space
 	Projection      lin.Mat4x4 // camera to clip and screen space
 	NormalM         lin.Mat4x4 // for lighting
-	PlaneDirection  lin.Mat4x4
+	PlaneDirection  dmat4.T
 	LightDir        lin.Vec3 // Light direction
+	_               [4]byte  // std140 padding (vec3 -> vec4)
 	RenderDistance  float32  // Maximum render distance
-	CameraPos       lin.Vec3 // camera position for terrain warnings
+	_               [12]byte // std140 padding (align dvec3)
+	CameraPos       dvec3.T  // camera position for terrain warnings
+	_               [8]byte  // std140 padding (dvec3 -> dvec4)
 	Time            float32  // Animation time
 	DisableWarnings float32  // 1.0 = disabled, 0.0 = enabled (match shader)
 	DisableFog      float32
+	_               [20]byte // std140 padding (struct align to 32)
 }
 
 // creating a byte slice array of size UniformBufferObject

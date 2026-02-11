@@ -4,7 +4,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/xlab/linmath"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 )
 
 // This loads chunks for 1 degree sections in the background.
@@ -59,12 +59,12 @@ func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T]
 	return streamer
 }
 
-func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
+func (d *DegreeChunkStreamer[T]) UpdatePos(pos dvec3.T) {
 	d.Lock()
 	defer d.Unlock()
 
-	lon_req := int(math.Round(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
-	lat_req := int(math.Round(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
+	lon_req := int(math.Round(pos[0] / ARC_DEGREES_TO_SECONDS))
+	lat_req := int(math.Round(-pos[2] / ARC_DEGREES_TO_SECONDS))
 
 	for lon := lon_req - 1; lon <= lon_req+1; lon++ {
 		for lat := lat_req - 1; lat <= lat_req+1; lat++ {

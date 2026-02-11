@@ -1,14 +1,14 @@
 #version 450
 
 layout(std140, binding = 0) uniform UBO {
-    mat4 model;
-    mat4 view;
+    dmat4 model;
+    dmat4 view;
     mat4 proj;
     mat4 normalM;
-    mat4 planeDirection;
+    dmat4 planeDirection;
     vec3 lightDir;
     float renderDistance;
-    vec3 cameraPos;
+    dvec3 cameraPos;
     float time;
     float disableWarnings;
     float disableFog;
@@ -26,9 +26,9 @@ layout(location = 3) out vec3 worldPos;
 const float AMBIENT = 0.15; // Ambient light intensity
 
 void main() {
-    vec4 worldPosition = ubo.model * vec4(inPosition, 1.0);
-    vec4 viewPosition = ubo.planeDirection * worldPosition;
-    gl_Position = ubo.proj * viewPosition;
+    dvec4 worldPosition = ubo.model * dvec4(inPosition, 1.0);
+    dvec4 viewPosition = ubo.planeDirection * worldPosition;
+    gl_Position = ubo.proj * vec4(viewPosition);
 
     // Transform normal to world space
     vec3 worldNormal = normalize(mat3(ubo.planeDirection) * mat3(ubo.normalM) * inNormal);
@@ -41,5 +41,5 @@ void main() {
 
     fragColor = intense * vec3(1.0);
     fragTexCoord = inTexCoord;
-    worldPos = worldPosition.xyz;
+    worldPos = vec3(worldPosition.xyz);
 }
