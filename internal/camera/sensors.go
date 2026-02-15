@@ -116,7 +116,7 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
 func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode {
-	cmd := exec.Command(ctx, "python3", filename)
+	cmd := exec.CommandContext(ctx, "python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
@@ -147,15 +147,6 @@ func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode
 			log.Println("Error reading sensor data:", err)
 			break
 		}
-
-		// select {
-		// case <-ctx.Done():
-		// 	log.Println("Sensors: context cancelled, stopping sensor reader")
-		// 	// return ctx.Err()
-		// 	// break
-		// 	return Waiting
-		// default:
-		// }
 
 		// Parse the sensor data
 		var yaw, roll, pitch float64
@@ -193,12 +184,6 @@ func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode
 	}
 
 	// Wait for the command to finish
-	// err = cmd.Wait()
-	// if err != nil {
-	// 	log.Println("Error waiting for sensor command:", err)
-	// 	return Waiting
-	// }
-
 	_ = cmd.Wait()
 	return Waiting
 }
