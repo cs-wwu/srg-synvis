@@ -272,8 +272,8 @@ func isInsideAirspace(pos [3]float32, features []Feature) *Feature {
 
 	for i := range features {
 		// Check altitude bounds first
-		low := int(math.Min(float64(features[i].Properties.AltitudeFloor), float64(features[i].Properties.AltitudeCeiling)))
-		high := int(math.Max(float64(features[i].Properties.AltitudeFloor), float64(features[i].Properties.AltitudeCeiling)))
+		low := int(math.Min(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
+		high := int(math.Max(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
 
 		if altitude < low || altitude > high {
 			continue
