@@ -178,7 +178,6 @@ fun App(regions: List<Region> = USregions()) {
                         isDownloading = true
                         downloadStatus = "Downloading..."
 
-                        // todo change
                         val result =
                             DownloadManager().downloadData(
                                 regions = selectedBoxes,

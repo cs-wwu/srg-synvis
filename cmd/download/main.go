@@ -360,7 +360,9 @@ func main() {
 	}
 
 	if cfg.useFAA {
-		// TODO: Download FAA data
+		if err := processor.GenerateObstructionData(); err != nil {
+			log.Printf("Failed to download FAA data: %v", err)
+		}
 	}
 
 	if cfg.useOSM {

@@ -11,6 +11,9 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Output from go build
+svs
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -34,6 +37,11 @@ go.work
 # Vulkan out file
 experimemtal/vulkan/shape/VulkanTest
 
+#Imgui Build
+/imgui-build
+internal/rendering/ui/build
+imgui.ini
+pkg/imgui
 # Environment file
 .env
 
