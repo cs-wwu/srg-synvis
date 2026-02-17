@@ -6,7 +6,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/linmath"
 )

@@ -553,7 +553,7 @@ func (app *Application) updateCommandBuffer(framebuffer vk.Framebuffer, descript
 	// Draw Obstructions
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.obstructionPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
-		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+		0, 1, []vk.DescriptorSet{descriptorSet}, 0, nil)
 
 	app.ObstructionStreamer.Lock()
 	for _, obstructionSquare := range app.ObstructionStreamer.Chunks {

@@ -1692,27 +1692,29 @@ func (app *Application) VulkanContextPrepare() error {
 		app.buildSimultaneousCommandBuffer(res)
 	}
 
-	platform := app.Context().Platform()
-	app.CimguiBackend, _ = backend.CreateBackend(glfwvulkanbackend.NewGLFWBackend())
-	app.CimguiBackend.AttachToExistingWindow(
-		app.WindowHandle,
-		platform.Instance(),
-		platform.Device(),
-		platform.PhysicalDevice(),
-		platform.GraphicsQueue(),
-		app.pipelineCache,
-		platform.GraphicsQueueFamilyIndex(),
-		app.Context().SwapchainImageResources(),
-		app.Context().SwapchainDimensions(),
-	)
-	// app.UIRenderer = ui.NewUIRenderer(
-	// 	platform.Instance(),
-	// 	platform.Device(),
-	// 	platform.PhysicalDevice(),
-	// 	platform.GraphicsQueue(),
-	// 	app.pipelineCache,
-	// 	platform.GraphicsQueueFamilyIndex(),
-	// )
+	if !app.cfg.CaptureOnly {
+		platform := app.Context().Platform()
+		app.CimguiBackend, _ = backend.CreateBackend(glfwvulkanbackend.NewGLFWBackend())
+		app.CimguiBackend.AttachToExistingWindow(
+			app.WindowHandle,
+			platform.Instance(),
+			platform.Device(),
+			platform.PhysicalDevice(),
+			platform.GraphicsQueue(),
+			app.pipelineCache,
+			platform.GraphicsQueueFamilyIndex(),
+			app.Context().SwapchainImageResources(),
+			app.Context().SwapchainDimensions(),
+		)
+		// app.UIRenderer = ui.NewUIRenderer(
+		// 	platform.Instance(),
+		// 	platform.Device(),
+		// 	platform.PhysicalDevice(),
+		// 	platform.GraphicsQueue(),
+		// 	app.pipelineCache,
+		// 	platform.GraphicsQueueFamilyIndex(),
+		// )
+	}
 
 	return nil
 }
