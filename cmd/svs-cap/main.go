@@ -92,7 +92,9 @@ type requestInput struct {
 
 type capture struct {
 	position lin.Vec3
-	rotation lin.Vec3
+	yaw      float64
+	pitch    float64
+	roll     float64
 }
 
 func configFromJson(config *models.AppConfig) []capture {
@@ -151,26 +153,22 @@ func configFromJson(config *models.AppConfig) []capture {
 		captures = append(captures, capture{
 			position: lin.Vec3{
 				float32(*cap.Longitude * ARC_DEGREES_TO_SECONDS),
-				float32(-*cap.Latitude * ARC_DEGREES_TO_SECONDS),
 				float32(*cap.Altitude / METERS_TO_WORLD),
+				float32(-*cap.Latitude * ARC_DEGREES_TO_SECONDS),
 			},
-			rotation: lin.Vec3{
-				float32(*cap.Pitch * DEG_TO_RAD),
-				float32(*cap.Roll * DEG_TO_RAD),
-				float32(*cap.Yaw * DEG_TO_RAD),
-			},
+			yaw:   *cap.Yaw * DEG_TO_RAD,
+			pitch: *cap.Pitch * DEG_TO_RAD,
+			roll:  *cap.Roll * DEG_TO_RAD,
 		})
 	}
 
-	firstCapture := payload.Captures[0]
-	config.CameraStartPos[0] = float32(*firstCapture.Longitude * ARC_DEGREES_TO_SECONDS)
-	config.CameraStartPos[1] = float32(*firstCapture.Altitude / METERS_TO_WORLD)
-	config.CameraStartPos[2] = float32(-*firstCapture.Latitude * ARC_DEGREES_TO_SECONDS)
+	firstCapture := captures[0]
+	config.CameraStartPos = firstCapture.position
 
 	rotationToDirection(
-		*firstCapture.Yaw*DEG_TO_RAD,
-		*firstCapture.Pitch*DEG_TO_RAD,
-		*firstCapture.Roll*DEG_TO_RAD,
+		firstCapture.yaw,
+		firstCapture.pitch,
+		firstCapture.roll,
 		&config.CameraStartDir,
 		&lin.Vec3{},
 		&lin.Vec3{},
