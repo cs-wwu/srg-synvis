@@ -275,9 +275,7 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 	if iface, ok := app.(ApplicationContextInvalidate); ok {
 		p.context.SetOnInvalidate(iface.VulkanContextInvalidate)
 	}
-	if mode.Has(VulkanPresent) {
-		p.context.prepare(false)
-	}
+	p.context.prepare(false)
 	return p, nil
 }
 

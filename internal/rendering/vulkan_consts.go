@@ -57,13 +57,22 @@ type Application struct {
 	skyboxIndexMemory  vk.DeviceMemory
 	skyboxIndexCount   uint32
 
+	// Only set when rendering for a capture
+	oneshotImage          vk.Image
+	oneshotImageView      vk.ImageView
+	oneshotDepthImage     vk.Image
+	oneshotDepthImageView vk.ImageView
+	oneshotFramebuffer    vk.Framebuffer
+	oneshotDescriptorSet  vk.DescriptorSet
+	oneshotCommandPool    vk.CommandPool
+
 	frameCount int
 
 	ubo UniformBufferObject
 
 	cfg models.AppConfig
 
-	camera        camera.Camera
+	Camera        camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]

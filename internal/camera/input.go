@@ -137,7 +137,7 @@ func (ip *InputProcessor) processViewInput(window *glfw.Window) {
 
 	// Apply rotation if any input was detected
 	if pitch != 0 || roll != 0 || yaw != 0 {
-		ip.camera.motionHandler.ApplyRelativeRotation(yaw, pitch, roll)
+		ip.camera.motionHandler.AdjustOrientation(yaw, pitch, roll)
 	}
 }
 
