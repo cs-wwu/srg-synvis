@@ -151,10 +151,7 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		first = false
 
 		// Update camera orientation
-		sm.camera.setOrientation(yaw, pitch, roll)
-
-		// Apply absolute rotation to camera
-		sm.camera.motionHandler.ApplyAbsoluteRotation(yaw, pitch, roll)
+		sm.camera.SetOrientation(yaw, pitch, roll)
 
 		// Store values for next smoothing iteration
 		oldYaw = yaw
@@ -236,8 +233,7 @@ func (sm *SensorManager) SetSensorData(data SensorData) {
 	}
 
 	if data.IMUValid {
-		sm.camera.setOrientation(data.Yaw, data.Pitch, data.Roll)
-		sm.camera.motionHandler.ApplyAbsoluteRotation(data.Yaw, data.Pitch, data.Roll)
+		sm.camera.SetOrientation(data.Yaw, data.Pitch, data.Roll)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/elokore/glfw/v3.4/glfw"
+	"github.com/ungerik/go3d/float64/quaternion"
 	lin "github.com/xlab/linmath"
 )
 
@@ -230,24 +231,17 @@ func (c *CameraImpl) updatePosition(newX, newZ, newY float32) {
 	(*c.pos)[1] = newY
 }
 
-// addPosition adds to the camera position (thread-safe)
+// addPosition adds to the camera position
 func (c *CameraImpl) addPosition(delta lin.Vec3) {
 	c.pos.Add(c.pos, &delta)
 }
 
-// subPosition subtracts from the camera position (thread-safe)
+// subPosition subtracts from the camera position
 func (c *CameraImpl) subPosition(delta lin.Vec3) {
 	c.pos.Sub(c.pos, &delta)
 }
 
-// updateVectors updates the camera orientation vectors (thread-safe)
-func (c *CameraImpl) updateVectors(front, right, up lin.Vec3) {
-	*c.front = front
-	*c.right = right
-	*c.up = up
-}
-
-// getVectors returns copies of the current vectors (thread-safe)
+// getVectors returns copies of the current vectors
 func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
 	front = *c.front
 	right = *c.right
@@ -256,10 +250,37 @@ func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
 }
 
 // setOrientation updates the orientation angles
-func (c *CameraImpl) setOrientation(yaw, pitch, roll float64) {
+func (c *CameraImpl) SetOrientation(yaw, pitch, roll float64) {
 	c.yaw = yaw
 	c.pitch = pitch
 	c.roll = roll
+
+	// Calculate the rotation quaternions for each component
+	qYaw := quaternion.FromAxisAngle(&qStartCameraUp, -yaw)
+	qRoll := quaternion.FromAxisAngle(&qStartCameraFront, -roll)
+	qPitch := quaternion.FromAxisAngle(&qStartCameraRight, -pitch)
+
+	// Calculate the combined rotation quaternion from Yaw, Roll, and Pitch
+	rotQuat := quaternion.Mul3(&qYaw, &qPitch, &qRoll)
+
+	// Rotate each vector based on the quaternion rotation
+	qFront := rotQuat.RotatedVec3(&qStartCameraFront)
+	qRight := rotQuat.RotatedVec3(&qStartCameraRight)
+	qUp := rotQuat.RotatedVec3(&qStartCameraUp)
+
+	// Normalize the vectors
+	qFront.Normalize()
+	qRight.Normalize()
+	qUp.Normalize()
+
+	// Convert to linmath vectors and update camera
+	front := lin.Vec3{float32(qFront[0]), float32(qFront[1]), float32(qFront[2])}
+	right := lin.Vec3{float32(qRight[0]), float32(qRight[1]), float32(qRight[2])}
+	up := lin.Vec3{float32(qUp[0]), float32(qUp[1]), float32(qUp[2])}
+
+	*c.front = front
+	*c.right = right
+	*c.up = up
 }
 
 // getOrientation returns the current orientation angles
