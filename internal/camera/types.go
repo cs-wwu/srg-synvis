@@ -59,6 +59,7 @@ type Camera interface {
 	getOrientation() (float64, float64, float64)
 	ViewMatrix() lin.Mat4x4
 	SetPosition(pos lin.Vec3)
+	SetOrientation(yaw, pitch, roll float64)
 	PlaneMatrix(*lin.Mat4x4)
 
 	// Input processing

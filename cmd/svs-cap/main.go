@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -46,7 +47,7 @@ func main() {
 
 	config.RenderDistance = (150.0 * 1000.0) / METERS_TO_WORLD
 	config.Fov = 70
-	configFromJson(&config)
+	captures := configFromJson(&config)
 
 	err := vk.SetDefaultGetInstanceProcAddr()
 	if err != nil {
@@ -59,7 +60,11 @@ func main() {
 	app := rendering.NewApplication(config)
 	as.NewPlatform(app)
 
-	app.RenderCapture()
+	for i, capture := range captures {
+		app.Camera.SetPosition(capture.position)
+		app.Camera.SetOrientation(capture.yaw, capture.pitch, capture.roll)
+		app.RenderCapture(fmt.Sprintf("capture_%d.png", i))
+	}
 }
 
 type settingsInput struct {

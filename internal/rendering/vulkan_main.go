@@ -144,7 +144,7 @@ func (app *Application) NextFrame() {
 	}
 }
 
-func (app *Application) RenderCapture() {
+func (app *Application) RenderCapture(filename string) {
 	app.NextFrame()
 
 	app.makeOneshotPool()
@@ -306,7 +306,7 @@ func (app *Application) RenderCapture() {
 		copy(dst, src)
 	}
 
-	f, err := os.Create("out.png")
+	f, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("failed to create output file: %v", err)
 	}
