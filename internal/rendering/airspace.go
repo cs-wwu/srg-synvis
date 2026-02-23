@@ -267,8 +267,7 @@ func isInsideAirspace(pos [3]float32, features []Feature) *Feature {
 	altitude := int(pos[1])
 
 	// Convert world coords to lat/lon
-	var lat, lon float64
-	fmt.Sscanf(coords.WorldToGPS(pos[0], pos[2]), "%f, %f", &lat, &lon)
+	lat, lon := coords.WorldToGPSFloat(pos[0], pos[2])
 
 	for i := range features {
 		// Check altitude bounds first
@@ -281,7 +280,7 @@ func isInsideAirspace(pos [3]float32, features []Feature) *Feature {
 
 		// 2D point-in-polygon check (lon/x, lat/y)
 		outer := features[i].Geometry.Coordinates[0] // type [][]float64
-		if pointInRing(lon, lat, outer) {
+		if pointInRing(float64(lon), float64(lat), outer) {
 			return &features[i] // Inside this airspace
 		}
 	}
