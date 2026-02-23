@@ -182,7 +182,7 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	// Note: This assumes coords package has the inverse function
 	// lat := float64(-pos[2]) / 3600.0           // Convert arcseconds to degrees
 	// lon := float64(pos[0]) / 3600.0            // Convert arcseconds to degrees
-	lat32, lon32 := coords.WorldToGPSFloat(pos[0], pos[2])
+	lat32, lon32 := coords.WorldToGPSFloat(float32(pos[0]), float32(pos[2]))
 	lat := float64(lat32)
 	lon := float64(lon32)
 	alt := float64(pos[1]) / HEIGHT_CONVERSION // Convert to meters
@@ -211,7 +211,7 @@ func (sm *SensorManager) GetSensorData() SensorData {
 	yaw, pitch, roll := sm.camera.getOrientation()
 
 	// Convert position back to GPS coordinates for the data structure
-	lat, lon := coords.WorldToGPSFloat(pos[0], pos[2])
+	lat, lon := coords.WorldToGPSFloat(float32(pos[0]), float32(pos[2]))
 	alt := pos[1] / HEIGHT_CONVERSION
 
 	return SensorData{
@@ -233,11 +233,11 @@ func (sm *SensorManager) GetSensorData() SensorData {
 func (sm *SensorManager) SetSensorData(data SensorData) {
 	if data.GPSValid {
 		// Convert GPS to world coordinates
-		worldX, worldZ := coords.GPSToWorld(data.GPSPosition.Latitude,
-			data.GPSPosition.Longitude)
+		worldX, worldZ := coords.GPSToWorld(float32(data.GPSPosition.Latitude),
+			float32(data.GPSPosition.Longitude))
 		worldY := data.GPSPosition.Altitude * HEIGHT_CONVERSION
 
-		sm.camera.updatePosition(worldX, worldZ, worldY)
+		sm.camera.updatePosition(float64(worldX), float64(worldZ), worldY)
 	}
 
 	if data.IMUValid {
@@ -253,8 +253,8 @@ func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
 
 	// Convert GPS coordinates to world coordinates
 	newY := float64(report.Alt) * HEIGHT_CONVERSION
-	newX, newZ := coords.GPSToWorld(report.Lat, report.Lon)
-	currPos := dvec3.T{newX, newY, newZ}
+	newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
+	currPos := dvec3.T{float64(newX), newY, float64(newZ)}
 	oldPos := lastReading.position
 
 	// cache position, occurred time, and velocity
@@ -353,234 +353,6 @@ func (mh *MotionHandler) FeedGPSUpdate() {
 		p3: pred2,  // far prediction (exit tangent control)
 	}
 	spline.splineStartTime = time.Now()
-}
-
-// TODO: This should be a test case, not inlined in sensors.
-func (sm *SensorManager) StartMockGPS(path []dvec3.T, updateInterval time.Duration) {
-	if sm == nil || len(path) == 0 {
-		return
-	}
-	log.Println("Starting mock GPS with determined path")
-
-	// Bootstrap: seed with first 3 positions immediately so spline can start
-	if len(sm.gpsRecordings) == 0 && len(path) >= 3 {
-		now := time.Now()
-		dt := updateInterval
-
-		for i := 0; i < 3 && i < len(path); i++ {
-			var vel dvec3.T
-			if i > 0 {
-				var delta dvec3.T
-				delta.Sub(&path[i], &path[i-1])
-				vel.Scale(&delta, 1.0/float32(dt.Seconds()))
-			}
-
-			sm.gpsRecordings = append(sm.gpsRecordings, GPSReading{
-				position: path[i],
-				occurred: now.Add(time.Duration(i) * dt),
-				velocity: vel,
-			})
-		}
-
-		// Set camera to p1 position (middle of initial 3)
-		sm.camera.updatePosition(path[1][0], path[1][2], path[1][1])
-
-		// Initialize smoothed velocity from the bootstrap
-		if len(sm.gpsRecordings) >= 2 {
-			sm.camera.smoothedVel = sm.gpsRecordings[2].velocity
-		}
-
-		// Build initial spline
-		sm.camera.motionHandler.splineManager.averageGPSInterval = float32(dt.Seconds())
-		sm.camera.motionHandler.FeedGPSUpdate()
-
-		log.Printf("Bootstrap complete: seeded %d initial readings", len(sm.gpsRecordings))
-	}
-
-	// Start feeding remaining points
-	startIdx := 3
-	if len(sm.gpsRecordings) == 0 {
-		// Fallback if bootstrap didn't happen
-		sm.gpsRecordings = append(sm.gpsRecordings, GPSReading{
-			position: path[0],
-			occurred: time.Now(),
-			velocity: dvec3.T{0, 0, 0},
-		})
-		startIdx = 1
-	}
-
-	var lastGPS *dvec3.T
-	var lastPlane *dvec3.T
-
-	for i := startIdx; i < len(path); i++ {
-		time.Sleep(updateInterval)
-
-		prev := sm.gpsRecordings[len(sm.gpsRecordings)-1]
-		now := time.Now()
-		dtSec := float32(now.Sub(prev.occurred).Seconds())
-		if dtSec < 0.001 {
-			dtSec = float32(updateInterval.Seconds())
-		}
-
-		// Calculate velocity
-		deltaPos := dvec3.T{}
-		deltaPos.Sub(&path[i], &path[i-1])
-
-		var velocity dvec3.T
-		velocity.Scale(&deltaPos, 1.0/dtSec)
-
-		reading := GPSReading{
-			position: path[i],
-			occurred: now,
-			velocity: velocity,
-		}
-
-		// Logging setup
-		if lastGPS == nil {
-			p := path[i-1]
-			lastGPS = &dvec3.T{p[0], p[1], p[2]}
-		}
-		if lastPlane == nil && sm.camera != nil {
-			p := sm.camera.Position()
-			lastPlane = &dvec3.T{p[0], p[1], p[2]}
-		}
-
-		// Calculate deltas for logging
-		dGPS := dvec3.T{}
-		dGPS.Sub(&reading.position, lastGPS)
-		gpsDist := float32(math.Sqrt(float64(dGPS[0]*dGPS[0] + dGPS[1]*dGPS[1] + dGPS[2]*dGPS[2])))
-
-		planeNow := dvec3.T{}
-		if sm.camera != nil {
-			p := sm.camera.Position()
-			planeNow = dvec3.T{p[0], p[1], p[2]}
-		}
-		dPlane := dvec3.T{}
-		if lastPlane != nil {
-			dPlane.Sub(&planeNow, lastPlane)
-		}
-		planeDist := float32(math.Sqrt(float64(dPlane[0]*dPlane[0] + dPlane[1]*dPlane[1] + dPlane[2]*dPlane[2])))
-
-		errVec := dvec3.T{}
-		errVec.Sub(&planeNow, &reading.position)
-		errDist := float32(math.Sqrt(float64(errVec[0]*errVec[0] + errVec[1]*errVec[1] + errVec[2]*errVec[2])))
-
-		dt := float32(updateInterval.Seconds())
-		gpsSpeed := gpsDist / dt
-		planeSpeed := planeDist / dt
-
-		log.Printf(
-			"#%d: err=%.2f | vGPS=%.1f | vPlane=%.1f",
-			i, errDist, gpsSpeed, planeSpeed,
-		)
-
-		*lastGPS = reading.position
-		*lastPlane = planeNow
-
-		// Push reading and maintain buffer
-		sm.gpsRecordings = append(sm.gpsRecordings, reading)
-		if len(sm.gpsRecordings) > 3 {
-			mma := &sm.camera.motionHandler.splineManager.averageGPSInterval
-			if *mma <= 0 {
-				*mma = dtSec
-			} else {
-				*mma = 0.8*(*mma) + 0.2*dtSec
-			}
-			sm.gpsRecordings = sm.gpsRecordings[1:]
-		}
-
-		// Update spline
-		if len(sm.gpsRecordings) >= 3 && sm.camera != nil && sm.camera.motionHandler != nil {
-			sm.camera.motionHandler.FeedGPSUpdate()
-		}
-	}
-	log.Println("Mock GPS path completed")
-}
-
-// GenerateScriptedPath returns a test flight path
-func GenerateScriptedPath(start dvec3.T, speedMPH float32, dt time.Duration) []dvec3.T {
-	path := []dvec3.T{}
-	cur := start
-	step := func(dx, dy, dz float32) {
-		cur = dvec3.T{cur[0] + dx, cur[1] + dy, cur[2] + dz}
-		path = append(path, cur)
-	}
-
-	const normHoriz = 35.0
-	const climbSlope = 0.2679491924311227 // tan(15°)
-
-	// 1) Fast north for 10 seconds (−Z)
-	for i := 0; i < 10; i++ {
-		step(0, 0, -normHoriz)
-	}
-
-	// 2) Bank east slowly: north → east
-	for i := 0; i < 10; i++ {
-		t := float32(i+1) / 10.0
-		dirX := +t
-		dirZ := -(1.0 - t)
-		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
-		dirX /= len
-		dirZ /= len
-		step(dirX*normHoriz, 0, dirZ*normHoriz)
-	}
-
-	// 3) Fully east for 10 seconds (+X)
-	for i := 0; i < 10; i++ {
-		step(+normHoriz, 0, 0)
-	}
-
-	// 4) Ease into 15° climb over 5 seconds
-	for i := 0; i < 5; i++ {
-		t := float32(i+1) / 5.0
-		dx := float32(+normHoriz)
-		dy := dx * float32(climbSlope) * t // ramp up the climb
-		step(dx, dy, 0)
-	}
-
-	// 5) Maintain climb, curve east to south
-	for i := 0; i < 10; i++ {
-		t := float32(i+1) / 10.0
-		dirX := +1.0 - t
-		dirZ := +t
-		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
-		dirX /= len
-		dirZ /= len
-		dx := dirX * normHoriz
-		dz := dirZ * normHoriz
-		dy := normHoriz * float32(climbSlope)
-		step(dx, dy, dz)
-	}
-
-	// 6) Ease out of climb over 5 seconds
-	for i := 0; i < 5; i++ {
-		t := float32(i+1) / 5.0
-		dy := normHoriz * float32(climbSlope) * (1.0 - t)
-		step(0, dy, normHoriz)
-	}
-
-	// 7) Level south for 10 seconds with gentle undulation
-	for i := 0; i < 10; i++ {
-		y := float64(i) * (2 * math.Pi / 10.0)
-		dy := float32(math.Sin(y)) * 5.0
-		step(0, dy, normHoriz)
-	}
-
-	// 8) Gradual turn south to west
-	for i := 0; i < 10; i++ {
-		t := float32(i+1) / 10.0
-		dirX := -t
-		dirZ := 1.0 - t
-		len := float32(math.Sqrt(float64(dirX*dirX + dirZ*dirZ)))
-		step(dirX/len*normHoriz, 0, dirZ/len*normHoriz)
-	}
-
-	// 9) Fully west 5 seconds
-	for i := 0; i < 5; i++ {
-		step(-normHoriz, 0, 0)
-	}
-
-	return path
 }
 
 func Smoother32(new1, old1, new2, old2, new3, old3 float32) (float32, float32, float32) {
