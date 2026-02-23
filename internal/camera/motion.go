@@ -279,8 +279,8 @@ func (mh *MotionHandler) PredictPosition(futureSeconds float64) dvec3.T {
 	}
 	predTime := mh.splineManager.averageGPSInterval * futureSeconds
 
-	// var turn = CalculateTurn(v1, v2, accel, v2.magnitude);
-	// TODO explain
+	// velocity difference (past+present) is sufficient to determine
+	// whether or not we are turning, and by how much
 	turn := mh.CalculateTurn(v1, v2, accel)
 
 	// If we are turning, predict position differently than if
@@ -324,8 +324,8 @@ func (mh *MotionHandler) PredictCurved(start dvec3.T, vel dvec3.T, turn *TurnInf
 
 // This compares the orientation of the two most recent readings to extrapolate
 // information about the current curve/turn to project future position(s)
-// TODO: the XZ logic has a bad line of reasoning. curves happen in the air, though maybe
-// not as often. doesn't seem to be a big deal now, but fix anyway
+// TODO: the XZ logic is incomplete. curves of course happen in the air
+// still works for now.
 func (mh *MotionHandler) CalculateTurn(v1, v2, accel dvec3.T) TurnInfo {
 	var info TurnInfo
 
@@ -334,8 +334,6 @@ func (mh *MotionHandler) CalculateTurn(v1, v2, accel dvec3.T) TurnInfo {
 	dir2 := dvec3.T{v2[0], 0, v2[2]}
 	dir2 = dir2.Normalized()
 
-	// float angle = Vector3.SignedAngle(dir1, dir2, Vector3.up);
-	// The Y axis is given by 0, 1, 0
 	angle := SignedAngle(dir1, dir2, MAP_UP)
 	info.angularVel = angle / mh.splineManager.averageGPSInterval
 
