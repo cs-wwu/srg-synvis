@@ -25,7 +25,7 @@ type CameraImpl struct {
 	sensitivity float64 // Camera sensitivity
 
 	// Motion parameters
-	prevPos    dvec3.T
+	prevPos    *dvec3.T
 	planePitch float64 // Pitch angle of the plane based on movement
 
 	// Orientation tracking (for sensors)
@@ -76,13 +76,13 @@ func dvec3FromLinVec3(v *lin.Vec3) dvec3.T {
 // NewCamera creates and initializes a new Camera
 func NewCamera(config CameraConfig) Camera {
 	// Initialize position and direction vectors
-	pos := dvec3FromLinVec3(&config.StartPos)
+	pos := config.StartPos
 
 	// Calculate initial vectors based on start direction
-	front := dvec3FromLinVec3(&config.StartDir)
+	front := config.StartDir
 	front.Normalize()
 
-	camStartUp := dvec3FromLinVec3(&START_CAMERA_UP)
+	camStartUp := START_CAMERA_UP
 	right := dvec3.Cross(&front, &camStartUp)
 	right.Normalize()
 
@@ -257,20 +257,28 @@ func (c *CameraImpl) Update() {
 		pos := mh.CentCatmullRom(t, sm.currentSplineData)
 		newPos = pos
 	} else {
-		// TODO this is not even dead reckoning yet
-		dt := elapsed - sm.averageGPSInterval
-		delta :=
-			newPos.Add(sm.currentSplineData.p2, delta)
+		// TODO this is not even really dead reckoning yet
+		// timeout/late update logic, should just continue
+		// on path for now
+		endPos := mh.CentCatmullRom(1.0, sm.currentSplineData)
+		overtime := elapsed - sm.averageGPSInterval
+		newPos = dvec3.T{
+			endPos[0] + c.smoothedVel[0]*overtime,
+			endPos[1] + c.smoothedVel[1]*overtime,
+			endPos[2] + c.smoothedVel[2]*overtime,
+		}
+		c.updatePosition(newPos[0], newPos[2], newPos[1])
+		return
 	}
 	c.updatePosition(newPos[0], newPos[2], newPos[1])
 
 	// Update the forward vector of the camera
 	cur := c.Position()
 	if c.prevPos == nil {
-		c.prevPos = dvec3.T{cur[0], cur[1], cur[2]}
+		c.prevPos = &dvec3.T{cur[0], cur[1], cur[2]}
 		c.prevPosTime = time.Now()
 	} else {
-		deltaPos := dvec3.Sub(&cur, &c.prevPos)
+		deltaPos := dvec3.Sub(&cur, c.prevPos)
 		// Calculate horizontal distance for pitch calculation
 		horizontalDist := math.Sqrt(float64(deltaPos[0]*deltaPos[0] + deltaPos[2]*deltaPos[2]))
 
@@ -321,15 +329,10 @@ func (c *CameraImpl) Update() {
 	}
 }
 
-// Starts mock GPS, interpolation testing
-func (c *CameraImpl) StartMockGPS(path []dvec3.T, updateInterval time.Duration) {
-	go c.sensorManager.StartMockGPS(path, updateInterval)
-}
-
 // GetPositionString returns a human-readable position string
 func (c *CameraImpl) GetPositionString() string {
 	pos := c.Position()
-	gpsCoords := coords.WorldToGPS(pos[0], pos[2])
+	gpsCoords := coords.WorldToGPS(float32(pos[0]), float32(pos[2]))
 	return fmt.Sprintf("World: (%.1f, %.1f, %.1f), GPS: %s",
 		pos[0], pos[1], pos[2], gpsCoords)
 }

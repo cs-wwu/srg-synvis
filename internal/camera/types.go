@@ -74,8 +74,6 @@ type Camera interface {
 	GetViewVectors() string
 
 	// Debugging
-	StartMockGPS(path []lin.Vec3, updateInterval time.Duration)
-
 	MapView() bool
 }
 

@@ -37,14 +37,6 @@ func NewApplication(cfg models.AppConfig) *Application {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
-
-	if cfg.UseGPS {
-		// Start from the configured camera position
-		startPos := cfg.CameraStartPos
-		testPath := camera.GenerateScriptedPath(startPos, 100.0, 1*time.Second)
-		cam.StartMockGPS(testPath, 1*time.Second)
-		log.Println("Started mock GPS for testing")
-	}
 	app := &Application{
 		camera:       cam,
 		Gps:          cfg.UseGPS,
