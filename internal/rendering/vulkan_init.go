@@ -23,6 +23,7 @@ import (
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	// as "github.com/vulkan-go/asche"
+	dmat4 "github.com/ungerik/go3d/float64/mat4"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -166,12 +167,14 @@ func (app *Application) updateUBO() {
 		app.ubo.Projection.Mult(&correction, &ortho)
 		app.ubo.Projection[1][1] *= -1
 
-		app.camera.PlaneMatrix(&app.ubo.PlaneDirection)
+		var planeMat dmat4.T
+		app.camera.PlaneMatrix(&planeMat)
+		app.ubo.PlaneDirection = dmat4ToLin(planeMat)
 	} else {
 		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1
 	}
-	app.ubo.View = app.camera.ViewMatrix()
+	app.ubo.View = dmat4ToLin(app.camera.ViewMatrix())
 }
 
 // Prepare depth buffers
@@ -1321,11 +1324,13 @@ func (app *Application) VulkanContextPrepare() error {
 
 	// Initialize StreamManager
 	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
-	app.StreamManager.UpdateCameraPosition(app.camera.Position())
+	initPos := app.camera.Position()
+	initPosLin := lin.Vec3{float32(initPos[0]), float32(initPos[1]), float32(initPos[2])}
+	app.StreamManager.UpdateCameraPosition(initPosLin)
 	app.StreamManager.Start()
 
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
+	app.RoadStreamer.UpdatePos(initPosLin)
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
@@ -1429,4 +1434,15 @@ func copyTextureData(dst unsafe.Pointer, src []byte, width, height, sourceStride
 		// Use the Vulkan provided Memcopy for the row data
 		vk.Memcopy(dstRow, src[srcOffset:srcOffset+rowSize])
 	}
+}
+
+// we want to keep float32s for rendering/gpu side. so convert
+func dmat4ToLin(m dmat4.T) lin.Mat4x4 {
+	var out lin.Mat4x4
+	for i := 0; i < 4; i++ {
+		for j := 0; j < 4; j++ {
+			out[i][j] = float32(m[i][j])
+		}
+	}
+	return out
 }

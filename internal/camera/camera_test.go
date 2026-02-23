@@ -10,13 +10,13 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/stratoberry/go-gpsd"
-	lin "github.com/xlab/linmath"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 )
 
 // Test configuration
 var (
-	testStartPos = lin.Vec3{-442800, 162.11664, -172800}
-	testStartDir = lin.Vec3{0, 0, -1}
+	testStartPos = dvec3.T{-442800, 162.11664, -172800}
+	testStartDir = dvec3.T{0, 0, -1}
 	testConfig   = CameraConfig{
 		StartPos:    testStartPos,
 		StartDir:    testStartDir,
@@ -140,13 +140,13 @@ func (m *MockGPSD) Close() {
 
 // Test utility functions
 
-// equal compares two float32 values with tolerance
-func equal(a, b float32) bool {
+// equal compares two float64 values with tolerance
+func equal(a, b float64) bool {
 	return math.Abs(float64(a)-float64(b)) <= 0.05
 }
 
 // equalVec3 compares two Vec3 with tolerance
-func equalVec3(a, b lin.Vec3) bool {
+func equalVec3(a, b dvec3.T) bool {
 	return equal(a[0], b[0]) && equal(a[1], b[1]) && equal(a[2], b[2])
 }
 
@@ -192,8 +192,8 @@ func TestCameraInitialization(t *testing.T) {
 
 func TestCameraConfiguration(t *testing.T) {
 	customConfig := CameraConfig{
-		StartPos:    lin.Vec3{100, 200, 300},
-		StartDir:    lin.Vec3{1, 0, 0},
+		StartPos:    dvec3.T{100, 200, 300},
+		StartDir:    dvec3.T{1, 0, 0},
 		DecimalYear: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 
@@ -251,9 +251,9 @@ func TestAbsoluteRotation(t *testing.T) {
 
 	// Verify orientation was set
 	actualYaw, actualPitch, actualRoll := impl.getOrientation()
-	if !equal(float32(actualYaw), float32(yaw)) ||
-		!equal(float32(actualPitch), float32(pitch)) ||
-		!equal(float32(actualRoll), float32(roll)) {
+	if !equal(actualYaw, yaw) ||
+		!equal(actualPitch, pitch) ||
+		!equal(actualRoll, roll) {
 		t.Errorf("Absolute rotation orientation not set correctly. Got (%f, %f, %f), expected (%f, %f, %f)",
 			actualYaw, actualPitch, actualRoll, yaw, pitch, roll)
 	}
@@ -280,7 +280,7 @@ func TestPositionUpdates(t *testing.T) {
 	cam := NewCamera(testConfig)
 
 	// Test setting position
-	newPos := lin.Vec3{1000, 2000, 3000}
+	newPos := dvec3.T{1000, 2000, 3000}
 	cam.SetPosition(newPos)
 
 	pos := cam.Position()
@@ -297,9 +297,7 @@ func TestMovement(t *testing.T) {
 
 	// Test forward movement
 	front, _, _ := impl.getVectors()
-	delta := lin.Vec3{}
-	delta.Scale(&front, 10.0)
-	impl.addPosition(delta)
+	impl.addPosition(front.Scaled(10.0))
 
 	newPos := cam.Position()
 
@@ -309,8 +307,7 @@ func TestMovement(t *testing.T) {
 	}
 
 	// Test backward movement to return to original
-	delta.Scale(&front, -10.0)
-	impl.addPosition(delta)
+	impl.addPosition(front.Scaled(-10.0))
 
 	finalPos := cam.Position()
 	if !equalVec3(finalPos, initialPos) {
@@ -382,10 +379,10 @@ func TestGPSValidFix(t *testing.T) {
 
 	// Calculate expected world coordinates
 	expectedX, expectedZ := coords.GPSToWorld(float32(expectedLat), float32(expectedLon))
-	expectedY := float32(expectedAlt) * HEIGHT_CONVERSION
+	expectedY := float64(float32(expectedAlt) * HEIGHT_CONVERSION)
 
 	pos := cam.Position()
-	if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
+	if !equal(pos[0], float64(expectedX)) || !equal(pos[1], expectedY) || !equal(pos[2], float64(expectedZ)) {
 		t.Errorf("GPS position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)",
 			pos, expectedX, expectedY, expectedZ)
 	}
@@ -405,9 +402,9 @@ func TestSensorDataStructure(t *testing.T) {
 	sensorData := impl.sensorManager.GetSensorData()
 
 	// Verify sensor data structure
-	if !equal(float32(sensorData.Yaw), float32(testYaw)) ||
-		!equal(float32(sensorData.Pitch), float32(testPitch)) ||
-		!equal(float32(sensorData.Roll), float32(testRoll)) {
+	if !equal(sensorData.Yaw, testYaw) ||
+		!equal(sensorData.Pitch, testPitch) ||
+		!equal(sensorData.Roll, testRoll) {
 		t.Errorf("Sensor data orientation incorrect. Got (%f, %f, %f), expected (%f, %f, %f)",
 			sensorData.Yaw, sensorData.Pitch, sensorData.Roll, testYaw, testPitch, testRoll)
 	}
@@ -443,18 +440,18 @@ func TestSetSensorData(t *testing.T) {
 	pos := cam.Position()
 	expectedX, expectedZ := coords.GPSToWorld(float32(testData.GPSPosition.Latitude),
 		float32(testData.GPSPosition.Longitude))
-	expectedY := float32(testData.GPSPosition.Altitude) * HEIGHT_CONVERSION
+	expectedY := float64(float32(testData.GPSPosition.Altitude) * HEIGHT_CONVERSION)
 
-	if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
+	if !equal(pos[0], float64(expectedX)) || !equal(pos[1], expectedY) || !equal(pos[2], float64(expectedZ)) {
 		t.Errorf("SetSensorData position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)",
 			pos, expectedX, expectedY, expectedZ)
 	}
 
 	// Verify orientation was updated
 	yaw, pitch, roll := impl.getOrientation()
-	if !equal(float32(yaw), float32(testData.Yaw)) ||
-		!equal(float32(pitch), float32(testData.Pitch)) ||
-		!equal(float32(roll), float32(testData.Roll)) {
+	if !equal(yaw, testData.Yaw) ||
+		!equal(pitch, testData.Pitch) ||
+		!equal(roll, testData.Roll) {
 		t.Errorf("SetSensorData orientation not updated correctly. Got (%f, %f, %f), expected (%f, %f, %f)",
 			yaw, pitch, roll, testData.Yaw, testData.Pitch, testData.Roll)
 	}
@@ -467,7 +464,7 @@ func TestMotionState(t *testing.T) {
 	impl := getCameraImpl(cam)
 
 	// Set some known state
-	testPos := lin.Vec3{1000, 2000, 3000}
+	testPos := dvec3.T{1000, 2000, 3000}
 	cam.SetPosition(testPos)
 
 	testYaw, testPitch, testRoll := 1.0, 0.5, -0.3
@@ -482,9 +479,9 @@ func TestMotionState(t *testing.T) {
 	}
 
 	// Verify orientation
-	if !equal(float32(state.Orientation.Yaw), float32(testYaw)) ||
-		!equal(float32(state.Orientation.Pitch), float32(testPitch)) ||
-		!equal(float32(state.Orientation.Roll), float32(testRoll)) {
+	if !equal(state.Orientation.Yaw, testYaw) ||
+		!equal(state.Orientation.Pitch, testPitch) ||
+		!equal(state.Orientation.Roll, testRoll) {
 		t.Errorf("Motion state orientation incorrect. Got (%f, %f, %f), expected (%f, %f, %f)",
 			state.Orientation.Yaw, state.Orientation.Pitch, state.Orientation.Roll,
 			testYaw, testPitch, testRoll)
@@ -503,15 +500,15 @@ func TestResetOrientation(t *testing.T) {
 
 	// Verify orientation is reset
 	yaw, pitch, roll := impl.getOrientation()
-	if !equal(float32(yaw), 0.0) || !equal(float32(pitch), 0.0) || !equal(float32(roll), 0.0) {
+	if !equal(yaw, 0.0) || !equal(pitch, 0.0) || !equal(roll, 0.0) {
 		t.Errorf("Orientation not reset correctly. Got (%f, %f, %f), expected (0, 0, 0)",
 			yaw, pitch, roll)
 	}
 
 	// Verify vectors are reset to initial state
 	front, right, up := impl.getVectors()
-	expectedFront := lin.Vec3{0, 0, -1}
-	expectedRight := lin.Vec3{1, 0, 0}
+	expectedFront := dvec3.T{0, 0, -1}
+	expectedRight := dvec3.T{1, 0, 0}
 	expectedUp := START_CAMERA_UP
 
 	if !equalVec3(front, expectedFront) {
@@ -531,11 +528,11 @@ func TestCameraUpdate(t *testing.T) {
 	cam := NewCamera(testConfig)
 
 	// Test that update doesn't crash
-	cam.Update(1.0 / 60.0) // 60 FPS delta time
+	cam.Update()
 
 	// Currently Update doesn't do much, but this ensures the interface works
 	pos := cam.Position()
-	if equalVec3(pos, lin.Vec3{0, 0, 0}) {
+	if equalVec3(pos, dvec3.T{0, 0, 0}) {
 		t.Log("Update method executed without error")
 	}
 }
@@ -550,7 +547,7 @@ func TestThreadSafety(t *testing.T) {
 	// Goroutine 1: Keep updating position
 	go func() {
 		for i := range 100 {
-			newPos := lin.Vec3{float32(i), float32(i * 2), float32(i * 3)}
+			newPos := dvec3.T{float64(i), float64(i * 2), float64(i * 3)}
 			cam.SetPosition(newPos)
 			time.Sleep(time.Microsecond)
 		}

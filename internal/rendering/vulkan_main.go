@@ -14,6 +14,7 @@ import (
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -23,8 +24,8 @@ import (
 func NewApplication(cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:    cfg.CameraStartPos,
-		StartDir:    cfg.CameraStartDir,
+		StartPos:    dvec3.T{float64(cfg.CameraStartPos[0]), float64(cfg.CameraStartPos[1]), float64(cfg.CameraStartPos[2])},
+		StartDir:    dvec3.T{float64(cfg.CameraStartDir[0]), float64(cfg.CameraStartDir[1]), float64(cfg.CameraStartDir[2])},
 		EnableGPS:   cfg.UseGPS,
 		EnableHat:   cfg.UseHat,
 		DecimalYear: time.Now(),
@@ -107,12 +108,13 @@ func (app *Application) NextFrame() {
 
 	// Set camera position in UBO for terrain height warnings
 	cameraPos := app.camera.Position()
-	app.ubo.CameraPos = cameraPos
+	app.ubo.CameraPos = lin.Vec3{float32(cameraPos[0]), float32(cameraPos[1]), float32(cameraPos[2])}
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
-	app.StreamManager.UpdateCameraPosition(cameraPos)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
+	cameraPosLin := lin.Vec3{float32(cameraPos[0]), float32(cameraPos[1]), float32(cameraPos[2])}
+	app.StreamManager.UpdateCameraPosition(cameraPosLin)
+	app.RoadStreamer.UpdatePos(cameraPosLin)
 
 	app.camera.ProcessInput(app.WindowHandle)
 	// Update system stats periodically

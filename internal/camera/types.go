@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/go-gl/glfw/v3.3/glfw"
+	dmat4 "github.com/ungerik/go3d/float64/mat4"
+	dvec3 "github.com/ungerik/go3d/float64/vec3"
 	lin "github.com/xlab/linmath"
 )
 
@@ -15,7 +17,7 @@ const (
 )
 
 var (
-	START_CAMERA_UP  = lin.Vec3{0.0, 1.0, 0.0}
+	START_CAMERA_UP  = dvec3.T{0.0, 1.0, 0.0}
 	CAMERA_SPEED     = float32(10.0)
 	LOOK_SENSITIVITY = float32((2 * 3.14159) / (SPR * FPS))
 )
@@ -54,10 +56,10 @@ type GPSPosition struct {
 // Camera interface defines what external systems need from the camera
 type Camera interface {
 	// Position and orientation
-	Position() lin.Vec3
-	ViewMatrix() lin.Mat4x4
-	SetPosition(pos lin.Vec3)
-	PlaneMatrix(*lin.Mat4x4)
+	Position() dvec3.T
+	ViewMatrix() dmat4.T
+	SetPosition(pos dvec3.T)
+	PlaneMatrix(*dmat4.T)
 
 	// Input processing
 	ProcessInput(window *glfw.Window)
@@ -67,7 +69,7 @@ type Camera interface {
 	EnableSensors(sensorScript string) error
 
 	// Updates and info
-	Update(deltaTime float32)
+	Update()
 	GetPositionString() string
 	GetViewVectors() string
 
@@ -87,8 +89,8 @@ const (
 
 // CameraConfig holds camera initialization parameters
 type CameraConfig struct {
-	StartPos    lin.Vec3
-	StartDir    lin.Vec3
+	StartPos    dvec3.T
+	StartDir    dvec3.T
 	EnableGPS   bool
 	EnableHat   bool
 	DecimalYear time.Time
