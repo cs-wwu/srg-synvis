@@ -88,6 +88,11 @@ type Application struct {
 }
 
 const (
+	ARC_DEGREES_TO_MINUTES = 60.0
+	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
+)
+
+const (
 	MAPS_PATH             = "assets/maps/"
 	DEFAULT_WINDOW_WIDTH  = 800
 	DEFAULT_WINDOW_HEIGHT = 480
