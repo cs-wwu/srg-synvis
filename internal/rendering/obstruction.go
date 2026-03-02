@@ -6,8 +6,14 @@ import (
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
+	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	vk "github.com/vulkan-go/vulkan"
+
 	"github.com/ungerik/go3d/vec2"
 	"github.com/ungerik/go3d/vec3"
+	as "github.com/vulkan-go/asche"
+	"google.golang.org/protobuf/proto"
 )
 
 type Shape int
@@ -100,7 +106,61 @@ func toWorldHeight(obstruction *pb.FAAPoint) float32 {
 	return float32((obstruction.Height * 0.3048) * (ARC_DEGREES_TO_MINUTES / 1852)) // feet to meters to arcseconds
 }
 
-func buildObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
+func (app *Application) buildObstruction(pos streaming.LatLonInt) *ObstructionSquare {
+	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
+	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
+	obstructionSquare := pb.ObstructionSquare{}
+	file, err := FileToBytesChecked(obstructionFile)
+	if err != nil {
+		log.Printf("vulkan: error loading obstruction square %s: %v", obstructionFile, err)
+		return nil
+	}
+
+	err = proto.Unmarshal(file, &obstructionSquare)
+	if err != nil {
+		log.Printf("vulkan: error unmarshaling obstruction square: %s: %v", obstructionFile, err)
+		return nil
+	}
+
+	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	if err != nil {
+		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
+		return nil
+	}
+
+	heightInfo := newHeightInfo(mapData.HeightData)
+	builder := newObstructionBuilder(heightInfo)
+
+	for _, obstruction := range obstructionSquare.Obstructions {
+		renderObstruction(builder, obstruction)
+	}
+
+	if len(builder.vertices) == 0 || len(builder.indices) == 0 || len(obstructionSquare.Obstructions) == 0 {
+		return nil
+	}
+
+	vertices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.vertexBytes(),
+		vk.BufferUsageVertexBufferBit,
+	)
+
+	indices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.indexBytes(),
+		vk.BufferUsageIndexBufferBit,
+	)
+
+	return &ObstructionSquare{
+		vertices:   vertices,
+		indices:    indices,
+		indexCount: uint32(len(builder.indices)),
+	}
+}
+
+func renderObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
 	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color
 
