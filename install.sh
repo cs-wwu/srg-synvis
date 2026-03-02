@@ -29,7 +29,7 @@ fi
 if [ "$EUID" -eq 0 ]; then
     echo -e "${GREEN}Installing Vulkan dependencies...${NC}"
     apt update || error_exit "Failed to update apt"
-    apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-validationlayers-dev spirv-tools libglfw3-dev \
+    apt -y install mesa-vulkan-drivers vulkan-tools libvulkan-dev vulkan-utility-libraries-dev spirv-tools libglfw3-dev \
         libglm-dev libxi-dev libxxf86vm-dev libxcursor-dev libxinerama-dev libxrandr-dev ||
         error_exit "Failed to install Vulkan dependencies"
 
@@ -76,6 +76,7 @@ GO_URL="https://golang.org/dl/${GO_FILENAME}"
 wget -q "$GO_URL" -O "/tmp/${GO_FILENAME}" || error_exit "Failed to download Go"
 tar -C "$GO_INSTALL_DIR" -xzf "/tmp/${GO_FILENAME}" || error_exit "Failed to extract Go"
 rm "/tmp/${GO_FILENAME}"
+
 
 # Detect shell and update PATH
 SHELL_TYPE=$(basename "$SHELL")

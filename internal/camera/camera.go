@@ -9,6 +9,7 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 	dmat4 "github.com/ungerik/go3d/float64/mat4"
 	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	"github.com/elokore/glfw/v3.4/glfw"
 	lin "github.com/xlab/linmath"
 )
 
@@ -123,6 +124,10 @@ func NewCamera(config CameraConfig) Camera {
 // Position returns the current camera position
 func (c *CameraImpl) Position() dvec3.T {
 	return c.pos
+}
+
+func (c *CameraImpl) Speed() float32 {
+	return c.speed
 }
 
 func (c *CameraImpl) MapView() bool {

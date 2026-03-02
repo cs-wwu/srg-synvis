@@ -17,6 +17,8 @@ type DegreeChunkStreamer[T any] struct {
 	Chunks map[LatLonInt]T
 
 	request chan LatLonInt
+
+	pending map[LatLonInt]bool
 }
 
 // TODO: These really should be consolidated. Also chunks aren't square.
@@ -37,6 +39,7 @@ type LatLonFloat struct {
 func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T] {
 	streamer := &DegreeChunkStreamer[T]{
 		Chunks:  make(map[LatLonInt]T),
+		pending: make(map[LatLonInt]bool),
 		request: make(chan LatLonInt, 64),
 	}
 
@@ -48,11 +51,11 @@ func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T]
 
 				streamer.Lock()
 				streamer.Chunks[pos] = chunk
+				delete(streamer.pending, pos)
 				streamer.Unlock()
 			}
 		}()
 	}
-
 	return streamer
 }
 
@@ -60,16 +63,29 @@ func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
 	d.Lock()
 	defer d.Unlock()
 
-	lon_req := int(math.Round(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
-	lat_req := int(math.Round(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
+	lon_req := int(math.Floor(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
+	lat_req := int(math.Floor(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
 
 	for lon := lon_req - 1; lon <= lon_req+1; lon++ {
 		for lat := lat_req - 1; lat <= lat_req+1; lat++ {
 			pos := LatLonInt{Lat: lat, Lon: lon}
-			_, ok := d.Chunks[pos]
-			if !ok {
+			_, exists := d.Chunks[pos]
+			_, isPending := d.pending[pos]
+			if !exists && !isPending {
+				d.pending[pos] = true
 				d.request <- pos
 			}
 		}
 	}
+}
+
+func (d *DegreeChunkStreamer[T]) GetLoaded() []T {
+	d.Lock()
+	defer d.Unlock()
+
+	chunks := make([]T, 0, len(d.Chunks))
+	for _, chunk := range d.Chunks {
+		chunks = append(chunks, chunk)
+	}
+	return chunks
 }

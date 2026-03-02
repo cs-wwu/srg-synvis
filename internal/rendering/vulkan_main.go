@@ -10,11 +10,12 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	as "github.com/vulkan-go/asche"
 
 	// as "github.com/vulkan-go/asche"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	dvec3 "github.com/ungerik/go3d/float64/vec3"
+	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -39,11 +40,12 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera:       cam,
-		Gps:          cfg.UseGPS,
-		Hat:          cfg.UseHat,
-		cfg:          cfg,
-		statsTracker: NewStatsTracker(1000, 5*time.Second),
+		camera:            cam,
+		Gps:               cfg.UseGPS,
+		Hat:               cfg.UseHat,
+		cfg:               cfg,
+		statsTracker:      NewStatsTracker(1000, 5*time.Second),
+		lastAirspaceCheck: time.Now(),
 	}
 
 	if cfg.BenchmarkMode {
@@ -66,6 +68,8 @@ func (app *Application) VulkanContextCleanup() error {
 
 	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
+	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
+	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
 
 	// Skybox resources
 	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
@@ -112,11 +116,20 @@ func (app *Application) NextFrame() {
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
-	cameraPosLin := lin.Vec3{float32(cameraPos[0]), float32(cameraPos[1]), float32(cameraPos[2])}
-	app.StreamManager.UpdateCameraPosition(cameraPosLin)
-	app.RoadStreamer.UpdatePos(cameraPosLin)
+  cameraPosLin := lin.Vec3{float32(cameraPos[0]), float32(cameraPos[1]), float32(cameraPos[2])}
+	app.StreamManager.UpdateCameraPosition(cameraPos)
+	app.RoadStreamer.UpdatePos(app.camera.Position())
+	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+
+	// Check current airspace periodically
+	if time.Since(app.lastAirspaceCheck) > 100*time.Millisecond {
+		app.UpdateCurrentAirspace()
+		app.lastAirspaceCheck = time.Now()
+	}
 
 	app.camera.ProcessInput(app.WindowHandle)
+
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.cfg.DebugMode,                 // validation layers
@@ -247,7 +260,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	app.StreamManager.RenderChunks(cmd)
 
-	// Draw roads last
+	// Draw roads
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
@@ -261,6 +274,47 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		}
 	}
 	app.RoadStreamer.Unlock()
+
+	// Draw Obstructions
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.obstructionPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
+		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.ObstructionStreamer.Lock()
+	for _, obstructionSquare := range app.ObstructionStreamer.Chunks {
+		if obstructionSquare != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{obstructionSquare.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, obstructionSquare.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, obstructionSquare.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.ObstructionStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

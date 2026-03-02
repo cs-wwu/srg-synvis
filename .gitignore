@@ -11,6 +11,9 @@
 # Test binary, built with `go test -c`
 *.test
 
+# Output from go build
+svs
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -34,5 +37,31 @@ go.work
 # Vulkan out file
 experimemtal/vulkan/shape/VulkanTest
 
+#Imgui Build
+/imgui-build
+internal/rendering/ui/build
+imgui.ini
+pkg/imgui
 # Environment file
 .env
+
+# KMD add-ons
+*.iml
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+.idea
+.DS_Store
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+node_modules/

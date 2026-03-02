@@ -377,11 +377,8 @@ func (sm *StreamManager) handleCameraUpdate(newPos lin.Vec2) {
 
 // periodicUpdate runs maintenance tasks
 func (sm *StreamManager) periodicUpdate() {
-	// Queue missing chunks for loading
 	sm.queueMissingChunks()
-
-	// Check for chunks that need eviction (when memory is getting full)
-	sm.checkMemoryPressure()
+	sm.queueDistantChunksForEviction()
 }
 
 // updateChunkSelection updates which chunks should be loaded
@@ -413,31 +410,21 @@ func (sm *StreamManager) queueMissingChunks() {
 	}
 }
 
-// checkMemoryPressure evicts chunks when memory usage is high
-func (sm *StreamManager) checkMemoryPressure() {
-	stats := sm.bucketAllocator.Stats()
-
-	// If memory usage > 85%, start evicting distant chunks
-	usagePercent := float32(stats.UsedSize) / float32(stats.TotalSize)
-	if usagePercent > 0.85 {
-		sm.queueDistantChunksForEviction()
-	}
-}
-
 // queueDistantChunksForEviction adds distant ready chunks to eviction queue
 func (sm *StreamManager) queueDistantChunksForEviction() {
 	readyChunks := sm.stateManager.ListChunksByState(streaming.StateReady)
 
-	// Find chunks to evict (furthest from camera first)
 	for _, record := range readyChunks {
-		// Calculate distance from current camera position
 		chunkWorldPos := sm.chunkSelector.GridToWorld(record.GridCoord)
 		dx := chunkWorldPos[0] - sm.lastCameraPos[0]
 		dz := chunkWorldPos[1] - sm.lastCameraPos[1]
-		distance := dx*dx + dz*dz // Use squared distance for efficiency
+		distance_squared := dx*dx + dz*dz
 
-		// If chunk is far and not in frustum, queue for eviction
-		if distance > sm.cfg.RenderDistance*sm.cfg.RenderDistance*0.5 {
+		// Remove chunks that are 10% outside of render distance. This
+		// avoids reloading chunks frequently that are right on the edge
+		// of visiblity.
+		threshold := sm.cfg.RenderDistance * 1.1
+		if distance_squared > threshold*threshold {
 			sm.workerPool.QueueEvictJob(record.GridCoord, record.Priority)
 		}
 	}

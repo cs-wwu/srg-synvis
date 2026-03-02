@@ -144,6 +144,7 @@ func DownloadHeightmaps(heightmaps []string, directoryPath string) error {
 		}
 
 		filepath := directoryPath + heightmap + ".zip"
+		fmt.Printf("at: %s\n", filepath)
 		err = attemptDownload(client, creds, filepath, heightmapURL)
 		if err != nil {
 			return fmt.Errorf("failed to download heightmap: %v", err)

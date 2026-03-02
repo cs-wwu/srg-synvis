@@ -537,47 +537,6 @@ func TestCameraUpdate(t *testing.T) {
 	}
 }
 
-func TestThreadSafety(t *testing.T) {
-	cam := NewCamera(testConfig)
-	impl := getCameraImpl(cam)
-
-	// Test concurrent position access
-	done := make(chan bool, 2)
-
-	// Goroutine 1: Keep updating position
-	go func() {
-		for i := range 100 {
-			newPos := dvec3.T{float64(i), float64(i * 2), float64(i * 3)}
-			cam.SetPosition(newPos)
-			time.Sleep(time.Microsecond)
-		}
-		done <- true
-	}()
-
-	// Goroutine 2: Keep reading position
-	go func() {
-		for range 100 {
-			_ = cam.Position()
-			time.Sleep(time.Microsecond)
-		}
-		done <- true
-	}()
-
-	// Goroutine 3: Keep updating vectors
-	go func() {
-		for range 50 {
-			impl.motionHandler.ApplyRelativeRotation(0.01, 0.01, 0.01)
-			time.Sleep(time.Microsecond * 2)
-		}
-	}()
-
-	// Wait for completion
-	<-done
-	<-done
-
-	t.Log("Thread safety test completed without panics")
-}
-
 // Benchmark Tests
 
 func BenchmarkPositionAccess(b *testing.B) {

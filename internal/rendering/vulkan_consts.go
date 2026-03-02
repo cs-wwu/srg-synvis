@@ -1,12 +1,17 @@
 package rendering
 
 import (
+	"time"
+
 	"github.com/cs-wwu/srg-synvis/internal/camera"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
-	as "github.com/cs-wwu/srg-synvis/pkg/asche"
+	"github.com/elokore/cimgui-go-vulkan/backend"
+	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
+	as "github.com/vulkan-go/asche"
 
-	"github.com/go-gl/glfw/v3.3/glfw"
+	"github.com/elokore/glfw/v3.4/glfw"
+
 	// as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 )
@@ -40,8 +45,18 @@ type Application struct {
 	planeIndexMemory  vk.DeviceMemory
 	planeIndexCount   uint32
 
+	// Airspaces
+	AirspaceStreamer        *streaming.DegreeChunkStreamer[*Airspace]
+	airspacePipeline        vk.Pipeline
+	airspaceStencilPipeline vk.Pipeline
+	currentAirspace         *Feature
+	lastAirspaceCheck       time.Time
+
 	// Roads
 	roadPipeline vk.Pipeline
+
+	// Obstructions
+	obstructionPipeline vk.Pipeline
 
 	// Skybox resources
 	skyboxPipeline     vk.Pipeline
@@ -60,8 +75,11 @@ type Application struct {
 	camera        camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
+	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
 	RoadStreamer *streaming.DegreeChunkStreamer[*RoadSquare]
+
+	ObstructionStreamer *streaming.DegreeChunkStreamer[*ObstructionSquare]
 
 	Gps bool
 	Hat bool
@@ -80,6 +98,16 @@ var texEnabled = []string{
 }
 
 const (
-	DepthFormat   = vk.FormatD16Unorm
+	DepthFormat   = vk.FormatD24UnormS8Uint
 	TextureFormat = vk.FormatR8g8b8a8Unorm
 )
+
+var airspaceColors = map[string][4]float32{
+	"A": {0.8, 0.0, 0.0, 0.4},  // Red - highest priority controlled airspace
+	"B": {0.0, 0.0, 0.5, 0.3},  // Dark blue - major airport terminal areas
+	"C": {0.8, 0.0, 0.8, 0.3},  // Magenta - medium airport areas
+	"D": {0.0, 0.0, 1.0, 0.25}, // Blue - smaller controlled airports
+	"E": {0.5, 0.5, 0.5, 0.15}, // Gray - controlled airspace (transparent)
+	"F": {0.0, 0.5, 0.0, 0.2},  // Green - special use (rare in US)
+	"G": {0.3, 0.3, 0.3, 0.1},  // Light gray - uncontrolled (very transparent)
+}
