@@ -46,6 +46,11 @@ var ROAD_TYPES = map[string]RoadType{
 	"taxiway":  {Width: 2, Color: vec3.T{0.9, 0.5, 0.8}},
 }
 
+const (
+	ROAD_OFFSET            = float32(1.0)
+	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
+)
+
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	points := make([]vec2.T, len(road.Points))
 	for i, point := range road.Points {

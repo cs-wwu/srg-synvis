@@ -90,9 +90,6 @@ type Application struct {
 const (
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
-
-	ROAD_OFFSET            = float32(1.0)
-	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
 )
 
 const (
