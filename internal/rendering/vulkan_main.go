@@ -38,7 +38,7 @@ func NewApplication(cfg models.AppConfig) *Application {
 		}
 	}
 	app := &Application{
-		camera:            *cam,
+		camera:            cam,
 		Gps:               cfg.UseGPS,
 		Hat:               cfg.UseHat,
 		cfg:               cfg,
