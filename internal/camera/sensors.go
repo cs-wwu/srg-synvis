@@ -17,7 +17,7 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera      *CameraImpl
+	camera      *Camera
 	testingMode bool // When true, skips smoothing for deterministic test results
 }
 
@@ -28,7 +28,7 @@ func (sm *SensorManager) SetTestingMode(enabled bool) {
 }
 
 // NewSensorManager creates a new sensor manager
-func NewSensorManager(camera *CameraImpl) *SensorManager {
+func NewSensorManager(camera *Camera) *SensorManager {
 	return &SensorManager{
 		camera:      camera,
 		testingMode: false,

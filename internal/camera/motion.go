@@ -8,7 +8,7 @@ import (
 
 // MotionHandler handles camera movement and rotation calculations
 type MotionHandler struct {
-	camera *CameraImpl
+	camera *Camera
 }
 
 // Quaternion-based rotation vectors for consistent calculations
@@ -19,7 +19,7 @@ var (
 )
 
 // NewMotionHandler creates a new motion handler
-func NewMotionHandler(camera *CameraImpl) *MotionHandler {
+func NewMotionHandler(camera *Camera) *MotionHandler {
 	return &MotionHandler{
 		camera: camera,
 	}
