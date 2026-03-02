@@ -317,8 +317,8 @@ func TestGPSNoFix(t *testing.T) {
 
 	initialPos := cam.Position()
 
-	// Enable testing mode to skip smoothing for deterministic test results
-	cam.sensorManager.SetTestingMode(true)
+	// Disable smoothing for deterministic test results
+	cam.sensorManager.SetSmoothing(false)
 
 	// Start GPS in background
 	go cam.sensorManager.StartGPS()
@@ -344,8 +344,8 @@ func TestGPSValidFix(t *testing.T) {
 	mock := NewMockGPSD(t)
 	defer mock.Close()
 
-	// Enable testing mode to skip smoothing for deterministic test results
-	cam.sensorManager.SetTestingMode(true)
+	// Disable smoothing for deterministic test results
+	cam.sensorManager.SetSmoothing(false)
 
 	// Start GPS in background
 	done := make(chan bool)
@@ -513,7 +513,7 @@ func TestCameraUpdate(t *testing.T) {
 	// Test that update doesn't crash
 	cam.Update(1.0 / 60.0) // 60 FPS delta time
 
-	// Currently Update doesn't do much, but this ensures the interface works
+	// Currently Update doesn't do much
 	pos := cam.Position()
 	if equalVec3(pos, lin.Vec3{0, 0, 0}) {
 		t.Log("Update method executed without error")
