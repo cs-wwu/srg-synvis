@@ -94,6 +94,10 @@ const (
 	OBSTRUCTION_BASE_RADIUS = 3.0
 )
 
+var (
+	OBSTRUCTION_COLOR = vec3.T{0.8, 0.5, 0.2} // orange-ish color
+)
+
 func toWorldLon(obstruction *pb.FAAPoint) float32 {
 	return float32(obstruction.Lon * ARC_DEGREES_TO_SECONDS)
 }
@@ -162,7 +166,7 @@ func (app *Application) buildObstruction(pos streaming.LatLonInt) *ObstructionSq
 
 func renderObstruction(builder *ObstructionBuilder, obstruction *pb.FAAPoint) {
 
-	builder.color = vec3.T{0.8, 0.5, 0.2} // orange-ish color
+	builder.color = OBSTRUCTION_COLOR
 
 	// Get obstruction shape
 	obsShape, ok := obsShapesMap[obstruction.Type]

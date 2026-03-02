@@ -24,15 +24,6 @@ type RoadBuilder struct {
 	color vec3.T
 }
 
-// TODO: Consolidate? Maybe move this conversion around?
-const (
-	ARC_DEGREES_TO_MINUTES = 60.0
-	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
-
-	ROAD_OFFSET            = float32(1.0)
-	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
-)
-
 func toWorld(point *pb.Point) vec2.T {
 	return vec2.T{
 		point.Lon * ARC_DEGREES_TO_SECONDS,
@@ -61,6 +52,11 @@ var ROAD_TYPES = map[string]RoadType{
 	"airstrip": {Width: 5, Color: vec3.T{0.9, 0.5, 0.8}},
 	"taxiway":  {Width: 2, Color: vec3.T{0.9, 0.5, 0.8}},
 }
+
+const (
+	ROAD_OFFSET            = float32(1.0)
+	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
+)
 
 func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
 
