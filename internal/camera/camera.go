@@ -10,7 +10,7 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-// Camera implements the Camera interface
+// The camera is the view and its associated position/rotation
 type Camera struct {
 	// Position and orientation vectors
 	pos   *lin.Vec3 // (x, y, z)
