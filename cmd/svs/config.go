@@ -35,7 +35,7 @@ func parseConfig() models.AppConfig {
 	fov := flag.Float64("fov", 60.0, "Field of view (degrees)")
 
 	flag.BoolVar(&config.DisableTerrainWarnings, "disable-warnings", false, "Disable terrain height warnings (red coloring)")
-	flag.BoolVar(&config.DebugMode, "debug", false, "Enable debug mode")
+	flag.BoolVar(&config.DebugMode, "debug", true, "Enable debug mode")
 	flag.BoolVar(&config.DisableFog, "disable-fog", false, "Disables Fog")
 	flag.BoolVar(&config.UncapFPS, "uncap-fps", false, "Uncap FPS for performance testing")
 	flag.BoolVar(&config.BenchmarkMode, "benchmark", false, "Enable benchmark mode (stat tracking/printing)")

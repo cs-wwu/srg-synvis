@@ -169,6 +169,10 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	doneC := make(chan struct{}, 2)
 	exitC := make(chan struct{}, 2)
 	defer closer.Bind(func() {
+		app.CimguiBackend.Cleanup()
+		app.Destroy()
+		//platform.Destroy()
+
 		exitC <- struct{}{}
 		<-doneC
 		log.Println("Bye!")
@@ -184,11 +188,8 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	for {
 		select {
 		case <-exitC:
-			app.CimguiBackend.Cleanup()
-			app.Destroy()
-			platform.Destroy()
-			window.Destroy()
-			glfw.Terminate()
+			// window.Destroy()
+			// glfw.Terminate()
 			doneC <- struct{}{}
 			return
 		case <-fpsTicker.C:

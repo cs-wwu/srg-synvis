@@ -64,7 +64,67 @@ func (u *UniformBufferObject) Data() []byte {
 	return (*[m]byte)(unsafe.Pointer(u))[:UBOSize]
 }
 
-func (app *Application) Destroy() {}
+func (app *Application) Destroy() {
+	dev := app.Context().Device()
+	vk.DeviceWaitIdle(dev)
+
+	// Pipelines
+	vk.DestroyPipeline(dev, app.pipeline, nil)
+	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
+	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
+	vk.DestroyPipeline(dev, app.obstructionPipeline, nil)
+	vk.DestroyPipeline(dev, app.planePipeline, nil)
+	vk.DestroyPipeline(dev, app.roadPipeline, nil)
+	vk.DestroyPipeline(dev, app.skyboxPipeline, nil)
+
+	// Set to null so asche doesnt mess with it
+	app.pipeline = vk.NullPipeline
+	app.airspacePipeline = vk.NullPipeline
+	app.airspaceStencilPipeline = vk.NullPipeline
+	app.obstructionPipeline = vk.NullPipeline
+	app.planePipeline = vk.NullPipeline
+	app.roadPipeline = vk.NullPipeline
+	app.skyboxPipeline = vk.NullPipeline
+	println("Cleanup pipelines")
+
+	// Render pass and pipeline layout
+	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
+	vk.DestroyRenderPass(dev, app.renderPass, nil)
+	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+
+	app.pipelineLayout = vk.NullPipelineLayout
+	app.renderPass = vk.NullRenderPass
+	app.descLayout = vk.NullDescriptorSetLayout
+	println("Cleanup Layouts and Render pass")
+
+	// Buffers
+	vk.DestroyBuffer(dev, app.planeVertexBuffer, nil)
+	vk.DestroyBuffer(dev, app.planeIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
+
+	app.planeVertexBuffer = vk.NullBuffer
+	app.planeIndexBuffer = vk.NullBuffer
+	app.skyboxIndexBuffer = vk.NullBuffer
+	app.skyboxVertexBuffer = vk.NullBuffer
+	println("Cleanup Buffers")
+
+	// Memory
+	vk.FreeMemory(dev, app.planeIndexMemory, nil)
+	vk.FreeMemory(dev, app.planeVertexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
+
+	app.planeIndexMemory = vk.NullDeviceMemory
+	app.planeVertexMemory = vk.NullDeviceMemory
+	app.skyboxIndexMemory = vk.NullDeviceMemory
+	app.skyboxVertexMemory = vk.NullDeviceMemory
+
+	println("Freed vulkan device memory")
+
+	app.Context().Platform().Destroy()
+
+}
 
 type RoadSquare struct {
 	vertices   *as.Buffer
