@@ -23,10 +23,10 @@ import (
 func NewApplication(cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:    cfg.CameraStartPos,
-		StartDir:    cfg.CameraStartDir,
-		EnableGPS:   cfg.UseGPS,
-		EnableHat:   cfg.UseHat,
+		StartPos:  cfg.CameraStartPos,
+		StartDir:  cfg.CameraStartDir,
+		EnableGPS: cfg.UseGPS,
+		EnableHat: cfg.UseHat,
 	}
 	cam := camera.NewCamera(cameraConfig)
 

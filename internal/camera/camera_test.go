@@ -18,10 +18,10 @@ var (
 	testStartPos = lin.Vec3{-442800, 162.11664, -172800}
 	testStartDir = lin.Vec3{0, 0, -1}
 	testConfig   = CameraConfig{
-		StartPos:    testStartPos,
-		StartDir:    testStartDir,
-		EnableGPS:   false,
-		EnableHat:   false,
+		StartPos:  testStartPos,
+		StartDir:  testStartDir,
+		EnableGPS: false,
+		EnableHat: false,
 	}
 )
 
@@ -182,8 +182,8 @@ func TestCameraInitialization(t *testing.T) {
 
 func TestCameraConfiguration(t *testing.T) {
 	customConfig := CameraConfig{
-		StartPos:    lin.Vec3{100, 200, 300},
-		StartDir:    lin.Vec3{1, 0, 0},
+		StartPos: lin.Vec3{100, 200, 300},
+		StartDir: lin.Vec3{1, 0, 0},
 	}
 
 	cam := NewCamera(customConfig)
