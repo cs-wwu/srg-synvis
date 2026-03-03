@@ -87,11 +87,6 @@ func NewCamera(config CameraConfig) *Camera {
 	camera.sensorManager = NewSensorManager(camera)
 	camera.motionHandler = NewMotionHandler(camera)
 
-	// Start hardware integration if requested
-	if config.EnableGPS {
-		go camera.sensorManager.StartGPS()
-	}
-
 	return camera
 }
 
