@@ -3,7 +3,6 @@ package camera
 import (
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/elokore/glfw/v3.4/glfw"
@@ -26,9 +25,6 @@ type Camera struct {
 	pitch float64 // Pitch relative to start
 	yaw   float64 // Yaw relative to start
 	roll  float64 // Roll angle relative to start
-
-	// Configuration
-	decimalYear time.Time // Date for magnetic world model
 
 	// Component managers
 	inputProcessor *InputProcessor
@@ -81,7 +77,6 @@ func NewCamera(config CameraConfig) *Camera {
 		right:       &right,
 		speed:       speed,
 		sensitivity: sensitivity,
-		decimalYear: config.DecimalYear,
 		pitch:       0.0,
 		roll:        0.0,
 		yaw:         0.0,

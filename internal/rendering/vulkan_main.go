@@ -27,7 +27,6 @@ func NewApplication(cfg models.AppConfig) *Application {
 		StartDir:    cfg.CameraStartDir,
 		EnableGPS:   cfg.UseGPS,
 		EnableHat:   cfg.UseHat,
-		DecimalYear: time.Now(),
 	}
 	cam := camera.NewCamera(cameraConfig)
 

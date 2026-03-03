@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 
@@ -187,7 +188,7 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	loc := egm96.NewLocationGeodetic(lat, lon, alt)
 
 	// Calculate magnetic field
-	mag, err := wmm.CalculateWMMMagneticField(loc, sm.camera.decimalYear)
+	mag, err := wmm.CalculateWMMMagneticField(loc, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to calculate magnetic field: %w", err)
 	}

@@ -20,7 +20,6 @@ var (
 	testConfig   = CameraConfig{
 		StartPos:    testStartPos,
 		StartDir:    testStartDir,
-		DecimalYear: time.Now(),
 		EnableGPS:   false,
 		EnableHat:   false,
 	}
@@ -185,7 +184,6 @@ func TestCameraConfiguration(t *testing.T) {
 	customConfig := CameraConfig{
 		StartPos:    lin.Vec3{100, 200, 300},
 		StartDir:    lin.Vec3{1, 0, 0},
-		DecimalYear: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 
 	cam := NewCamera(customConfig)
