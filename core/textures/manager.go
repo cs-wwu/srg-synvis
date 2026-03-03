@@ -106,7 +106,6 @@ func (tm *TextureManager) LoadTexture(id string, filepath string) (*Texture, err
 	defer func() {
 		vk.DestroyBuffer(tm.device, stagingBuffer, nil)
 		vk.FreeMemory(tm.device, stagingMemory, nil)
-		println("Cleaned staging buffer")
 	}()
 
 	// Create image
