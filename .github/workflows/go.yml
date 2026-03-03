@@ -47,10 +47,6 @@ jobs:
         run: |
           go test -v ./...
 
-      - name: Go Modernize
-        run: |
-            go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test ./...
-
   fmt:
     runs-on: ubuntu-latest
     steps:

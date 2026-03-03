@@ -100,7 +100,8 @@ func (sm *SensorManager) StartGPS() error {
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
-func (sm *SensorManager) StartSensors(filename string) Mode {
+func (sm *SensorManager) StartSensors() Mode {
+	filename := "./internal/camera/hat.py"
 	cmd := exec.Command("python3", filename)
 
 	// Create a pipe for standard output
