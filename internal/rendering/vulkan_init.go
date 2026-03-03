@@ -20,12 +20,8 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
-
-	obspb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
-	roadpb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
@@ -307,7 +303,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		if len(data) > 0 {
 			var pData unsafe.Pointer
 			ret = vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
-			if IsError(ret) {
+			if ret != vk.Success {
 				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
 				return tex
 			}
@@ -502,111 +498,6 @@ func (app *Application) prepareTextures() {
 	app.textures = make([]*Texture, 0, len(texEnabled))
 	for _, texFile := range texEnabled {
 		app.textures = append(app.textures, prepareTex(texFile))
-	}
-}
-
-func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
-
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
-	roadSquare := roadpb.RoadSquare{}
-	file, err := FileToBytesChecked(roadFile)
-	if err != nil {
-		log.Printf("vulkan: error loading road square %s: %v", roadFile, err)
-		return nil
-	}
-	err = proto.Unmarshal(file, &roadSquare)
-	if err != nil {
-		log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
-		return nil
-	}
-
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-		return nil
-	}
-	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newRoadBuilder(heightInfo)
-
-	for _, road := range roadSquare.Roads {
-		renderRoad(builder, road)
-	}
-
-	// NB: These buffers must be created while `builder` is still referenced,
-	// so that the `vertexBytes` and `indexBytes` methods return valid slices.
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
-	return &RoadSquare{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-	}
-}
-
-func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionSquare {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
-	obstructionSquare := obspb.ObstructionSquare{}
-	file, err := FileToBytesChecked(obstructionFile)
-	if err != nil {
-		log.Printf("vulkan: error loading obstruction square %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	err = proto.Unmarshal(file, &obstructionSquare)
-	if err != nil {
-		log.Printf("vulkan: error unmarshaling obstruction square: %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newObstructionBuilder(heightInfo)
-
-	for _, obstruction := range obstructionSquare.Obstructions {
-		buildObstruction(builder, obstruction)
-	}
-
-	if len(builder.vertices) == 0 || len(builder.indices) == 0 || len(obstructionSquare.Obstructions) == 0 {
-		return nil
-	}
-
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
-	return &ObstructionSquare{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
 	}
 }
 
@@ -1847,7 +1738,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
 	app.RoadStreamer.UpdatePos(app.camera.Position())
 
-	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
+	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.buildObstruction)
 	app.ObstructionStreamer.UpdatePos(app.camera.Position())
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
@@ -1899,10 +1790,6 @@ func (app *Application) VulkanContextPrepare() error {
 	// )
 
 	return nil
-}
-
-func IsError(ret vk.Result) bool {
-	return ret != vk.Success
 }
 
 func OrPanic(err error, finalizers ...func()) {

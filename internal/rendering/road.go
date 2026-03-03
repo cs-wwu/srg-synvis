@@ -1,8 +1,15 @@
 package rendering
 
 import (
+	"log"
 	"math"
 	"unsafe"
+
+	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	as "github.com/vulkan-go/asche"
+	vk "github.com/vulkan-go/vulkan"
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 	"github.com/ungerik/go3d/float64/vec2"
@@ -50,6 +57,57 @@ const (
 	ROAD_OFFSET            = float32(1.0)
 	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
 )
+
+func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
+
+	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
+	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
+	roadSquare := pb.RoadSquare{}
+	file, err := FileToBytesChecked(roadFile)
+	if err != nil {
+		log.Printf("vulkan: error loading road square %s: %v", roadFile, err)
+		return nil
+	}
+	err = proto.Unmarshal(file, &roadSquare)
+	if err != nil {
+		log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
+		return nil
+	}
+
+	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	if err != nil {
+		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
+		return nil
+	}
+	heightInfo := newHeightInfo(mapData.HeightData)
+	builder := newRoadBuilder(heightInfo)
+
+	for _, road := range roadSquare.Roads {
+		renderRoad(builder, road)
+	}
+
+	// NB: These buffers must be created while `builder` is still referenced,
+	// so that the `vertexBytes` and `indexBytes` methods return valid slices.
+	vertices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.vertexBytes(),
+		vk.BufferUsageVertexBufferBit,
+	)
+
+	indices := as.CreateBuffer(
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+		builder.indexBytes(),
+		vk.BufferUsageIndexBufferBit,
+	)
+
+	return &RoadSquare{
+		vertices:   vertices,
+		indices:    indices,
+		indexCount: uint32(len(builder.indices)),
+	}
+}
 
 func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	points := make([]vec2.T, len(road.Points))
