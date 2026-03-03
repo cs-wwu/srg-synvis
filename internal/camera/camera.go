@@ -194,8 +194,8 @@ func (c *CameraImpl) EnableGPS() error {
 }
 
 // EnableSensors starts sensor integration with the specified script
-func (c *CameraImpl) EnableSensors(sensorScript string) error {
-	go c.sensorManager.StartSensors(sensorScript)
+func (c *CameraImpl) EnableSensors() error {
+	go c.sensorManager.StartSensors()
 	return nil
 }
 
