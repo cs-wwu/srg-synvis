@@ -61,25 +61,70 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DeviceWaitIdle(dev)
 
 	// Stop background workers before destroying resources
-	app.StreamManager.Stop()
 	app.StreamManager.Destroy()
+	println("Destroyed stream manager")
+	app.CimguiBackend.Cleanup()
 
-	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
 	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
-
-	// Skybox resources
-	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
-	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.DestroyPipeline(dev, app.obstructionPipeline, nil)
+	vk.DestroyPipeline(dev, app.planePipeline, nil)
+	vk.DestroyPipeline(dev, app.roadPipeline, nil)
 	vk.DestroyPipeline(dev, app.skyboxPipeline, nil)
+	println("Destroyed pipelines")
 
+	// Render pass and pipeline layout
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
-	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
+	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+	vk.DestroyDescriptorPool(dev, app.descPool, nil)
+	println("Destroyed misc")
+
+	// Buffers
+	vk.DestroyBuffer(dev, app.planeVertexBuffer, nil)
+	vk.DestroyBuffer(dev, app.planeIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
+	println("Destroyed buffers")
+
+	// Memory
+	vk.FreeMemory(dev, app.planeIndexMemory, nil)
+	vk.FreeMemory(dev, app.planeVertexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
+	println("Freed device memory")
+
+	for _, stream := range app.AirspaceStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		if stream.instances != nil {
+			stream.instances.Destroy()
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Airspace stream Buffers and Device Memory")
+
+	for _, stream := range app.ObstructionStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Obstructions stream Buffers and Device Memory")
+
+	for _, stream := range app.RoadStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Road stream buffers and Device Memory")
 
 	for i := range app.textures {
 		if app.textures[i] != nil {
@@ -87,13 +132,13 @@ func (app *Application) VulkanContextCleanup() error {
 			app.textures[i] = nil
 		}
 	}
+	println("Destroyed textures")
 
 	if app.depth != nil {
 		app.depth.Destroy(dev)
 		app.depth = nil
 	}
-
-	vk.DeviceWaitIdle(dev)
+	println("Destroyed depth")
 
 	return nil
 }
