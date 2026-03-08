@@ -1,9 +1,9 @@
 package spatial
 
 import (
-	"math"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	lin "github.com/xlab/linmath"
 )
 
@@ -13,19 +13,16 @@ const (
 )
 
 func TestNewChunkSelector(t *testing.T) {
+	assert := assert.New(t)
+
 	cs := NewChunkSelector(testChunkSize, nil)
-	if cs == nil {
-		t.Fatal("NewChunkSelector returned nil")
-	}
-	if cs.chunkSize != testChunkSize {
-		t.Errorf("Expected chunk size %f, got %f", testChunkSize, cs.chunkSize)
-	}
-	if cs.lodStrategy == nil {
-		t.Error("Expected default LOD strategy to be created")
-	}
+	assert.NotNil(cs)
+	assert.Equal(float32(testChunkSize), cs.chunkSize)
+	assert.NotNil(cs.lodStrategy)
 }
 
 func TestWorldToGridConversion(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	tests := []struct {
@@ -41,14 +38,12 @@ func TestWorldToGridConversion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := cs.WorldToGrid(test.worldPos)
-		if result != test.expected {
-			t.Errorf("WorldToGrid(%v) = %v, expected %v", test.worldPos, result, test.expected)
-		}
+		assert.Equal(test.expected, cs.WorldToGrid(test.worldPos))
 	}
 }
 
 func TestGridToWorldConversion(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	tests := []struct {
@@ -62,14 +57,13 @@ func TestGridToWorldConversion(t *testing.T) {
 
 	for _, test := range tests {
 		result := cs.GridToWorld(test.gridCoord)
-		if math.Abs(float64(result[0]-test.expected[0])) > tolerance ||
-			math.Abs(float64(result[1]-test.expected[1])) > tolerance {
-			t.Errorf("GridToWorld(%v) = %v, expected %v", test.gridCoord, result, test.expected)
-		}
+		assert.InDelta(test.expected[0], result[0], tolerance)
+		assert.InDelta(test.expected[1], result[1], tolerance)
 	}
 }
 
 func TestRoundTripConversion(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	testPositions := []lin.Vec2{
@@ -81,14 +75,12 @@ func TestRoundTripConversion(t *testing.T) {
 		backToWorld := cs.GridToWorld(coord)
 
 		// Should be within the same chunk
-		coordAgain := cs.WorldToGrid(backToWorld)
-		if coord != coordAgain {
-			t.Errorf("Round trip failed: %v -> %v -> %v -> %v", pos, coord, backToWorld, coordAgain)
-		}
+		assert.Equal(coord, cs.WorldToGrid(backToWorld))
 	}
 }
 
 func TestGetNeighborCoords(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	center := GridCoord{5, 10}
@@ -102,13 +94,12 @@ func TestGetNeighborCoords(t *testing.T) {
 	}
 
 	for i, expected := range expected {
-		if neighbors[i] != expected {
-			t.Errorf("Neighbor %d: got %v, expected %v", i, neighbors[i], expected)
-		}
+		assert.Equal(expected, neighbors[i])
 	}
 }
 
 func TestLODStrategy(t *testing.T) {
+	assert := assert.New(t)
 	lodStrategy := NewDefaultLODStrategy(3, 500.0, 2.0)
 	cs := NewChunkSelector(testChunkSize, lodStrategy)
 
@@ -127,14 +118,12 @@ func TestLODStrategy(t *testing.T) {
 	for _, test := range tests {
 		// Position chunk at the test distance
 		coord := GridCoord{int(test.distance / testChunkSize), 0}
-		result := cs.CalculateLOD(coord, cameraPos)
-		if result != test.expectedLOD {
-			t.Errorf("CalculateLOD at distance %f: got LOD %d, expected %d", test.distance, result, test.expectedLOD)
-		}
+		assert.Equal(test.expectedLOD, cs.CalculateLOD(coord, cameraPos))
 	}
 }
 
 func TestPriorityCalculation(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 	cameraPos := lin.Vec2{0, 0}
 
@@ -147,17 +136,14 @@ func TestPriorityCalculation(t *testing.T) {
 	farPriorityInFrustum := cs.CalculatePriority(farCoord, cameraPos, true)
 
 	// In-frustum should have higher priority than out-of-frustum
-	if closePriorityInFrustum <= closePriorityOutFrustum {
-		t.Error("In-frustum priority should be higher than out-of-frustum")
-	}
+	assert.Greater(closePriorityInFrustum, closePriorityOutFrustum)
 
 	// Closer chunks should have higher priority
-	if farPriorityInFrustum >= closePriorityInFrustum {
-		t.Error("Closer chunks should have higher priority")
-	}
+	assert.Less(farPriorityInFrustum, closePriorityInFrustum)
 }
 
 func TestUpdateSelection(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	// Create a simple frustum that includes everything (for testing)
@@ -168,43 +154,34 @@ func TestUpdateSelection(t *testing.T) {
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
 	desired := cs.GetDesiredChunks()
-	if len(desired) == 0 {
-		t.Error("Expected some chunks to be selected")
-	}
+	assert.NotZero(len(desired))
 
 	// Check that all desired chunks are within render distance
 	for _, spec := range desired {
-		if spec.Distance > renderDistance {
-			t.Errorf("Chunk %v at distance %f exceeds render distance %f",
-				spec.GridCoord, spec.Distance, renderDistance)
-		}
+		assert.LessOrEqual(spec.Distance, renderDistance)
 	}
 }
 
 func TestChunkAvailabilityTracking(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	coord := GridCoord{1, 1}
 
 	// Initially should not be available
-	if cs.IsChunkAvailable(coord) {
-		t.Error("Chunk should not be available initially")
-	}
+	assert.False(cs.IsChunkAvailable(coord))
 
 	// Mark as available
 	cs.MarkChunkAvailable(coord)
-	if !cs.IsChunkAvailable(coord) {
-		t.Error("Chunk should be available after marking")
-	}
+	assert.True(cs.IsChunkAvailable(coord))
 
 	// Mark as unavailable
 	cs.MarkChunkUnavailable(coord)
-	if cs.IsChunkAvailable(coord) {
-		t.Error("Chunk should not be available after unmarking")
-	}
+	assert.False(cs.IsChunkAvailable(coord))
 }
 
 func TestMissingChunks(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	// Set up a selection with some chunks
@@ -218,23 +195,19 @@ func TestMissingChunks(t *testing.T) {
 	missing := cs.GetMissingChunks()
 	desired := cs.GetDesiredChunks()
 
-	if len(missing) != len(desired) {
-		t.Errorf("Expected %d missing chunks, got %d", len(desired), len(missing))
-	}
+	assert.Equal(len(desired), len(missing))
 
 	// Mark some chunks as available
 	if len(desired) > 0 {
 		cs.MarkChunkAvailable(desired[0].GridCoord)
 
 		newMissing := cs.GetMissingChunks()
-		if len(newMissing) != len(desired)-1 {
-			t.Errorf("Expected %d missing chunks after marking one available, got %d",
-				len(desired)-1, len(newMissing))
-		}
+		assert.Equal(len(desired)-1, len(newMissing))
 	}
 }
 
 func TestHighestPriorityMissing(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	// Set up selection
@@ -245,30 +218,26 @@ func TestHighestPriorityMissing(t *testing.T) {
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
 	highest := cs.GetHighestPriorityMissing()
+	assert.NotNil(highest)
 	if highest == nil {
-		t.Error("Expected a highest priority chunk")
 		return
 	}
 
 	// Should be closest to camera (highest priority)
 	missing := cs.GetMissingChunks()
 	for _, chunk := range missing {
-		if chunk.Priority > highest.Priority {
-			t.Errorf("Found chunk with higher priority than 'highest': %f > %f",
-				chunk.Priority, highest.Priority)
-		}
+		assert.LessOrEqual(chunk.Priority, highest.Priority)
 	}
 }
 
 func TestChunkDesiredStatus(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	coord := GridCoord{0, 0}
 
 	// Initially should not be desired
-	if cs.IsChunkDesired(coord) {
-		t.Error("Chunk should not be desired initially")
-	}
+	assert.False(cs.IsChunkDesired(coord))
 
 	// After selection that includes this chunk, it should be desired
 	frustum := createTestFrustum()
@@ -277,20 +246,17 @@ func TestChunkDesiredStatus(t *testing.T) {
 
 	cs.UpdateSelection(cameraPos, frustum, renderDistance)
 
-	if !cs.IsChunkDesired(coord) {
-		t.Error("Chunk should be desired after selection")
-	}
+	assert.True(cs.IsChunkDesired(coord))
 
 	// After moving camera far away, it should not be desired
 	farCameraPos := lin.Vec2{10000, 10000}
 	cs.UpdateSelection(farCameraPos, frustum, renderDistance)
 
-	if cs.IsChunkDesired(coord) {
-		t.Error("Chunk should not be desired after moving camera away")
-	}
+	assert.False(cs.IsChunkDesired(coord))
 }
 
 func TestClear(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	// Set up some state
@@ -304,35 +270,27 @@ func TestClear(t *testing.T) {
 	cs.MarkChunkAvailable(coord)
 
 	// Verify state exists
-	if len(cs.GetDesiredChunks()) == 0 {
-		t.Error("Expected desired chunks before clear")
-	}
+	assert.NotZero(len(cs.GetDesiredChunks()))
 
 	// Clear and verify everything is reset
 	cs.Clear()
 
-	if len(cs.GetDesiredChunks()) != 0 {
-		t.Error("Expected no desired chunks after clear")
-	}
-
-	if cs.IsChunkAvailable(coord) {
-		t.Error("Expected no available chunks after clear")
-	}
+	assert.Zero(len(cs.GetDesiredChunks()))
+	assert.False(cs.IsChunkAvailable(coord))
 
 	highest := cs.GetHighestPriorityMissing()
-	if highest != nil {
-		t.Error("Expected no missing chunks after clear")
-	}
+	assert.Nil(highest)
 }
 
 func TestStats(t *testing.T) {
+	assert := assert.New(t)
 	cs := NewChunkSelector(testChunkSize, nil)
 
 	// Initially should have empty stats
 	stats := cs.Stats()
-	if stats.DesiredChunks != 0 || stats.AvailableChunks != 0 || stats.MissingChunks != 0 {
-		t.Error("Expected empty stats initially")
-	}
+	assert.Zero(stats.DesiredChunks)
+	assert.Zero(stats.AvailableChunks)
+	assert.Zero(stats.MissingChunks)
 
 	// Set up some chunks
 	frustum := createTestFrustum()
@@ -349,18 +307,14 @@ func TestStats(t *testing.T) {
 
 	// Check stats
 	stats = cs.Stats()
-	if stats.DesiredChunks != len(desired) {
-		t.Errorf("Expected %d desired chunks in stats, got %d", len(desired), stats.DesiredChunks)
-	}
+	assert.Equal(len(desired), stats.DesiredChunks)
 
 	if len(desired) > 1 && stats.AvailableChunks != 1 {
-		t.Errorf("Expected 1 available chunk in stats, got %d", stats.AvailableChunks)
+		assert.Equal(1, stats.AvailableChunks)
 	}
 
 	expectedMissing := len(desired) - stats.AvailableChunks
-	if stats.MissingChunks != expectedMissing {
-		t.Errorf("Expected %d missing chunks in stats, got %d", expectedMissing, stats.MissingChunks)
-	}
+	assert.Equal(expectedMissing, stats.MissingChunks)
 
 	t.Logf("Stats: %+v", stats)
 	t.Logf("Detailed stats: %s", cs.GetDetailedStats())

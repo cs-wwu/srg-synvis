@@ -10,6 +10,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/stratoberry/go-gpsd"
+	"github.com/stretchr/testify/assert"
 	lin "github.com/xlab/linmath"
 )
 
@@ -139,48 +140,40 @@ func (m *MockGPSD) Close() {
 
 // Test utility functions
 
-// equal compares two float32 values with tolerance
-func equal(a, b float32) bool {
-	return math.Abs(float64(a)-float64(b)) <= 0.05
-}
+const floatTolerance = 0.05
 
-// equalVec3 compares two Vec3 with tolerance
-func equalVec3(a, b lin.Vec3) bool {
-	return equal(a[0], b[0]) && equal(a[1], b[1]) && equal(a[2], b[2])
+func assertVec3InDelta(assert *assert.Assertions, expected, actual lin.Vec3) {
+	assert.InDelta(expected[0], actual[0], floatTolerance)
+	assert.InDelta(expected[1], actual[1], floatTolerance)
+	assert.InDelta(expected[2], actual[2], floatTolerance)
 }
 
 // Camera Initialization Tests
 
 func TestCameraInitialization(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Test position
 	pos := cam.Position()
-	if !equalVec3(pos, testStartPos) {
-		t.Errorf("Position not set correctly. Got %v, expected %v", pos, testStartPos)
-	}
+	assertVec3InDelta(assert, testStartPos, pos)
 
 	// Test view matrix is generated
 	viewMatrix := cam.ViewMatrix()
 	// Just verify it's not zero matrix
-	if viewMatrix[0][0] == 0 && viewMatrix[1][1] == 0 && viewMatrix[2][2] == 0 {
-		t.Error("View matrix appears to be zero matrix")
-	}
+	assert.False(viewMatrix[0][0] == 0 && viewMatrix[1][1] == 0 && viewMatrix[2][2] == 0)
 
 	// Test position string generation
 	posStr := cam.GetPositionString()
-	if posStr == "" {
-		t.Error("Position string should not be empty")
-	}
+	assert.NotEmpty(posStr)
 
 	// Test vectors string generation
 	vecStr := cam.GetViewVectors()
-	if vecStr == "" {
-		t.Error("View vectors string should not be empty")
-	}
+	assert.NotEmpty(vecStr)
 }
 
 func TestCameraConfiguration(t *testing.T) {
+	assert := assert.New(t)
 	customConfig := CameraConfig{
 		StartPos: lin.Vec3{100, 200, 300},
 		StartDir: lin.Vec3{1, 0, 0},
@@ -190,14 +183,13 @@ func TestCameraConfiguration(t *testing.T) {
 
 	// Test custom position
 	pos := cam.Position()
-	if !equalVec3(pos, customConfig.StartPos) {
-		t.Errorf("Custom position not set. Got %v, expected %v", pos, customConfig.StartPos)
-	}
+	assertVec3InDelta(assert, customConfig.StartPos, pos)
 }
 
 // Motion and Rotation Tests
 
 func TestRelativeRotation(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Test yaw rotation (90 degrees right)
@@ -205,13 +197,13 @@ func TestRelativeRotation(t *testing.T) {
 	front, _, _ := cam.getVectors()
 
 	// After 90-degree yaw, front should point right (positive X)
-	if !equal(front[0], 1.0) || !equal(front[1], 0.0) || !equal(front[2], 0.0) {
-		t.Errorf("Yaw rotation failed. Front vector: [%f, %f, %f], expected [1, 0, 0]",
-			front[0], front[1], front[2])
-	}
+	assert.InDelta(1.0, front[0], floatTolerance)
+	assert.InDelta(0.0, front[1], floatTolerance)
+	assert.InDelta(0.0, front[2], floatTolerance)
 }
 
 func TestPitchAfterYaw(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// First rotate 90 degrees right (yaw)
@@ -222,13 +214,13 @@ func TestPitchAfterYaw(t *testing.T) {
 	front, _, _ := cam.getVectors()
 
 	// After yaw right then pitch up, should be looking up
-	if !equal(front[0], 0.0) || !equal(front[1], 1.0) || !equal(front[2], 0.0) {
-		t.Errorf("Pitch after yaw failed. Front vector: [%f, %f, %f], expected [0, 1, 0]",
-			front[0], front[1], front[2])
-	}
+	assert.InDelta(0.0, front[0], floatTolerance)
+	assert.InDelta(1.0, front[1], floatTolerance)
+	assert.InDelta(0.0, front[2], floatTolerance)
 }
 
 func TestAbsoluteRotation(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Test absolute rotation to specific orientation
@@ -237,15 +229,13 @@ func TestAbsoluteRotation(t *testing.T) {
 
 	// Verify orientation was set
 	actualYaw, actualPitch, actualRoll := cam.getOrientation()
-	if !equal(float32(actualYaw), float32(yaw)) ||
-		!equal(float32(actualPitch), float32(pitch)) ||
-		!equal(float32(actualRoll), float32(roll)) {
-		t.Errorf("Absolute rotation orientation not set correctly. Got (%f, %f, %f), expected (%f, %f, %f)",
-			actualYaw, actualPitch, actualRoll, yaw, pitch, roll)
-	}
+	assert.InDelta(yaw, actualYaw, floatTolerance)
+	assert.InDelta(pitch, actualPitch, floatTolerance)
+	assert.InDelta(roll, actualRoll, floatTolerance)
 }
 
 func TestRollRotation(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Test roll rotation (90 degrees)
@@ -253,15 +243,15 @@ func TestRollRotation(t *testing.T) {
 	_, _, up := cam.getVectors()
 
 	// After 90-degree roll, up should point left (negative X)
-	if !equal(up[0], -1.0) || !equal(up[1], 0.0) || !equal(up[2], 0.0) {
-		t.Errorf("Roll rotation failed. Up vector: [%f, %f, %f], expected [-1, 0, 0]",
-			up[0], up[1], up[2])
-	}
+	assert.InDelta(-1.0, up[0], floatTolerance)
+	assert.InDelta(0.0, up[1], floatTolerance)
+	assert.InDelta(0.0, up[2], floatTolerance)
 }
 
 // Position and Movement Tests
 
 func TestPositionUpdates(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Test setting position
@@ -269,12 +259,11 @@ func TestPositionUpdates(t *testing.T) {
 	cam.SetPosition(newPos)
 
 	pos := cam.Position()
-	if !equalVec3(pos, newPos) {
-		t.Errorf("SetPosition failed. Got %v, expected %v", pos, newPos)
-	}
+	assertVec3InDelta(assert, newPos, pos)
 }
 
 func TestMovement(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	initialPos := cam.Position()
@@ -288,24 +277,20 @@ func TestMovement(t *testing.T) {
 	newPos := cam.Position()
 
 	// Position should have changed
-	if equalVec3(newPos, initialPos) {
-		t.Error("Position should have changed after movement")
-	}
+	assert.NotEqual(initialPos, newPos)
 
 	// Test backward movement to return to original
 	delta.Scale(&front, -10.0)
 	cam.addPosition(delta)
 
 	finalPos := cam.Position()
-	if !equalVec3(finalPos, initialPos) {
-		t.Errorf("Position should return to original after forward then backward movement. Got %v, expected %v",
-			finalPos, initialPos)
-	}
+	assertVec3InDelta(assert, initialPos, finalPos)
 }
 
 // GPS Integration Tests
 
 func TestGPSNoFix(t *testing.T) {
+	assert := assert.New(t)
 	config := testConfig
 	config.EnableGPS = true
 	cam := NewCamera(config)
@@ -328,13 +313,11 @@ func TestGPSNoFix(t *testing.T) {
 
 	// Position should not have changed significantly
 	currentPos := cam.Position()
-	if !equalVec3(currentPos, initialPos) {
-		t.Errorf("Camera position should not change with NoFix. Got %v, expected %v",
-			currentPos, initialPos)
-	}
+	assertVec3InDelta(assert, initialPos, currentPos)
 }
 
 func TestGPSValidFix(t *testing.T) {
+	assert := assert.New(t)
 	config := testConfig
 	config.EnableGPS = true
 	cam := NewCamera(config)
@@ -363,15 +346,15 @@ func TestGPSValidFix(t *testing.T) {
 	expectedY := float32(expectedAlt) * HEIGHT_CONVERSION
 
 	pos := cam.Position()
-	if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
-		t.Errorf("GPS position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)",
-			pos, expectedX, expectedY, expectedZ)
-	}
+	assert.InDelta(expectedX, pos[0], floatTolerance)
+	assert.InDelta(expectedY, pos[1], floatTolerance)
+	assert.InDelta(expectedZ, pos[2], floatTolerance)
 }
 
 // Sensor Data Tests
 
 func TestSensorDataStructure(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Set some test orientation
@@ -382,19 +365,14 @@ func TestSensorDataStructure(t *testing.T) {
 	sensorData := cam.sensorManager.GetSensorData()
 
 	// Verify sensor data structure
-	if !equal(float32(sensorData.Yaw), float32(testYaw)) ||
-		!equal(float32(sensorData.Pitch), float32(testPitch)) ||
-		!equal(float32(sensorData.Roll), float32(testRoll)) {
-		t.Errorf("Sensor data orientation incorrect. Got (%f, %f, %f), expected (%f, %f, %f)",
-			sensorData.Yaw, sensorData.Pitch, sensorData.Roll, testYaw, testPitch, testRoll)
-	}
-
-	if !sensorData.IMUValid {
-		t.Error("IMU should be marked as valid when orientation is set")
-	}
+	assert.InDelta(testYaw, sensorData.Yaw, floatTolerance)
+	assert.InDelta(testPitch, sensorData.Pitch, floatTolerance)
+	assert.InDelta(testRoll, sensorData.Roll, floatTolerance)
+	assert.True(sensorData.IMUValid)
 }
 
 func TestSetSensorData(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Create test sensor data
@@ -421,24 +399,21 @@ func TestSetSensorData(t *testing.T) {
 		float32(testData.GPSPosition.Longitude))
 	expectedY := float32(testData.GPSPosition.Altitude) * HEIGHT_CONVERSION
 
-	if !equal(pos[0], expectedX) || !equal(pos[1], expectedY) || !equal(pos[2], expectedZ) {
-		t.Errorf("SetSensorData position not updated correctly.\nGot: %v\nExpected: (%f, %f, %f)",
-			pos, expectedX, expectedY, expectedZ)
-	}
+	assert.InDelta(expectedX, pos[0], floatTolerance)
+	assert.InDelta(expectedY, pos[1], floatTolerance)
+	assert.InDelta(expectedZ, pos[2], floatTolerance)
 
 	// Verify orientation was updated
 	yaw, pitch, roll := cam.getOrientation()
-	if !equal(float32(yaw), float32(testData.Yaw)) ||
-		!equal(float32(pitch), float32(testData.Pitch)) ||
-		!equal(float32(roll), float32(testData.Roll)) {
-		t.Errorf("SetSensorData orientation not updated correctly. Got (%f, %f, %f), expected (%f, %f, %f)",
-			yaw, pitch, roll, testData.Yaw, testData.Pitch, testData.Roll)
-	}
+	assert.InDelta(testData.Yaw, yaw, floatTolerance)
+	assert.InDelta(testData.Pitch, pitch, floatTolerance)
+	assert.InDelta(testData.Roll, roll, floatTolerance)
 }
 
 // Motion State Tests
 
 func TestMotionState(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Set some known state
@@ -452,21 +427,16 @@ func TestMotionState(t *testing.T) {
 	state := cam.motionHandler.GetMotionState()
 
 	// Verify position
-	if !equalVec3(state.Position, testPos) {
-		t.Errorf("Motion state position incorrect. Got %v, expected %v", state.Position, testPos)
-	}
+	assertVec3InDelta(assert, testPos, state.Position)
 
 	// Verify orientation
-	if !equal(float32(state.Orientation.Yaw), float32(testYaw)) ||
-		!equal(float32(state.Orientation.Pitch), float32(testPitch)) ||
-		!equal(float32(state.Orientation.Roll), float32(testRoll)) {
-		t.Errorf("Motion state orientation incorrect. Got (%f, %f, %f), expected (%f, %f, %f)",
-			state.Orientation.Yaw, state.Orientation.Pitch, state.Orientation.Roll,
-			testYaw, testPitch, testRoll)
-	}
+	assert.InDelta(testYaw, state.Orientation.Yaw, floatTolerance)
+	assert.InDelta(testPitch, state.Orientation.Pitch, floatTolerance)
+	assert.InDelta(testRoll, state.Orientation.Roll, floatTolerance)
 }
 
 func TestResetOrientation(t *testing.T) {
+	assert := assert.New(t)
 	cam := NewCamera(testConfig)
 
 	// Apply some rotation
@@ -477,10 +447,9 @@ func TestResetOrientation(t *testing.T) {
 
 	// Verify orientation is reset
 	yaw, pitch, roll := cam.getOrientation()
-	if !equal(float32(yaw), 0.0) || !equal(float32(pitch), 0.0) || !equal(float32(roll), 0.0) {
-		t.Errorf("Orientation not reset correctly. Got (%f, %f, %f), expected (0, 0, 0)",
-			yaw, pitch, roll)
-	}
+	assert.InDelta(0.0, yaw, floatTolerance)
+	assert.InDelta(0.0, pitch, floatTolerance)
+	assert.InDelta(0.0, roll, floatTolerance)
 
 	// Verify vectors are reset to initial state
 	front, right, up := cam.getVectors()
@@ -488,13 +457,7 @@ func TestResetOrientation(t *testing.T) {
 	expectedRight := lin.Vec3{1, 0, 0}
 	expectedUp := START_CAMERA_UP
 
-	if !equalVec3(front, expectedFront) {
-		t.Errorf("Front vector not reset correctly. Got %v, expected %v", front, expectedFront)
-	}
-	if !equalVec3(right, expectedRight) {
-		t.Errorf("Right vector not reset correctly. Got %v, expected %v", right, expectedRight)
-	}
-	if !equalVec3(up, expectedUp) {
-		t.Errorf("Up vector not reset correctly. Got %v, expected %v", up, expectedUp)
-	}
+	assertVec3InDelta(assert, expectedFront, front)
+	assertVec3InDelta(assert, expectedRight, right)
+	assertVec3InDelta(assert, expectedUp, up)
 }
