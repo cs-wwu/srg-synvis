@@ -7,9 +7,14 @@ import (
 
 // PriorityQueue implements a generic priority queue for jobs
 type PriorityQueue[T any] struct {
-	items       []PriorityItem[T]
+	storage     queueStorage[T]
 	getPriority func(T) float32
 	mutex       sync.Mutex
+}
+
+// Implements `heap.Interface`, ie, `Len`, `Less`, `Swap`, `Push`, and `Pop`
+type queueStorage[T any] struct {
+	items []PriorityItem[T]
 }
 
 type PriorityItem[T any] struct {
@@ -21,39 +26,13 @@ type PriorityItem[T any] struct {
 // NewPriorityQueue creates a new priority queue with higher priority items first
 func NewPriorityQueue[T any](getPriority func(T) float32) *PriorityQueue[T] {
 	pq := &PriorityQueue[T]{
-		items:       make([]PriorityItem[T], 0),
+		storage: queueStorage[T]{
+			items: make([]PriorityItem[T], 0),
+		},
 		getPriority: getPriority,
 	}
-	heap.Init(pq)
+	heap.Init(&pq.storage)
 	return pq
-}
-
-func (pq *PriorityQueue[T]) Len() int { return len(pq.items) }
-
-func (pq *PriorityQueue[T]) Less(i, j int) bool {
-	// Higher priority first
-	return pq.items[i].Priority > pq.items[j].Priority
-}
-
-func (pq *PriorityQueue[T]) Swap(i, j int) {
-	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
-	pq.items[i].Index = i
-	pq.items[j].Index = j
-}
-
-func (pq *PriorityQueue[T]) Push(x any) {
-	item := x.(PriorityItem[T])
-	item.Index = len(pq.items)
-	pq.items = append(pq.items, item)
-}
-
-func (pq *PriorityQueue[T]) Pop() any {
-	old := pq.items
-	n := len(old)
-	item := old[n-1]
-	item.Index = -1
-	pq.items = old[0 : n-1]
-	return item
 }
 
 // Enqueue adds an item to the priority queue
@@ -66,34 +45,61 @@ func (pq *PriorityQueue[T]) Enqueue(value T) {
 		Value:    value,
 		Priority: priority,
 	}
-	heap.Push(pq, item)
+	heap.Push(&pq.storage, item)
 }
 
 // Dequeue removes and returns the highest priority item
-func (pq *PriorityQueue[T]) Dequeue() (T, bool) {
+func (pq *PriorityQueue[T]) Dequeue() (item T, exists bool) {
 	pq.mutex.Lock()
 	defer pq.mutex.Unlock()
 
-	var zero T
-	if pq.Len() == 0 {
-		return zero, false
+	exists = pq.storage.Len() > 0
+	if exists {
+		item = heap.Pop(&pq.storage).(PriorityItem[T]).Value
 	}
-
-	item := heap.Pop(pq).(PriorityItem[T])
-	return item.Value, true
+	return
 }
 
 // Size returns the number of items in the queue
 func (pq *PriorityQueue[T]) Size() int {
 	pq.mutex.Lock()
 	defer pq.mutex.Unlock()
-	return pq.Len()
+
+	return pq.storage.Len()
 }
 
 // Clear removes all items from the queue
 func (pq *PriorityQueue[T]) Clear() {
 	pq.mutex.Lock()
 	defer pq.mutex.Unlock()
-	pq.items = pq.items[:0]
-	heap.Init(pq)
+
+	pq.storage.items = pq.storage.items[:0]
+}
+
+func (pq *queueStorage[T]) Len() int { return len(pq.items) }
+
+func (pq *queueStorage[T]) Less(i, j int) bool {
+	// Higher priority first
+	return pq.items[i].Priority > pq.items[j].Priority
+}
+
+func (pq *queueStorage[T]) Swap(i, j int) {
+	pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
+	pq.items[i].Index = i
+	pq.items[j].Index = j
+}
+
+func (pq *queueStorage[T]) Push(x any) {
+	item := x.(PriorityItem[T])
+	item.Index = len(pq.items)
+	pq.items = append(pq.items, item)
+}
+
+func (pq *queueStorage[T]) Pop() any {
+	old := pq.items
+	n := len(old)
+	item := old[n-1]
+	item.Index = -1
+	pq.items = old[0 : n-1]
+	return item
 }
