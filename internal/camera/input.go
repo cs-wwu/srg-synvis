@@ -10,11 +10,11 @@ import (
 
 // InputProcessor handles keyboard input for camera movement
 type InputProcessor struct {
-	camera *Camera
+	camera *CameraImpl
 }
 
 // NewInputProcessor creates a new input processor
-func NewInputProcessor(camera *Camera) *InputProcessor {
+func NewInputProcessor(camera *CameraImpl) *InputProcessor {
 	return &InputProcessor{
 		camera: camera,
 	}

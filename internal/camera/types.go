@@ -51,6 +51,31 @@ type GPSPosition struct {
 	Mode      int // GPS fix mode
 }
 
+// Camera interface defines what external systems need from the camera
+type Camera interface {
+	// Position and orientation
+	Position() lin.Vec3
+	Speed() float32
+	getOrientation() (float64, float64, float64)
+	ViewMatrix() lin.Mat4x4
+	SetPosition(pos lin.Vec3)
+	PlaneMatrix(*lin.Mat4x4)
+
+	// Input processing
+	ProcessInput(window *glfw.Window)
+
+	// Hardware integration
+	EnableGPS() error
+	EnableSensors() error
+
+	// Updates and info
+	Update(deltaTime float32)
+	GetPositionString() string
+	GetViewVectors() string
+
+	MapView() bool
+}
+
 // Mode represents different camera operation modes
 type Mode int
 

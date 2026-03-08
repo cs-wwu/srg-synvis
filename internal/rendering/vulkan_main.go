@@ -23,10 +23,11 @@ import (
 func NewApplication(cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:  cfg.CameraStartPos,
-		StartDir:  cfg.CameraStartDir,
-		EnableGPS: cfg.UseGPS,
-		EnableHat: cfg.UseHat,
+		StartPos:    cfg.CameraStartPos,
+		StartDir:    cfg.CameraStartDir,
+		EnableGPS:   cfg.UseGPS,
+		EnableHat:   cfg.UseHat,
+		DecimalYear: time.Now(),
 	}
 	cam := camera.NewCamera(cameraConfig)
 
@@ -35,9 +36,6 @@ func NewApplication(cfg models.AppConfig) *Application {
 		if err := cam.EnableSensors(); err != nil {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
-	}
-	if cfg.UseGPS {
-		cam.EnableGPS()
 	}
 	app := &Application{
 		camera:            cam,

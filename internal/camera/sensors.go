@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 
@@ -18,21 +17,21 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera           *Camera
-	smoothingEnabled bool // When true, smooths path through space
+	camera      *CameraImpl
+	testingMode bool // When true, skips smoothing for deterministic test results
 }
 
-// SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
-// TODO: After triage, smoothing enabled will just reroute to motion prediction.
-func (sm *SensorManager) SetSmoothing(enabled bool) {
-	sm.smoothingEnabled = enabled
+// SetTestingMode enables or disables the testing mode
+// When testing mode is enabled, smoothing will be disabled for deterministic test results
+func (sm *SensorManager) SetTestingMode(enabled bool) {
+	sm.testingMode = enabled
 }
 
 // NewSensorManager creates a new sensor manager
-func NewSensorManager(camera *Camera) *SensorManager {
+func NewSensorManager(camera *CameraImpl) *SensorManager {
 	return &SensorManager{
-		camera:           camera,
-		smoothingEnabled: true,
+		camera:      camera,
+		testingMode: false,
 	}
 }
 
@@ -69,9 +68,8 @@ func (sm *SensorManager) StartGPS() error {
 			newZ = oldZ + zdif
 		}
 
-		// Apply smoothing to reduce GPS jitter
-		// Testing mode = no smoothing
-		if sm.smoothingEnabled {
+		// Apply smoothing to reduce GPS jitter (skip in testing mode)
+		if !sm.testingMode {
 			newX, newY, newZ = Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
 		}
 
@@ -189,7 +187,7 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	loc := egm96.NewLocationGeodetic(lat, lon, alt)
 
 	// Calculate magnetic field
-	mag, err := wmm.CalculateWMMMagneticField(loc, time.Now())
+	mag, err := wmm.CalculateWMMMagneticField(loc, sm.camera.decimalYear)
 	if err != nil {
 		return fmt.Errorf("failed to calculate magnetic field: %w", err)
 	}
