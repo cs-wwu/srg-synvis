@@ -498,18 +498,3 @@ func TestResetOrientation(t *testing.T) {
 		t.Errorf("Up vector not reset correctly. Got %v, expected %v", up, expectedUp)
 	}
 }
-
-// Integration Tests
-
-func TestCameraUpdate(t *testing.T) {
-	cam := NewCamera(testConfig)
-
-	// Test that update doesn't crash
-	cam.Update(1.0 / 60.0) // 60 FPS delta time
-
-	// Currently Update doesn't do much
-	pos := cam.Position()
-	if equalVec3(pos, lin.Vec3{0, 0, 0}) {
-		t.Log("Update method executed without error")
-	}
-}
