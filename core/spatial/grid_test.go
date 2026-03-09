@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ungerik/go3d/float64/vec2"
 	lin "github.com/xlab/linmath"
 )
 
@@ -416,13 +417,13 @@ func createTestFrustum() Frustum {
 	return Frustum{
 		Planes: [4]FrustumPlane{
 			// Left plane (normal points right)
-			{Normal: lin.Vec2{1, 0}, D: 5000},
+			{Normal: vec2.T{1, 0}, D: 5000},
 			// Right plane (normal points left)
-			{Normal: lin.Vec2{-1, 0}, D: 5000},
+			{Normal: vec2.T{-1, 0}, D: 5000},
 			// Near plane (normal points away)
-			{Normal: lin.Vec2{0, 1}, D: 10},
+			{Normal: vec2.T{0, 1}, D: 10},
 			// Far plane (normal points toward)
-			{Normal: lin.Vec2{0, -1}, D: 5000},
+			{Normal: vec2.T{0, -1}, D: 5000},
 		},
 	}
 }
