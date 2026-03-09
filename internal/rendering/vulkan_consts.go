@@ -72,7 +72,7 @@ type Application struct {
 
 	cfg models.AppConfig
 
-	camera        camera.Camera
+	camera        *camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
