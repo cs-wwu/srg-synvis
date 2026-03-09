@@ -3,6 +3,7 @@ package rendering
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -19,12 +20,8 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
-
-	obspb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
-	roadpb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
@@ -306,7 +303,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		if len(data) > 0 {
 			var pData unsafe.Pointer
 			ret = vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
-			if IsError(ret) {
+			if ret != vk.Success {
 				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
 				return tex
 			}
@@ -504,87 +501,40 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
+func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
-	roadSquare := roadpb.RoadSquare{}
-	file, err := FileToBytesChecked(roadFile)
+	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
+
+	var geojson FeatureCollection
+	file, err := FileToBytesChecked(airspaceFile)
 	if err != nil {
-		log.Printf("vulkan: error loading road square %s: %v", roadFile, err)
+		log.Printf("vulkan: error loading airspace %s: %v", airspaceFile, err)
 		return nil
 	}
-	err = proto.Unmarshal(file, &roadSquare)
+
+	err = json.Unmarshal(file, &geojson)
 	if err != nil {
-		log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
+		log.Printf("vulkan: error unmarshaling airspace %s: %v", airspaceFile, err)
 		return nil
 	}
 
 	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
 	if err != nil {
-		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-		return nil
-	}
-	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newRoadBuilder(heightInfo)
-
-	for _, road := range roadSquare.Roads {
-		renderRoad(builder, road)
-	}
-
-	// NB: These buffers must be created while `builder` is still referenced,
-	// so that the `vertexBytes` and `indexBytes` methods return valid slices.
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
-	return &RoadSquare{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-	}
-}
-
-func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionSquare {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
-	obstructionSquare := obspb.ObstructionSquare{}
-	file, err := FileToBytesChecked(obstructionFile)
-	if err != nil {
-		log.Printf("vulkan: error loading obstruction square %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	err = proto.Unmarshal(file, &obstructionSquare)
-	if err != nil {
-		log.Printf("vulkan: error unmarshaling obstruction square: %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
+		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil
 	}
 
 	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newObstructionBuilder(heightInfo)
+	builder := newAirspaceBuilder(heightInfo)
+	instances := make([]AirspaceInstance, len(geojson.Features))
 
-	for _, obstruction := range obstructionSquare.Obstructions {
-		buildObstruction(builder, obstruction)
-	}
-
-	if len(builder.vertices) == 0 || len(builder.indices) == 0 || len(obstructionSquare.Obstructions) == 0 {
-		return nil
+	for i, airspace := range geojson.Features {
+		renderAirspace(builder, airspace, airspaceColors[airspace.Properties.Class])
+		instances[i] = AirspaceInstance{
+			LowerAlt: float32(airspace.Properties.AltitudeFloor),
+			UpperAlt: float32(airspace.Properties.AltitudeCeiling),
+			Color:    airspaceColors[airspace.Properties.Class],
+		}
 	}
 
 	vertices := as.CreateBuffer(
@@ -593,7 +543,6 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 		builder.vertexBytes(),
 		vk.BufferUsageVertexBufferBit,
 	)
-
 	indices := as.CreateBuffer(
 		app.Context().Device(),
 		app.Context().Platform().MemoryProperties(),
@@ -601,10 +550,11 @@ func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionS
 		vk.BufferUsageIndexBufferBit,
 	)
 
-	return &ObstructionSquare{
+	return &Airspace{
 		vertices:   vertices,
 		indices:    indices,
 		indexCount: uint32(len(builder.indices)),
+		features:   geojson.Features,
 	}
 }
 
@@ -673,8 +623,8 @@ func (app *Application) prepareRenderPass() {
 			Samples:        vk.SampleCount1Bit,
 			LoadOp:         vk.AttachmentLoadOpClear,
 			StoreOp:        vk.AttachmentStoreOpDontCare,
-			StencilLoadOp:  vk.AttachmentLoadOpDontCare,
-			StencilStoreOp: vk.AttachmentStoreOpDontCare,
+			StencilLoadOp:  vk.AttachmentLoadOpClear,
+			StencilStoreOp: vk.AttachmentStoreOpStore,
 			InitialLayout:  vk.ImageLayoutUndefined,
 			FinalLayout:    vk.ImageLayoutDepthStencilAttachmentOptimal,
 		}},
@@ -1267,6 +1217,282 @@ func (app *Application) prepareObstructionPipeline() {
 	app.obstructionPipeline = obstructionPipeline[0]
 }
 
+func (app *Application) prepareAirspacePipeline() {
+	dev := app.Context().Device()
+
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.vert.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.frag.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
+
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    uint32(unsafe.Sizeof(AirspaceVertex{})),
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 2,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
+
+				{
+					Binding:  0,
+					Location: 0,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   0,
+				},
+				{
+					Binding:  0,
+					Location: 1,
+					Format:   vk.FormatR32g32b32a32Sfloat,
+					Offset:   12,
+				},
+			},
+		},
+
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+
+			DepthBiasEnable: vk.False,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask:      0x0,
+				BlendEnable:         vk.True,
+				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
+				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
+				ColorBlendOp:        vk.BlendOpAdd,
+				SrcAlphaBlendFactor: vk.BlendFactorOne,
+				DstAlphaBlendFactor: vk.BlendFactorZero,
+				AlphaBlendOp:        vk.BlendOpAdd,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.True,
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.True,
+			Front: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpReplace,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpAlways,
+				CompareMask: 0xFF,
+				WriteMask:   0xFF,
+				Reference:   1,
+			},
+			Back: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpReplace,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpAlways,
+				CompareMask: 0xFF,
+				WriteMask:   0xFF,
+				Reference:   1,
+			},
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	airspacePipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, airspacePipeline)
+	OrPanic(as.NewError(ret))
+	app.airspacePipeline = airspacePipeline[0]
+}
+
+func (app *Application) prepareAirspaceStencilPipeline() {
+	dev := app.Context().Device()
+
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.vert.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/airspace.frag.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
+
+	pipelineBuilder := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType:                         vk.StructureTypePipelineVertexInputStateCreateInfo,
+			VertexBindingDescriptionCount: 1,
+			PVertexBindingDescriptions: []vk.VertexInputBindingDescription{{
+				Binding:   0,
+				Stride:    uint32(unsafe.Sizeof(AirspaceVertex{})),
+				InputRate: vk.VertexInputRateVertex,
+			}},
+			VertexAttributeDescriptionCount: 2,
+			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
+
+				{
+					Binding:  0,
+					Location: 0,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   0,
+				},
+				{
+					Binding:  0,
+					Location: 1,
+					Format:   vk.FormatR32g32b32a32Sfloat,
+					Offset:   12,
+				},
+			},
+		},
+
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeBackBit),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+
+			DepthBiasEnable: vk.False,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask:      0xF,
+				BlendEnable:         vk.True,
+				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
+				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
+				ColorBlendOp:        vk.BlendOpAdd,
+				SrcAlphaBlendFactor: vk.BlendFactorOne,
+				DstAlphaBlendFactor: vk.BlendFactorZero,
+				AlphaBlendOp:        vk.BlendOpAdd,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:       vk.True,
+			DepthWriteEnable:      vk.True,
+			DepthCompareOp:        vk.CompareOpLessOrEqual,
+			DepthBoundsTestEnable: vk.False,
+			StencilTestEnable:     vk.True,
+			Front: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpKeep,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpEqual,
+				CompareMask: 0xFF,
+				WriteMask:   0x00,
+				Reference:   1,
+			},
+			Back: vk.StencilOpState{
+				FailOp:      vk.StencilOpKeep,
+				PassOp:      vk.StencilOpKeep,
+				DepthFailOp: vk.StencilOpKeep,
+				CompareOp:   vk.CompareOpEqual,
+				CompareMask: 0xFF,
+				WriteMask:   0x00,
+				Reference:   1,
+			},
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	airspaceStencilPipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1, []vk.GraphicsPipelineCreateInfo{pipelineBuilder}, nil, airspaceStencilPipeline)
+	OrPanic(as.NewError(ret))
+	app.airspaceStencilPipeline = airspaceStencilPipeline[0]
+}
+
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
@@ -1515,6 +1741,10 @@ func (app *Application) VulkanContextPrepare() error {
 	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
 	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 
+	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
+	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+	app.currentAirspace = nil
+
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
 	app.prepareRenderPass()
@@ -1523,6 +1753,8 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareSkyboxPipeline()
 	app.preparePlaneModel()
 	app.preparePlanePipeline()
+	app.prepareAirspacePipeline()
+	app.prepareAirspaceStencilPipeline()
 	app.prepareRoadPipeline()
 	app.prepareObstructionPipeline()
 	app.prepareDescriptorPool()
@@ -1558,10 +1790,6 @@ func (app *Application) VulkanContextPrepare() error {
 	// )
 
 	return nil
-}
-
-func IsError(ret vk.Result) bool {
-	return ret != vk.Success
 }
 
 func OrPanic(err error, finalizers ...func()) {

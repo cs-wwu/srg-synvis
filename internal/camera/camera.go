@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/elokore/glfw/v3.4/glfw"
 	lin "github.com/xlab/linmath"
 )
 
-// CameraImpl implements the Camera interface
-type CameraImpl struct {
+// The camera is the view and its associated position/rotation
+type Camera struct {
 	// Position and orientation vectors
 	pos          *lin.Vec3 // (x, y, z)
 	lastFramePos lin.Vec3
@@ -29,9 +28,6 @@ type CameraImpl struct {
 	pitch float64 // Pitch relative to start
 	yaw   float64 // Yaw relative to start
 	roll  float64 // Roll angle relative to start
-
-	// Configuration
-	decimalYear time.Time // Date for magnetic world model
 
 	// Component managers
 	inputProcessor *InputProcessor
@@ -55,7 +51,7 @@ var (
 )
 
 // NewCamera creates and initializes a new Camera
-func NewCamera(config CameraConfig) Camera {
+func NewCamera(config CameraConfig) *Camera {
 	// Initialize position and direction vectors
 	pos := config.StartPos
 	up := START_CAMERA_UP
@@ -78,7 +74,7 @@ func NewCamera(config CameraConfig) Camera {
 	lastPos := lin.Vec3{pos[0], pos[1], pos[2]}
 
 	// Create camera instance
-	camera := &CameraImpl{
+	camera := &Camera{
 		pos:           &pos,
 		lastFramePos:  lastPos,
 		up:            &up,
@@ -86,11 +82,10 @@ func NewCamera(config CameraConfig) Camera {
 		right:         &right,
 		speed:         speed,
 		measuredSpeed: 0,
-		sensitivity:   sensitivity,
-		decimalYear:   config.DecimalYear,
-		pitch:         0.0,
-		roll:          0.0,
-		yaw:           0.0,
+		sensitivity: sensitivity,
+		pitch:       0.0,
+		roll:        0.0,
+		yaw:         0.0,
 	}
 
 	// Initialize component managers
@@ -102,20 +97,20 @@ func NewCamera(config CameraConfig) Camera {
 }
 
 // Position returns the current camera position
-func (c *CameraImpl) Position() lin.Vec3 {
+func (c *Camera) Position() lin.Vec3 {
 	return *c.pos
 }
 
-func (c *CameraImpl) Speed() float32 {
+func (c *Camera) Speed() float32 {
 	return c.speed
 }
 
-func (c *CameraImpl) MapView() bool {
+func (c *Camera) MapView() bool {
 	return c.mapView
 }
 
 // ViewMatrix returns the camera's view matrix
-func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
+func (c *Camera) ViewMatrix() (result lin.Mat4x4) {
 	if c.mapView {
 		up := lin.Vec3{}
 		up.Scale(&MAP_UP, MAP_OFFSET)
@@ -143,7 +138,7 @@ func (c *CameraImpl) ViewMatrix() (result lin.Mat4x4) {
 
 const CAMERA_TO_PLANE_DISTANCE = 50.0
 
-func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
+func (c *Camera) PlaneMatrix(result *lin.Mat4x4) {
 	result.Identity()
 
 	// Face forwards.
@@ -179,17 +174,17 @@ func (c *CameraImpl) PlaneMatrix(result *lin.Mat4x4) {
 }
 
 // SetPosition sets the camera position
-func (c *CameraImpl) SetPosition(newPos lin.Vec3) {
+func (c *Camera) SetPosition(newPos lin.Vec3) {
 	*c.pos = newPos
 }
 
 // ProcessInput handles input from the window
-func (c *CameraImpl) ProcessInput(window *glfw.Window) {
+func (c *Camera) ProcessInput(window *glfw.Window) {
 	c.inputProcessor.ProcessInput(window)
 }
 
 // EnableGPS starts GPS integration
-func (c *CameraImpl) EnableGPS() error {
+func (c *Camera) EnableGPS() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.sensorManager.ctxGPS = ctx
 	c.sensorManager.cancelGPS = cancel
@@ -198,32 +193,30 @@ func (c *CameraImpl) EnableGPS() error {
 }
 
 // Terminates the GPS integration
-func (c *CameraImpl) CancelGPS() error {
+func (c *Camera) CancelGPS() error {
 	c.sensorManager.cancelGPS()
-	return nil
-}
+
 
 // EnableSensors starts sensor integration with the specified script
-func (c *CameraImpl) EnableSensors(sensorScript string) error {
+func (c *Camera) EnableSensors() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.sensorManager.ctxHat = ctx
 	c.sensorManager.cancelHat = cancel
-	go c.sensorManager.StartSensors(sensorScript, ctx)
+	go c.sensorManager.StartSensors(ctx)
 	return nil
 }
 
 // Terimates the Sensor integration
-func (c *CameraImpl) CancelSensors() error {
+func (c *Camera) CancelSensors() error {
 	c.sensorManager.cancelHat()
-	return nil
-}
+
 
 func (c *CameraImpl) MeasureSpeed() float32 {
 	return c.measuredSpeed
 }
 
 // Update performs any per-frame updates
-func (c *CameraImpl) Update(deltaTime float32) {
+func (c *Camera) Update(deltaTime float32) {
 	// Currently no per-frame updates needed
 	// This is where future plane mode physics could go
 
@@ -238,7 +231,7 @@ func (c *CameraImpl) Update(deltaTime float32) {
 }
 
 // GetPositionString returns a human-readable position string
-func (c *CameraImpl) GetPositionString() string {
+func (c *Camera) GetPositionString() string {
 	pos := c.Position()
 	gpsCoords := coords.WorldToGPS(pos[0], pos[2])
 	return fmt.Sprintf("World: (%.1f, %.1f, %.1f), GPS: %s",
@@ -246,7 +239,7 @@ func (c *CameraImpl) GetPositionString() string {
 }
 
 // GetViewVectors returns a string representation of view vectors
-func (c *CameraImpl) GetViewVectors() string {
+func (c *Camera) GetViewVectors() string {
 	return fmt.Sprintf("Up: (%.3f, %.3f, %.3f), Front: (%.3f, %.3f, %.3f), Right: (%.3f, %.3f, %.3f)",
 		c.up[0], c.up[1], c.up[2],
 		c.front[0], c.front[1], c.front[2],
@@ -261,31 +254,31 @@ func (c *CameraImpl) GetBasis() []lin.Vec3 {
 // Internal methods for component access
 
 // updatePosition updates the camera position (thread-safe)
-func (c *CameraImpl) updatePosition(newX, newZ, newY float32) {
+func (c *Camera) updatePosition(newX, newZ, newY float32) {
 	(*c.pos)[0] = newX
 	(*c.pos)[2] = newZ
 	(*c.pos)[1] = newY
 }
 
 // addPosition adds to the camera position (thread-safe)
-func (c *CameraImpl) addPosition(delta lin.Vec3) {
+func (c *Camera) addPosition(delta lin.Vec3) {
 	c.pos.Add(c.pos, &delta)
 }
 
 // subPosition subtracts from the camera position (thread-safe)
-func (c *CameraImpl) subPosition(delta lin.Vec3) {
+func (c *Camera) subPosition(delta lin.Vec3) {
 	c.pos.Sub(c.pos, &delta)
 }
 
 // updateVectors updates the camera orientation vectors (thread-safe)
-func (c *CameraImpl) updateVectors(front, right, up lin.Vec3) {
+func (c *Camera) updateVectors(front, right, up lin.Vec3) {
 	*c.front = front
 	*c.right = right
 	*c.up = up
 }
 
 // getVectors returns copies of the current vectors (thread-safe)
-func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
+func (c *Camera) getVectors() (front, right, up lin.Vec3) {
 	front = *c.front
 	right = *c.right
 	up = *c.up
@@ -293,13 +286,13 @@ func (c *CameraImpl) getVectors() (front, right, up lin.Vec3) {
 }
 
 // setOrientation updates the orientation angles
-func (c *CameraImpl) setOrientation(yaw, pitch, roll float64) {
+func (c *Camera) setOrientation(yaw, pitch, roll float64) {
 	c.yaw = yaw
 	c.pitch = pitch
 	c.roll = roll
 }
 
 // getOrientation returns the current orientation angles
-func (c *CameraImpl) getOrientation() (yaw, pitch, roll float64) {
+func (c *Camera) getOrientation() (yaw, pitch, roll float64) {
 	return c.yaw, c.pitch, c.roll
 }

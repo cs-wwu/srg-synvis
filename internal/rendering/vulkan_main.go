@@ -27,13 +27,12 @@ func NewApplication(Cfg models.AppConfig) *Application {
 		StartDir:    Cfg.CameraStartDir,
 		EnableGPS:   Cfg.UseGPS,
 		EnableHat:   Cfg.UseHat,
-		DecimalYear: time.Now(),
 	}
 	cam := camera.NewCamera(cameraConfig)
 
 	// Enable hardware if needed (moved here for cleaner initialization)
 	if Cfg.UseHat {
-		if err := cam.EnableSensors("./internal/camera/hat.py"); err != nil {
+		if err := cam.EnableSensors(); err != nil {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
@@ -46,7 +45,9 @@ func NewApplication(Cfg models.AppConfig) *Application {
 		Hat:          Cfg.UseHat,
 		Cfg:          Cfg,
 		statsTracker: NewStatsTracker(1000, 5*time.Second),
-	}
+    lastAirspaceCheck: time.Now(),
+  }
+
 
 	if Cfg.BenchmarkMode {
 		app.statsTracker.Enable()
@@ -63,23 +64,70 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DeviceWaitIdle(dev)
 
 	// Stop background workers before destroying resources
-	app.StreamManager.Stop()
 	app.StreamManager.Destroy()
+	println("Destroyed stream manager")
+	app.CimguiBackend.Cleanup()
 
-	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
-
-	// Skybox resources
-	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
-	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
+	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
+	vk.DestroyPipeline(dev, app.obstructionPipeline, nil)
+	vk.DestroyPipeline(dev, app.planePipeline, nil)
+	vk.DestroyPipeline(dev, app.roadPipeline, nil)
 	vk.DestroyPipeline(dev, app.skyboxPipeline, nil)
+	println("Destroyed pipelines")
 
+	// Render pass and pipeline layout
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
-	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
+	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+	vk.DestroyDescriptorPool(dev, app.descPool, nil)
+	println("Destroyed misc")
+
+	// Buffers
+	vk.DestroyBuffer(dev, app.planeVertexBuffer, nil)
+	vk.DestroyBuffer(dev, app.planeIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
+	println("Destroyed buffers")
+
+	// Memory
+	vk.FreeMemory(dev, app.planeIndexMemory, nil)
+	vk.FreeMemory(dev, app.planeVertexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
+	println("Freed device memory")
+
+	for _, stream := range app.AirspaceStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		if stream.instances != nil {
+			stream.instances.Destroy()
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Airspace stream Buffers and Device Memory")
+
+	for _, stream := range app.ObstructionStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Obstructions stream Buffers and Device Memory")
+
+	for _, stream := range app.RoadStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Road stream buffers and Device Memory")
 
 	for i := range app.textures {
 		if app.textures[i] != nil {
@@ -87,13 +135,13 @@ func (app *Application) VulkanContextCleanup() error {
 			app.textures[i] = nil
 		}
 	}
+	println("Destroyed textures")
 
 	if app.depth != nil {
 		app.depth.Destroy(dev)
 		app.depth = nil
 	}
-
-	vk.DeviceWaitIdle(dev)
+	println("Destroyed depth")
 
 	return nil
 }
@@ -126,8 +174,16 @@ func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.StreamManager.UpdateCameraPosition(cameraPos)
 	app.RoadStreamer.UpdatePos(app.Camera.Position())
 	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
+
+	// Check current airspace periodically
+	if time.Since(app.lastAirspaceCheck) > 100*time.Millisecond {
+		app.UpdateCurrentAirspace()
+		app.lastAirspaceCheck = time.Now()
+	}
 
 	app.Camera.ProcessInput(app.WindowHandle)
+
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
 		app.Cfg.DebugMode,                 // validation layers
@@ -289,6 +345,32 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		}
 	}
 	app.ObstructionStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

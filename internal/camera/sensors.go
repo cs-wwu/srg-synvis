@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 
@@ -18,25 +19,26 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera      *CameraImpl
-	testingMode bool // When true, skips smoothing for deterministic test results
+	camera      *Camera
+	smoothingEnabled bool // When true, smooths path through space
 	ctxGPS		context.Context
 	cancelGPS	context.CancelFunc
 	ctxHat		context.Context
 	cancelHat	context.CancelFunc
+	camera           *Camera
 }
 
-// SetTestingMode enables or disables the testing mode
-// When testing mode is enabled, smoothing will be disabled for deterministic test results
-func (sm *SensorManager) SetTestingMode(enabled bool) {
-	sm.testingMode = enabled
+// SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
+// TODO: After triage, smoothing enabled will just reroute to motion prediction.
+func (sm *SensorManager) SetSmoothing(enabled bool) {
+	sm.smoothingEnabled = enabled
 }
 
 // NewSensorManager creates a new sensor manager
-func NewSensorManager(camera *CameraImpl) *SensorManager {
+func NewSensorManager(camera *Camera) *SensorManager {
 	return &SensorManager{
 		camera:      camera,
-		testingMode: false,
+		smoothingEnabled: true,
 		ctxGPS:		 nil,
 		cancelGPS:	 nil,
 		ctxHat:		 nil,
@@ -77,8 +79,9 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 			newZ = oldZ + zdif
 		}
 
-		// Apply smoothing to reduce GPS jitter (skip in testing mode)
-		if !sm.testingMode {
+		// Apply smoothing to reduce GPS jitter
+		// Testing mode = no smoothing
+		if sm.smoothingEnabled {
 			newX, newY, newZ = Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
 		}
 
@@ -115,8 +118,9 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
-func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode {
-	cmd := exec.CommandContext(ctx, "python3", filename)
+func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
+	filename := "./internal/camera/hat.py"
+  cmd := exec.CommandContext(ctx, "python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
@@ -157,8 +161,8 @@ func (sm *SensorManager) StartSensors(filename string, ctx context.Context) Mode
 		}
 
 		// Invert pitch for correct orientation
-		pitch = -pitch
-		pitch = pitch - 3.14159/2
+		// pitch = -pitch
+		pitch = pitch + 3.14159/2
 
 		// Apply magnetic declination correction
 		if err := sm.applyMagneticDeclination(&yaw); err != nil {
@@ -202,7 +206,7 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	loc := egm96.NewLocationGeodetic(lat, lon, alt)
 
 	// Calculate magnetic field
-	mag, err := wmm.CalculateWMMMagneticField(loc, sm.camera.decimalYear)
+	mag, err := wmm.CalculateWMMMagneticField(loc, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to calculate magnetic field: %w", err)
 	}
