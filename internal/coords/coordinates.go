@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	lin "github.com/xlab/linmath"
 )
 
@@ -58,7 +59,7 @@ const (
 //	0, 3600  -> "n00e000"
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
-func WorldToMap(x, z int) string {
+func WorldToMap(x, z int) spatial.MapCoord {
 	z = -z // Flip for vulkan
 	// Adjust coordinates to handle the overlap
 	lat := z / int(ARC_DEGREES_TO_SECONDS)
@@ -70,23 +71,7 @@ func WorldToMap(x, z int) string {
 		lon -= 1
 	}
 
-	return LatLonToMap(lat, lon)
-}
-
-func LatLonToMap(lat, lon int) string {
-	latDir := 'n'
-	if lat < 0 {
-		latDir = 's'
-		lat = -lat
-	}
-
-	lonDir := 'e'
-	if lon < 0 {
-		lonDir = 'w'
-		lon = -lon
-	}
-
-	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
+	return spatial.MapCoord{Lat: lat, Lon: lon}
 }
 
 // Takes a map coordinate and returns the corresponding float x, z coords.
@@ -182,6 +167,6 @@ func WorldToGPSFloat(x, z float32) (float32, float32) {
 	return lat, lon
 }
 
-func GetMapFromPosition(pos lin.Vec3) string {
+func GetMapFromPosition(pos lin.Vec3) spatial.MapCoord {
 	return WorldToMap(int(pos[0]), int(pos[2]))
 }

@@ -27,7 +27,7 @@ func TestMapToWorldRoundtrip(t *testing.T) {
 			x, z := MapToWorld(tt.coord)
 			resultCoord := WorldToMap(x, z)
 
-			if resultCoord != tt.coord {
+			if resultCoord.String() != tt.coord {
 				t.Errorf("MapToWorld -> WorldToMap roundtrip failed for %s: got %s, want %s",
 					tt.coord, resultCoord, tt.coord)
 				t.Errorf("World coordinates: (%d, %d)", x, z)
@@ -84,7 +84,7 @@ func TestWorldToMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := WorldToMap(tt.x, tt.z)
-			if result != tt.expected {
+			if result.String() != tt.expected {
 				t.Errorf("WorldToMap(%d, %d) = %s; want %s",
 					tt.x, tt.z, result, tt.expected)
 			}

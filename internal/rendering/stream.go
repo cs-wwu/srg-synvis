@@ -406,7 +406,7 @@ func (sm *StreamManager) queueMissingChunks() {
 		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
 
 		// Queue through WorkerPool
-		sm.workerPool.QueueLoadJob(spec, chunkMapCoord)
+		sm.workerPool.QueueLoadJob(spec, chunkMapCoord.String())
 	}
 }
 

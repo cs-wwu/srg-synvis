@@ -6,7 +6,6 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
-	"github.com/cs-wwu/srg-synvis/internal/coords"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"google.golang.org/protobuf/proto"
@@ -59,9 +58,7 @@ const (
 )
 
 func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
-
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
+	roadFile := "assets/chunks/roads/data/" + pos.String() + ".pb"
 	roadSquare := pb.RoadSquare{}
 	file, err := FileToBytesChecked(roadFile)
 	if err != nil {
@@ -74,7 +71,7 @@ func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos.String())
 	if err != nil {
 		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
 		return nil

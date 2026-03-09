@@ -7,7 +7,6 @@ import (
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
-	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
 
 	"github.com/ungerik/go3d/vec2"
@@ -111,8 +110,7 @@ func toWorldHeight(obstruction *pb.FAAPoint) float32 {
 }
 
 func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquare {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
+	obstructionFile := "assets/chunks/obstructions/data/" + pos.String() + ".pb"
 	obstructionSquare := pb.ObstructionSquare{}
 	file, err := FileToBytesChecked(obstructionFile)
 	if err != nil {
@@ -126,7 +124,7 @@ func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquar
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos.String())
 	if err != nil {
 		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
 		return nil
