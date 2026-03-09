@@ -517,7 +517,7 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(pos.String())
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil

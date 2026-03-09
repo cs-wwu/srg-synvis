@@ -117,7 +117,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec) error {
 	// Get map data
 	mapData, err := sm.assetManager.LoadMapData(
-		coords.WorldToMap(int(spec.WorldPos[0]), int(spec.WorldPos[1])).String(),
+		coords.WorldToMap(int(spec.WorldPos[0]), int(spec.WorldPos[1])),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to get map data: %w", err)

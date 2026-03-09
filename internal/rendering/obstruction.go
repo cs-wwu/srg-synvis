@@ -124,7 +124,7 @@ func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquar
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(pos.String())
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
 		return nil

@@ -71,7 +71,7 @@ func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(pos.String())
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
 		return nil

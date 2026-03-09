@@ -5,6 +5,8 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 // assetManager is the main implementation of the AssetManager interface.
@@ -31,12 +33,7 @@ func NewAssetManager(basePath string, maxMaps int) AssetManager {
 }
 
 // LoadMapData loads both heightmap and watermap for a coordinate.
-func (am *assetManager) LoadMapData(coord string) (*MapData, error) {
-	// Validate coordinate format
-	if !isValidCoordinate(coord) {
-		return nil, fmt.Errorf("invalid coordinate format: %s", coord)
-	}
-
+func (am *assetManager) LoadMapData(coord spatial.MapCoord) (*MapData, error) {
 	// Check cache first
 	if data := am.cache.Get(coord); data != nil {
 		am.cacheHits.Add(1)
@@ -64,7 +61,7 @@ func (am *assetManager) LoadMapData(coord string) (*MapData, error) {
 }
 
 // PreloadMaps loads multiple maps asynchronously.
-func (am *assetManager) PreloadMaps(coords []string) <-chan LoadResult {
+func (am *assetManager) PreloadMaps(coords []spatial.MapCoord) <-chan LoadResult {
 	results := make(chan LoadResult, len(coords))
 
 	go func() {
@@ -76,19 +73,10 @@ func (am *assetManager) PreloadMaps(coords []string) <-chan LoadResult {
 		var wg sync.WaitGroup
 
 		for _, coord := range coords {
-			// Skip invalid coordinates
-			if !isValidCoordinate(coord) {
-				results <- LoadResult{
-					Coord: coord,
-					Err:   fmt.Errorf("invalid coordinate format: %s", coord),
-				}
-				continue
-			}
-
 			wg.Add(1)
 			sem <- struct{}{} // Acquire semaphore
 
-			go func(c string) {
+			go func(c spatial.MapCoord) {
 				defer wg.Done()
 				defer func() { <-sem }() // Release semaphore
 
@@ -108,12 +96,12 @@ func (am *assetManager) PreloadMaps(coords []string) <-chan LoadResult {
 }
 
 // IsLoaded checks if a map is currently in cache.
-func (am *assetManager) IsLoaded(coord string) bool {
+func (am *assetManager) IsLoaded(coord spatial.MapCoord) bool {
 	return am.cache.Has(coord)
 }
 
 // GetLoadedCoords returns all currently cached coordinates.
-func (am *assetManager) GetLoadedCoords() []string {
+func (am *assetManager) GetLoadedCoords() []spatial.MapCoord {
 	return am.cache.GetCoords()
 }
 
@@ -148,33 +136,4 @@ func (am *assetManager) SetMaxCached(max int) {
 // Clear removes all cached data.
 func (am *assetManager) Clear() {
 	am.cache.Clear()
-}
-
-// isValidCoordinate validates coordinate format (e.g., "n48w123").
-func isValidCoordinate(coord string) bool {
-	if len(coord) != 7 {
-		return false
-	}
-
-	// Check hemisphere indicators
-	if coord[0] != 'n' && coord[0] != 's' {
-		return false
-	}
-	if coord[3] != 'e' && coord[3] != 'w' {
-		return false
-	}
-
-	// Check digits
-	for i := 1; i <= 2; i++ {
-		if coord[i] < '0' || coord[i] > '9' {
-			return false
-		}
-	}
-	for i := 4; i <= 6; i++ {
-		if coord[i] < '0' || coord[i] > '9' {
-			return false
-		}
-	}
-
-	return true
 }
