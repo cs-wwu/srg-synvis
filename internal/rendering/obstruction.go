@@ -6,8 +6,8 @@ import (
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	vk "github.com/vulkan-go/vulkan"
 
 	"github.com/ungerik/go3d/vec2"
@@ -110,7 +110,7 @@ func toWorldHeight(obstruction *pb.FAAPoint) float32 {
 	return float32((obstruction.Height * 0.3048) * (ARC_DEGREES_TO_MINUTES / 1852)) // feet to meters to arcseconds
 }
 
-func (app *Application) buildObstruction(pos streaming.LatLonInt) *ObstructionSquare {
+func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquare {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
 	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
 	obstructionSquare := pb.ObstructionSquare{}

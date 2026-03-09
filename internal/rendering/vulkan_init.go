@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
@@ -501,7 +502,7 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
+func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
 	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
 
