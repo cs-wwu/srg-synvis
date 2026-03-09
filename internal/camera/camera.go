@@ -82,10 +82,10 @@ func NewCamera(config CameraConfig) *Camera {
 		right:         &right,
 		speed:         speed,
 		measuredSpeed: 0,
-		sensitivity: sensitivity,
-		pitch:       0.0,
-		roll:        0.0,
-		yaw:         0.0,
+		sensitivity:   sensitivity,
+		pitch:         0.0,
+		roll:          0.0,
+		yaw:           0.0,
 	}
 
 	// Initialize component managers

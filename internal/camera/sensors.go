@@ -19,12 +19,12 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera      *Camera
+	camera           *Camera
 	smoothingEnabled bool // When true, smooths path through space
-	ctxGPS		context.Context
-	cancelGPS	context.CancelFunc
-	ctxHat		context.Context
-	cancelHat	context.CancelFunc
+	ctxGPS           context.Context
+	cancelGPS        context.CancelFunc
+	ctxHat           context.Context
+	cancelHat        context.CancelFunc
 }
 
 // SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
@@ -36,12 +36,12 @@ func (sm *SensorManager) SetSmoothing(enabled bool) {
 // NewSensorManager creates a new sensor manager
 func NewSensorManager(camera *Camera) *SensorManager {
 	return &SensorManager{
-		camera:      camera,
+		camera:           camera,
 		smoothingEnabled: true,
-		ctxGPS:		 nil,
-		cancelGPS:	 nil,
-		ctxHat:		 nil,
-		cancelHat:	 nil,
+		ctxGPS:           nil,
+		cancelGPS:        nil,
+		ctxHat:           nil,
+		cancelHat:        nil,
 	}
 }
 
@@ -106,7 +106,7 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		log.Println("GPS: context cancelled, stopping GPS")
-		gps.Close() 
+		gps.Close()
 		return ctx.Err()
 	case <-done:
 		log.Println("GPS: watch ended")
@@ -119,7 +119,7 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 // Runs as a separate goroutine
 func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 	filename := "./internal/camera/hat.py"
-  cmd := exec.CommandContext(ctx, "python3", filename)
+	cmd := exec.CommandContext(ctx, "python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()

@@ -53,7 +53,7 @@ func (app *Application) VulkanAppName() string {
 func (app *Application) VulkanLayers() []string {
 	validationLayers := []string{}
 	if app.Cfg.DebugMode {
-	validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
+		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
 	} else {
 		log.Println("vulkan: debug mode is off, not using validation layers")
 	}

@@ -23,10 +23,10 @@ import (
 func NewApplication(Cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:    Cfg.CameraStartPos,
-		StartDir:    Cfg.CameraStartDir,
-		EnableGPS:   Cfg.UseGPS,
-		EnableHat:   Cfg.UseHat,
+		StartPos:  Cfg.CameraStartPos,
+		StartDir:  Cfg.CameraStartDir,
+		EnableGPS: Cfg.UseGPS,
+		EnableHat: Cfg.UseHat,
 	}
 	cam := camera.NewCamera(cameraConfig)
 
@@ -40,14 +40,13 @@ func NewApplication(Cfg models.AppConfig) *Application {
 		cam.EnableGPS()
 	}
 	app := &Application{
-		Camera:       cam,
-		Gps:          Cfg.UseGPS,
-		Hat:          Cfg.UseHat,
-		Cfg:          Cfg,
-		statsTracker: NewStatsTracker(1000, 5*time.Second),
-    lastAirspaceCheck: time.Now(),
-  }
-
+		Camera:            cam,
+		Gps:               Cfg.UseGPS,
+		Hat:               Cfg.UseHat,
+		Cfg:               Cfg,
+		statsTracker:      NewStatsTracker(1000, 5*time.Second),
+		lastAirspaceCheck: time.Now(),
+	}
 
 	if Cfg.BenchmarkMode {
 		app.statsTracker.Enable()
@@ -146,7 +145,6 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
-
 func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.statsTracker.StartFrame()
 
@@ -155,7 +153,7 @@ func (app *Application) NextFrame(deltaTime time.Duration) {
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
 	app.Camera.ProcessInput(app.WindowHandle)
-	if (app.Cfg.DisableFog) {
+	if app.Cfg.DisableFog {
 		app.ubo.DisableFog = 1.0
 	} else {
 		app.ubo.DisableFog = 0.0

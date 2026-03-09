@@ -9,29 +9,29 @@ import (
 
 type SettingBar struct {
 	ui.UIComponent
-	AnchorPoint         imgui.Vec2
-	Position            ui.UDim
-	Size                ui.UDim
+	AnchorPoint    imgui.Vec2
+	Position       ui.UDim
+	Size           ui.UDim
 	DebugMode      bool
 	DisableFog     bool
-	UseGPS		   bool
-	UseHat		   bool
+	UseGPS         bool
+	UseHat         bool
 	RenderDistance float32
-	app *rendering.Application
+	app            *rendering.Application
 }
 
 func NewSettingBar(position ui.UDim, size ui.UDim) *SettingBar {
 	var config models.AppConfig
 	return &SettingBar{
-		AnchorPoint:         imgui.NewVec2(0, 0),
-		Position:            position,
-		Size:                size,
+		AnchorPoint:    imgui.NewVec2(0, 0),
+		Position:       position,
+		Size:           size,
 		DebugMode:      config.DebugMode,
 		DisableFog:     config.DisableFog,
 		RenderDistance: config.RenderDistance,
-		UseGPS:			config.UseGPS,
-		UseHat:			config.UseHat,
-		app: nil,
+		UseGPS:         config.UseGPS,
+		UseHat:         config.UseHat,
+		app:            nil,
 	}
 }
 
@@ -71,15 +71,15 @@ func (bar *SettingBar) Render() {
 		bar.app.Cfg.DisableFog = bar.DisableFog
 	}
 	if imgui.Checkbox("Use GPS", &bar.UseGPS) {
-		if (bar.UseGPS) {
+		if bar.UseGPS {
 			bar.app.Camera.EnableGPS()
 		} else {
 			bar.app.Camera.CancelGPS()
 		}
 	}
-	// TODO second re-enable doesn't work 
+	// TODO second re-enable doesn't work
 	if imgui.Checkbox("Use Hat", &bar.UseHat) {
-		if (bar.UseHat) {
+		if bar.UseHat {
 			bar.app.Camera.EnableSensors()
 		} else {
 			bar.app.Camera.CancelSensors()
