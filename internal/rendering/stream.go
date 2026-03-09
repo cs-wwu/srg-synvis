@@ -14,6 +14,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	"github.com/ungerik/go3d/float64/vec2"
 
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -386,11 +387,11 @@ func (sm *StreamManager) updateChunkSelection() {
 	// Create frustum for current camera position
 	near := float32(1.0)
 	frustum := spatial.NewFrustumFromCamera(
-		sm.lastCameraPos,
-		sm.cfg.CameraStartDir[1],
-		sm.cfg.Fov,
-		near,
-		sm.cfg.RenderDistance,
+		vec2.T{float64(sm.lastCameraPos[0]), float64(sm.lastCameraPos[1])},
+		float64(sm.cfg.CameraStartDir[1]),
+		float64(sm.cfg.Fov),
+		float64(near),
+		float64(sm.cfg.RenderDistance),
 	)
 
 	// Update ChunkSelector

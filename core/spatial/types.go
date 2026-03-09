@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ungerik/go3d/float64/vec2"
 	lin "github.com/xlab/linmath"
 )
 
@@ -111,6 +112,6 @@ type Frustum struct {
 
 // FrustumPlane represents a plane in the 2D view frustum
 type FrustumPlane struct {
-	Normal lin.Vec2 // 2D normal vector
-	D      float32  // Distance from origin
+	Normal vec2.T  // 2D normal vector
+	D      float64 // Distance from origin
 }
