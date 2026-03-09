@@ -4,38 +4,6 @@ import (
 	"testing"
 )
 
-// TestMapToWorldRoundtrip tests that converting from map coordinates to world coordinates
-// and back results in the original map coordinates
-func TestMapToWorldRoundtrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		coord string
-	}{
-		{"SeattleArea", "n48w123"},
-		{"NorthwestQuadrant", "n00w001"},
-		{"NortheastQuadrant", "n00e000"},
-		{"SouthwestQuadrant", "s01w001"},
-		{"SoutheastQuadrant", "s01e000"},
-		{"OuterNorthwest", "n01w002"},
-		{"OuterNortheast", "n01e001"},
-		{"OuterSouthwest", "s02w002"},
-		{"OuterSoutheast", "s02e001"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			x, z := MapToWorld(tt.coord)
-			resultCoord := WorldToMap(x, z)
-
-			if resultCoord.String() != tt.coord {
-				t.Errorf("MapToWorld -> WorldToMap roundtrip failed for %s: got %s, want %s",
-					tt.coord, resultCoord, tt.coord)
-				t.Errorf("World coordinates: (%d, %d)", x, z)
-			}
-		})
-	}
-}
-
 // TestWorldToMap tests that world coordinates map to the expected map tile
 func TestWorldToMap(t *testing.T) {
 	tests := []struct {

@@ -74,39 +74,6 @@ func WorldToMap(x, z int) spatial.MapCoord {
 	return spatial.MapCoord{Lat: lat, Lon: lon}
 }
 
-// Takes a map coordinate and returns the corresponding float x, z coords.
-// Specifically the top-left coord of the map. e.g.
-//
-//	"n48w123" -> -442800, 176400
-//	"n00w001" -> -3600, 3600
-//	"n00e000" -> 0, 3600
-//	"s01e001" -> 3600, 0
-func MapToWorld(coord string) (x, z int) {
-	if len(coord) != 7 {
-		return 0, 0 // Invalid coordinate format
-	}
-
-	latDir := coord[0]
-	lonDir := coord[3]
-	lat, _ := strconv.Atoi(coord[1:3])
-	lon, _ := strconv.Atoi(coord[4:7])
-
-	x = lon * ARC_DEGREES_TO_SECONDS
-	if lonDir == 'w' {
-		x = -x
-	}
-
-	z = lat * ARC_DEGREES_TO_SECONDS
-	if latDir == 's' {
-		z = -z
-	}
-	z += ARC_DEGREES_TO_SECONDS
-
-	z = -z // Flip for vulkan
-
-	return x, z
-}
-
 // Takes an x, z coordinate and returns the corresponding pixel coordinates.
 // This wraps around the image as you move across the world.
 // Images start in the top-left, due to vulkan, need to flip z coordinate
