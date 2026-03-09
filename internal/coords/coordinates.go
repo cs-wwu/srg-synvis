@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
-	lin "github.com/xlab/linmath"
 )
 
 // This file should be used for coordinate math and rendering math
@@ -132,8 +131,4 @@ func WorldToGPSFloat(x, z float32) (float32, float32) {
 	lon := x / 3600.0
 
 	return lat, lon
-}
-
-func GetMapFromPosition(pos lin.Vec3) spatial.MapCoord {
-	return WorldToMap(int(pos[0]), int(pos[2]))
 }
