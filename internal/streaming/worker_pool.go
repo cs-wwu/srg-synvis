@@ -21,7 +21,6 @@ const (
 // LoadJob represents a chunk loading job
 type LoadJob struct {
 	Spec     spatial.ChunkSpec
-	MapCoord string
 	Priority float32
 	QueuedAt time.Time
 }
@@ -35,7 +34,7 @@ type EvictJob struct {
 
 // ChunkLoader interface defines what the worker pool needs to load/evict chunks
 type ChunkLoader interface {
-	LoadChunk(spec spatial.ChunkSpec, mapCoord string) error
+	LoadChunk(spec spatial.ChunkSpec) error
 	EvictChunk(coord spatial.GridCoord) error
 	SetChunkState(coord spatial.GridCoord, state ChunkState, priority float32, lodLevel int) error
 	GetChunkState(coord spatial.GridCoord) ChunkState
@@ -147,7 +146,7 @@ func (wp *WorkerPool) IsRunning() bool {
 }
 
 // QueueLoadJob adds a load job to the queue
-func (wp *WorkerPool) QueueLoadJob(spec spatial.ChunkSpec, mapCoord string) {
+func (wp *WorkerPool) QueueLoadJob(spec spatial.ChunkSpec) {
 	// Check if already queued or loading
 	currentState := wp.loader.GetChunkState(spec.GridCoord)
 	if currentState != StateUnloaded {
@@ -164,7 +163,6 @@ func (wp *WorkerPool) QueueLoadJob(spec spatial.ChunkSpec, mapCoord string) {
 	// Add to load queue
 	job := LoadJob{
 		Spec:     spec,
-		MapCoord: mapCoord,
 		Priority: spec.Priority,
 		QueuedAt: time.Now(),
 	}
@@ -242,7 +240,7 @@ func (wp *WorkerPool) processLoadJob(workerID int, job LoadJob) {
 	}
 
 	// Load the chunk
-	err = wp.loader.LoadChunk(job.Spec, job.MapCoord)
+	err = wp.loader.LoadChunk(job.Spec)
 	if err != nil {
 		log.Printf("Worker %d: Failed to load chunk %v: %v", workerID, job.Spec.GridCoord, err)
 		// Mark as failed
