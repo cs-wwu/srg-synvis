@@ -12,6 +12,7 @@ const (
 	heightmapExtension = ".hgt.png"
 	watermapExtension  = ".swb.png"
 	textureExtension   = ".osm.png"
+	mapSize            = 3601 // Map dimensions (SRTM/NASADEM standard)
 )
 
 // loadFromDisk loads both heightmap and watermap from disk and converts to raw data.
@@ -190,23 +191,21 @@ func loadGrayImage(path string) (*image.Gray, error) {
 
 // validateMapDimensions ensures heightmap and watermap have correct dimensions.
 func validateMapDimensions(heightmap *image.Gray16, watermap *image.Gray) error {
-	const expectedSize = 3601
-
 	hBounds := heightmap.Bounds()
 
 	// Check heightmap dimensions
-	if hBounds.Dx() != expectedSize || hBounds.Dy() != expectedSize {
+	if hBounds.Dx() != mapSize || hBounds.Dy() != mapSize {
 		return fmt.Errorf("invalid heightmap dimensions: expected %dx%d, got %dx%d",
-			expectedSize, expectedSize, hBounds.Dx(), hBounds.Dy())
+			mapSize, mapSize, hBounds.Dx(), hBounds.Dy())
 	}
 
 	// Check watermap dimensions if it exists
 	if watermap != nil {
 		wBounds := watermap.Bounds()
 
-		if wBounds.Dx() != expectedSize || wBounds.Dy() != expectedSize {
+		if wBounds.Dx() != mapSize || wBounds.Dy() != mapSize {
 			return fmt.Errorf("invalid watermap dimensions: expected %dx%d, got %dx%d",
-				expectedSize, expectedSize, wBounds.Dx(), wBounds.Dy())
+				mapSize, mapSize, wBounds.Dx(), wBounds.Dy())
 		}
 
 		// Ensure dimensions match
