@@ -189,12 +189,6 @@ func (c *Camera) EnableSensors() error {
 	return nil
 }
 
-// Update performs any per-frame updates
-func (c *Camera) Update(deltaTime float32) {
-	// Currently no per-frame updates needed
-	// This is where future plane mode physics could go
-}
-
 // GetPositionString returns a human-readable position string
 func (c *Camera) GetPositionString() string {
 	pos := c.Position()
