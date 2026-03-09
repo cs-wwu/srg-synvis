@@ -195,7 +195,8 @@ func (c *Camera) EnableGPS() error {
 // Terminates the GPS integration
 func (c *Camera) CancelGPS() error {
 	c.sensorManager.cancelGPS()
-
+	return nil
+}
 
 // EnableSensors starts sensor integration with the specified script
 func (c *Camera) EnableSensors() error {
@@ -209,9 +210,10 @@ func (c *Camera) EnableSensors() error {
 // Terimates the Sensor integration
 func (c *Camera) CancelSensors() error {
 	c.sensorManager.cancelHat()
+	return nil
+}
 
-
-func (c *CameraImpl) MeasureSpeed() float32 {
+func (c *Camera) MeasureSpeed() float32 {
 	return c.measuredSpeed
 }
 
@@ -247,7 +249,7 @@ func (c *Camera) GetViewVectors() string {
 }
 
 // Returns basis vectors in an array ordered: Up, Front, Right
-func (c *CameraImpl) GetBasis() []lin.Vec3 {
+func (c *Camera) GetBasis() []lin.Vec3 {
 	return []lin.Vec3{*c.up, *c.front, *c.right}
 }
 

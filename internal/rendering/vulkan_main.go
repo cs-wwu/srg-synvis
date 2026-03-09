@@ -146,9 +146,6 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
-func (app *Application) GetCamera() camera.Camera {
-	return app.Camera
-}
 
 func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.statsTracker.StartFrame()

@@ -25,7 +25,6 @@ type SensorManager struct {
 	cancelGPS	context.CancelFunc
 	ctxHat		context.Context
 	cancelHat	context.CancelFunc
-	camera           *Camera
 }
 
 // SetSmoothing allows for motion through space to be discrete or smoothed (continuous)

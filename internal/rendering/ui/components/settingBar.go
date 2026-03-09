@@ -80,7 +80,7 @@ func (bar *SettingBar) Render() {
 	// TODO second re-enable doesn't work 
 	if imgui.Checkbox("Use Hat", &bar.UseHat) {
 		if (bar.UseHat) {
-			bar.app.Camera.EnableSensors("./internal/camera/hat.py")
+			bar.app.Camera.EnableSensors()
 		} else {
 			bar.app.Camera.CancelSensors()
 		}

@@ -54,13 +54,13 @@ func NewFlightInstruments() *FlightInstruments {
 }
 
 func (window *FlightInstruments) Render() {
-	cam := window.app.GetCamera()
+	cam := window.app.Camera
 	frontVector := cam.GetBasis()[1]
 	window.Compass.HeadingDegrees = linmath.RadiansToDegrees(float32(getCompassHeadingRadians(frontVector)))
 
 	window.Speedometer.Value = cam.MeasureSpeed()
 
-	window.Gauge.Value = window.app.GetCamera().Position()[1]
+	window.Gauge.Value = window.app.Camera.Position()[1]
 	window.Gauge.Render()
 	window.Compass.Render()
 	window.Speedometer.Render()

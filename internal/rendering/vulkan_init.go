@@ -1738,11 +1738,11 @@ func (app *Application) VulkanContextPrepare() error {
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
 	app.RoadStreamer.UpdatePos(app.Camera.Position())
 
-	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
+	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.buildObstruction)
 	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
-	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
 	app.currentAirspace = nil
 
 	app.prepareUniformBuffers()
