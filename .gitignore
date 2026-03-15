@@ -65,3 +65,4 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+kmd/composeApp/bin/jvmMain/binaries/
