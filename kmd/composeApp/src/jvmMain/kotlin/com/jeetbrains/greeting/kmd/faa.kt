@@ -2,13 +2,15 @@ package processor
 
 // import com.google.protobuf.Message
 // import com.google.protobuf.ByteString
+// import proto.ObstructionsProto
+// import com.jeetbrains.greeting.kmd.proto.ObstructionsProto
+import obs.Faa
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.nio.file.Paths
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -47,22 +49,28 @@ data class FAAPoint(
     val lon: Double,
     val height: Double,
     val type: String,
-    val quantity: Double
+    val quantity: Double,
 )
 
 data class ObsSquare(
     val latDeg: Int,
     val lonDeg: Int,
-    val records: MutableList<FAAPoint> = mutableListOf()
+    val records: MutableList<FAAPoint> = mutableListOf(),
 )
 
-fun generateSquareKey(lat: Double, lon: Double): String {
+fun generateSquareKey(
+    lat: Double,
+    lon: Double,
+): String {
     val latDeg = floor(lat).toInt()
     val lonDeg = floor(lon).toInt()
     return "$latDeg,$lonDeg"
 }
 
-fun parseDOFFile(filePath: String, squareBuffers: MutableMap<String, ObsSquare>) {
+fun parseDOFFile(
+    filePath: String,
+    squareBuffers: MutableMap<String, ObsSquare>,
+) {
     File(filePath).bufferedReader().useLines { lines ->
         lines.forEachIndexed { index, line ->
             val lineNum = index + 1
@@ -102,13 +110,14 @@ fun parseDOFFile(filePath: String, squareBuffers: MutableMap<String, ObsSquare>)
             if (lonHem == "W") lon = -lon
             val ele = elevation + height
 
-            val obs = FAAPoint(
-                lat = lat,
-                lon = lon,
-                height = ele,
-                type = obsType,
-                quantity = quantityVal.toDouble()
-            )
+            val obs =
+                FAAPoint(
+                    lat = lat,
+                    lon = lon,
+                    height = ele,
+                    type = obsType,
+                    quantity = quantityVal.toDouble(),
+                )
 
             val key = generateSquareKey(lat, lon)
             squareBuffers.getOrPut(key) {
@@ -118,22 +127,52 @@ fun parseDOFFile(filePath: String, squareBuffers: MutableMap<String, ObsSquare>)
     }
 }
 
+// fun saveToProtobufs(squareBuffers: Map<String, ObsSquare>) {
+//     val outputDir = File("assets/chunks/obstructions/data")
+//     outputDir.mkdirs() // For now, just log what would be saved
+//     // You can implement custom serialization later if needed
+//     for ((_, square) in squareBuffers) {
+//         println("Would save square: lat=${square.latDeg}, lon=${square.lonDeg}, count=${square.records.size}")
+//     }
+// }
 fun saveToProtobufs(squareBuffers: Map<String, ObsSquare>) {
     val outputDir = File("assets/chunks/obstructions/data")
-    outputDir.mkdirs() // For now, just log what would be saved 
-    // You can implement custom serialization later if needed 
+    outputDir.mkdirs()
     for ((_, square) in squareBuffers) {
-        println("Would save square: lat=${square.latDeg}, lon=${square.lonDeg}, count=${square.records.size}")
-    } 
-} 
-
-//  helper function: 
-fun coordToString(lat: Int, lon: Int): String {
-    val latStr = if (lat >= 0) "n%02d".format(lat) else "s%02d".format(-lat) 
-    val lonStr = if (lon >= 0) "e%03d".format(lon) else "w%03d".format(-lon) 
-    return "$latStr$lonStr"
+        val pbSquare =
+            Faa.ObstructionSquare.newBuilder()
+                .setLatDeg(square.latDeg)
+                .setLonDeg(square.lonDeg)
+                .apply {
+                    square.records.forEach { obs ->
+                        addObstructions(
+                            Faa.FAAPoint.newBuilder()
+                                .setLat(obs.lat)
+                                .setLon(obs.lon)
+                                .setHeight(obs.height)
+                                .setType(obs.type)
+                                .setQuantity(obs.quantity)
+                                .build(),
+                        )
+                    }
+                }
+                .build()
+        val path = File(outputDir, "${coordToString(square.latDeg, square.lonDeg)}.pb")
+        FileOutputStream(path).use { fos ->
+            pbSquare.writeTo(fos)
+        }
+    }
 }
 
+//  helper function:
+fun coordToString(
+    lat: Int,
+    lon: Int,
+): String {
+    val latStr = if (lat >= 0) "n%02d".format(lat) else "s%02d".format(-lat)
+    val lonStr = if (lon >= 0) "e%03d".format(lon) else "w%03d".format(-lon)
+    return "$latStr$lonStr"
+}
 
 /**
  * Scrapes the FAA DOF webpage and returns the URL of the most recent DOF zip release.
@@ -194,8 +233,9 @@ fun downloadFAADOF(finalPath: String) {
  * Reads the currency date from the header line of the DOF.DAT file.
  */
 fun parseCurrencyDate(reader: BufferedReader): LocalDate {
-    val header = reader.readLine()
-        ?: throw IllegalStateException("DOF.DAT file is empty")
+    val header =
+        reader.readLine()
+            ?: throw IllegalStateException("DOF.DAT file is empty")
     val currencyString = header.substring(HEADER_START, HEADER_END).trim()
     val formatter = DateTimeFormatter.ofPattern("MM/dd/yy")
     return LocalDate.parse(currencyString, formatter)

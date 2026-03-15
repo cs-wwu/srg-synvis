@@ -6,7 +6,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import processor.generateAirData
 import processor.generateObstructionData
-import kotlin.math.floor
 
 // Extension function for BoundingBox -> heightmap tiles
 fun BoundingBox.toHeightmapTiles(): List<String> {
@@ -43,7 +42,6 @@ fun BoundingBox.toCoordinateSquares(): List<List<Int>> {
 }
 
 actual class DownloadManager {
-
     actual suspend fun downloadData(
         regions: Set<BoundingBox>,
         useNASA: Boolean,
@@ -56,9 +54,10 @@ actual class DownloadManager {
                 val output = StringBuilder()
 
                 if (useNASA) {
-                    val heightmaps = regions
-                        .flatMap { it.toHeightmapTiles() }
-                        .distinct()
+                    val heightmaps =
+                        regions
+                            .flatMap { it.toHeightmapTiles() }
+                            .distinct()
 
                     downloadHeightmaps(heightmaps, outputDir)
                     output.appendLine("NASA: downloaded ${heightmaps.size} heightmap tile(s)")
@@ -70,9 +69,10 @@ actual class DownloadManager {
                 }
 
                 if (useOSM) {
-                    val coordinateSquares = regions
-                        .flatMap { it.toCoordinateSquares() }
-                        .distinct()
+                    val coordinateSquares =
+                        regions
+                            .flatMap { it.toCoordinateSquares() }
+                            .distinct()
 
                     generateAirData(coordinateSquares, OSM_API_URL)
                     output.appendLine("OSM: aeroway data generated for ${coordinateSquares.size} square(s)")
@@ -93,4 +93,3 @@ actual class DownloadManager {
         private const val OSM_API_URL = "https://overpass-api.de/api/interpreter"
     }
 }
-

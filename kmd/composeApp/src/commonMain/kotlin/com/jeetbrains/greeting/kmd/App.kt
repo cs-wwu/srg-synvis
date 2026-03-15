@@ -183,6 +183,8 @@ fun App(regions: List<Region> = USregions()) {
                                 regions = selectedBoxes,
                                 useNASA = true,
                                 useOSM = true,
+                                useFAA = true,
+                                outputDir = "../../assets/maps/",
                             )
 
                         result.onSuccess { output ->

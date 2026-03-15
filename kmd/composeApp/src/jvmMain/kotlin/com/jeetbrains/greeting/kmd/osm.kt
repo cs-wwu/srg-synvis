@@ -9,13 +9,13 @@ import java.net.URLEncoder
 data class OSMPoint(
     val lat: Double,
     val lon: Double,
-    val height: Double
+    val height: Double,
 )
 
 // These mirror the Go OverpassResponse / Element types — adjust fields to match your actual structs
 @Serializable
 data class OverpassResponse(
-    val elements: List<Element> = emptyList()
+    val elements: List<Element> = emptyList(),
 )
 
 @Serializable
@@ -25,7 +25,7 @@ data class Element(
     val lat: Double = 0.0,
     val lon: Double = 0.0,
     val nodes: List<Long> = emptyList(),
-    val tags: Map<String, String> = emptyMap()
+    val tags: Map<String, String> = emptyMap(),
 )
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -34,12 +34,16 @@ private val json = Json { ignoreUnknownKeys = true }
  * Makes a POST request to the Overpass API for aeroway data within a 1-degree
  * coordinate square defined by the first two values in [map] (lat, lon).
  */
-fun makeAirApiRequest(apiUrl: String, map: List<Int>): OverpassResponse {
+fun makeAirApiRequest(
+    apiUrl: String,
+    map: List<Int>,
+): OverpassResponse {
     val lat = map[0]
     val lon = map[1]
     val bounds = "($lat,$lon,${lat + 1},${lon + 1});"
 
-    val query = """
+    val query =
+        """
         [out:json];
         (
             way["aeroway"="hangar"]$bounds
@@ -48,7 +52,7 @@ fun makeAirApiRequest(apiUrl: String, map: List<Int>): OverpassResponse {
         );
         (._;>;);
         out body;
-    """.trimIndent()
+        """.trimIndent()
 
     val encodedData = "data=" + URLEncoder.encode(query, "UTF-8")
 
@@ -76,7 +80,7 @@ fun makeAirApiRequest(apiUrl: String, map: List<Int>): OverpassResponse {
 fun storeAirData(
     ways: List<Element>,
     nodes: Map<Long, Element>,
-    airType: String
+    airType: String,
 ): List<List<OSMPoint>> {
     val airBuf = mutableListOf<List<OSMPoint>>()
 
@@ -106,7 +110,10 @@ fun storeAirData(
 /**
  * Fetches and processes aeroway OSM data for each coordinate square in [maps].
  */
-fun generateAirData(maps: List<List<Int>>, apiUrl: String) {
+fun generateAirData(
+    maps: List<List<Int>>,
+    apiUrl: String,
+) {
     require(maps.isNotEmpty()) { "No maps specified" }
 
     for (map in maps) {
@@ -120,11 +127,12 @@ fun generateAirData(maps: List<List<Int>>, apiUrl: String) {
         for (element in osmData.elements) {
             when (element.type) {
                 "node" -> nodes[element.id] = element
-                "way" -> when (element.tags["aeroway"]) {
-                    "hangar" -> hangars.add(element)
-                    "terminal" -> terminals.add(element)
-                    "tower" -> towers.add(element)
-                }
+                "way" ->
+                    when (element.tags["aeroway"]) {
+                        "hangar" -> hangars.add(element)
+                        "terminal" -> terminals.add(element)
+                        "tower" -> towers.add(element)
+                    }
             }
         }
 

@@ -66,6 +66,8 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            // implementation("com.google.protobuf:protobuf-kotlin:3.25.1")
+            implementation("com.google.protobuf:protobuf-java:4.28.3")
         }
     }
 }
@@ -99,7 +101,7 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
-    implementation("com.google.protobuf:protobuf-kotlin.3.25.1")
+    // implementation("com.google.protobuf:protobuf-kotlin:3.25.1")
 }
 
 compose.desktop {

@@ -21,15 +21,19 @@ data class Credentials(val token: String)
  * Loads credentials from the EARTHDATA_TOKEN environment variable.
  */
 fun loadCredentials(): Credentials {
-    val token = System.getenv("EARTHDATA_TOKEN")
-        ?: throw IllegalStateException("EARTHDATA_TOKEN environment variable not set")
+    val token =
+        System.getenv("EARTHDATA_TOKEN")
+            ?: throw IllegalStateException("EARTHDATA_TOKEN environment variable not set")
     return Credentials(token)
 }
 
 /**
  * Opens an authenticated HTTP connection to the given URL.
  */
-fun openConnection(url: String, creds: Credentials): HttpURLConnection {
+fun openConnection(
+    url: String,
+    creds: Credentials,
+): HttpURLConnection {
     val connection = URL(url).openConnection() as HttpURLConnection
     connection.setRequestProperty("Authorization", "Bearer ${creds.token}")
     connection.connect()
@@ -39,7 +43,10 @@ fun openConnection(url: String, creds: Credentials): HttpURLConnection {
 /**
  * Writes an InputStream to the given file path.
  */
-fun downloadResponse(inputStream: InputStream, filePath: String) {
+fun downloadResponse(
+    inputStream: InputStream,
+    filePath: String,
+) {
     File(filePath).outputStream().use { outputStream ->
         inputStream.copyTo(outputStream)
     }
@@ -62,7 +69,11 @@ fun heightmapToURL(heightmap: String): String {
 /**
  * Attempts to download the file at the given URL to the specified file path.
  */
-fun attemptDownload(creds: Credentials, filePath: String, url: String) {
+fun attemptDownload(
+    creds: Credentials,
+    filePath: String,
+    url: String,
+) {
     val connection = openConnection(url, creds)
     try {
         check(connection.responseCode == HttpURLConnection.HTTP_OK) {
@@ -77,7 +88,10 @@ fun attemptDownload(creds: Credentials, filePath: String, url: String) {
 /**
  * Downloads a list of heightmap tiles to the specified directory.
  */
-fun downloadHeightmaps(heightmaps: List<String>, directoryPath: String) {
+fun downloadHeightmaps(
+    heightmaps: List<String>,
+    directoryPath: String,
+) {
     val creds = loadCredentials()
 
     for (heightmap in heightmaps) {
@@ -92,7 +106,10 @@ fun downloadHeightmaps(heightmaps: List<String>, directoryPath: String) {
 /**
  * Unzips a zip archive to the specified target directory.
  */
-fun unzip(zipFile: String, targetDir: String) {
+fun unzip(
+    zipFile: String,
+    targetDir: String,
+) {
     println("Unzipping $zipFile")
 
     ZipInputStream(File(zipFile).inputStream()).use { zis ->
