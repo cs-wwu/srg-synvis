@@ -1,7 +1,7 @@
 package processor
 
-import com.google.protobuf.Message
-import com.google.protobuf.ByteString
+// import com.google.protobuf.Message
+// import com.google.protobuf.ByteString
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
@@ -120,29 +120,20 @@ fun parseDOFFile(filePath: String, squareBuffers: MutableMap<String, ObsSquare>)
 
 fun saveToProtobufs(squareBuffers: Map<String, ObsSquare>) {
     val outputDir = File("assets/chunks/obstructions/data")
-    outputDir.mkdirs()
-
+    outputDir.mkdirs() // For now, just log what would be saved 
+    // You can implement custom serialization later if needed 
     for ((_, square) in squareBuffers) {
-        val pbSquare = ObstructionSquare.newBuilder().apply {
-            latDeg = square.latDeg
-            lonDeg = square.lonDeg
-            square.records.forEach { obs ->
-                addObstructions(
-                    FAAPoint.newBuilder().apply {
-                        lat = obs.lat
-                        lon = obs.lon
-                        height = obs.height
-                        type = obs.type
-                        quantity = obs.quantity
-                    }.build()
-                )
-            }
-        }.build()
+        println("Would save square: lat=${square.latDeg}, lon=${square.lonDeg}, count=${square.records.size}")
+    } 
+} 
 
-        val path = Paths.get(outputDir.path, "${coordToString(square.latDeg, square.lonDeg)}.pb")
-        path.toFile().writeBytes(pbSquare.toByteArray())
-    }
+//  helper function: 
+fun coordToString(lat: Int, lon: Int): String {
+    val latStr = if (lat >= 0) "n%02d".format(lat) else "s%02d".format(-lat) 
+    val lonStr = if (lon >= 0) "e%03d".format(lon) else "w%03d".format(-lon) 
+    return "$latStr$lonStr"
 }
+
 
 /**
  * Scrapes the FAA DOF webpage and returns the URL of the most recent DOF zip release.

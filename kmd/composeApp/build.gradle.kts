@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     alias(libs.plugins.ktlint)
+    kotlin("plugin.serialization") version "2.0.20"
 }
 
 ktlint {
@@ -57,6 +58,7 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -97,6 +99,7 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    implementation("com.google.protobuf:protobuf-kotlin.3.25.1")
 }
 
 compose.desktop {

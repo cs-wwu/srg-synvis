@@ -1,3 +1,4 @@
+// DownloadManager.jvm.kt
 package com.jeetbrains.greeting.kmd
 
 import api.downloadHeightmaps
@@ -5,12 +6,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import processor.generateAirData
 import processor.generateObstructionData
+import kotlin.math.floor
 
+// Extension function for BoundingBox -> heightmap tiles
 fun BoundingBox.toHeightmapTiles(): List<String> {
     val tiles = mutableListOf<String>()
 
-    val latRange = floor(South).toInt()..floor(North).toInt()
-    val lonRange = floor(West).toInt()..floor(East).toInt()
+    val latRange = South..North
+    val lonRange = West..East
 
     for (lat in latRange) {
         for (lon in lonRange) {
@@ -21,6 +24,22 @@ fun BoundingBox.toHeightmapTiles(): List<String> {
     }
 
     return tiles
+}
+
+// Extension function for BoundingBox -> coordinate squares
+fun BoundingBox.toCoordinateSquares(): List<List<Int>> {
+    val squares = mutableListOf<List<Int>>()
+
+    val latRange = South..North
+    val lonRange = West..East
+
+    for (lat in latRange) {
+        for (lon in lonRange) {
+            squares.add(listOf(lat, lon))
+        }
+    }
+
+    return squares
 }
 
 actual class DownloadManager {
@@ -65,7 +84,13 @@ actual class DownloadManager {
             }
         }
 
+    // Remove installScript() if the expect declaration still exists in commonMain
+    actual suspend fun installScript(): Result<String> {
+        return Result.failure(Exception("installScript is deprecated - not needed for Kotlin implementation"))
+    }
+
     companion object {
         private const val OSM_API_URL = "https://overpass-api.de/api/interpreter"
     }
 }
+
