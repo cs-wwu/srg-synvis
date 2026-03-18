@@ -5,9 +5,6 @@ import (
 )
 
 const (
-	// Map dimensions (SRTM/NASADEM standard)
-	mapSize = 3601
-
 	// Sea level in 16-bit heightmap (32768 is zero/sea level)
 	seaLevel = uint16(32768)
 
@@ -46,13 +43,3 @@ func generateOceanWater() []uint8 {
 	}
 	return data
 }
-
-// Direction represents cardinal directions for coastal ocean generation.
-type Direction int
-
-const (
-	North Direction = iota
-	East
-	South
-	West
-)

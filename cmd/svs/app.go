@@ -9,9 +9,8 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	as "github.com/vulkan-go/asche"
 
-	"github.com/elokore/cimgui-go-vulkan/imgui"
-
 	_ "github.com/cs-wwu/srg-synvis/internal/rendering/ui/menus"
+	"github.com/elokore/cimgui-go-vulkan/imgui"
 	"github.com/elokore/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
@@ -172,11 +171,14 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 		exitC <- struct{}{}
 		<-doneC
 		log.Println("Bye!")
+		return
 	})
 
 	if app.IsUncappedFPS() {
 		frameDelay = time.Millisecond
 	}
+
+	ui.DeliverApp(app)
 
 	fpsTicker := time.NewTicker(frameDelay)
 	defer fpsTicker.Stop()
@@ -184,9 +186,8 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	for {
 		select {
 		case <-exitC:
-			app.CimguiBackend.Cleanup()
-			app.Destroy()
 			platform.Destroy()
+			app.Destroy()
 			window.Destroy()
 			glfw.Terminate()
 			doneC <- struct{}{}
@@ -197,7 +198,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 				continue
 			}
 			glfw.PollEvents()
-			app.NextFrame()
+			app.NextFrame(frameDelay)
 
 			imageIdx, outdated, err := app.Context().AcquireNextImage()
 			if err != nil {

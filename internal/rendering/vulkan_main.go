@@ -20,32 +20,35 @@ import (
 
 // This file is for initializing and handling the main vulkan necessities
 
-func NewApplication(cfg models.AppConfig) *Application {
+func NewApplication(Cfg models.AppConfig) *Application {
 	// Fixed typo: camerCfg -> cameraConfig
 	cameraConfig := camera.CameraConfig{
-		StartPos:    cfg.CameraStartPos,
-		StartDir:    cfg.CameraStartDir,
-		EnableGPS:   cfg.UseGPS,
-		EnableHat:   cfg.UseHat,
-		DecimalYear: time.Now(),
+		StartPos:  Cfg.CameraStartPos,
+		StartDir:  Cfg.CameraStartDir,
+		EnableGPS: Cfg.UseGPS,
+		EnableHat: Cfg.UseHat,
 	}
 	cam := camera.NewCamera(cameraConfig)
 
 	// Enable hardware if needed (moved here for cleaner initialization)
-	if cfg.UseHat {
-		if err := cam.EnableSensors("./internal/camera/hat.py"); err != nil {
+	if Cfg.UseHat {
+		if err := cam.EnableSensors(); err != nil {
 			log.Printf("Warning: Failed to enable sensors: %v", err)
 		}
 	}
+	if Cfg.UseGPS {
+		cam.EnableGPS()
+	}
 	app := &Application{
-		camera:       cam,
-		Gps:          cfg.UseGPS,
-		Hat:          cfg.UseHat,
-		cfg:          cfg,
-		statsTracker: NewStatsTracker(1000, 5*time.Second),
+		Camera:            cam,
+		Gps:               Cfg.UseGPS,
+		Hat:               Cfg.UseHat,
+		Cfg:               Cfg,
+		statsTracker:      NewStatsTracker(1000, 5*time.Second),
+		lastAirspaceCheck: time.Now(),
 	}
 
-	if cfg.BenchmarkMode {
+	if Cfg.BenchmarkMode {
 		app.statsTracker.Enable()
 	}
 
@@ -60,23 +63,70 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DeviceWaitIdle(dev)
 
 	// Stop background workers before destroying resources
-	app.StreamManager.Stop()
 	app.StreamManager.Destroy()
+	println("Destroyed stream manager")
+	app.CimguiBackend.Cleanup()
 
-	vk.DestroyDescriptorPool(dev, app.descPool, nil)
 	vk.DestroyPipeline(dev, app.pipeline, nil)
-
-	// Skybox resources
-	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
-	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
-	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
+	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
+	vk.DestroyPipeline(dev, app.obstructionPipeline, nil)
+	vk.DestroyPipeline(dev, app.planePipeline, nil)
+	vk.DestroyPipeline(dev, app.roadPipeline, nil)
 	vk.DestroyPipeline(dev, app.skyboxPipeline, nil)
+	println("Destroyed pipelines")
 
+	// Render pass and pipeline layout
 	vk.DestroyPipelineCache(dev, app.pipelineCache, nil)
-	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyPipelineLayout(dev, app.pipelineLayout, nil)
+	vk.DestroyRenderPass(dev, app.renderPass, nil)
 	vk.DestroyDescriptorSetLayout(dev, app.descLayout, nil)
+	vk.DestroyDescriptorPool(dev, app.descPool, nil)
+	println("Destroyed misc")
+
+	// Buffers
+	vk.DestroyBuffer(dev, app.planeVertexBuffer, nil)
+	vk.DestroyBuffer(dev, app.planeIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxIndexBuffer, nil)
+	vk.DestroyBuffer(dev, app.skyboxVertexBuffer, nil)
+	println("Destroyed buffers")
+
+	// Memory
+	vk.FreeMemory(dev, app.planeIndexMemory, nil)
+	vk.FreeMemory(dev, app.planeVertexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxIndexMemory, nil)
+	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
+	println("Freed device memory")
+
+	for _, stream := range app.AirspaceStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		if stream.instances != nil {
+			stream.instances.Destroy()
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Airspace stream Buffers and Device Memory")
+
+	for _, stream := range app.ObstructionStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Obstructions stream Buffers and Device Memory")
+
+	for _, stream := range app.RoadStreamer.GetLoaded() {
+		if stream == nil {
+			continue
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
+	}
+	println("Destroyed Road stream buffers and Device Memory")
 
 	for i := range app.textures {
 		if app.textures[i] != nil {
@@ -84,44 +134,59 @@ func (app *Application) VulkanContextCleanup() error {
 			app.textures[i] = nil
 		}
 	}
+	println("Destroyed textures")
 
 	if app.depth != nil {
 		app.depth.Destroy(dev)
 		app.depth = nil
 	}
-
-	vk.DeviceWaitIdle(dev)
+	println("Destroyed depth")
 
 	return nil
 }
 
-func (app *Application) NextFrame() {
+func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.statsTracker.StartFrame()
 
 	app.frameCount++
 
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
-	app.camera.ProcessInput(app.WindowHandle)
+	app.Camera.ProcessInput(app.WindowHandle)
+	if app.Cfg.DisableFog {
+		app.ubo.DisableFog = 1.0
+	} else {
+		app.ubo.DisableFog = 0.0
+	}
 	app.updateUBO()
 
 	// Set camera position in UBO for terrain height warnings
-	cameraPos := app.camera.Position()
+	cameraPos := app.Camera.Position()
 	app.ubo.CameraPos = cameraPos
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
 	app.StreamManager.UpdateCameraPosition(cameraPos)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
-	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.RoadStreamer.UpdatePos(app.Camera.Position())
+	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
 
-	app.camera.ProcessInput(app.WindowHandle)
+	// Check current airspace periodically
+	if time.Since(app.lastAirspaceCheck) > 100*time.Millisecond {
+		app.UpdateCurrentAirspace()
+		app.lastAirspaceCheck = time.Now()
+	}
+
+	app.Camera.ProcessInput(app.WindowHandle)
+
 	// Update system stats periodically
 	app.statsTracker.UpdateSystemStats(
-		app.cfg.DebugMode,                 // validation layers
+		app.Cfg.DebugMode,                 // validation layers
 		app.Context().PresentModeString(), // or get from present mode
 		3,                                 // frame lag
 	)
+
+	app.Camera.Update(float32(deltaTime.Seconds()))
 
 	// Report if needed
 	if app.statsTracker.ShouldReport() {
@@ -214,7 +279,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdDrawIndexed(cmd, app.skyboxIndexCount, 1, 0, 0, 0)
 
 	// Draw the plane
-	if app.camera.MapView() {
+	if app.Camera.MapView() {
 		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.planePipeline)
 		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 			0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
@@ -275,6 +340,32 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 		}
 	}
 	app.ObstructionStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
+
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+
+	app.AirspaceStreamer.Lock()
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		}
+	}
+	app.AirspaceStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

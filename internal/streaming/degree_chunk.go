@@ -63,19 +63,29 @@ func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
 	d.Lock()
 	defer d.Unlock()
 
-	lon_req := int(math.Round(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
-	lat_req := int(math.Round(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
+	lon_req := int(math.Floor(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
+	lat_req := int(math.Floor(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
 
 	for lon := lon_req - 1; lon <= lon_req+1; lon++ {
 		for lat := lat_req - 1; lat <= lat_req+1; lat++ {
 			pos := LatLonInt{Lat: lat, Lon: lon}
 			_, exists := d.Chunks[pos]
 			_, isPending := d.pending[pos]
-
 			if !exists && !isPending {
 				d.pending[pos] = true
 				d.request <- pos
 			}
 		}
 	}
+}
+
+func (d *DegreeChunkStreamer[T]) GetLoaded() []T {
+	d.Lock()
+	defer d.Unlock()
+
+	chunks := make([]T, 0, len(d.Chunks))
+	for _, chunk := range d.Chunks {
+		chunks = append(chunks, chunk)
+	}
+	return chunks
 }

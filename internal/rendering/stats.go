@@ -108,7 +108,7 @@ func (st *StatsTracker) StartFrame() {
 
 	// Calculate frame time from previous frame
 	if !st.lastFrameTime.IsZero() {
-		frameTime := now.Sub(st.lastFrameTime).Seconds() * 1000 // ms
+		frameTime := float64(now.Sub(st.lastFrameTime).Milliseconds()) // ms
 		st.addSample(&st.frameTimes, frameTime)
 		st.current.FrameTimeMs = frameTime
 	}
@@ -127,7 +127,7 @@ func (st *StatsTracker) StartRender() {
 	defer st.mu.Unlock()
 
 	// CPU time is from frame start to render start
-	cpuTime := time.Since(st.cpuStart).Seconds() * 1000 // ms
+	cpuTime := float64(time.Since(st.cpuStart).Milliseconds())
 	st.addSample(&st.cpuTimes, cpuTime)
 	st.current.CPUTimeMs = cpuTime
 
@@ -143,7 +143,7 @@ func (st *StatsTracker) EndRender() {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
-	renderTime := time.Since(st.renderStart).Seconds() * 1000 // ms
+	renderTime := float64(time.Since(st.renderStart).Milliseconds())
 	st.addSample(&st.renderTimes, renderTime)
 	st.current.RenderTimeMs = renderTime
 }
