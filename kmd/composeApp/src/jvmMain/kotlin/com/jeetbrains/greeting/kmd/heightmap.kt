@@ -1,6 +1,7 @@
 package com.jeetbrains.greeting.kmd
 
 import java.awt.image.BufferedImage
+import java.awt.image.DataBufferUShort
 import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -8,7 +9,6 @@ import java.nio.ByteOrder
 import javax.imageio.IIOImage
 import javax.imageio.ImageIO
 import javax.imageio.ImageWriteParam
-import kotlin.math.abs
 
 private const val HEIGHTMAP_LENGTH = 3601
 
@@ -47,14 +47,18 @@ class ElevationPixels {
      * Populates the pixel matrix by normalizing elevation values.
      * Converts from int16 range (-32768 to 32767) to uint16 range (0 to 65535).
      * 
-     * Example: -12345 becomes 20423 (which is 32768 - 12345)
+     * This matches Go's conversion: uint16(int16_value) + 32768
+     * The conversion to unsigned happens via bit reinterpretation.
      */
     fun populate(elevations: Elevations) {
-        val minInt16 = abs(Short.MIN_VALUE.toInt()) // 32768
+        val minInt16 = 32768 // abs(Short.MIN_VALUE)
         
         for (i in 0 until HEIGHTMAP_LENGTH) {
             for (j in 0 until HEIGHTMAP_LENGTH) {
-                val normalized = elevations[i, j].toInt() + minInt16
+                // Convert signed short to unsigned int (0-65535) by masking
+                val asUnsigned = elevations[i, j].toInt() and 0xFFFF
+                // Add offset (this is what Go does: uint16(int16) + minInt16)
+                val normalized = (asUnsigned + minInt16) and 0xFFFF
                 data[i][j] = normalized
             }
         }
@@ -110,11 +114,16 @@ fun heightmapToPng(heightmapFilepath: String, pngFilepath: String) {
         BufferedImage.TYPE_USHORT_GRAY
     )
     
+    // Direct access to the underlying short array for efficiency
+    val raster = grayImage.raster
+    val dataBuffer = raster.dataBuffer as DataBufferUShort
+    val pixelData = dataBuffer.data
+    
+    // Copy pixels directly to the image buffer
     for (y in 0 until HEIGHTMAP_LENGTH) {
         for (x in 0 until HEIGHTMAP_LENGTH) {
-            val grayValue = pixels[y, x]
-            // For TYPE_USHORT_GRAY, setRGB expects the value in the lower 16 bits
-            grayImage.setRGB(x, y, grayValue)
+            val index = y * HEIGHTMAP_LENGTH + x
+            pixelData[index] = pixels[y, x].toShort()
         }
     }
 
@@ -135,4 +144,5 @@ fun heightmapToPng(heightmapFilepath: String, pngFilepath: String) {
         writer.dispose()
     }
 }
+
 
