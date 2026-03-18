@@ -1,11 +1,7 @@
-// DownloadManager.jvm.kt
 package com.jeetbrains.greeting.kmd
 
-import api.downloadHeightmaps
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import processor.generateAirData
-import processor.generateObstructionData
 
 // Extension function for BoundingBox -> heightmap tiles
 fun BoundingBox.toHeightmapTiles(): List<String> {
@@ -54,21 +50,24 @@ actual class DownloadManager {
                 val output = StringBuilder()
 
                 if (useNASA) {
-                    val heightmaps =
-                        regions
-                            .flatMap { it.toHeightmapTiles() }
-                            .distinct()
+                    println("trying nasa")
+                    val heightmaps = regions.flatMap{ it.toHeightmapTiles() }.distinct()
 
                     downloadHeightmaps(heightmaps, outputDir)
+                    processHeightmaps(heightmaps, outputDir)
                     output.appendLine("NASA: downloaded ${heightmaps.size} heightmap tile(s)")
+                    
+                    generateRoadProtobufs(heightmaps)
                 }
 
                 if (useFAA) {
+                    println("trying faa")
                     generateObstructionData()
                     output.appendLine("FAA: obstruction data generated")
                 }
 
                 if (useOSM) {
+                    println("trying osm")
                     val coordinateSquares =
                         regions
                             .flatMap { it.toCoordinateSquares() }

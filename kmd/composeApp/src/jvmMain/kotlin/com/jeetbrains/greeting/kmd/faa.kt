@@ -1,4 +1,4 @@
-package processor
+package com.jeetbrains.greeting.kmd
 
 // import com.google.protobuf.Message
 // import com.google.protobuf.ByteString

@@ -1,5 +1,6 @@
-package api
+package com.jeetbrains.greeting.kmd
 
+import java.awt.image.BufferedImage
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -8,6 +9,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.zip.ZipInputStream
+import javax.imageio.ImageIO
 
 // NASA EarthData API constants
 private const val NASA_BASE_URL =
@@ -74,6 +76,12 @@ fun attemptDownload(
     filePath: String,
     url: String,
 ) {
+    // Check if file exists
+    val file = File(filePath)
+    if (file.exists()) {
+        return;
+    }
+
     val connection = openConnection(url, creds)
     try {
         check(connection.responseCode == HttpURLConnection.HTTP_OK) {
@@ -112,6 +120,13 @@ fun unzip(
 ) {
     println("Unzipping $zipFile")
 
+    // val targetPath = Paths.get(targetDir).toAbsolutePath().normalize()
+    // val extractPath = targetPath.resolve(entry.name).normalize()
+
+    // require(extractPath.startsWith(targetPath)) {
+    //     "Bad zip entry: ${entry.name}"
+    // }
+
     ZipInputStream(File(zipFile).inputStream()).use { zis ->
         var entry = zis.nextEntry
         while (entry != null) {
@@ -129,5 +144,34 @@ fun unzip(
             zis.closeEntry()
             entry = zis.nextEntry
         }
+    }
+}
+
+/**
+ * Converts downloaded heightmaps to .pngs
+ */
+fun processHeightmaps(heightmaps: List<String>, targetDir: String) {
+    for (heightmap in heightmaps) {
+        val zipFilePath = "$targetDir$heightmap.zip"
+        val outputDir = "$targetDir$heightmap/"
+
+        unzip(zipFilePath, outputDir)
+
+        Files.deleteIfExists(Paths.get(zipFilePath)) // remove zip
+
+        val startTime = System.currentTimeMillis()
+
+        val waterFile = "$outputDir$heightmap.swb"
+        val waterPng = "$targetDir$heightmap.swb.png"
+        watermapToPng(waterFile, waterPng)
+
+        println("png conversion took ${System.currentTimeMillis() - startTime} ms")
+
+        val heightmapFile = "$outputDir$heightmap.hgt"
+        val pngFile = "$targetDir$heightmap.hgt.png"
+        heightmapToPng(heightmapFile, pngFile)
+
+        // Remove extracted directory
+        File(outputDir).deleteRecursively()
     }
 }
