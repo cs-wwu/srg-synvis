@@ -121,13 +121,21 @@ fun parseHeightmapToCoords(heightmap: String): List<Int> {
 /**
  * Generates road protobuf files for the given heightmap tiles.
  */
-fun generateRoadProtobufs(heightmaps: List<String>) {
-    val outputDir = File("assets/chunks/roads/data")
+fun generateRoadProtobufs(heightmaps: List<String>, outputName: String) {
+    val outputDir = File(outputName)
     outputDir.mkdirs()
 
     // OSM takes a couple seconds per request, process sequentially to avoid rate limits
     // See https://dev.overpass-api.de/overpass-doc/en/preface/commons.html
     for (heightmap in heightmaps) {
+
+        // Check if file exists
+        val roadName = "$outputName$heightmap.pb"
+        val roadfile = File(roadName)
+        if (roadfile.exists()) {
+            continue
+        }
+
         try {
             val coords = parseHeightmapToCoords(heightmap)
             generateRoadSquare(outputDir, coords[0], coords[1])

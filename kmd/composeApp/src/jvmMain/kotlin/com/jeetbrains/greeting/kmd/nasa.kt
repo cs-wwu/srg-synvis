@@ -76,11 +76,6 @@ fun attemptDownload(
     filePath: String,
     url: String,
 ) {
-    // Check if file exists
-    val file = File(filePath)
-    if (file.exists()) {
-        return;
-    }
 
     val connection = openConnection(url, creds)
     try {
@@ -103,11 +98,22 @@ fun downloadHeightmaps(
     val creds = loadCredentials()
 
     for (heightmap in heightmaps) {
-        println("Downloading: $heightmap")
         val heightmapURL = heightmapToURL(heightmap)
-        val filePath = "$directoryPath$heightmap.zip"
-        println("at: $filePath")
-        attemptDownload(creds, filePath, heightmapURL)
+        val zipfilePath = "$directoryPath$heightmap.zip"
+        val pngfilePath = "$directoryPath$heightmap.swb.png"
+
+        // Check if file exists
+        val zipfile = File(zipfilePath)
+        if (zipfile.exists()) {
+            continue;
+        }
+        val pngfile = File(pngfilePath)
+        if (pngfile.exists()) {
+            continue;
+        }
+        println("Downloading: $heightmap")
+        println("at: $zipfilePath")
+        attemptDownload(creds, zipfilePath, heightmapURL)
     }
 }
 
@@ -119,13 +125,6 @@ fun unzip(
     targetDir: String,
 ) {
     println("Unzipping $zipFile")
-
-    // val targetPath = Paths.get(targetDir).toAbsolutePath().normalize()
-    // val extractPath = targetPath.resolve(entry.name).normalize()
-
-    // require(extractPath.startsWith(targetPath)) {
-    //     "Bad zip entry: ${entry.name}"
-    // }
 
     ZipInputStream(File(zipFile).inputStream()).use { zis ->
         var entry = zis.nextEntry
@@ -155,22 +154,29 @@ fun processHeightmaps(heightmaps: List<String>, targetDir: String) {
         val zipFilePath = "$targetDir$heightmap.zip"
         val outputDir = "$targetDir$heightmap/"
 
+        // Check if zipfile DNE
+        val zipfile = File(zipFilePath)
+        if (!zipfile.exists()) {
+            continue;
+        }
+
         unzip(zipFilePath, outputDir)
-
-        Files.deleteIfExists(Paths.get(zipFilePath)) // remove zip
-
-        val startTime = System.currentTimeMillis()
 
         val waterFile = "$outputDir$heightmap.swb"
         val waterPng = "$targetDir$heightmap.swb.png"
-        watermapToPng(waterFile, waterPng)
 
-        println("png conversion took ${System.currentTimeMillis() - startTime} ms")
+        // Check if processed file exists
+        val pngfile = File(waterPng)
+        if (pngfile.exists()) {
+            continue;
+        }
+        watermapToPng(waterFile, waterPng)
 
         val heightmapFile = "$outputDir$heightmap.hgt"
         val pngFile = "$targetDir$heightmap.hgt.png"
         heightmapToPng(heightmapFile, pngFile)
 
+        Files.deleteIfExists(Paths.get(zipFilePath)) // remove zip
         // Remove extracted directory
         File(outputDir).deleteRecursively()
     }

@@ -53,29 +53,35 @@ actual class DownloadManager {
                     println("trying nasa")
                     val heightmaps = regions.flatMap{ it.toHeightmapTiles() }.distinct()
 
-                    downloadHeightmaps(heightmaps, outputDir)
-                    processHeightmaps(heightmaps, outputDir)
+                    val outputName = outputDir + "maps/"
+                    downloadHeightmaps(heightmaps, outputName)
+                    processHeightmaps(heightmaps, outputName)
                     output.appendLine("NASA: downloaded ${heightmaps.size} heightmap tile(s)")
                     
-                    generateRoadProtobufs(heightmaps)
+                    // if (useOSM)
+                    val roadOutputName = outputDir + "chunks/roads/data/"
+                    generateRoadProtobufs(heightmaps, roadOutputName)
                 }
 
                 if (useFAA) {
                     println("trying faa")
-                    generateObstructionData()
+                    val obsOutputName = outputDir + "chunks/obstructions/data/"
+                    val dofOutputName = outputDir + "DOF_Files/"
+                    generateObstructionData(dofOutputName, obsOutputName)
                     output.appendLine("FAA: obstruction data generated")
                 }
 
-                if (useOSM) {
-                    println("trying osm")
-                    val coordinateSquares =
-                        regions
-                            .flatMap { it.toCoordinateSquares() }
-                            .distinct()
+                // if (useOSM) {
+                //     println("trying osm")
+                //     val coordinateSquares =
+                //         regions
+                //             .flatMap { it.toCoordinateSquares() }
+                //             .distinct()
 
-                    generateAirData(coordinateSquares, OSM_API_URL)
-                    output.appendLine("OSM: aeroway data generated for ${coordinateSquares.size} square(s)")
-                }
+                //     // val outputName = outputDir + "chunks/roads/data/"
+                //     generateAirData(coordinateSquares, OSM_API_URL)
+                //     output.appendLine("OSM: aeroway data generated for ${coordinateSquares.size} square(s)")
+                // }
 
                 Result.success(output.toString())
             } catch (e: Exception) {

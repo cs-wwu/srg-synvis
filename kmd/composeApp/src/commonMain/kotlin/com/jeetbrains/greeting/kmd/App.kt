@@ -184,7 +184,7 @@ fun App(regions: List<Region> = USregions()) {
                                 useNASA = true,
                                 useOSM = true,
                                 useFAA = true,
-                                outputDir = "../../assets/maps/",
+                                outputDir = "../../assets/",
                             )
 
                         result.onSuccess { output ->

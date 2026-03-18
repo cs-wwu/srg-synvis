@@ -1,3 +1,5 @@
+// NOTE: could not find the Go code version of this file actually being used??
+
 package com.jeetbrains.greeting.kmd
 
 import kotlinx.serialization.Serializable
@@ -12,7 +14,7 @@ data class OSMPoint(
     val height: Double,
 )
 
-// These mirror the Go OverpassResponse / Element types — adjust fields to match your actual structs
+
 @Serializable
 data class OverpassResponse(
     val elements: List<Element> = emptyList(),
@@ -144,7 +146,5 @@ fun generateAirData(
     }
 }
 
-// JSON deserialization — Go uses encoding/json with struct tags. The Kotlin version uses kotlinx.serialization with @Serializable data classes, which is the idiomatic choice for Kotlin (especially if you're on a multiplatform or Android project). You'll need the org.jetbrains.kotlinx:kotlinx-serialization-json dependency and the serialization Gradle plugin. If you're already using Gson or Moshi in your project, swapping out json.decodeFromString for those is straightforward.
-// OverpassResponse and Element — The Go code references these types but defines them elsewhere (your processor package). I've included placeholder definitions here based on usage — the fields type, id, lat, lon, nodes, and tags are all implied by the Go code. Adjust them to match whatever your actual shared type definitions look like.
-// storeAirData bug preservation — The original Go code has a subtle bug: it only appends a point to wayPoints if the node has an "ele" tag, even though a zero height is set as the default. If a node has no "ele" tag, it's silently skipped. The Kotlin translation preserves this behaviour faithfully. If you want all nodes included regardless of elevation data, move wayPoints.add(point) outside the if (eleTag != null) block.
-// generateAirData nil check — Go checks if maps == nil, which becomes require(maps.isNotEmpty()) in Kotlin since Kotlin lists can't be null unless explicitly typed as nullable (List<...>?). If your call sites can pass a nullable list, change the parameter to maps: List<List<Int>>? and use requireNotNull(maps) instead
+// JSON deserialization — Go uses encoding/json with struct tags. The Kotlin version uses kotlinx.serialization with @Serializable data classes, which is the idiomatic choice for Kotlin (especially if you're on a multiplatform or Android project). Need the org.jetbrains.kotlinx:kotlinx-serialization-json dependency and the serialization Gradle plugin.
+// OverpassResponse and Element — The Go code references these types but defines them elsewhere (your processor package). There are placeholder definitions here based on usage — the fields type, id, lat, lon, nodes, and tags are all implied by the Go code.

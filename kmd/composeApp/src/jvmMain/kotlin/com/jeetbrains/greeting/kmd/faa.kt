@@ -1,9 +1,5 @@
 package com.jeetbrains.greeting.kmd
 
-// import com.google.protobuf.Message
-// import com.google.protobuf.ByteString
-// import proto.ObstructionsProto
-// import com.jeetbrains.greeting.kmd.proto.ObstructionsProto
 import obs.Faa
 import java.io.BufferedReader
 import java.io.File
@@ -135,8 +131,8 @@ fun parseDOFFile(
 //         println("Would save square: lat=${square.latDeg}, lon=${square.lonDeg}, count=${square.records.size}")
 //     }
 // }
-fun saveToProtobufs(squareBuffers: Map<String, ObsSquare>) {
-    val outputDir = File("assets/chunks/obstructions/data")
+fun saveToProtobufs(squareBuffers: Map<String, ObsSquare>, directoryPath: String) {
+    val outputDir = File(directoryPath)
     outputDir.mkdirs()
     for ((_, square) in squareBuffers) {
         val pbSquare =
@@ -180,6 +176,10 @@ fun coordToString(
 fun getDOFLink(): String {
     val faaUrl = "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dof"
     val connection = URL(faaUrl).openConnection() as HttpURLConnection
+    
+    // Add User-Agent header to avoid 403 Forbidden
+    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
     val html = connection.inputStream.bufferedReader().readText()
     connection.disconnect()
 
@@ -192,18 +192,21 @@ fun getDOFLink(): String {
         ?: throw IllegalStateException("Could not find DOF zip link on FAA webpage")
 }
 
+
 /**
  * Downloads the latest DOF.DAT file from the FAA and saves it to finalPath.
  */
-fun downloadFAADOF(finalPath: String) {
+fun downloadFAADOF(finalPath: String, dofDirectoryPath: String) {
     val dofUrl = getDOFLink()
 
     val connection = URL(dofUrl).openConnection() as HttpURLConnection
+    connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
     check(connection.responseCode == HttpURLConnection.HTTP_OK) {
         "Failed to download DOF zip, status: ${connection.responseCode}"
     }
 
-    val initialPath = "./assets/DOF_Files/DOF.zip"
+    val initialPath = dofDirectoryPath + "DOF.zip"
     File(initialPath).outputStream().use { out ->
         connection.inputStream.copyTo(out)
     }
@@ -229,6 +232,7 @@ fun downloadFAADOF(finalPath: String) {
     throw IllegalStateException("DOF.DAT not found inside downloaded zip")
 }
 
+
 /**
  * Reads the currency date from the header line of the DOF.DAT file.
  */
@@ -245,10 +249,10 @@ fun parseCurrencyDate(reader: BufferedReader): LocalDate {
  * Top-level entry point: downloads (if needed) and processes FAA obstruction data
  * into coordinate-keyed protobuf files.
  */
-fun generateObstructionData() {
-    File("./assets/DOF_Files/").mkdirs()
+fun generateObstructionData(dofDirectoryPath: String, obsDirectoryPath: String) {
+    File(dofDirectoryPath).mkdirs()
 
-    val filePath = "./assets/DOF_Files/DOF.DAT"
+    val filePath = dofDirectoryPath + ".DAT"
     val file = File(filePath)
 
     var daysSinceUpdate = Double.MAX_VALUE
@@ -259,10 +263,10 @@ fun generateObstructionData() {
 
     // DOF is updated every 56 days, released 2 days after — refresh threshold is 58 days
     if (!file.exists() || daysSinceUpdate >= 58) {
-        downloadFAADOF(filePath)
+        downloadFAADOF(filePath, dofDirectoryPath)
     }
 
     val squareBuffers = mutableMapOf<String, ObsSquare>()
     parseDOFFile(filePath, squareBuffers)
-    saveToProtobufs(squareBuffers)
+    saveToProtobufs(squareBuffers, obsDirectoryPath)
 }
