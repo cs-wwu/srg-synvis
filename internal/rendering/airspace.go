@@ -307,7 +307,7 @@ func pointInRing(x, y float64, ring [][]float64) bool {
 }
 
 func (app *Application) UpdateCurrentAirspace() {
-	cameraPos := app.camera.Position()
+	cameraPos := app.Camera.Position()
 
 	// Get all loaded airspace chunks
 	loadedChunks := app.AirspaceStreamer.GetLoaded()

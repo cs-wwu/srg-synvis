@@ -2,6 +2,7 @@ package camera
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os/exec"
@@ -20,6 +21,10 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 type SensorManager struct {
 	camera           *Camera
 	smoothingEnabled bool // When true, smooths path through space
+	ctxGPS           context.Context
+	cancelGPS        context.CancelFunc
+	ctxHat           context.Context
+	cancelHat        context.CancelFunc
 }
 
 // SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
@@ -33,19 +38,23 @@ func NewSensorManager(camera *Camera) *SensorManager {
 	return &SensorManager{
 		camera:           camera,
 		smoothingEnabled: true,
+		ctxGPS:           nil,
+		cancelGPS:        nil,
+		ctxHat:           nil,
+		cancelHat:        nil,
 	}
 }
 
 // StartGPS connects to the GPSD service and gets lat, lon, and alt with TPV report
 // Runs as a separate goroutine
-func (sm *SensorManager) StartGPS() error {
+func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	// Connect to GPSD
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
 		log.Println("Failed to connect to GPSD:", err)
 		return err
 	}
-	defer gps.Close()
+	// defer gps.Close()
 
 	// Store previous data in case of GPS fix issues
 	pos := sm.camera.Position()
@@ -94,15 +103,23 @@ func (sm *SensorManager) StartGPS() error {
 	done := gps.Watch()
 	<-done
 
-	return nil
+	select {
+	case <-ctx.Done():
+		log.Println("GPS: context cancelled, stopping GPS")
+		gps.Close()
+		return ctx.Err()
+	case <-done:
+		log.Println("GPS: watch ended")
+		return nil
+	}
 }
 
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
-func (sm *SensorManager) StartSensors() Mode {
+func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 	filename := "./internal/camera/hat.py"
-	cmd := exec.Command("python3", filename)
+	cmd := exec.CommandContext(ctx, "python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
@@ -117,6 +134,10 @@ func (sm *SensorManager) StartSensors() Mode {
 		log.Println("Error starting sensor command:", err)
 		return StartCommand
 	}
+
+	defer func() {
+		_ = cmd.Wait()
+	}()
 
 	first := true
 	var oldYaw, oldRoll, oldPitch float64
@@ -166,12 +187,7 @@ func (sm *SensorManager) StartSensors() Mode {
 	}
 
 	// Wait for the command to finish
-	err = cmd.Wait()
-	if err != nil {
-		log.Println("Error waiting for sensor command:", err)
-		return Waiting
-	}
-
+	_ = cmd.Wait()
 	return Waiting
 }
 
@@ -197,8 +213,8 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	// Apply declination correction (magnetic to true heading)
 	*yaw = *yaw + mag.D()
 
-	log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
-		mag.D(), lat, lon)
+	// log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
+	//	mag.D(), lat, lon)
 
 	return nil
 }
