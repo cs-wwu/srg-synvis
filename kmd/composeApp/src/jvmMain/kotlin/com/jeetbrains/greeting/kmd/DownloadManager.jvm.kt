@@ -71,18 +71,6 @@ actual class DownloadManager {
                     output.appendLine("FAA: obstruction data generated")
                 }
 
-                // if (useOSM) {
-                //     println("trying osm")
-                //     val coordinateSquares =
-                //         regions
-                //             .flatMap { it.toCoordinateSquares() }
-                //             .distinct()
-
-                //     // val outputName = outputDir + "chunks/roads/data/"
-                //     generateAirData(coordinateSquares, OSM_API_URL)
-                //     output.appendLine("OSM: aeroway data generated for ${coordinateSquares.size} square(s)")
-                // }
-
                 Result.success(output.toString())
             } catch (e: Exception) {
                 Result.failure(e)
