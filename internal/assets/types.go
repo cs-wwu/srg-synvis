@@ -2,18 +2,20 @@ package assets
 
 import (
 	"time"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 // MapData represents a complete map tile with elevation and water data.
 // Heightmaps and watermaps are always loaded and cached together as they
 // are always used together in the terrain system.
 type MapData struct {
-	Coord      string    // Map coordinate (e.g., "n48w123")
-	HeightData []uint16  // 3601 * 3601 * 2 bytes of height data
-	WaterData  []uint8   // 3601 * 3601 bytes of water data
-	LoadedAt   time.Time // When this data was loaded
-	Size       int64     // Approximate memory usage in bytes
-	IsOcean    bool      // True if this is a generated ocean tile
+	Coord      spatial.MapCoord // Map coordinate (e.g., "n48w123")
+	HeightData []uint16         // 3601 * 3601 * 2 bytes of height data
+	WaterData  []uint8          // 3601 * 3601 bytes of water data
+	LoadedAt   time.Time        // When this data was loaded
+	Size       int64            // Approximate memory usage in bytes
+	IsOcean    bool             // True if this is a generated ocean tile
 }
 
 // AssetManager handles loading and caching of map data for the terrain system.
@@ -23,17 +25,17 @@ type AssetManager interface {
 	// LoadMapData loads both heightmap and watermap for a coordinate.
 	// Returns cached data if available, loads from disk if not.
 	// Generates ocean data if files don't exist.
-	LoadMapData(coord string) (*MapData, error)
+	LoadMapData(coord spatial.MapCoord) (*MapData, error)
 
 	// PreloadMaps loads multiple maps asynchronously.
 	// Returns a channel that receives results as they complete.
-	PreloadMaps(coords []string) <-chan LoadResult
+	PreloadMaps(coords []spatial.MapCoord) <-chan LoadResult
 
 	// IsLoaded checks if a map is currently in cache.
-	IsLoaded(coord string) bool
+	IsLoaded(coord spatial.MapCoord) bool
 
 	// GetLoadedCoords returns all currently cached coordinates.
-	GetLoadedCoords() []string
+	GetLoadedCoords() []spatial.MapCoord
 
 	// Stats returns current cache statistics.
 	Stats() CacheStats
@@ -48,9 +50,9 @@ type AssetManager interface {
 
 // LoadResult is returned from async loading operations.
 type LoadResult struct {
-	Coord string   // Map coordinate
-	Data  *MapData // Loaded data (nil if error)
-	Err   error    // Error if loading failed
+	Coord spatial.MapCoord // Map coordinate
+	Data  *MapData         // Loaded data (nil if error)
+	Err   error            // Error if loading failed
 }
 
 // CacheStats provides insight into cache performance and memory usage.

@@ -6,8 +6,7 @@ import (
 	"unsafe"
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
-	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	vk "github.com/vulkan-go/vulkan"
 
 	"github.com/ungerik/go3d/vec2"
@@ -110,9 +109,8 @@ func toWorldHeight(obstruction *pb.FAAPoint) float32 {
 	return float32((obstruction.Height * 0.3048) * (ARC_DEGREES_TO_MINUTES / 1852)) // feet to meters to arcseconds
 }
 
-func (app *Application) buildObstruction(pos streaming.LatLonInt) *ObstructionSquare {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
+func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquare {
+	obstructionFile := "assets/chunks/obstructions/data/" + pos.String() + ".pb"
 	obstructionSquare := pb.ObstructionSquare{}
 	file, err := FileToBytesChecked(obstructionFile)
 	if err != nil {
@@ -126,7 +124,7 @@ func (app *Application) buildObstruction(pos streaming.LatLonInt) *ObstructionSq
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
 		return nil

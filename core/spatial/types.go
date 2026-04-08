@@ -12,6 +12,11 @@ type GridCoord struct {
 	X, Z int
 }
 
+// MapCoord represents a 1-degree by 1-degree chunk on the map
+type MapCoord struct {
+	Lat, Lon int
+}
+
 // String returns a string representation of GridCoord
 func (c GridCoord) String() string {
 	return fmt.Sprintf("(%d,%d)", c.X, c.Z)

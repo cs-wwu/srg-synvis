@@ -114,9 +114,11 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 // ChunkLoader interface implementation for WorkerPool
 
 // LoadChunk handles the loading of a single chunk (called by WorkerPool)
-func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) error {
+func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec) error {
 	// Get map data
-	mapData, err := sm.assetManager.LoadMapData(mapCoord)
+	mapData, err := sm.assetManager.LoadMapData(
+		coords.WorldToMap(int(spec.WorldPos[0]), int(spec.WorldPos[1])),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get map data: %w", err)
 	}
@@ -402,11 +404,7 @@ func (sm *StreamManager) queueMissingChunks() {
 	missingChunks := sm.chunkSelector.GetMissingChunks()
 
 	for _, spec := range missingChunks {
-		// Determine map coordinate
-		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
-
-		// Queue through WorkerPool
-		sm.workerPool.QueueLoadJob(spec, chunkMapCoord)
+		sm.workerPool.QueueLoadJob(spec)
 	}
 }
 

@@ -2,6 +2,8 @@ package assets
 
 import (
 	"time"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 const (
@@ -12,7 +14,7 @@ const (
 )
 
 // generateOceanTile creates a flat ocean tile with all water.
-func (am *assetManager) generateOceanTile(coord string) *MapData {
+func (am *assetManager) generateOceanTile(coord spatial.MapCoord) *MapData {
 	heightData := generateOceanHeight()
 	waterData := generateOceanWater()
 

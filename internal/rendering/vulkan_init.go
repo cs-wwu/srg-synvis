@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
 
@@ -501,9 +501,8 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
+func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
+	airspaceFile := "assets/chunks/airspace/data/" + pos.String() + ".geojson"
 
 	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
@@ -518,7 +517,7 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil

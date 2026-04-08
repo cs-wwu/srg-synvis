@@ -5,8 +5,7 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/cs-wwu/srg-synvis/internal/streaming"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"google.golang.org/protobuf/proto"
@@ -58,10 +57,8 @@ const (
 	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
 )
 
-func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
-
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
+func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
+	roadFile := "assets/chunks/roads/data/" + pos.String() + ".pb"
 	roadSquare := pb.RoadSquare{}
 	file, err := FileToBytesChecked(roadFile)
 	if err != nil {
@@ -74,7 +71,7 @@ func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
 		return nil

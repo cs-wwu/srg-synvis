@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 )
 
 // loadFromDisk loads both heightmap and watermap from disk and converts to raw data.
-func (am *assetManager) loadFromDisk(coord string) (*MapData, error) {
+func (am *assetManager) loadFromDisk(coord spatial.MapCoord) (*MapData, error) {
 	// Load heightmap PNG and convert to raw data
 	heightmapPath := am.resolvePath(coord, fileTypeHeightmap)
 	heightmap, err := loadGray16Image(heightmapPath)
@@ -56,20 +58,18 @@ func (am *assetManager) loadFromDisk(coord string) (*MapData, error) {
 }
 
 // resolvePath builds the full file path for an asset.
-func (am *assetManager) resolvePath(coord string, fType fileType) string {
-	var extension string
+func (am *assetManager) resolvePath(coord spatial.MapCoord, fType fileType) string {
+	path := coord.String()
 	switch fType {
 	case fileTypeHeightmap:
-		extension = heightmapExtension
+		path += heightmapExtension
 	case fileTypeWatermap:
-		extension = watermapExtension
+		path += watermapExtension
 	case fileTypeTexture:
-		extension = textureExtension
-	default:
-		extension = ".unknown"
+		path += textureExtension
 	}
 
-	return filepath.Join(am.basePath, coord+extension)
+	return filepath.Join(am.basePath, path)
 }
 
 // gray16PixToArray efficiently converts Gray16.Pix to uint16 array.

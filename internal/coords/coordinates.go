@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	lin "github.com/xlab/linmath"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 // This file should be used for coordinate math and rendering math
@@ -58,7 +58,7 @@ const (
 //	0, 3600  -> "n00e000"
 //	0, 0 	 -> "s01e000"
 //	-3600, 0 -> "s01w001"
-func WorldToMap(x, z int) string {
+func WorldToMap(x, z int) spatial.MapCoord {
 	z = -z // Flip for vulkan
 	// Adjust coordinates to handle the overlap
 	lat := z / int(ARC_DEGREES_TO_SECONDS)
@@ -70,56 +70,7 @@ func WorldToMap(x, z int) string {
 		lon -= 1
 	}
 
-	return LatLonToMap(lat, lon)
-}
-
-func LatLonToMap(lat, lon int) string {
-	latDir := 'n'
-	if lat < 0 {
-		latDir = 's'
-		lat = -lat
-	}
-
-	lonDir := 'e'
-	if lon < 0 {
-		lonDir = 'w'
-		lon = -lon
-	}
-
-	return fmt.Sprintf("%c%02d%c%03d", latDir, lat, lonDir, lon)
-}
-
-// Takes a map coordinate and returns the corresponding float x, z coords.
-// Specifically the top-left coord of the map. e.g.
-//
-//	"n48w123" -> -442800, 176400
-//	"n00w001" -> -3600, 3600
-//	"n00e000" -> 0, 3600
-//	"s01e001" -> 3600, 0
-func MapToWorld(coord string) (x, z int) {
-	if len(coord) != 7 {
-		return 0, 0 // Invalid coordinate format
-	}
-
-	latDir := coord[0]
-	lonDir := coord[3]
-	lat, _ := strconv.Atoi(coord[1:3])
-	lon, _ := strconv.Atoi(coord[4:7])
-
-	x = lon * ARC_DEGREES_TO_SECONDS
-	if lonDir == 'w' {
-		x = -x
-	}
-
-	z = lat * ARC_DEGREES_TO_SECONDS
-	if latDir == 's' {
-		z = -z
-	}
-	z += ARC_DEGREES_TO_SECONDS
-
-	z = -z // Flip for vulkan
-
-	return x, z
+	return spatial.MapCoord{Lat: lat, Lon: lon}
 }
 
 // Takes an x, z coordinate and returns the corresponding pixel coordinates.
@@ -180,8 +131,4 @@ func WorldToGPSFloat(x, z float32) (float32, float32) {
 	lon := x / 3600.0
 
 	return lat, lon
-}
-
-func GetMapFromPosition(pos lin.Vec3) string {
-	return WorldToMap(int(pos[0]), int(pos[2]))
 }
