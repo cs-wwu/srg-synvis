@@ -53,6 +53,18 @@ func (n *QuadTreeNode[T]) Children() iter.Seq[*QuadTreeNode[T]] {
 	}
 }
 
+func (n *QuadTreeNode[T]) DirectChildrenPositions() [4]GridCoord {
+	half := n.size / 2
+	mid := GridCoord{n.origin.X + int(half), n.origin.Z + int(half)}
+
+	return [4]GridCoord{
+		n.origin,            // NW
+		{mid.X, n.origin.Z}, // NE
+		{n.origin.X, mid.Z}, // SW
+		mid,                 // SE
+	}
+}
+
 // Split subdivides a leaf node into 4 children and returns them (NW, NE, SW, SE).
 // Panics if the node is not a leaf or cannot be subdivided further.
 func (qt *QuadTree[T]) Split(node *QuadTreeNode[T]) [4]*QuadTreeNode[T] {
@@ -63,14 +75,8 @@ func (qt *QuadTree[T]) Split(node *QuadTreeNode[T]) [4]*QuadTreeNode[T] {
 		panic("cannot split a node of size 1")
 	}
 
-	half := node.size / 2
-	mid := GridCoord{node.origin.X + int(half), node.origin.Z + int(half)}
-
-	node.children = [4]*QuadTreeNode[T]{
-		{origin: node.origin, size: half, parent: node},                     // NW
-		{origin: GridCoord{mid.X, node.origin.Z}, size: half, parent: node}, // NE
-		{origin: GridCoord{node.origin.X, mid.Z}, size: half, parent: node}, // SW
-		{origin: mid, size: half, parent: node},                             // SE
+	for i, pos := range node.DirectChildrenPositions() {
+		node.children[i] = &QuadTreeNode[T]{origin: pos, size: node.size / 2, parent: node}
 	}
 
 	delete(qt.leaves, node)
