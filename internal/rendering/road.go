@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	"google.golang.org/protobuf/proto"
@@ -16,7 +17,7 @@ import (
 )
 
 type RoadBuilder struct {
-	heightInfo *HeightInfo
+	heightInfo *chunk.HeightInfo
 	vertices   []RoadVertex
 	indices    []uint32
 
@@ -76,7 +77,7 @@ func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
 		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
 		return nil
 	}
-	heightInfo := newHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
 	builder := newRoadBuilder(heightInfo)
 
 	for _, road := range roadSquare.Roads {
@@ -282,7 +283,7 @@ func perpendicularDistance(pt, lineStart, lineEnd vec2.T) float64 {
 	return num / den
 }
 
-func newRoadBuilder(heightInfo *HeightInfo) *RoadBuilder {
+func newRoadBuilder(heightInfo *chunk.HeightInfo) *RoadBuilder {
 	return &RoadBuilder{
 		heightInfo: heightInfo,
 		vertices:   make([]RoadVertex, 0),

@@ -7,6 +7,7 @@ import (
 
 	pb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	vk "github.com/vulkan-go/vulkan"
 
 	"github.com/ungerik/go3d/vec2"
@@ -82,7 +83,7 @@ var obsShapesMap = map[string]Shape{
 }
 
 type ObstructionBuilder struct {
-	heightInfo *HeightInfo
+	heightInfo *chunk.HeightInfo
 	vertices   []ObstructionVertex
 	indices    []uint32
 
@@ -130,7 +131,7 @@ func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquar
 		return nil
 	}
 
-	heightInfo := newHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
 	builder := newObstructionBuilder(heightInfo)
 
 	for _, obstruction := range obstructionSquare.Obstructions {
@@ -314,7 +315,7 @@ func (builder *ObstructionBuilder) addTriangle(a, b, c uint32) {
 	builder.indices = append(builder.indices, a, b, c)
 }
 
-func newObstructionBuilder(heightInfo *HeightInfo) *ObstructionBuilder {
+func newObstructionBuilder(heightInfo *chunk.HeightInfo) *ObstructionBuilder {
 	return &ObstructionBuilder{
 		heightInfo: heightInfo,
 		vertices:   make([]ObstructionVertex, 0),
