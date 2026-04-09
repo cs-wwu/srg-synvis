@@ -60,10 +60,10 @@ func CalculateChunkVertices(heightInfo *HeightInfo, waterData []uint8, chunk *Ch
 			worldX := chunk.X + (x * stride) - 1 // Start one vertex west (subtract a point)
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
-			if firstZ && worldZ%3600 == -1 || worldZ%3600 == 1 {
+			if firstZ && (worldZ%3600 == -1 || worldZ%3600 == 1) {
 				localZ -= 3599
 			}
-			if firstX && worldX%3600 == -1 || worldX%3600 == 1 {
+			if firstX && (worldX%3600 == -1 || worldX%3600 == 1) {
 				localX -= 3599
 			}
 
