@@ -88,6 +88,9 @@ type Application struct {
 }
 
 const (
+	CHUNK_SIZE = 144 // Same as before for compatibility
+	MAP_FOLDER = "assets/maps/"
+
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 )
