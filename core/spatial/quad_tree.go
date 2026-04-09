@@ -1,0 +1,98 @@
+package spatial
+
+import "iter"
+
+type QuadTree[T any] struct {
+	root   *QuadTreeNode[T]
+	leaves map[*QuadTreeNode[T]]struct{}
+}
+
+type QuadTreeNode[T any] struct {
+	origin   GridCoord // The top left corner.
+	size     uint      // The width/height of this node. Always a power of 2.
+	parent   *QuadTreeNode[T]
+	children [4]*QuadTreeNode[T]
+
+	Value T
+}
+
+func NewQuadTree[T any](size uint) *QuadTree[T] {
+	if (size & (size - 1)) != 0 {
+		panic("size must be a power of 2")
+	}
+
+	root := &QuadTreeNode[T]{size: size}
+	return &QuadTree[T]{
+		root:   root,
+		leaves: map[*QuadTreeNode[T]]struct{}{root: {}},
+	}
+}
+
+func (qt *QuadTree[T]) Leaves() iter.Seq[*QuadTreeNode[T]] {
+	return func(yield func(*QuadTreeNode[T]) bool) {
+		for leaf := range qt.leaves {
+			if !yield(leaf) {
+				break
+			}
+		}
+	}
+}
+
+func (n *QuadTreeNode[T]) Origin() GridCoord        { return n.origin }
+func (n *QuadTreeNode[T]) Size() uint               { return n.size }
+func (n *QuadTreeNode[T]) Parent() *QuadTreeNode[T] { return n.parent }
+func (n *QuadTreeNode[T]) IsLeaf() bool             { return n.children[0] == nil }
+
+func (n *QuadTreeNode[T]) Children() iter.Seq[*QuadTreeNode[T]] {
+	return func(yield func(*QuadTreeNode[T]) bool) {
+		for _, child := range n.children {
+			if !yield(child) {
+				break
+			}
+		}
+	}
+}
+
+// Split subdivides a leaf node into 4 children and returns them (NW, NE, SW, SE).
+// Panics if the node is not a leaf or cannot be subdivided further.
+func (qt *QuadTree[T]) Split(node *QuadTreeNode[T]) [4]*QuadTreeNode[T] {
+	if !node.IsLeaf() {
+		panic("cannot split a non-leaf node")
+	}
+	if node.size < 2 {
+		panic("cannot split a node of size 1")
+	}
+
+	half := node.size / 2
+	mid := GridCoord{node.origin.X + int(half), node.origin.Z + int(half)}
+
+	node.children = [4]*QuadTreeNode[T]{
+		{origin: node.origin, size: half, parent: node},                     // NW
+		{origin: GridCoord{mid.X, node.origin.Z}, size: half, parent: node}, // NE
+		{origin: GridCoord{node.origin.X, mid.Z}, size: half, parent: node}, // SW
+		{origin: mid, size: half, parent: node},                             // SE
+	}
+
+	delete(qt.leaves, node)
+	for _, child := range node.children {
+		qt.leaves[child] = struct{}{}
+	}
+
+	return node.children
+}
+
+// Merge collapses a node's 4 children back into a leaf.
+// Panics if the node is already a leaf.
+func (qt *QuadTree[T]) Merge(node *QuadTreeNode[T]) {
+	if node.IsLeaf() {
+		panic("cannot merge a leaf node")
+	}
+	for _, child := range node.children {
+		if !child.IsLeaf() {
+			panic("cannot merge a node with non-leaf children")
+		}
+		delete(qt.leaves, child)
+	}
+	node.children = [4]*QuadTreeNode[T]{}
+	qt.leaves[node] = struct{}{}
+}
