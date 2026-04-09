@@ -12,6 +12,8 @@ type ChunkManager struct {
 	AssetManager assets.AssetManager
 	cameraPos    vec3.T
 
+	device vk.Device
+
 	chunks *spatial.QuadTree[renderChunk]
 
 	splitRequests  map[*spatial.QuadTreeNode[renderChunk]]struct{}
@@ -31,9 +33,10 @@ type completion struct {
 	chunks [4]renderChunk
 }
 
-func NewChunkManager(assetManager assets.AssetManager) *ChunkManager {
+func NewChunkManager(assetManager assets.AssetManager, device vk.Device) *ChunkManager {
 	c := &ChunkManager{
 		AssetManager:   assetManager,
+		device:         device,
 		chunks:         spatial.NewQuadTree[renderChunk](1024 * 1024),
 		splitRequests:  map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
 		requestEnqueue: make(chan *spatial.QuadTreeNode[renderChunk]),
@@ -41,6 +44,9 @@ func NewChunkManager(assetManager assets.AssetManager) *ChunkManager {
 		completed:      make(chan completion),
 	}
 	go c.runRequestQueue()
+	for range 4 {
+		go c.runWorker()
+	}
 	return c
 }
 
@@ -71,6 +77,17 @@ func (c *ChunkManager) runRequestQueue() {
 				queue = queue[1:]
 			}
 		}
+	}
+}
+
+func (c *ChunkManager) runWorker() {
+	for node := range c.requests {
+		// Split the node `c` into 4, then build those 4 renderChunks, then send em back.
+		chunks := [4]renderChunk{}
+		for i, pos := range node.DirectChildrenPositions() {
+			chunks[i] = c.buildChunk(pos, node.Size()/2)
+		}
+		c.completed <- completion{node: node, chunks: chunks}
 	}
 }
 

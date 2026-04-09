@@ -1,8 +1,10 @@
 package chunk
 
 import (
+	"encoding/binary"
 	"fmt"
 
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
@@ -29,6 +31,34 @@ type Chunk struct {
 	LODLevel LODLevel
 }
 
+func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk {
+	chunk := &Chunk{
+		X:        pos.X * CHUNK_SIZE,
+		Z:        pos.Z * CHUNK_SIZE,
+		LODLevel: 0,
+	}
+
+	mapData, err := c.AssetManager.LoadMapData(
+		coords.WorldToMap(int(chunk.X), int(chunk.Z)),
+	)
+	if err != nil {
+		fmt.Printf("Failed to load map data: %v\n", err)
+		return renderChunk{}
+	}
+
+	chunk.calculateVertices(NewHeightInfo(mapData.HeightData), mapData.WaterData)
+	chunk.calculateIndices()
+	chunk.calculateNormals()
+
+	out, err := chunk.upload(c.device)
+	if err != nil {
+		fmt.Printf("Failed to upload chunk: %v\n", err)
+		return renderChunk{}
+	}
+
+	return out
+}
+
 // Loads a specific chunk into memory, x and z are the upper-left corner of
 // the chunk (world is in arcsecond coordinates)
 // Note that the world is Latitude by Longitude times 3600 (arcseconds):
@@ -43,7 +73,7 @@ func ChunkKey(chunkX, chunkZ int) string {
 }
 
 // Calculate vertices and texcoords for a chunk
-func CalculateChunkVertices(heightInfo *HeightInfo, waterData []uint8, chunk *Chunk) {
+func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8) {
 	// Calculate vertex stride based on LOD
 	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on right/bottom edges
@@ -88,7 +118,7 @@ func CalculateChunkVertices(heightInfo *HeightInfo, waterData []uint8, chunk *Ch
 }
 
 // Generate indices (triangle strip)c
-func CalculateChunkIndices(chunk *Chunk) {
+func (chunk *Chunk) calculateIndices() {
 	stride := 1 << chunk.LODLevel
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
 	numStrips := verticesPerSide - 1
@@ -120,7 +150,7 @@ func CalculateChunkIndices(chunk *Chunk) {
 }
 
 // Calculate normals for the chunk
-func CalculateChunkNormals(chunk *Chunk) {
+func (chunk *Chunk) calculateNormals() {
 	stride := 1 << chunk.LODLevel
 	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
 
@@ -188,4 +218,42 @@ func CalculateLODChunkSizes() []vk.DeviceSize {
 		lodChunkSizes[lod] = vertexDataSize + indexDataSize
 	}
 	return lodChunkSizes
+}
+
+func (chunk *Chunk) upload(device vk.Device) (out renderChunk, err error) {
+	// Vertex buffer
+	res := vk.CreateBuffer(device, &vk.BufferCreateInfo{
+		SType: vk.StructureTypeBufferCreateInfo,
+		Usage: vk.BufferUsageFlags(vk.BufferUsageVertexBufferBit),
+		Size:  vk.DeviceSize(len(chunk.Vertices) * VertexSize),
+	}, nil, &out.vertexBuffer)
+	if res != vk.Success {
+		err = fmt.Errorf("failed to allocate vertex buffer")
+		return
+	}
+
+	// Index buffer
+	res = vk.CreateBuffer(device, &vk.BufferCreateInfo{
+		SType: vk.StructureTypeBufferCreateInfo,
+		Usage: vk.BufferUsageFlags(vk.BufferUsageIndexBufferBit),
+		Size:  vk.DeviceSize(len(chunk.Indices) * IndexSize),
+	}, nil, &out.indexBuffer)
+	if res != vk.Success {
+		err = fmt.Errorf("failed to allocate index buffer")
+		return
+	}
+
+	// Upload vertex data
+	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
+	for i, vertex := range chunk.Vertices {
+		copy(vertexData[i*VertexSize:], vertex.Data())
+	}
+
+	// Upload index data
+	indexData := make([]byte, len(chunk.Indices)*IndexSize)
+	for i, index := range chunk.Indices {
+		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
+	}
+
+	return
 }
