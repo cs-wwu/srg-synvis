@@ -63,7 +63,7 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DeviceWaitIdle(dev)
 
 	// Stop background workers before destroying resources
-	app.StreamManager.Destroy()
+	app.ChunkManager.Destroy()
 	println("Destroyed stream manager")
 	app.CimguiBackend.Cleanup()
 
@@ -166,7 +166,7 @@ func (app *Application) NextFrame(deltaTime time.Duration) {
 
 	// Update the camera position in the stream manager (non-blocking)
 	// This will trigger background chunk loading/unloading
-	app.StreamManager.UpdateCameraPosition(cameraPos)
+	app.ChunkManager.UpdatePos(app.Camera.Position())
 	app.RoadStreamer.UpdatePos(app.Camera.Position())
 	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
@@ -293,23 +293,7 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
 		0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	chunks := app.StreamManager.GetRenderableChunks()
-	vertexCount := 0
-	triangleCount := 0
-
-	for _, chunk := range chunks {
-		vertexCount += chunk.IndexCount // approximate
-		triangleCount += chunk.IndexCount / 3
-	}
-
-	app.statsTracker.UpdateRenderingStats(
-		vertexCount,
-		triangleCount,
-		len(chunks), // draw calls
-		len(chunks), // chunk count
-	)
-
-	app.StreamManager.RenderChunks(cmd)
+	app.ChunkManager.RenderChunks(cmd)
 
 	// Draw roads
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/camera"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	"github.com/elokore/cimgui-go-vulkan/backend"
@@ -73,7 +74,7 @@ type Application struct {
 	Cfg models.AppConfig
 
 	Camera        *camera.Camera
-	StreamManager *StreamManager
+	ChunkManager  *chunk.ChunkManager
 	WindowHandle  *glfw.Window
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
