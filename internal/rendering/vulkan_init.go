@@ -1730,7 +1730,11 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize StreamManager
-	app.ChunkManager = chunk.NewChunkManager(assets.NewAssetManager(MAP_FOLDER, 50), app.Context().Device())
+	app.ChunkManager = chunk.NewChunkManager(
+		assets.NewAssetManager(MAP_FOLDER, 50),
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+	)
 	app.ChunkManager.UpdatePos(app.Camera.Position())
 
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)

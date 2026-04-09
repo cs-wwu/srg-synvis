@@ -6,6 +6,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	as "github.com/vulkan-go/asche"
 	vk "github.com/vulkan-go/vulkan"
 	lin "github.com/xlab/linmath"
 )
@@ -50,7 +51,7 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 	chunk.calculateIndices()
 	chunk.calculateNormals()
 
-	out, err := chunk.upload(c.device)
+	out, err := chunk.upload(c.device, c.memProps)
 	if err != nil {
 		fmt.Printf("Failed to upload chunk: %v\n", err)
 		return renderChunk{}
@@ -220,40 +221,23 @@ func CalculateLODChunkSizes() []vk.DeviceSize {
 	return lodChunkSizes
 }
 
-func (chunk *Chunk) upload(device vk.Device) (out renderChunk, err error) {
+func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) (out renderChunk, err error) {
 	// Vertex buffer
-	res := vk.CreateBuffer(device, &vk.BufferCreateInfo{
-		SType: vk.StructureTypeBufferCreateInfo,
-		Usage: vk.BufferUsageFlags(vk.BufferUsageVertexBufferBit),
-		Size:  vk.DeviceSize(len(chunk.Vertices) * VertexSize),
-	}, nil, &out.vertexBuffer)
-	if res != vk.Success {
-		err = fmt.Errorf("failed to allocate vertex buffer")
-		return
-	}
-
-	// Index buffer
-	res = vk.CreateBuffer(device, &vk.BufferCreateInfo{
-		SType: vk.StructureTypeBufferCreateInfo,
-		Usage: vk.BufferUsageFlags(vk.BufferUsageIndexBufferBit),
-		Size:  vk.DeviceSize(len(chunk.Indices) * IndexSize),
-	}, nil, &out.indexBuffer)
-	if res != vk.Success {
-		err = fmt.Errorf("failed to allocate index buffer")
-		return
-	}
-
-	// Upload vertex data
 	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
 	for i, vertex := range chunk.Vertices {
 		copy(vertexData[i*VertexSize:], vertex.Data())
 	}
+	vb := as.CreateBuffer(device, memProps, vertexData, vk.BufferUsageVertexBufferBit)
+	out.vertexBuffer = vb.Buffer
 
-	// Upload index data
+	// Index buffer
 	indexData := make([]byte, len(chunk.Indices)*IndexSize)
 	for i, index := range chunk.Indices {
 		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
 	}
+	ib := as.CreateBuffer(device, memProps, indexData, vk.BufferUsageIndexBufferBit)
+	out.indexBuffer = ib.Buffer
 
+	out.indexCount = uint32(len(chunk.Indices))
 	return
 }

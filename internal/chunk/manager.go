@@ -12,7 +12,8 @@ type ChunkManager struct {
 	AssetManager assets.AssetManager
 	cameraPos    vec3.T
 
-	device vk.Device
+	device   vk.Device
+	memProps vk.PhysicalDeviceMemoryProperties
 
 	chunks *spatial.QuadTree[renderChunk]
 
@@ -33,10 +34,11 @@ type completion struct {
 	chunks [4]renderChunk
 }
 
-func NewChunkManager(assetManager assets.AssetManager, device vk.Device) *ChunkManager {
+func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) *ChunkManager {
 	c := &ChunkManager{
 		AssetManager:   assetManager,
 		device:         device,
+		memProps:       memProps,
 		chunks:         spatial.NewQuadTree[renderChunk](1024 * 1024),
 		splitRequests:  map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
 		requestEnqueue: make(chan *spatial.QuadTreeNode[renderChunk]),
@@ -146,11 +148,11 @@ func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 }
 
 func (c *ChunkManager) tooCoarse(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) < 2.0
+	return c.distance(leaf)/float64(leaf.Size()) < 500.0
 }
 
 func (c *ChunkManager) tooFine(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) > 3.0
+	return c.distance(leaf)/float64(leaf.Size()) > 800.0
 }
 
 func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float64 {
