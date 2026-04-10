@@ -48,10 +48,10 @@ func TestSplit_ChildrenHaveCorrectOrigins(t *testing.T) {
 
 	// NW, NE, SW, SE
 	expected := []spatial.GridCoord{
+		{X: -8, Z: -8},
+		{X: 0, Z: -8},
+		{X: -8, Z: 0},
 		{X: 0, Z: 0},
-		{X: 8, Z: 0},
-		{X: 0, Z: 8},
-		{X: 8, Z: 8},
 	}
 	for i, child := range children {
 		assert.Equal(t, expected[i], child.Origin(), "child[%d] origin", i)

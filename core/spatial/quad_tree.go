@@ -21,7 +21,8 @@ func NewQuadTree[T any](size uint) *QuadTree[T] {
 		panic("size must be a power of 2")
 	}
 
-	root := &QuadTreeNode[T]{size: size}
+	origin := GridCoord{-int(size) / 2, -int(size) / 2}
+	root := &QuadTreeNode[T]{origin: origin, size: size}
 	return &QuadTree[T]{
 		root:   root,
 		leaves: map[*QuadTreeNode[T]]struct{}{root: {}},
