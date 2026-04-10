@@ -199,37 +199,6 @@ func (chunk *Chunk) calculateNormals() {
 	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
 }
 
-// CalculateLODChunkSizes calculates memory requirements for each LOD level
-func CalculateLODChunkSizes() []vk.DeviceSize {
-	numLODLevels := LOD_COUNT
-	lodChunkSizes := make([]vk.DeviceSize, numLODLevels)
-
-	for lod := range numLODLevels {
-		stride := 1
-		if lod > 0 {
-			stride = 1 << uint(lod)
-		}
-
-		vps := (CHUNK_SIZE / stride) + 1 // +1 for overlap
-		numVertices := vps * vps
-		vertexDataSize := vk.DeviceSize(numVertices) * vk.DeviceSize(VertexSize)
-
-		// Calculate indices (same logic as existing chunk.go)
-		numIndices := 0
-		if vps > 1 {
-			numStrips := vps - 1
-			numIndices = numStrips * vps * 2
-			if numStrips > 1 {
-				numIndices += (numStrips - 1) * 2
-			}
-		}
-		indexDataSize := vk.DeviceSize(numIndices) * vk.DeviceSize(IndexSize)
-
-		lodChunkSizes[lod] = vertexDataSize + indexDataSize
-	}
-	return lodChunkSizes
-}
-
 func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) (out renderChunk, err error) {
 	// Vertex buffer
 	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
