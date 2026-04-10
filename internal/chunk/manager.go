@@ -19,10 +19,9 @@ type ChunkManager struct {
 
 	chunks *spatial.QuadTree[renderChunk]
 
-	splitRequests  map[*spatial.QuadTreeNode[renderChunk]]struct{}
-	requestEnqueue chan *spatial.QuadTreeNode[renderChunk]
-	requests       chan *spatial.QuadTreeNode[renderChunk]
-	completed      chan completion
+	splitRequests map[*spatial.QuadTreeNode[renderChunk]]struct{}
+	requests      chan *spatial.QuadTreeNode[renderChunk]
+	completed     chan completion
 }
 
 type renderChunk struct {
@@ -38,50 +37,18 @@ type completion struct {
 
 func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) *ChunkManager {
 	c := &ChunkManager{
-		AssetManager:   assetManager,
-		device:         device,
-		memProps:       memProps,
-		chunks:         spatial.NewQuadTree[renderChunk](1024 * 1024),
-		splitRequests:  map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
-		requestEnqueue: make(chan *spatial.QuadTreeNode[renderChunk]),
-		requests:       make(chan *spatial.QuadTreeNode[renderChunk]),
-		completed:      make(chan completion),
+		AssetManager:  assetManager,
+		device:        device,
+		memProps:      memProps,
+		chunks:        spatial.NewQuadTree[renderChunk](1024 * 1024),
+		splitRequests: map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
+		requests:      make(chan *spatial.QuadTreeNode[renderChunk], 1024),
+		completed:     make(chan completion, 64),
 	}
-	go c.runRequestQueue()
-	for range 4 {
+	for range 32 {
 		go c.runWorker()
 	}
 	return c
-}
-
-// runRequestQueue buffers split requests between the render thread and the worker,
-// giving the request queue an unlimited size.
-func (c *ChunkManager) runRequestQueue() {
-	var queue []*spatial.QuadTreeNode[renderChunk]
-	for {
-		if len(queue) == 0 {
-			item, ok := <-c.requestEnqueue
-			if !ok {
-				close(c.requests)
-				return
-			}
-			queue = append(queue, item)
-		} else {
-			select {
-			case item, ok := <-c.requestEnqueue:
-				if !ok {
-					for _, q := range queue {
-						c.requests <- q
-					}
-					close(c.requests)
-					return
-				}
-				queue = append(queue, item)
-			case c.requests <- queue[0]:
-				queue = queue[1:]
-			}
-		}
-	}
 }
 
 func (c *ChunkManager) runWorker() {
@@ -155,7 +122,7 @@ outer:
 func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 	if _, ok := c.splitRequests[leaf]; !ok {
 		c.splitRequests[leaf] = struct{}{}
-		c.requestEnqueue <- leaf
+		c.requests <- leaf
 	}
 }
 
@@ -180,7 +147,7 @@ func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float6
 }
 
 func (c *ChunkManager) Destroy() {
-	close(c.requestEnqueue)
+	close(c.requests)
 }
 
 func (chunk *renderChunk) Render(cmd vk.CommandBuffer) {
