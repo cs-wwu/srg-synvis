@@ -119,8 +119,12 @@ outer:
 
 func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 	if _, ok := c.splitRequests[leaf]; !ok {
-		c.splitRequests[leaf] = struct{}{}
-		c.requests <- leaf
+		select {
+		case c.requests <- leaf:
+			c.splitRequests[leaf] = struct{}{}
+		default:
+			// Queue full, will retry next frame.
+		}
 	}
 }
 
