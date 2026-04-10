@@ -3,8 +3,7 @@ package spatial
 import "iter"
 
 type QuadTree[T any] struct {
-	root   *QuadTreeNode[T]
-	leaves map[*QuadTreeNode[T]]struct{}
+	root *QuadTreeNode[T]
 }
 
 type QuadTreeNode[T any] struct {
@@ -23,20 +22,25 @@ func NewQuadTree[T any](size uint) *QuadTree[T] {
 
 	origin := GridCoord{-int(size) / 2, -int(size) / 2}
 	root := &QuadTreeNode[T]{origin: origin, size: size}
-	return &QuadTree[T]{
-		root:   root,
-		leaves: map[*QuadTreeNode[T]]struct{}{root: {}},
-	}
+	return &QuadTree[T]{root: root}
 }
 
 func (qt *QuadTree[T]) Leaves() iter.Seq[*QuadTreeNode[T]] {
 	return func(yield func(*QuadTreeNode[T]) bool) {
-		for leaf := range qt.leaves {
-			if !yield(leaf) {
-				break
-			}
+		qt.root.walkLeaves(yield)
+	}
+}
+
+func (n *QuadTreeNode[T]) walkLeaves(yield func(*QuadTreeNode[T]) bool) bool {
+	if n.IsLeaf() {
+		return yield(n)
+	}
+	for _, child := range n.children {
+		if !child.walkLeaves(yield) {
+			return false
 		}
 	}
+	return true
 }
 
 func (n *QuadTreeNode[T]) Origin() GridCoord        { return n.origin }
@@ -52,6 +56,16 @@ func (n *QuadTreeNode[T]) Children() iter.Seq[*QuadTreeNode[T]] {
 			}
 		}
 	}
+}
+
+func (n *QuadTreeNode[T]) AllChildrenAreLeaves() bool {
+	// Golang please - I just want `iter.All()`.
+	for _, child := range n.children {
+		if !child.IsLeaf() {
+			return false
+		}
+	}
+	return true
 }
 
 func (n *QuadTreeNode[T]) DirectChildrenPositions() [4]GridCoord {
@@ -80,11 +94,6 @@ func (qt *QuadTree[T]) Split(node *QuadTreeNode[T]) [4]*QuadTreeNode[T] {
 		node.children[i] = &QuadTreeNode[T]{origin: pos, size: node.size / 2, parent: node}
 	}
 
-	delete(qt.leaves, node)
-	for _, child := range node.children {
-		qt.leaves[child] = struct{}{}
-	}
-
 	return node.children
 }
 
@@ -98,8 +107,6 @@ func (qt *QuadTree[T]) Merge(node *QuadTreeNode[T]) {
 		if !child.IsLeaf() {
 			panic("cannot merge a node with non-leaf children")
 		}
-		delete(qt.leaves, child)
 	}
 	node.children = [4]*QuadTreeNode[T]{}
-	qt.leaves[node] = struct{}{}
 }
