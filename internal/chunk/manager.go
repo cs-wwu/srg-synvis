@@ -1,8 +1,6 @@
 package chunk
 
 import (
-	"math"
-
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/ungerik/go3d/float64/vec3"
@@ -127,11 +125,13 @@ func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 }
 
 func (c *ChunkManager) tooCoarse(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) < 0.1
+	d := c.distance(leaf)
+	return d < 8000 && d/float64(leaf.Size()) < 2.0
 }
 
 func (c *ChunkManager) tooFine(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) > 0.2
+	d := c.distance(leaf)
+	return d > 10000 || c.distance(leaf)/float64(leaf.Size()) > 2.5
 }
 
 func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float64 {
@@ -140,10 +140,15 @@ func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float6
 	minZ := float64(chunk.Origin().Z)
 	maxZ := float64(chunk.Origin().Z) + float64(chunk.Size())
 
-	dx := max(minX-c.cameraPos[0], 0, c.cameraPos[0]-maxX)
-	dz := max(minZ-c.cameraPos[2], 0, c.cameraPos[2]-maxZ)
+	// Return 0 if inside the chunk.
+	if c.cameraPos[0] >= minX && c.cameraPos[0] <= maxX && c.cameraPos[2] >= minZ && c.cameraPos[2] <= maxZ {
+		return 0
+	}
 
-	return math.Sqrt(dx*dx + dz*dz)
+	center := vec3.T{(minX + maxX) / 2, 0, (minZ + maxZ) / 2}
+	delta := center.Sub(&c.cameraPos)
+	delta[1] /= 1000.0
+	return delta.Length()
 }
 
 func (c *ChunkManager) Destroy() {
