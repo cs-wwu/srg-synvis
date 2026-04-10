@@ -15,6 +15,9 @@ type LODLevel int
 
 const CHUNK_SIZE = 144 // Same as before for compatibility
 
+const MAX_CHUNK_SIZE = 16 // Nodes larger than this are not meshed.
+const MIN_CHUNK_SIZE = 4  // Leaves are not split to be smaller than this.
+
 const (
 	LOD_0 LODLevel = iota // Full detail
 	LOD_1                 // Half detail
@@ -29,13 +32,19 @@ type Chunk struct {
 	Indices  []Index
 	X        int // Global X Position of the top-left chunk corner
 	Z        int // Global Z Position of the top-left chunk corner
+	size     uint
 	LODLevel LODLevel
 }
 
 func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk {
+	if size > MAX_CHUNK_SIZE {
+		return renderChunk{}
+	}
+
 	chunk := &Chunk{
-		X:        pos.X * CHUNK_SIZE,
-		Z:        pos.Z * CHUNK_SIZE,
+		X:        pos.X,
+		Z:        pos.Z,
+		size:     size,
 		LODLevel: 0,
 	}
 

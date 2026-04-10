@@ -1,6 +1,8 @@
 package chunk
 
 import (
+	"math"
+
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/ungerik/go3d/float64/vec3"
@@ -110,6 +112,7 @@ outer:
 				continue
 			}
 
+			delete(c.splitRequests, completion.node)
 			children := c.chunks.Split(completion.node)
 			for i, child := range children {
 				child.Value = completion.chunks[i]
@@ -119,20 +122,29 @@ outer:
 		}
 	}
 
+	var toMerge []*spatial.QuadTreeNode[renderChunk]
 	for leaf := range c.chunks.Leaves() {
-		if c.tooCoarse(leaf) {
+		if leaf.Size() > MIN_CHUNK_SIZE && c.tooCoarse(leaf) {
 			c.requestSplit(leaf)
 		}
-	}
 
-	for leaf := range c.chunks.Leaves() {
-		// Double check that the parent still isn't a leaf - we're merging as we iterate!
-		if c.tooFine(leaf) && leaf.Parent() != nil && !leaf.Parent().IsLeaf() {
-			for child := range leaf.Parent().Children() {
-				delete(c.splitRequests, child)
-			}
-			c.chunks.Merge(leaf.Parent())
+		parent := leaf.Parent()
+		if parent == nil {
+			continue
 		}
+
+		if c.tooFine(parent) && parent.AllChildrenAreLeaves() {
+			toMerge = append(toMerge, leaf.Parent())
+		}
+	}
+	for _, parent := range toMerge {
+		if parent.IsLeaf() {
+			continue
+		}
+		for child := range parent.Children() {
+			delete(c.splitRequests, child)
+		}
+		c.chunks.Merge(parent)
 	}
 
 	for leaf := range c.chunks.Leaves() {
@@ -148,21 +160,23 @@ func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 }
 
 func (c *ChunkManager) tooCoarse(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) < 500.0
+	return c.distance(leaf)/float64(leaf.Size()) < 0.1
 }
 
 func (c *ChunkManager) tooFine(leaf *spatial.QuadTreeNode[renderChunk]) bool {
-	return c.distance(leaf)/float64(leaf.Size()) > 800.0
+	return c.distance(leaf)/float64(leaf.Size()) > 0.2
 }
 
 func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float64 {
-	center := vec3.T{
-		float64(chunk.Origin().X) + float64(chunk.Size())/2,
-		0,
-		float64(chunk.Origin().Z) + float64(chunk.Size())/2,
-	}
+	minX := float64(chunk.Origin().X)
+	maxX := float64(chunk.Origin().X) + float64(chunk.Size())
+	minZ := float64(chunk.Origin().Z)
+	maxZ := float64(chunk.Origin().Z) + float64(chunk.Size())
 
-	return center.Sub(&c.cameraPos).Length()
+	dx := max(minX-c.cameraPos[0], 0, c.cameraPos[0]-maxX)
+	dz := max(minZ-c.cameraPos[2], 0, c.cameraPos[2]-maxZ)
+
+	return math.Sqrt(dx*dx + dz*dz)
 }
 
 func (c *ChunkManager) Destroy() {
