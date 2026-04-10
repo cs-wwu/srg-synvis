@@ -13,10 +13,12 @@ import (
 
 type LODLevel int
 
-const CHUNK_SIZE = 144 // Same as before for compatibility
+// Nodes larger than this are not meshed.
+const MAX_CHUNK_SIZE = 8192
 
-const MAX_CHUNK_SIZE = 16 // Nodes larger than this are not meshed.
-const MIN_CHUNK_SIZE = 4  // Leaves are not split to be smaller than this.
+// Leaves are not split to be smaller than this. Also, the number of vertices
+// in every chunk.
+const MIN_CHUNK_SIZE = 64
 
 const (
 	LOD_0 LODLevel = iota // Full detail
@@ -30,10 +32,9 @@ const (
 type Chunk struct {
 	Vertices []Vertex
 	Indices  []Index
-	X        int // Global X Position of the top-left chunk corner
-	Z        int // Global Z Position of the top-left chunk corner
-	size     uint
-	LODLevel LODLevel
+	X        int  // Global X Position of the top-left chunk corner
+	Z        int  // Global Z Position of the top-left chunk corner
+	size     uint // width/height in grid cells. always a power of 2
 }
 
 func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk {
@@ -42,10 +43,9 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 	}
 
 	chunk := &Chunk{
-		X:        pos.X,
-		Z:        pos.Z,
-		size:     size,
-		LODLevel: 0,
+		X:    pos.X,
+		Z:    pos.Z,
+		size: size,
 	}
 
 	mapData, err := c.AssetManager.LoadMapData(
@@ -85,18 +85,18 @@ func ChunkKey(chunkX, chunkZ int) string {
 // Calculate vertices and texcoords for a chunk
 func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8) {
 	// Calculate vertex stride based on LOD
-	stride := 1 << chunk.LODLevel                // 1, 2, 4, or 8
-	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap on right/bottom edges
+	stride := int(chunk.size / MIN_CHUNK_SIZE)
+	const VERTICES_PER_STRIDE = (MIN_CHUNK_SIZE) + 1 // +1 for overlap on right/bottom edges
 
 	// Allocate vertex array based on LOD level
-	chunk.Vertices = make([]Vertex, verticesPerSide*verticesPerSide)
+	chunk.Vertices = make([]Vertex, VERTICES_PER_STRIDE*VERTICES_PER_STRIDE)
 	firstZ := true
 
-	for z := range verticesPerSide {
+	for z := range VERTICES_PER_STRIDE {
 		worldZ := chunk.Z + (z * stride) - 1 // Start one vertex north (subtract a point)
 		firstX := true
 
-		for x := range verticesPerSide {
+		for x := range VERTICES_PER_STRIDE {
 			worldX := chunk.X + (x * stride) - 1 // Start one vertex west (subtract a point)
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
 
@@ -111,7 +111,7 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8)
 			height := heightInfo.getLocal(localX, localZ)
 			isWater := waterData[localZ*MAP_LENGTH+localX]
 
-			idx := z*verticesPerSide + x
+			idx := z*VERTICES_PER_STRIDE + x
 			chunk.Vertices[idx] = Vertex{
 				Position: lin.Vec3{float32(worldX), height, float32(worldZ)},
 				TexCoord: lin.Vec3{
@@ -129,31 +129,30 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8)
 
 // Generate indices (triangle strip)c
 func (chunk *Chunk) calculateIndices() {
-	stride := 1 << chunk.LODLevel
-	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
-	numStrips := verticesPerSide - 1
-	verticesPerStrip := verticesPerSide * 2
+	const VERTICES_PER_STRIDE = (MIN_CHUNK_SIZE) + 1 // +1 for overlap on right/bottom edges
+	numStrips := VERTICES_PER_STRIDE - 1
+	verticesPerStrip := VERTICES_PER_STRIDE * 2
 	degenerateVertices := (numStrips - 1) * 2
 
 	chunk.Indices = make([]Index, (numStrips*verticesPerStrip)+degenerateVertices)
 	indexPos := 0
 
-	for z := range verticesPerSide - 1 {
+	for z := range VERTICES_PER_STRIDE - 1 {
 		if z > 0 {
 			// Degenerate triangle to connect strips
-			chunk.Indices[indexPos] = Index(z * verticesPerSide)
+			chunk.Indices[indexPos] = Index(z * VERTICES_PER_STRIDE)
 			indexPos++
 		}
 
-		for x := range verticesPerSide {
-			chunk.Indices[indexPos] = Index(z*verticesPerSide + x)
-			chunk.Indices[indexPos+1] = Index((z+1)*verticesPerSide + x)
+		for x := range VERTICES_PER_STRIDE {
+			chunk.Indices[indexPos] = Index(z*VERTICES_PER_STRIDE + x)
+			chunk.Indices[indexPos+1] = Index((z+1)*VERTICES_PER_STRIDE + x)
 			indexPos += 2
 		}
 
-		if z < verticesPerSide-2 {
+		if z < VERTICES_PER_STRIDE-2 {
 			// Degenerate triangle for next strip
-			chunk.Indices[indexPos] = Index((z+1)*verticesPerSide + (verticesPerSide - 1))
+			chunk.Indices[indexPos] = Index((z+1)*VERTICES_PER_STRIDE + (VERTICES_PER_STRIDE - 1))
 			indexPos++
 		}
 	}
@@ -161,16 +160,15 @@ func (chunk *Chunk) calculateIndices() {
 
 // Calculate normals for the chunk
 func (chunk *Chunk) calculateNormals() {
-	stride := 1 << chunk.LODLevel
-	verticesPerSide := (CHUNK_SIZE / stride) + 1 // +1 for overlap
+	const VERTICES_PER_STRIDE = (MIN_CHUNK_SIZE) + 1 // +1 for overlap on right/bottom edges
 
 	// For each vertex except the last row and column
-	for z := range verticesPerSide - 1 {
-		for x := range verticesPerSide - 1 {
-			idx := z*verticesPerSide + x
+	for z := range VERTICES_PER_STRIDE - 1 {
+		for x := range VERTICES_PER_STRIDE - 1 {
+			idx := z*VERTICES_PER_STRIDE + x
 			current := chunk.Vertices[idx].Position
 			right := chunk.Vertices[idx+1].Position
-			down := chunk.Vertices[idx+verticesPerSide].Position
+			down := chunk.Vertices[idx+VERTICES_PER_STRIDE].Position
 
 			var normal, a, b lin.Vec3
 			a.Sub(&down, &current)
@@ -183,19 +181,19 @@ func (chunk *Chunk) calculateNormals() {
 	}
 
 	// Handle right edge - use the normal from the vertex to the left
-	for z := range verticesPerSide - 1 {
-		idx := z*verticesPerSide + (verticesPerSide - 1)
+	for z := range VERTICES_PER_STRIDE - 1 {
+		idx := z*VERTICES_PER_STRIDE + (VERTICES_PER_STRIDE - 1)
 		chunk.Vertices[idx].Normal = chunk.Vertices[idx-1].Normal
 	}
 
 	// Handle bottom edge - use the normal from the vertex above
-	for x := range verticesPerSide {
-		idx := (verticesPerSide-1)*verticesPerSide + x
-		chunk.Vertices[idx].Normal = chunk.Vertices[idx-verticesPerSide].Normal
+	for x := range VERTICES_PER_STRIDE {
+		idx := (VERTICES_PER_STRIDE-1)*VERTICES_PER_STRIDE + x
+		chunk.Vertices[idx].Normal = chunk.Vertices[idx-VERTICES_PER_STRIDE].Normal
 	}
 
 	// Handle bottom-right corner - use normal from vertex to the left
-	lastIdx := (verticesPerSide * verticesPerSide) - 1
+	lastIdx := (VERTICES_PER_STRIDE * VERTICES_PER_STRIDE) - 1
 	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
 }
 
