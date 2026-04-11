@@ -525,8 +525,22 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
-	builder := newAirspaceBuilder(heightInfo)
+	heightInfoMap := chunk.NewHeightInfoMap(pos, mapData.HeightData)
+
+	for dlat := -1; dlat <= 1; dlat++ {
+		for dlon := -1; dlon <= 1; dlon++ {
+			if dlat == 0 && dlon == 0 {
+				continue // skip center, already loaded
+			}
+			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
+			adjData, err := app.ChunkManager.AssetManager.LoadMapData(dir)
+			if err == nil {
+				heightInfoMap.AddTile(dir, adjData.HeightData)
+			}
+		}
+	}
+
+	builder := newAirspaceBuilder(heightInfoMap)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
 	for i, airspace := range geojson.Features {

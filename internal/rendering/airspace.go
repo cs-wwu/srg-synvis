@@ -29,10 +29,10 @@ type Geometry struct {
 }
 
 type AirspaceBuilder struct {
-	heightInfo *chunk.HeightInfo
-	vertices   []AirspaceVertex
-	indices    []uint32
-	color      [4]float32
+	heightInfoMap *chunk.HeightInfoMap
+	vertices      []AirspaceVertex
+	indices       []uint32
+	color         [4]float32
 }
 
 type AirspaceVertex struct {
@@ -61,11 +61,11 @@ type FeatureCollection struct {
 
 const AIRSPACE_ALTITUDE_OFFSET = float32(100.0)
 
-func newAirspaceBuilder(heightInfo *chunk.HeightInfo) *AirspaceBuilder {
+func newAirspaceBuilder(heightInfoMap *chunk.HeightInfoMap) *AirspaceBuilder {
 	return &AirspaceBuilder{
-		heightInfo: heightInfo,
-		vertices:   make([]AirspaceVertex, 0),
-		indices:    make([]uint32, 0),
+		heightInfoMap: heightInfoMap,
+		vertices:      make([]AirspaceVertex, 0),
+		indices:       make([]uint32, 0),
 	}
 }
 
@@ -119,7 +119,7 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		lon, lat := outerRing[i][0], outerRing[i][1]
 		x := float32(lon * ARC_DEGREES_TO_SECONDS)
 		y := float32(-lat * ARC_DEGREES_TO_SECONDS)
-		height := builder.heightInfo.Height(x, y)
+		height := builder.heightInfoMap.Height(x, y)
 		lowerAlt := toWorldHeightAirspace(float32(props.AltitudeFloor + int(height) + 10))
 		upperAlt := toWorldHeightAirspace(float32(props.AltitudeCeiling))
 

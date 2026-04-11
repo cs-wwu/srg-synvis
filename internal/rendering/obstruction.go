@@ -83,9 +83,9 @@ var obsShapesMap = map[string]Shape{
 }
 
 type ObstructionBuilder struct {
-	heightInfo *chunk.HeightInfo
-	vertices   []ObstructionVertex
-	indices    []uint32
+	heightInfoMap *chunk.HeightInfoMap
+	vertices      []ObstructionVertex
+	indices       []uint32
 
 	color vec3.T
 }
@@ -131,8 +131,22 @@ func (app *Application) buildObstruction(pos spatial.MapCoord) *ObstructionSquar
 		return nil
 	}
 
-	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
-	builder := newObstructionBuilder(heightInfo)
+	heightInfoMap := chunk.NewHeightInfoMap(pos, mapData.HeightData)
+
+	for dlat := -1; dlat <= 1; dlat++ {
+		for dlon := -1; dlon <= 1; dlon++ {
+			if dlat == 0 && dlon == 0 {
+				continue // skip center, already loaded
+			}
+			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
+			adjData, err := app.ChunkManager.AssetManager.LoadMapData(dir)
+			if err == nil {
+				heightInfoMap.AddTile(dir, adjData.HeightData)
+			}
+		}
+	}
+
+	builder := newObstructionBuilder(heightInfoMap)
 
 	for _, obstruction := range obstructionSquare.Obstructions {
 		renderObstruction(builder, obstruction)
@@ -298,7 +312,7 @@ func (builder *ObstructionBuilder) renderObstructionShape(x float32, z float32, 
 }
 
 func (builder *ObstructionBuilder) addPoint(point vec2.T) uint32 {
-	height := builder.heightInfo.Height(float32(point[0]), float32(point[1]))
+	height := builder.heightInfoMap.Height(float32(point[0]), float32(point[1]))
 	return builder.addVertex(ObstructionVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},
 		Color:    builder.color,
@@ -315,11 +329,11 @@ func (builder *ObstructionBuilder) addTriangle(a, b, c uint32) {
 	builder.indices = append(builder.indices, a, b, c)
 }
 
-func newObstructionBuilder(heightInfo *chunk.HeightInfo) *ObstructionBuilder {
+func newObstructionBuilder(heightInfoMap *chunk.HeightInfoMap) *ObstructionBuilder {
 	return &ObstructionBuilder{
-		heightInfo: heightInfo,
-		vertices:   make([]ObstructionVertex, 0),
-		indices:    make([]uint32, 0),
+		heightInfoMap: heightInfoMap,
+		vertices:      make([]ObstructionVertex, 0),
+		indices:       make([]uint32, 0),
 	}
 }
 
