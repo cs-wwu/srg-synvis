@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
 
@@ -523,7 +524,7 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	heightInfo := newHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
 	builder := newAirspaceBuilder(heightInfo)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
@@ -1510,7 +1511,7 @@ func (app *Application) preparePipeline() {
 	bindingDescriptions := []vk.VertexInputBindingDescription{
 		{
 			Binding:   0,
-			Stride:    uint32(VertexSize),
+			Stride:    uint32(chunk.VertexSize),
 			InputRate: vk.VertexInputRateVertex,
 		},
 	}
@@ -1520,19 +1521,19 @@ func (app *Application) preparePipeline() {
 			Binding:  0,
 			Location: 0,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.Position)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.TexCoord)),
 		},
 		{
 			Binding:  0,
 			Location: 2,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.Normal)),
 		},
 	}
 
