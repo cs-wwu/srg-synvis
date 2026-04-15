@@ -5,6 +5,7 @@ import (
 	"math"
 	"unsafe"
 
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	as "github.com/vulkan-go/asche"
 )
@@ -29,7 +30,7 @@ type Geometry struct {
 }
 
 type AirspaceBuilder struct {
-	heightInfo *HeightInfo
+	heightInfo *chunk.HeightInfo
 	vertices   []AirspaceVertex
 	indices    []uint32
 	color      [4]float32
@@ -61,7 +62,7 @@ type FeatureCollection struct {
 
 const AIRSPACE_ALTITUDE_OFFSET = float32(100.0)
 
-func newAirspaceBuilder(heightInfo *HeightInfo) *AirspaceBuilder {
+func newAirspaceBuilder(heightInfo *chunk.HeightInfo) *AirspaceBuilder {
 	return &AirspaceBuilder{
 		heightInfo: heightInfo,
 		vertices:   make([]AirspaceVertex, 0),
@@ -307,7 +308,7 @@ func pointInRing(x, y float64, ring [][]float64) bool {
 }
 
 func (app *Application) UpdateCurrentAirspace() {
-	cameraPos := app.camera.Position()
+	cameraPos := app.Camera.Position()
 
 	// Get all loaded airspace chunks
 	loadedChunks := app.AirspaceStreamer.GetLoaded()

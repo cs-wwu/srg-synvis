@@ -11,6 +11,7 @@ import (
 	"github.com/cs-wwu/srg-synvis/core/memory"
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
@@ -80,7 +81,7 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 	chunkSelector := spatial.NewChunkSelector(CHUNK_SIZE, nil)
 
 	// Initialize BucketAllocator
-	lodChunkSizes := CalculateLODChunkSizes()
+	lodChunkSizes := chunk.CalculateLODChunkSizes()
 	bucketAllocator := memory.NewBucketAllocator(device, memProps,
 		[]float32{0.3, 0.2, 0.2, 0.2, 0.1}, lodChunkSizes)
 
@@ -114,28 +115,30 @@ func NewStreamManager(device *vk.Device, memProps *vk.PhysicalDeviceMemoryProper
 // ChunkLoader interface implementation for WorkerPool
 
 // LoadChunk handles the loading of a single chunk (called by WorkerPool)
-func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) error {
+func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec) error {
 	// Get map data
-	mapData, err := sm.assetManager.LoadMapData(mapCoord)
+	mapData, err := sm.assetManager.LoadMapData(
+		coords.WorldToMap(int(spec.WorldPos[0]), int(spec.WorldPos[1])),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to get map data: %w", err)
 	}
 
 	// Generate chunk using existing logic from package
-	chunk := &Chunk{
+	c := &chunk.Chunk{
 		X:        int(spec.WorldPos[0] - CHUNK_SIZE/2), // Convert center pos to corner
 		Z:        int(spec.WorldPos[1] - CHUNK_SIZE/2),
-		LODLevel: LODLevel(spec.LODLevel),
+		LODLevel: chunk.LODLevel(spec.LODLevel),
 	}
 
 	// Calculate geometry using raw data
-	CalculateChunkVertices(newHeightInfo(mapData.HeightData), mapData.WaterData, chunk)
-	CalculateChunkIndices(chunk)
-	CalculateChunkNormals(chunk)
+	chunk.CalculateChunkVertices(chunk.NewHeightInfo(mapData.HeightData), mapData.WaterData, c)
+	chunk.CalculateChunkIndices(c)
+	chunk.CalculateChunkNormals(c)
 
 	// Allocate vertex buffer
 	vertexId := fmt.Sprintf("chunk_%v_vertices", spec.GridCoord)
-	vertexDataSize := vk.DeviceSize(len(chunk.Vertices) * VertexSize)
+	vertexDataSize := vk.DeviceSize(len(c.Vertices) * chunk.VertexSize)
 	success, vertexOffset := sm.bucketAllocator.AllocateChunk(vertexId, vertexDataSize, spec.LODLevel)
 	if !success {
 		return fmt.Errorf("failed to allocate vertex buffer")
@@ -143,7 +146,7 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 
 	// Allocate index buffer
 	indexId := fmt.Sprintf("chunk_%v_indices", spec.GridCoord)
-	indexDataSize := vk.DeviceSize(len(chunk.Indices) * IndexSize)
+	indexDataSize := vk.DeviceSize(len(c.Indices) * chunk.IndexSize)
 	success, indexOffset := sm.bucketAllocator.AllocateChunk(indexId, indexDataSize, spec.LODLevel)
 	if !success {
 		sm.bucketAllocator.FreeChunk(vertexId, spec.LODLevel)
@@ -151,9 +154,9 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	}
 
 	// Upload vertex data
-	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
-	for i, vertex := range chunk.Vertices {
-		copy(vertexData[i*VertexSize:], vertex.Data())
+	vertexData := make([]byte, len(c.Vertices)*chunk.VertexSize)
+	for i, vertex := range c.Vertices {
+		copy(vertexData[i*chunk.VertexSize:], vertex.Data())
 	}
 
 	if err := sm.bucketAllocator.Upload(vertexId, spec.LODLevel, vertexData); err != nil {
@@ -163,9 +166,9 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 	}
 
 	// Upload index data
-	indexData := make([]byte, len(chunk.Indices)*IndexSize)
-	for i, index := range chunk.Indices {
-		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
+	indexData := make([]byte, len(c.Indices)*chunk.IndexSize)
+	for i, index := range c.Indices {
+		binary.LittleEndian.PutUint32(indexData[i*chunk.IndexSize:], uint32(index))
 	}
 
 	if err := sm.bucketAllocator.Upload(indexId, spec.LODLevel, indexData); err != nil {
@@ -182,7 +185,7 @@ func (sm *StreamManager) LoadChunk(spec spatial.ChunkSpec, mapCoord string) erro
 		IndexBufferId:  indexId,
 		VertexOffset:   vertexOffset,
 		IndexOffset:    indexOffset,
-		IndexCount:     len(chunk.Indices),
+		IndexCount:     len(c.Indices),
 	}
 
 	// Store renderable chunk with thread safety
@@ -402,11 +405,7 @@ func (sm *StreamManager) queueMissingChunks() {
 	missingChunks := sm.chunkSelector.GetMissingChunks()
 
 	for _, spec := range missingChunks {
-		// Determine map coordinate
-		chunkMapCoord := coords.GetMapFromPosition(lin.Vec3{spec.WorldPos[0], 0, spec.WorldPos[1]})
-
-		// Queue through WorkerPool
-		sm.workerPool.QueueLoadJob(spec, chunkMapCoord)
+		sm.workerPool.QueueLoadJob(spec)
 	}
 }
 

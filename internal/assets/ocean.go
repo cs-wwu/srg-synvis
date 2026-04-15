@@ -2,12 +2,11 @@ package assets
 
 import (
 	"time"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 const (
-	// Map dimensions (SRTM/NASADEM standard)
-	mapSize = 3601
-
 	// Sea level in 16-bit heightmap (32768 is zero/sea level)
 	seaLevel = uint16(32768)
 
@@ -15,7 +14,7 @@ const (
 )
 
 // generateOceanTile creates a flat ocean tile with all water.
-func (am *assetManager) generateOceanTile(coord string) *MapData {
+func (am *assetManager) generateOceanTile(coord spatial.MapCoord) *MapData {
 	heightData := generateOceanHeight()
 	waterData := generateOceanWater()
 
@@ -46,13 +45,3 @@ func generateOceanWater() []uint8 {
 	}
 	return data
 }
-
-// Direction represents cardinal directions for coastal ocean generation.
-type Direction int
-
-const (
-	North Direction = iota
-	East
-	South
-	West
-)

@@ -70,9 +70,9 @@ type Application struct {
 
 	ubo UniformBufferObject
 
-	cfg models.AppConfig
+	Cfg models.AppConfig
 
-	camera        camera.Camera
+	Camera        *camera.Camera
 	StreamManager *StreamManager
 	WindowHandle  *glfw.Window
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]

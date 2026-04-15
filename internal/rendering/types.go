@@ -9,12 +9,6 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-type Vertex struct {
-	Position lin.Vec3
-	TexCoord lin.Vec3
-	Normal   lin.Vec3
-}
-
 // NB: This gets cast to a byte slice, so it must have the exact same bytes
 // that the shader expects.
 type RoadVertex struct {
@@ -25,21 +19,6 @@ type RoadVertex struct {
 type ObstructionVertex struct {
 	Position vec3.T
 	Color    vec3.T
-}
-
-const VertexSize = int(unsafe.Sizeof(Vertex{}))
-
-func (v *Vertex) Data() []byte {
-	return (*[VertexSize]byte)(unsafe.Pointer(v))[:]
-}
-
-type Index uint32 // Be wary of integer overflow with large mesh
-
-const IndexSize = int(unsafe.Sizeof(Index(0)))
-
-func (u *Index) Data() []byte {
-	const m = 0x7fffffff
-	return (*[m]byte)(unsafe.Pointer(u))[:IndexSize]
 }
 
 type UniformBufferObject struct {

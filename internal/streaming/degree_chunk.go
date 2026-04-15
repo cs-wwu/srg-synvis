@@ -4,6 +4,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/xlab/linmath"
 )
 
@@ -14,11 +15,9 @@ import (
 type DegreeChunkStreamer[T any] struct {
 	sync.Mutex
 
-	Chunks map[LatLonInt]T
-
-	request chan LatLonInt
-
-	pending map[LatLonInt]bool
+	Chunks  map[spatial.MapCoord]T
+	request chan spatial.MapCoord
+	pending map[spatial.MapCoord]bool
 }
 
 // TODO: These really should be consolidated. Also chunks aren't square.
@@ -27,20 +26,16 @@ const (
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 )
 
-type LatLonInt struct {
-	Lat int
-	Lon int
-}
 type LatLonFloat struct {
 	Lat float64
 	Lon float64
 }
 
-func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T] {
+func NewDegreeStreamer[T any](builder func(spatial.MapCoord) T) *DegreeChunkStreamer[T] {
 	streamer := &DegreeChunkStreamer[T]{
-		Chunks:  make(map[LatLonInt]T),
-		pending: make(map[LatLonInt]bool),
-		request: make(chan LatLonInt, 64),
+		Chunks:  make(map[spatial.MapCoord]T),
+		pending: make(map[spatial.MapCoord]bool),
+		request: make(chan spatial.MapCoord, 64),
 	}
 
 	for range 8 {
@@ -68,7 +63,7 @@ func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
 
 	for lon := lon_req - 1; lon <= lon_req+1; lon++ {
 		for lat := lat_req - 1; lat <= lat_req+1; lat++ {
-			pos := LatLonInt{Lat: lat, Lon: lon}
+			pos := spatial.MapCoord{Lat: lat, Lon: lon}
 			_, exists := d.Chunks[pos]
 			_, isPending := d.pending[pos]
 			if !exists && !isPending {

@@ -8,121 +8,111 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestAssetManager tests the complete AssetManager implementation.
 func TestAssetManager(t *testing.T) {
+	assert := assert.New(t)
+
 	// Create temporary directory for test files
 	tempDir := t.TempDir()
 
 	// Create asset manager
 	am := NewAssetManager(tempDir, 3)
+	assert.NotNil(am)
 
 	// Test loading non-existent map (should generate ocean)
 	t.Run("GenerateOcean", func(t *testing.T) {
-		data, err := am.LoadMapData("n48w123")
-		if err != nil {
-			t.Fatalf("Failed to load map: %v", err)
-		}
+		data, err := am.LoadMapData(spatial.MapCoord{Lat: 48, Lon: -123})
+		assert.NoError(err)
 
-		if !data.IsOcean {
-			t.Error("Expected ocean tile")
-		}
+		assert.True(data.IsOcean)
 
 		// Check dimensions
 		expectedPixels := mapSize * mapSize
-		if len(data.HeightData) != expectedPixels {
-			t.Errorf("Invalid heightmap size: expected %d, got %d", expectedPixels, len(data.HeightData))
-		}
+		assert.Len(data.HeightData, expectedPixels)
 
 		// Check ocean elevation
 		sample := data.HeightData[100*mapSize+100] // Convert 2D to 1D indexing
-		if sample != seaLevel {
-			t.Errorf("Expected ocean elevation %d, got %d", seaLevel, sample)
-		}
+		assert.Equal(seaLevel, sample)
 
 		// Check water coverage
 		water := data.WaterData[100*mapSize+100]
-		if water != fullWater {
-			t.Errorf("Expected full water %d, got %d", fullWater, water)
-		}
+		assert.EqualValues(fullWater, water)
 	})
 
 	// Test cache hits
 	t.Run("CacheHit", func(t *testing.T) {
 		// First load
-		data1, err := am.LoadMapData("n48w123")
-		if err != nil {
-			t.Fatalf("Failed to load map: %v", err)
-		}
+		data1, err := am.LoadMapData(spatial.MapCoord{Lat: 48, Lon: -123})
+		assert.NoError(err)
 
 		// Second load should be from cache
-		data2, err := am.LoadMapData("n48w123")
-		if err != nil {
-			t.Fatalf("Failed to load map: %v", err)
-		}
+		data2, err := am.LoadMapData(spatial.MapCoord{Lat: 48, Lon: -123})
+		assert.NoError(err)
 
 		// Should be the same object
-		if data1 != data2 {
-			t.Error("Expected cached data")
-		}
+		assert.Same(data1, data2)
 
 		stats := am.Stats()
-		if stats.CacheHits == 0 {
-			t.Error("Expected cache hits")
-		}
+		assert.NotZero(stats.CacheHits)
 	})
 
 	// Test cache eviction
 	t.Run("CacheEviction", func(t *testing.T) {
 		// Load 4 maps (cache size is 3)
-		coords := []string{"n48w123", "n48w122", "n47w123", "n47w122"}
+		coords := []spatial.MapCoord{
+			{Lat: 48, Lon: -123},
+			{Lat: 48, Lon: -122},
+			{Lat: 47, Lon: -123},
+			{Lat: 47, Lon: -122},
+		}
 		for _, coord := range coords {
 			_, err := am.LoadMapData(coord)
-			if err != nil {
-				t.Fatalf("Failed to load %s: %v", coord, err)
-			}
+			assert.NoError(err)
 		}
 
 		// First map should be evicted
-		if am.IsLoaded("n48w123") {
-			t.Error("Expected n48w123 to be evicted")
-		}
+		assert.False(am.IsLoaded(spatial.MapCoord{Lat: 48, Lon: -123}))
 
 		// Last 3 should still be loaded
 		for _, coord := range coords[1:] {
-			if !am.IsLoaded(coord) {
-				t.Errorf("Expected %s to be loaded", coord)
-			}
+			assert.True(am.IsLoaded(coord))
 		}
 
 		stats := am.Stats()
-		if stats.Evictions == 0 {
-			t.Error("Expected evictions")
-		}
+		assert.NotZero(stats.Evictions)
 	})
 }
 
 // TestConcurrentAccess tests thread safety.
 func TestConcurrentAccess(t *testing.T) {
+	assert := assert.New(t)
 	tempDir := t.TempDir()
 	am := NewAssetManager(tempDir, 10)
 
 	// Concurrent loads
 	var wg sync.WaitGroup
-	coords := []string{"n48w123", "n48w122", "n47w123", "n47w122", "n46w123"}
+	coords := []spatial.MapCoord{
+		{Lat: 48, Lon: -123},
+		{Lat: 48, Lon: -122},
+		{Lat: 47, Lon: -123},
+		{Lat: 47, Lon: -122},
+		{Lat: 46, Lon: -123},
+	}
 
 	for _, coord := range coords {
 		wg.Add(1)
-		go func(c string) {
+		go func(c spatial.MapCoord) {
 			defer wg.Done()
 
 			// Load multiple times
 			for range 10 {
 				_, err := am.LoadMapData(c)
-				if err != nil {
-					t.Errorf("Failed to load %s: %v", c, err)
-				}
+				assert.NoError(err)
 			}
 		}(coord)
 	}
@@ -131,17 +121,21 @@ func TestConcurrentAccess(t *testing.T) {
 
 	// All maps should be loaded
 	loaded := am.GetLoadedCoords()
-	if len(loaded) != len(coords) {
-		t.Errorf("Expected %d loaded maps, got %d", len(coords), len(loaded))
-	}
+	assert.Len(loaded, len(coords))
 }
 
 // TestPreloadMaps tests async preloading.
 func TestPreloadMaps(t *testing.T) {
+	assert := assert.New(t)
 	tempDir := t.TempDir()
 	am := NewAssetManager(tempDir, 10)
 
-	coords := []string{"n48w123", "n48w122", "n47w123", "invalid", "n46w123"}
+	coords := []spatial.MapCoord{
+		{Lat: 48, Lon: -123},
+		{Lat: 48, Lon: -122},
+		{Lat: 47, Lon: -123},
+		{Lat: 46, Lon: -123},
+	}
 	results := am.PreloadMaps(coords)
 
 	successCount := 0
@@ -150,102 +144,60 @@ func TestPreloadMaps(t *testing.T) {
 	for result := range results {
 		if result.Err != nil {
 			errorCount++
-			if result.Coord != "invalid" {
-				t.Errorf("Unexpected error for %s: %v", result.Coord, result.Err)
-			}
+			t.Errorf("Unexpected error for %s: %v", result.Coord, result.Err)
 		} else {
 			successCount++
-			if result.Data == nil {
-				t.Errorf("No data for %s", result.Coord)
-			}
+			assert.NotNil(result.Data)
 		}
 	}
 
-	if successCount != 4 {
-		t.Errorf("Expected 4 successful loads, got %d", successCount)
-	}
-	if errorCount != 1 {
-		t.Errorf("Expected 1 error, got %d", errorCount)
-	}
+	assert.Equal(len(coords), successCount)
+	assert.Equal(0, errorCount)
 }
 
 // TestLoadFromDisk tests loading actual files.
 func TestLoadFromDisk(t *testing.T) {
+	assert := assert.New(t)
 	tempDir := t.TempDir()
 
 	// Create test map files
-	coord := "n48w123"
+	coord := spatial.MapCoord{Lat: 48, Lon: -123}
 	createTestMapFiles(t, tempDir, coord)
 
 	am := NewAssetManager(tempDir, 3)
 
 	data, err := am.LoadMapData(coord)
-	if err != nil {
-		t.Fatalf("Failed to load map: %v", err)
-	}
+	assert.NoError(err)
 
-	if data.IsOcean {
-		t.Error("Expected real map, not ocean")
-	}
+	assert.False(data.IsOcean)
 
 	// Verify data using raw array access
 	height := data.HeightData[100*mapSize+100]
-	if height != 32768 {
-		t.Errorf("Expected height 32768, got %d", height)
-	}
+	assert.Equal(uint16(32768), height)
 
 	water := data.WaterData[100*mapSize+100]
-	if water != 255 {
-		t.Errorf("Expected water 255, got %d", water)
-	}
-}
-
-// TestCoordinateValidation tests coordinate format validation.
-func TestCoordinateValidation(t *testing.T) {
-	tests := []struct {
-		coord string
-		valid bool
-	}{
-		{"n48w123", true},
-		{"s01e000", true},
-		{"n00w001", true},
-		{"n90w180", true},
-		{"", false},
-		{"n48", false},
-		{"x48w123", false},
-		{"n100w123", false},
-		{"n48x123", false},
-		{"n48w1234", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.coord, func(t *testing.T) {
-			valid := isValidCoordinate(tt.coord)
-			if valid != tt.valid {
-				t.Errorf("isValidCoordinate(%q) = %v, want %v", tt.coord, valid, tt.valid)
-			}
-		})
-	}
+	assert.Equal(uint8(255), water)
 }
 
 // TestMemoryManagement tests memory tracking.
 func TestMemoryManagement(t *testing.T) {
+	assert := assert.New(t)
 	tempDir := t.TempDir()
 	am := NewAssetManager(tempDir, 3)
 
 	// Load several maps
-	coords := []string{"n48w123", "n48w122", "n47w123"}
+	coords := []spatial.MapCoord{
+		{Lat: 48, Lon: -123},
+		{Lat: 48, Lon: -122},
+		{Lat: 47, Lon: -123},
+	}
 	for _, coord := range coords {
 		_, err := am.LoadMapData(coord)
-		if err != nil {
-			t.Fatalf("Failed to load %s: %v", coord, err)
-		}
+		assert.NoError(err)
 	}
 
 	stats := am.Stats()
-	if stats.TotalMemory == 0 {
-		t.Error("Expected non-zero memory usage")
-	}
+	assert.NotZero(stats.TotalMemory)
 
 	// The file in memory should be about 3 heightmaps + 3 watermaps
 	// Each heightmap is 3601x3601 pixels, 16 bits per pixel (raw uint16 array)
@@ -255,14 +207,12 @@ func TestMemoryManagement(t *testing.T) {
 	expectedMemory := (3 * rawHeightmapSize) + (3 * rawWatermapSize)
 	tolerance := float64(0.1) // 10% tolerance
 
-	if float64(stats.TotalMemory) < float64(expectedMemory)*(1-tolerance) ||
-		float64(stats.TotalMemory) > float64(expectedMemory)*(1+tolerance) {
-		t.Errorf("Memory usage %d != expected %d", stats.TotalMemory, expectedMemory)
-	}
+	assert.GreaterOrEqual(float64(stats.TotalMemory), float64(expectedMemory)*(1-tolerance))
+	assert.LessOrEqual(float64(stats.TotalMemory), float64(expectedMemory)*(1+tolerance))
 }
 
 // Helper function to create test map files
-func createTestMapFiles(t *testing.T, dir, coord string) {
+func createTestMapFiles(t *testing.T, dir string, coord spatial.MapCoord) {
 	// Create test heightmap
 	heightmap := image.NewGray16(image.Rect(0, 0, mapSize, mapSize))
 	for y := range mapSize {
@@ -271,7 +221,7 @@ func createTestMapFiles(t *testing.T, dir, coord string) {
 		}
 	}
 
-	heightmapPath := filepath.Join(dir, coord+heightmapExtension)
+	heightmapPath := filepath.Join(dir, coord.String()+heightmapExtension)
 	if err := saveGray16Image(heightmapPath, heightmap); err != nil {
 		t.Fatalf("Failed to create test heightmap: %v", err)
 	}
@@ -288,7 +238,7 @@ func createTestMapFiles(t *testing.T, dir, coord string) {
 		}
 	}
 
-	watermapPath := filepath.Join(dir, coord+watermapExtension)
+	watermapPath := filepath.Join(dir, coord.String()+watermapExtension)
 	if err := saveGrayImage(watermapPath, watermap); err != nil {
 		t.Fatalf("Failed to create test watermap: %v", err)
 	}
@@ -300,10 +250,10 @@ func BenchmarkLoadMapData(b *testing.B) {
 	am := NewAssetManager(tempDir, 10)
 
 	// Preload to ensure it's cached
-	am.LoadMapData("n48w123")
+	am.LoadMapData(spatial.MapCoord{Lat: 48, Lon: -123})
 
 	for b.Loop() {
-		_, err := am.LoadMapData("n48w123")
+		_, err := am.LoadMapData(spatial.MapCoord{Lat: 48, Lon: -123})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -315,7 +265,13 @@ func BenchmarkConcurrentLoads(b *testing.B) {
 	tempDir := b.TempDir()
 	am := NewAssetManager(tempDir, 20)
 
-	coords := []string{"n48w123", "n48w122", "n47w123", "n47w122", "n46w123"}
+	coords := []spatial.MapCoord{
+		{Lat: 48, Lon: -123},
+		{Lat: 48, Lon: -122},
+		{Lat: 47, Lon: -123},
+		{Lat: 47, Lon: -122},
+		{Lat: 46, Lon: -123},
+	}
 
 	b.RunParallel(func(pb *testing.PB) {
 		i := 0

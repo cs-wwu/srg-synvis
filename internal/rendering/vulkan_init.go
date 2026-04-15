@@ -17,15 +17,12 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/udhos/gwob"
-
-	obspb "github.com/cs-wwu/srg-synvis/assets/chunks/obstructions"
-	roadpb "github.com/cs-wwu/srg-synvis/assets/chunks/roads"
 
 	"github.com/elokore/cimgui-go-vulkan/backend"
 	glfwvulkanbackend "github.com/elokore/cimgui-go-vulkan/backend/glfwvulkan-backend"
@@ -38,7 +35,7 @@ import (
 // This file is for vulkan initialization
 
 func (app *Application) IsUncappedFPS() bool {
-	return app.cfg.UncapFPS
+	return app.Cfg.UncapFPS
 }
 
 func (app *Application) VulkanSurface(instance vk.Instance) (surface vk.Surface) {
@@ -56,7 +53,7 @@ func (app *Application) VulkanAppName() string {
 
 func (app *Application) VulkanLayers() []string {
 	validationLayers := []string{}
-	if app.cfg.DebugMode {
+	if app.Cfg.DebugMode {
 		validationLayers = append(validationLayers, "VK_LAYER_KHRONOS_validation")
 	} else {
 		log.Println("vulkan: debug mode is off, not using validation layers")
@@ -95,14 +92,14 @@ func (app *Application) SetSwapchainDimensions(dim *as.SwapchainDimensions) {
 
 func (app *Application) VulkanInstanceExtensions() []string {
 	extensions := app.WindowHandle.GetRequiredInstanceExtensions()
-	if app.cfg.DebugMode {
+	if app.Cfg.DebugMode {
 		extensions = append(extensions, "VK_EXT_debug_report")
 	}
 	return extensions
 }
 
 func (app *Application) VulkanPresentMode() vk.PresentMode {
-	if app.cfg.UncapFPS {
+	if app.Cfg.UncapFPS {
 		return vk.PresentModeImmediate
 	}
 	return vk.PresentModeMailbox
@@ -134,17 +131,17 @@ func (app *Application) initUBO() {
 	app.ubo.Model.Identity()
 	temp := lin.Vec3{0, 0.1, 0.1}
 	app.ubo.LightDir.Norm(&temp)
-	app.ubo.RenderDistance = app.cfg.RenderDistance
-	log.Printf("vulkan: render distance: %f", app.cfg.RenderDistance)
+	app.ubo.RenderDistance = app.Cfg.RenderDistance
+	log.Printf("vulkan: render distance: %f", app.Cfg.RenderDistance)
 
 	// Fix the logic to match shader expectations
-	if app.cfg.DisableTerrainWarnings {
+	if app.Cfg.DisableTerrainWarnings {
 		app.ubo.DisableWarnings = 1.0 // 1.0 = disabled
 	} else {
 		app.ubo.DisableWarnings = 0.0 // 0.0 = enabled
 	}
 
-	if app.cfg.DisableFog {
+	if app.Cfg.DisableFog {
 		app.ubo.DisableFog = 1.0 // 1.0 = disabled
 		log.Printf("Disabling fog\n")
 	} else {
@@ -156,7 +153,7 @@ func (app *Application) initUBO() {
 func (app *Application) updateUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
 
-	if app.camera.MapView() {
+	if app.Camera.MapView() {
 		ortho := lin.Mat4x4{}
 
 		// TODO: Zoom? Currently, 1000x1000 points are visible in the map view.
@@ -174,12 +171,12 @@ func (app *Application) updateUBO() {
 		app.ubo.Projection.Mult(&correction, &ortho)
 		app.ubo.Projection[1][1] *= -1
 
-		app.camera.PlaneMatrix(&app.ubo.PlaneDirection)
+		app.Camera.PlaneMatrix(&app.ubo.PlaneDirection)
 	} else {
-		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.cfg.Fov), aspectRatio, 1.0, app.cfg.RenderDistance)
+		app.ubo.Projection.Perspective(lin.DegreesToRadians(app.Cfg.Fov), aspectRatio, 1.0, app.Cfg.RenderDistance)
 		app.ubo.Projection[1][1] *= -1
 	}
-	app.ubo.View = app.camera.ViewMatrix()
+	app.ubo.View = app.Camera.ViewMatrix()
 }
 
 // Prepare depth buffers
@@ -307,7 +304,7 @@ func (app *Application) prepareTextureImage(path string, tiling vk.ImageTiling,
 		if len(data) > 0 {
 			var pData unsafe.Pointer
 			ret = vk.MapMemory(dev, tex.mem, 0, layout.Size, 0, &pData)
-			if IsError(ret) {
+			if ret != vk.Success {
 				log.Printf("vulkan warning: failed to map device memory for data (len=%d)", len(data))
 				return tex
 			}
@@ -505,114 +502,8 @@ func (app *Application) prepareTextures() {
 	}
 }
 
-func (app *Application) buildRoad(pos streaming.LatLonInt) *RoadSquare {
-
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	roadFile := "assets/chunks/roads/data/" + mapPos + ".pb"
-	roadSquare := roadpb.RoadSquare{}
-	file, err := FileToBytesChecked(roadFile)
-	if err != nil {
-		log.Printf("vulkan: error loading road square %s: %v", roadFile, err)
-		return nil
-	}
-	err = proto.Unmarshal(file, &roadSquare)
-	if err != nil {
-		log.Printf("vulkan: error unmarshaling road square %s: %v", roadFile, err)
-		return nil
-	}
-
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-		return nil
-	}
-	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newRoadBuilder(heightInfo)
-
-	for _, road := range roadSquare.Roads {
-		renderRoad(builder, road)
-	}
-
-	// NB: These buffers must be created while `builder` is still referenced,
-	// so that the `vertexBytes` and `indexBytes` methods return valid slices.
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
-	return &RoadSquare{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-	}
-}
-
-func (app *Application) renderObstruction(pos streaming.LatLonInt) *ObstructionSquare {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	obstructionFile := "assets/chunks/obstructions/data/" + mapPos + ".pb"
-	obstructionSquare := obspb.ObstructionSquare{}
-	file, err := FileToBytesChecked(obstructionFile)
-	if err != nil {
-		log.Printf("vulkan: error loading obstruction square %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	err = proto.Unmarshal(file, &obstructionSquare)
-	if err != nil {
-		log.Printf("vulkan: error unmarshaling obstruction square: %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for obstruction square: %s: %v", obstructionFile, err)
-		return nil
-	}
-
-	heightInfo := newHeightInfo(mapData.HeightData)
-	builder := newObstructionBuilder(heightInfo)
-
-	for _, obstruction := range obstructionSquare.Obstructions {
-		buildObstruction(builder, obstruction)
-	}
-
-	if len(builder.vertices) == 0 || len(builder.indices) == 0 || len(obstructionSquare.Obstructions) == 0 {
-		return nil
-	}
-
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
-	return &ObstructionSquare{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-	}
-}
-
-func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
-	mapPos := coords.LatLonToMap(pos.Lat, pos.Lon)
-	airspaceFile := "assets/chunks/airspace/data/" + mapPos + ".geojson"
+func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
+	airspaceFile := "assets/chunks/airspace/data/" + pos.String() + ".geojson"
 
 	var geojson FeatureCollection
 	file, err := FileToBytesChecked(airspaceFile)
@@ -627,13 +518,13 @@ func (app *Application) buildAirspace(pos streaming.LatLonInt) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(mapPos)
+	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
 	if err != nil {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil
 	}
 
-	heightInfo := newHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
 	builder := newAirspaceBuilder(heightInfo)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
@@ -1620,7 +1511,7 @@ func (app *Application) preparePipeline() {
 	bindingDescriptions := []vk.VertexInputBindingDescription{
 		{
 			Binding:   0,
-			Stride:    uint32(VertexSize),
+			Stride:    uint32(chunk.VertexSize),
 			InputRate: vk.VertexInputRateVertex,
 		},
 	}
@@ -1630,19 +1521,19 @@ func (app *Application) preparePipeline() {
 			Binding:  0,
 			Location: 0,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Position)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.Position)),
 		},
 		{
 			Binding:  0,
 			Location: 1,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.TexCoord)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.TexCoord)),
 		},
 		{
 			Binding:  0,
 			Location: 2,
 			Format:   vk.FormatR32g32b32Sfloat,
-			Offset:   uint32(unsafe.Offsetof(Vertex{}.Normal)),
+			Offset:   uint32(unsafe.Offsetof(chunk.Vertex{}.Normal)),
 		},
 	}
 
@@ -1840,18 +1731,18 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize StreamManager
-	app.StreamManager = NewStreamManager(&dev, &memProps, app.cfg)
-	app.StreamManager.UpdateCameraPosition(app.camera.Position())
+	app.StreamManager = NewStreamManager(&dev, &memProps, app.Cfg)
+	app.StreamManager.UpdateCameraPosition(app.Camera.Position())
 	app.StreamManager.Start()
 
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
-	app.RoadStreamer.UpdatePos(app.camera.Position())
+	app.RoadStreamer.UpdatePos(app.Camera.Position())
 
-	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.renderObstruction)
-	app.ObstructionStreamer.UpdatePos(app.camera.Position())
+	app.ObstructionStreamer = streaming.NewDegreeStreamer(app.buildObstruction)
+	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
-	app.AirspaceStreamer.UpdatePos(app.camera.Position())
+	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
 	app.currentAirspace = nil
 
 	app.prepareUniformBuffers()
@@ -1899,10 +1790,6 @@ func (app *Application) VulkanContextPrepare() error {
 	// )
 
 	return nil
-}
-
-func IsError(ret vk.Result) bool {
-	return ret != vk.Success
 }
 
 func OrPanic(err error, finalizers ...func()) {

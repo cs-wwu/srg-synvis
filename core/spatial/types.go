@@ -12,6 +12,11 @@ type GridCoord struct {
 	X, Z int
 }
 
+// MapCoord represents a 1-degree by 1-degree chunk on the map
+type MapCoord struct {
+	Lat, Lon int
+}
+
 // String returns a string representation of GridCoord
 func (c GridCoord) String() string {
 	return fmt.Sprintf("(%d,%d)", c.X, c.Z)
@@ -113,30 +118,4 @@ type Frustum struct {
 type FrustumPlane struct {
 	Normal lin.Vec2 // 2D normal vector
 	D      float32  // Distance from origin
-}
-
-// ChunkSelectionSystem is the interface for spatial chunk selection and state tracking
-type ChunkSelectionSystem interface {
-	// Core selection logic
-	UpdateSelection(cameraPos lin.Vec2, viewFrustum Frustum, renderDistance float32)
-	GetDesiredChunks() []ChunkSpec
-	GetMissingChunks() []ChunkSpec
-	GetHighestPriorityMissing() *ChunkSpec
-
-	// State tracking (StreamManager reports availability)
-	MarkChunkAvailable(coord GridCoord)
-	MarkChunkUnavailable(coord GridCoord)
-	IsChunkAvailable(coord GridCoord) bool
-	IsChunkDesired(coord GridCoord) bool
-
-	// Spatial utilities
-	GetNeighborCoords(coord GridCoord) [4]GridCoord
-	CalculateLOD(coord GridCoord, cameraPos lin.Vec2) int
-	CalculatePriority(coord GridCoord, cameraPos lin.Vec2, inFrustum bool) float32
-	WorldToGrid(pos lin.Vec2) GridCoord
-	GridToWorld(coord GridCoord) lin.Vec2
-
-	// Utilities
-	Stats() ChunkSelectorStats
-	Clear()
 }

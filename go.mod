@@ -18,9 +18,13 @@ require (
 	github.com/westphae/geomag v1.0.2
 	github.com/xlab/linmath v0.0.0-20220922225318-40b6290c3b40
 	golang.org/x/net v0.42.0
-	golang.org/x/term v0.33.0
 )
 
-require golang.org/x/sys v0.36.0 // indirect
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/stretchr/testify v1.11.1
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
 
 replace github.com/vulkan-go/asche => ./pkg/asche

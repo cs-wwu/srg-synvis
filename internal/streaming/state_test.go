@@ -6,9 +6,12 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestString(t *testing.T) {
+	assert := assert.New(t)
+
 	tests := []struct {
 		state    ChunkState
 		expected string
@@ -22,13 +25,13 @@ func TestString(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if got := tt.state.String(); got != tt.expected {
-			t.Errorf("ChunkState(%d).String() = %v, want %v", tt.state, got, tt.expected)
-		}
+		got := tt.state.String()
+		assert.Equal(tt.expected, got)
 	}
 }
 
 func TestTransitionTo(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name      string
 		fromState ChunkState
@@ -50,26 +53,26 @@ func TestTransitionTo(t *testing.T) {
 		{"Ready to Queued", StateReady, StateQueued, true},
 		{"Evicting to Ready", StateEvicting, StateReady, true},
 	}
+	assert.NotEmpty(tests)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := &ChunkRecord{State: tt.fromState}
 			err := record.TransitionTo(tt.toState)
 
-			if tt.wantError && err == nil {
-				t.Errorf("Expected error for transition %s -> %s, but got none", tt.fromState, tt.toState)
-			}
-			if !tt.wantError && err != nil {
-				t.Errorf("Unexpected error for transition %s -> %s: %v", tt.fromState, tt.toState, err)
-			}
-			if !tt.wantError && record.State != tt.toState {
-				t.Errorf("State not updated: expected %s, got %s", tt.toState, record.State)
+			if tt.wantError {
+				assert.Error(err)
+			} else {
+				assert.NoError(err)
+				assert.Equal(tt.toState, record.State)
 			}
 		})
 	}
 }
 
 func TestTouch(t *testing.T) {
+	assert := assert.New(t)
+
 	record := &ChunkRecord{
 		LastUsed: time.Now().Add(-time.Hour),
 	}
@@ -77,108 +80,84 @@ func TestTouch(t *testing.T) {
 	oldTime := record.LastUsed
 	record.Touch()
 
-	if !record.LastUsed.After(oldTime) {
-		t.Error("Touch() should update LastUsed to a more recent time")
-	}
+	assert.True(record.LastUsed.After(oldTime))
 
 	// Should be very recent (within last second)
-	if time.Since(record.LastUsed) > time.Second {
-		t.Error("Touch() should set LastUsed to approximately now")
-	}
+	assert.LessOrEqual(time.Since(record.LastUsed), time.Second)
 }
 
 func TestAge(t *testing.T) {
+	assert := assert.New(t)
+
 	record := &ChunkRecord{
 		StateChanged: time.Now().Add(-time.Minute),
 	}
 
 	age := record.Age()
-	if age < 50*time.Second || age > 70*time.Second {
-		t.Errorf("Age() returned %v, expected approximately 1 minute", age)
-	}
+	assert.GreaterOrEqual(age, 50*time.Second)
+	assert.LessOrEqual(age, 70*time.Second)
 }
 
 func TestNewChunkStateManager(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 
-	if csm == nil {
-		t.Fatal("NewChunkStateManager() returned nil")
-	}
-
-	if csm.chunks == nil {
-		t.Error("chunks map not initialized")
-	}
-
-	if csm.Count() != 0 {
-		t.Errorf("Expected count 0 for new manager, got %d", csm.Count())
-	}
+	assert.NotNil(csm)
+	assert.NotNil(csm.chunks)
+	assert.Equal(0, csm.Count())
 }
 
 func TestGetChunkState(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	coord := spatial.GridCoord{X: 1, Z: 2}
 
 	// Non-existent chunk should return StateUnloaded
-	if state := csm.GetChunkState(coord); state != StateUnloaded {
-		t.Errorf("Expected StateUnloaded for non-existent chunk, got %s", state)
-	}
+	state := csm.GetChunkState(coord)
+	assert.Equal(StateUnloaded, state)
 
 	// Add a chunk and verify state
 	err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-	if err != nil {
-		t.Fatalf("SetChunkState failed: %v", err)
-	}
+	assert.NoError(err)
 
-	if state := csm.GetChunkState(coord); state != StateQueued {
-		t.Errorf("Expected StateQueued, got %s", state)
-	}
+	state = csm.GetChunkState(coord)
+	assert.Equal(StateQueued, state)
 }
 
 func TestSetChunkState(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	coord := spatial.GridCoord{X: 1, Z: 2}
 
 	// New chunks must start with StateQueued
 	err := csm.SetChunkState(coord, StateLoading, 1.0, 0)
-	if err == nil {
-		t.Error("Expected error when creating chunk with non-Queued state")
-	}
+	assert.Error(err)
 
 	// Proper chunk creation
 	err = csm.SetChunkState(coord, StateQueued, 2.5, 1)
-	if err != nil {
-		t.Fatalf("SetChunkState failed: %v", err)
-	}
+	assert.NoError(err)
 
 	// Verify the record was created correctly
 	record := csm.GetChunkRecord(coord)
+	assert.NotNil(record)
 	if record == nil {
-		t.Fatal("Record not created")
+		return
 	}
-	if record.Priority != 2.5 {
-		t.Errorf("Expected priority 2.5, got %f", record.Priority)
-	}
-	if record.LODLevel != 1 {
-		t.Errorf("Expected LOD level 1, got %d", record.LODLevel)
-	}
+	assert.Equal(float32(2.5), record.Priority)
+	assert.Equal(1, record.LODLevel)
 
 	// Test state progression
 	err = csm.SetChunkState(coord, StateLoading, 3.0, 2)
-	if err != nil {
-		t.Errorf("Transition to Loading failed: %v", err)
-	}
+	assert.NoError(err)
 
 	// Verify priority and LOD were updated
 	record = csm.GetChunkRecord(coord)
-	if record.Priority != 3.0 {
-		t.Errorf("Priority not updated: expected 3.0, got %f", record.Priority)
-	}
-	if record.LODLevel != 2 {
-		t.Errorf("LOD not updated: expected 2, got %d", record.LODLevel)
-	}
+	assert.Equal(float32(3.0), record.Priority)
+	assert.Equal(2, record.LODLevel)
 }
 
 func TestTouchChunk(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	coord := spatial.GridCoord{X: 1, Z: 2}
 
@@ -187,9 +166,7 @@ func TestTouchChunk(t *testing.T) {
 
 	// Create chunk and test touching
 	err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-	if err != nil {
-		t.Fatalf("SetChunkState failed: %v", err)
-	}
+	assert.NoError(err)
 
 	oldRecord := csm.GetChunkRecord(coord)
 	time.Sleep(time.Millisecond) // Ensure time difference
@@ -197,53 +174,39 @@ func TestTouchChunk(t *testing.T) {
 	csm.TouchChunk(coord)
 
 	newRecord := csm.GetChunkRecord(coord)
-	if !newRecord.LastUsed.After(oldRecord.LastUsed) {
-		t.Error("TouchChunk should update LastUsed time")
-	}
+	assert.True(newRecord.LastUsed.After(oldRecord.LastUsed))
 }
 
 func TestRemoveChunk(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	coord := spatial.GridCoord{X: 1, Z: 2}
 
 	// Removing non-existent chunk should not error
 	err := csm.RemoveChunk(coord)
-	if err != nil {
-		t.Errorf("RemoveChunk on non-existent chunk failed: %v", err)
-	}
+	assert.NoError(err)
 
 	// Create chunk and try to remove while in wrong state
 	err = csm.SetChunkState(coord, StateQueued, 1.0, 0)
-	if err != nil {
-		t.Fatalf("SetChunkState failed: %v", err)
-	}
+	assert.NoError(err)
 
 	err = csm.RemoveChunk(coord)
-	if err == nil {
-		t.Error("Expected error when removing chunk in Queued state")
-	}
+	assert.Error(err)
 
 	// Transition to valid state for removal
 	err = csm.SetChunkState(coord, StateUnloaded, 1.0, 0)
-	if err != nil {
-		t.Fatalf("Transition to Unloaded failed: %v", err)
-	}
+	assert.NoError(err)
 
 	err = csm.RemoveChunk(coord)
-	if err != nil {
-		t.Errorf("RemoveChunk failed: %v", err)
-	}
+	assert.NoError(err)
 
 	// Verify removal
-	if csm.GetChunkState(coord) != StateUnloaded {
-		t.Error("Chunk should be unloaded after removal")
-	}
-	if csm.Count() != 0 {
-		t.Errorf("Expected count 0 after removal, got %d", csm.Count())
-	}
+	assert.Equal(StateUnloaded, csm.GetChunkState(coord))
+	assert.Equal(0, csm.Count())
 }
 
 func TestListChunksByState(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 
 	// Create chunks in different states
@@ -256,93 +219,70 @@ func TestListChunksByState(t *testing.T) {
 	// Add chunks
 	for _, coord := range coords {
 		err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-		if err != nil {
-			t.Fatalf("SetChunkState failed: %v", err)
-		}
+		assert.NoError(err)
 	}
 
 	// Transition one to Loading
 	err := csm.SetChunkState(coords[1], StateLoading, 1.0, 0)
-	if err != nil {
-		t.Fatalf("Transition failed: %v", err)
-	}
+	assert.NoError(err)
 
 	// Test listing
 	queuedChunks := csm.ListChunksByState(StateQueued)
-	if len(queuedChunks) != 2 {
-		t.Errorf("Expected 2 queued chunks, got %d", len(queuedChunks))
-	}
+	assert.Len(queuedChunks, 2)
 
 	loadingChunks := csm.ListChunksByState(StateLoading)
-	if len(loadingChunks) != 1 {
-		t.Errorf("Expected 1 loading chunk, got %d", len(loadingChunks))
-	}
+	assert.Len(loadingChunks, 1)
 
 	readyChunks := csm.ListChunksByState(StateReady)
-	if len(readyChunks) != 0 {
-		t.Errorf("Expected 0 ready chunks, got %d", len(readyChunks))
-	}
+	assert.Len(readyChunks, 0)
 }
 
 func TestGetStats(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 
 	// Initially empty
 	stats := csm.GetStats()
-	if len(stats) != 0 {
-		t.Errorf("Expected empty stats, got %v", stats)
-	}
+	assert.Len(stats, 0)
 
 	// Add chunks in different states
 	coords := []spatial.GridCoord{{X: 1, Z: 1}, {X: 2, Z: 2}, {X: 3, Z: 3}}
 	for _, coord := range coords {
 		err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-		if err != nil {
-			t.Fatalf("SetChunkState failed: %v", err)
-		}
+		assert.NoError(err)
 	}
 
 	// Transition one
 	err := csm.SetChunkState(coords[0], StateLoading, 1.0, 0)
-	if err != nil {
-		t.Fatalf("Transition failed: %v", err)
-	}
+	assert.NoError(err)
 
 	stats = csm.GetStats()
-	if stats[StateQueued] != 2 {
-		t.Errorf("Expected 2 queued chunks, got %d", stats[StateQueued])
-	}
-	if stats[StateLoading] != 1 {
-		t.Errorf("Expected 1 loading chunk, got %d", stats[StateLoading])
-	}
+	assert.Equal(2, stats[StateQueued])
+	assert.Equal(1, stats[StateLoading])
 
 	t.Logf("Stats: %v", stats)
 }
 
 func TestClear(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 
 	// Add some chunks
 	coords := []spatial.GridCoord{{X: 1, Z: 1}, {X: 2, Z: 2}}
 	for _, coord := range coords {
 		err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-		if err != nil {
-			t.Fatalf("SetChunkState failed: %v", err)
-		}
+		assert.NoError(err)
 	}
 
-	if csm.Count() != 2 {
-		t.Errorf("Expected count 2, got %d", csm.Count())
-	}
+	assert.Equal(2, csm.Count())
 
 	csm.Clear()
 
-	if csm.Count() != 0 {
-		t.Errorf("Expected count 0 after Clear(), got %d", csm.Count())
-	}
+	assert.Equal(0, csm.Count())
 }
 
 func TestConcurrentAccess(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	const numGoroutines = 10
 	const numOperations = 100
@@ -360,25 +300,20 @@ func TestConcurrentAccess(t *testing.T) {
 
 				// Create chunk
 				err := csm.SetChunkState(coord, StateQueued, float32(j), id)
-				if err != nil {
-					t.Errorf("SetChunkState failed: %v", err)
+				if !assert.NoError(err) {
 					continue
 				}
 
 				// Read state
 				state := csm.GetChunkState(coord)
-				if state != StateQueued {
-					t.Errorf("Expected StateQueued, got %s", state)
-				}
+				assert.Equal(StateQueued, state)
 
 				// Touch chunk
 				csm.TouchChunk(coord)
 
 				// Get record
 				record := csm.GetChunkRecord(coord)
-				if record == nil {
-					t.Error("GetChunkRecord returned nil")
-				}
+				assert.NotNil(record)
 			}
 		}(i)
 	}
@@ -387,41 +322,30 @@ func TestConcurrentAccess(t *testing.T) {
 
 	// Verify final state
 	expectedCount := numGoroutines * numOperations
-	if csm.Count() != expectedCount {
-		t.Errorf("Expected count %d, got %d", expectedCount, csm.Count())
-	}
+	assert.Equal(expectedCount, csm.Count())
 
 	stats := csm.GetStats()
-	if stats[StateQueued] != expectedCount {
-		t.Errorf("Expected %d queued chunks, got %d", expectedCount, stats[StateQueued])
-	}
+	assert.Equal(expectedCount, stats[StateQueued])
 }
 
 func TestGetChunkRecordReturnsCopy(t *testing.T) {
+	assert := assert.New(t)
 	csm := NewChunkStateManager()
 	coord := spatial.GridCoord{X: 1, Z: 2}
 
 	err := csm.SetChunkState(coord, StateQueued, 1.0, 0)
-	if err != nil {
-		t.Fatalf("SetChunkState failed: %v", err)
-	}
+	assert.NoError(err)
 
 	record1 := csm.GetChunkRecord(coord)
 	record2 := csm.GetChunkRecord(coord)
 
 	// Should be equal but different pointers
-	if record1 == record2 {
-		t.Error("GetChunkRecord should return copies, not the same pointer")
-	}
+	assert.NotSame(record1, record2)
 
-	if record1.Priority != record2.Priority {
-		t.Error("Copies should have same values")
-	}
+	assert.Equal(record1.Priority, record2.Priority)
 
 	// Modifying returned record should not affect internal state
 	record1.Priority = 999.0
 	record3 := csm.GetChunkRecord(coord)
-	if record3.Priority == 999.0 {
-		t.Error("Modifying returned record affected internal state")
-	}
+	assert.NotEqual(float32(999.0), record3.Priority)
 }
