@@ -49,7 +49,6 @@ type Application struct {
 	AirspaceStreamer        *streaming.DegreeChunkStreamer[*Airspace]
 	airspacePipeline        vk.Pipeline
 	airspaceStencilPipeline vk.Pipeline
-	airspaceTintPipeline    vk.Pipeline
 	CurrentAirspace         *Feature
 	lastAirspaceCheck       time.Time
 
