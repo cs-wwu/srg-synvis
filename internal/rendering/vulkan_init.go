@@ -1743,7 +1743,7 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
 	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
-	app.currentAirspace = nil
+	app.CurrentAirspace = nil
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
