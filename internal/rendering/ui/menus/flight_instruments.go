@@ -12,10 +12,12 @@ import (
 
 type FlightInstruments struct {
 	ui.UIComponent
-	Gauge       *components.RectangleGauge
-	Speedometer *components.RectangleGauge
-	Compass     *components.RibbonCompass
-	app         *rendering.Application
+	Gauge             *components.RectangleGauge
+	Speedometer       *components.RectangleGauge
+	Compass           *components.RibbonCompass
+	AirspaceIndicator *components.AirspaceIndicator
+	currentAirspace   *rendering.Feature // nil when not in one
+	app               *rendering.Application
 }
 
 var NORTH_VECTOR = linmath.Vec3{0, 0, -1}
@@ -47,9 +49,10 @@ func NewFlightInstruments() *FlightInstruments {
 	speedometer.MeterRange = 80
 
 	return &FlightInstruments{
-		Gauge:       altimeter,
-		Compass:     compass,
-		Speedometer: speedometer,
+		Gauge:             altimeter,
+		Compass:           compass,
+		Speedometer:       speedometer,
+		AirspaceIndicator: components.NewAirspaceIndicator(),
 	}
 }
 
@@ -64,6 +67,12 @@ func (window *FlightInstruments) Render() {
 	window.Gauge.Render()
 	window.Compass.Render()
 	window.Speedometer.Render()
+
+	window.currentAirspace = window.app.CurrentAirspace
+	if window.currentAirspace != nil {
+		window.AirspaceIndicator.Airspace = window.currentAirspace
+		window.AirspaceIndicator.Render()
+	}
 }
 
 func (window *FlightInstruments) UseApp(app *rendering.Application) {

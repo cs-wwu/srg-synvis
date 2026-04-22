@@ -1,7 +1,6 @@
 package rendering
 
 import (
-	"fmt"
 	"math"
 	"unsafe"
 
@@ -319,11 +318,10 @@ func (app *Application) UpdateCurrentAirspace() {
 			continue
 		}
 		if inside := isInsideAirspace(cameraPos, chunk.features); inside != nil {
-			app.currentAirspace = inside
-			fmt.Printf("Current airspace: %s\n", inside.Properties.Name)
+			app.CurrentAirspace = inside
 			return
 		}
 	}
 
-	app.currentAirspace = nil
+	app.CurrentAirspace = nil
 }
