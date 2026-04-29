@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_ARB_shading_language_420pack : enable
 
-layout(std140, binding = 0) uniform UBO {
+layout(binding = 0) uniform UBO {
     mat4 model;
     mat4 view;
     mat4 proj;
@@ -14,6 +14,8 @@ layout(std140, binding = 0) uniform UBO {
     float time;
     float disableWarnings;
     float disableFog;
+    vec2 _pad;
+    vec4 overlayColor;
 } ubo;
 
 layout(location = 0) in vec3 inPosition;

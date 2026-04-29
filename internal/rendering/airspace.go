@@ -144,24 +144,16 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 			bottomIds[bottomTriangles[i+2]],
 			bottomIds[bottomTriangles[i+1]])
 
-		// Top cap - both sides
-		builder.addTriangle(topIds[bottomTriangles[i]],
-			topIds[bottomTriangles[i+1]],
-			topIds[bottomTriangles[i+2]])
+		// Top cap - just top side is needed
 		builder.addTriangle(topIds[bottomTriangles[i]],
 			topIds[bottomTriangles[i+2]],
 			topIds[bottomTriangles[i+1]])
 	}
 
-	// Build walls - both sides
 	for i := range n {
 		nextI := (i + 1) % n
-		// Outside face
 		builder.addTriangle(bottomIds[i], topIds[i], bottomIds[nextI])
 		builder.addTriangle(topIds[i], topIds[nextI], bottomIds[nextI])
-		// Inside face
-		builder.addTriangle(bottomIds[i], bottomIds[nextI], topIds[i])
-		builder.addTriangle(topIds[i], bottomIds[nextI], topIds[nextI])
 	}
 }
 

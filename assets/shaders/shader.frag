@@ -4,7 +4,7 @@
 
 layout(binding = 1) uniform sampler2D texSampler;
 
-layout(std140, binding = 0) uniform UBO {
+layout(binding = 0) uniform UBO {
     mat4 model;
     mat4 view;
     mat4 proj;
@@ -16,6 +16,8 @@ layout(std140, binding = 0) uniform UBO {
     float time;
     float disableWarnings;
     float disableFog;
+    vec2 _pad;
+    vec4 overlayColor;
 } ubo;
 
 layout(location = 0) in vec3 fragColor;

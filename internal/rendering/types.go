@@ -33,6 +33,8 @@ type UniformBufferObject struct {
 	Time            float32  // Animation time
 	DisableWarnings float32  // 1.0 = disabled, 0.0 = enabled (match shader)
 	DisableFog      float32
+	_pad            [2]float32
+	OverlayColor    [4]float32 // Overlay color for being inside airspace
 }
 
 // creating a byte slice array of size UniformBufferObject

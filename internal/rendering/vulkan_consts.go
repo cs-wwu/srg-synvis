@@ -46,11 +46,12 @@ type Application struct {
 	planeIndexCount   uint32
 
 	// Airspaces
-	AirspaceStreamer        *streaming.DegreeChunkStreamer[*Airspace]
-	airspacePipeline        vk.Pipeline
-	airspaceStencilPipeline vk.Pipeline
-	CurrentAirspace         *Feature
-	lastAirspaceCheck       time.Time
+	AirspaceStreamer          *streaming.DegreeChunkStreamer[*Airspace]
+	airspacePipeline          vk.Pipeline
+	airspaceStencilPipeline   vk.Pipeline
+	fullscreenOverlayPipeline vk.Pipeline
+	CurrentAirspace           *Feature
+	lastAirspaceCheck         time.Time
 
 	// Roads
 	roadPipeline vk.Pipeline
