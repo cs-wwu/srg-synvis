@@ -55,20 +55,8 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 		return renderChunk{}
 	}
 
-	heightInfo := NewHeightInfoMap(mapCoord, mapData.HeightData)
-	for dlat := -1; dlat <= 1; dlat++ {
-		for dlon := -1; dlon <= 1; dlon++ {
-			if dlat == 0 && dlon == 0 {
-				continue
-			}
-			dir := spatial.MapCoord{Lat: mapCoord.Lat + dlat, Lon: mapCoord.Lon + dlon}
-			adjData, err := c.AssetManager.LoadMapData(dir)
-			if err == nil {
-				heightInfo.AddTile(dir, adjData.HeightData)
-			}
-		}
-	}
-
+	heightInfo := NewHeightInfo(c.AssetManager, mapCoord)
+	// FIXME: Plumb WaterData through height info as well.
 	chunk.calculateVertices(heightInfo, mapData.WaterData)
 	chunk.calculateIndices()
 	chunk.calculateNormals()
@@ -96,7 +84,7 @@ func ChunkKey(chunkX, chunkZ int) string {
 }
 
 // Calculate vertices and texcoords for a chunk
-func (chunk *Chunk) calculateVertices(heightInfo *HeightInfoMap, waterData []uint8) {
+func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8) {
 	stride := int(chunk.size / MIN_CHUNK_SIZE)
 	const VERTICES_PER_STRIDE = MIN_CHUNK_SIZE + 1
 

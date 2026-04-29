@@ -17,9 +17,9 @@ import (
 )
 
 type RoadBuilder struct {
-	HeightInfoMap *chunk.HeightInfoMap
-	vertices      []RoadVertex
-	indices       []uint32
+	heightInfo *chunk.HeightInfo
+	vertices   []RoadVertex
+	indices    []uint32
 
 	color vec3.T
 }
@@ -72,28 +72,8 @@ func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
 		return nil
 	}
 
-	mapData, err := app.ChunkManager.AssetManager.LoadMapData(pos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-		return nil
-	}
-
-	heightInfoMap := chunk.NewHeightInfoMap(pos, mapData.HeightData)
-
-	for dlat := -1; dlat <= 1; dlat++ {
-		for dlon := -1; dlon <= 1; dlon++ {
-			if dlat == 0 && dlon == 0 {
-				continue // skip center, already loaded
-			}
-			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
-			adjData, err := app.ChunkManager.AssetManager.LoadMapData(dir)
-			if err == nil {
-				heightInfoMap.AddTile(dir, adjData.HeightData)
-			}
-		}
-	}
-
-	builder := newRoadBuilder(heightInfoMap)
+	heightInfo := chunk.NewHeightInfo(app.ChunkManager.AssetManager, pos)
+	builder := newRoadBuilder(heightInfo)
 
 	for _, road := range roadSquare.Roads {
 		renderRoad(builder, road)
@@ -298,16 +278,16 @@ func perpendicularDistance(pt, lineStart, lineEnd vec2.T) float64 {
 	return num / den
 }
 
-func newRoadBuilder(TileMap *chunk.HeightInfoMap) *RoadBuilder {
+func newRoadBuilder(heightInfo *chunk.HeightInfo) *RoadBuilder {
 	return &RoadBuilder{
-		HeightInfoMap: TileMap,
-		vertices:      make([]RoadVertex, 0),
-		indices:       make([]uint32, 0),
+		heightInfo: heightInfo,
+		vertices:   make([]RoadVertex, 0),
+		indices:    make([]uint32, 0),
 	}
 }
 
 func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
-	height := r.HeightInfoMap.Height(float32(point[0]), float32(point[1]))
+	height := r.heightInfo.Height(float32(point[0]), float32(point[1]))
 	height += ROAD_OFFSET
 	return r.addVertex(RoadVertex{
 		Position: vec3.T{float32(point[0]), height, float32(point[1])},

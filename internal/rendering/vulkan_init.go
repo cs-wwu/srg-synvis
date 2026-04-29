@@ -519,28 +519,8 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.ChunkManager.AssetManager.LoadMapData(pos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for airspace: %v", err)
-		return nil
-	}
-
-	heightInfoMap := chunk.NewHeightInfoMap(pos, mapData.HeightData)
-
-	for dlat := -1; dlat <= 1; dlat++ {
-		for dlon := -1; dlon <= 1; dlon++ {
-			if dlat == 0 && dlon == 0 {
-				continue // skip center, already loaded
-			}
-			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
-			adjData, err := app.ChunkManager.AssetManager.LoadMapData(dir)
-			if err == nil {
-				heightInfoMap.AddTile(dir, adjData.HeightData)
-			}
-		}
-	}
-
-	builder := newAirspaceBuilder(heightInfoMap)
+	heightInfo := chunk.NewHeightInfo(app.ChunkManager.AssetManager, pos)
+	builder := newAirspaceBuilder(heightInfo)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
 	for i, airspace := range geojson.Features {
