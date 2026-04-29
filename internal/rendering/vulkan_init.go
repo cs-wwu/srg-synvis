@@ -519,13 +519,7 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.ChunkManager.AssetManager.LoadMapData(pos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for airspace: %v", err)
-		return nil
-	}
-
-	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(app.ChunkManager.AssetManager, pos)
 	builder := newAirspaceBuilder(heightInfo)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 

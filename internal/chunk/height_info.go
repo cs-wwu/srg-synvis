@@ -1,6 +1,11 @@
 package chunk
 
-import "math"
+import (
+	"math"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/assets"
+)
 
 const (
 	HEIGHT_SCALE = 60.0 / 1852.0 // Meters to Arcseconds
@@ -8,31 +13,67 @@ const (
 )
 
 type HeightInfo struct {
+	tileMap map[spatial.MapCoord]chunkHeightInfo
+}
+
+type chunkHeightInfo struct {
 	heightData *[MAP_LENGTH * MAP_LENGTH]uint16
 }
 
-func NewHeightInfo(data []uint16) *HeightInfo {
-	return &HeightInfo{
+func newChunkHeightInfo(data []uint16) *chunkHeightInfo {
+	return &chunkHeightInfo{
 		heightData: (*[MAP_LENGTH * MAP_LENGTH]uint16)(data),
 	}
 }
 
-func (h *HeightInfo) Height(x, z float32) float32 {
-	localX := math.Mod(math.Mod(float64(x), 3600)+3600, 3600)
-	localZ := math.Mod(math.Mod(float64(z), 3600)+3600, 3600)
+func (t *HeightInfo) addTile(pos spatial.MapCoord, data []uint16) {
+	t.tileMap[pos] = *newChunkHeightInfo(data)
+}
 
-	a := h.getLocal(int(localX), int(localZ))
-	b := h.getLocal(int(localX+1), int(localZ))
-	c := h.getLocal(int(localX), int(localZ+1))
-	d := h.getLocal(int(localX+1), int(localZ+1))
+func NewHeightInfo(assetManager assets.AssetManager, pos spatial.MapCoord) *HeightInfo {
+	heightInfo := &HeightInfo{tileMap: make(map[spatial.MapCoord]chunkHeightInfo)}
 
-	_, fractX := math.Modf(localX)
-	_, fractZ := math.Modf(localZ)
+	for dlat := -1; dlat <= 1; dlat++ {
+		for dlon := -1; dlon <= 1; dlon++ {
+			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
+			adjData, err := assetManager.LoadMapData(dir)
+			if err == nil {
+				heightInfo.addTile(dir, adjData.HeightData)
+			}
+		}
+	}
+
+	return heightInfo
+}
+
+func (t *HeightInfo) Height(x, z float32) float32 {
+	ix := int(math.Floor(float64(x)))
+	iz := int(math.Floor(float64(z)))
+	fractX := float64(x) - float64(ix)
+	fractZ := float64(z) - float64(iz)
+
+	a := t.sample(ix, iz)
+	b := t.sample(ix+1, iz)
+	c := t.sample(ix, iz+1)
+	d := t.sample(ix+1, iz+1)
 
 	return lerp(lerp(a, b, fractX), lerp(c, d, fractX), fractZ)
 }
 
-func (h *HeightInfo) getLocal(x, z int) float32 {
+func (t *HeightInfo) sample(worldX, worldZ int) float32 {
+	tileX := int(math.Floor(float64(worldX) / 3600))
+	tileZ := int(math.Floor(float64(-worldZ) / 3600)) // negated
+	localX := worldX - tileX*3600
+	localZ := (-worldZ) - tileZ*3600
+
+	h, ok := t.tileMap[spatial.MapCoord{Lon: tileX, Lat: tileZ}]
+	if !ok {
+		return 0.0
+	}
+	return h.getLocal(localX, localZ)
+}
+
+func (h *chunkHeightInfo) getLocal(x, z int) float32 {
 	if (x < 0 || x >= MAP_LENGTH) || (z < 0 || z >= MAP_LENGTH) {
 		return 0.0
 	}

@@ -48,15 +48,16 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 		size: size,
 	}
 
-	mapData, err := c.AssetManager.LoadMapData(
-		coords.WorldToMap(int(chunk.X), int(chunk.Z)),
-	)
+	mapCoord := coords.WorldToMap(int(chunk.X), int(chunk.Z))
+	mapData, err := c.AssetManager.LoadMapData(mapCoord)
 	if err != nil {
 		fmt.Printf("Failed to load map data: %v\n", err)
 		return renderChunk{}
 	}
 
-	chunk.calculateVertices(NewHeightInfo(mapData.HeightData), mapData.WaterData)
+	heightInfo := NewHeightInfo(c.AssetManager, mapCoord)
+	// FIXME: Plumb WaterData through height info as well.
+	chunk.calculateVertices(heightInfo, mapData.WaterData)
 	chunk.calculateIndices()
 	chunk.calculateNormals()
 
@@ -84,31 +85,22 @@ func ChunkKey(chunkX, chunkZ int) string {
 
 // Calculate vertices and texcoords for a chunk
 func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8) {
-	// Calculate vertex stride based on LOD
 	stride := int(chunk.size / MIN_CHUNK_SIZE)
-	const VERTICES_PER_STRIDE = (MIN_CHUNK_SIZE) + 1 // +1 for overlap on right/bottom edges
+	const VERTICES_PER_STRIDE = MIN_CHUNK_SIZE + 1
 
-	// Allocate vertex array based on LOD level
 	chunk.Vertices = make([]Vertex, VERTICES_PER_STRIDE*VERTICES_PER_STRIDE)
-	firstZ := true
 
 	for z := range VERTICES_PER_STRIDE {
-		worldZ := chunk.Z + (z * stride) - 1 // Start one vertex north (subtract a point)
-		firstX := true
+		worldZ := chunk.Z + (z * stride) - 1
 
 		for x := range VERTICES_PER_STRIDE {
-			worldX := chunk.X + (x * stride) - 1 // Start one vertex west (subtract a point)
+			worldX := chunk.X + (x * stride) - 1
+
+			// HeightInfoMap handles tile boundaries internally now
+			height := heightInfo.Height(float32(worldX), float32(worldZ))
+
+			// Water still uses single tile for now
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
-
-			if firstZ && (worldZ%3600 == -1 || worldZ%3600 == 1) {
-				localZ -= 3599
-			}
-			if firstX && (worldX%3600 == -1 || worldX%3600 == 1) {
-				localX -= 3599
-			}
-
-			// Direct array access - much faster than method image
-			height := heightInfo.getLocal(localX, localZ)
 			isWater := waterData[localZ*MAP_LENGTH+localX]
 
 			idx := z*VERTICES_PER_STRIDE + x
@@ -120,10 +112,7 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8)
 					float32(isWater),
 				},
 			}
-
-			firstX = false
 		}
-		firstZ = false
 	}
 }
 
