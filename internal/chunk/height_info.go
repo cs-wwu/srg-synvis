@@ -18,16 +18,17 @@ type HeightInfo struct {
 
 type chunkHeightInfo struct {
 	heightData *[MAP_LENGTH * MAP_LENGTH]uint16
+	waterData  *[MAP_LENGTH * MAP_LENGTH]uint8
 }
 
-func newChunkHeightInfo(data []uint16) *chunkHeightInfo {
+func newChunkHeightInfo(data *assets.MapData) *chunkHeightInfo {
 	return &chunkHeightInfo{
-		heightData: (*[MAP_LENGTH * MAP_LENGTH]uint16)(data),
+		heightData: (*[MAP_LENGTH * MAP_LENGTH]uint16)(data.HeightData),
+		waterData:  (*[MAP_LENGTH * MAP_LENGTH]uint8)(data.WaterData),
 	}
 }
 
 func (t *HeightInfo) addTile(pos spatial.MapCoord, data []uint16) {
-	t.tileMap[pos] = *newChunkHeightInfo(data)
 }
 
 func NewHeightInfo(assetManager assets.AssetManager, pos spatial.MapCoord) *HeightInfo {
@@ -38,7 +39,7 @@ func NewHeightInfo(assetManager assets.AssetManager, pos spatial.MapCoord) *Heig
 			dir := spatial.MapCoord{Lat: pos.Lat + dlat, Lon: pos.Lon + dlon}
 			adjData, err := assetManager.LoadMapData(dir)
 			if err == nil {
-				heightInfo.addTile(dir, adjData.HeightData)
+				heightInfo.tileMap[dir] = *newChunkHeightInfo(adjData)
 			}
 		}
 	}
@@ -58,6 +59,19 @@ func (t *HeightInfo) Height(x, z float32) float32 {
 	d := t.sample(ix+1, iz+1)
 
 	return lerp(lerp(a, b, fractX), lerp(c, d, fractX), fractZ)
+}
+
+func (t *HeightInfo) IsWater(worldX, worldZ int) bool {
+	tileX := int(math.Floor(float64(worldX) / 3600))
+	tileZ := int(math.Floor(float64(-worldZ) / 3600)) // negated
+	localX := worldX - tileX*3600
+	localZ := (-worldZ) - tileZ*3600
+
+	h, ok := t.tileMap[spatial.MapCoord{Lon: tileX, Lat: tileZ}]
+	if !ok {
+		return false
+	}
+	return h.waterData[localZ*MAP_LENGTH+localX] > 0
 }
 
 func (t *HeightInfo) sample(worldX, worldZ int) float32 {

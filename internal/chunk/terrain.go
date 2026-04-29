@@ -49,15 +49,8 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 	}
 
 	mapCoord := coords.WorldToMap(int(chunk.X), int(chunk.Z))
-	mapData, err := c.AssetManager.LoadMapData(mapCoord)
-	if err != nil {
-		fmt.Printf("Failed to load map data: %v\n", err)
-		return renderChunk{}
-	}
-
 	heightInfo := NewHeightInfo(c.AssetManager, mapCoord)
-	// FIXME: Plumb WaterData through height info as well.
-	chunk.calculateVertices(heightInfo, mapData.WaterData)
+	chunk.calculateVertices(heightInfo)
 	chunk.calculateIndices()
 	chunk.calculateNormals()
 
@@ -84,7 +77,7 @@ func ChunkKey(chunkX, chunkZ int) string {
 }
 
 // Calculate vertices and texcoords for a chunk
-func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8) {
+func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo) {
 	stride := int(chunk.size / MIN_CHUNK_SIZE)
 	const VERTICES_PER_STRIDE = MIN_CHUNK_SIZE + 1
 
@@ -96,12 +89,18 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8)
 		for x := range VERTICES_PER_STRIDE {
 			worldX := chunk.X + (x * stride) - 1
 
-			// HeightInfoMap handles tile boundaries internally now
 			height := heightInfo.Height(float32(worldX), float32(worldZ))
 
-			// Water still uses single tile for now
+			isWater := heightInfo.IsWater(worldX, worldZ)
+			var waterVal float32
+			// Seriously go? No one-liners??
+			if isWater {
+				waterVal = 1.0
+			} else {
+				waterVal = 0.0
+			}
+
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
-			isWater := waterData[localZ*MAP_LENGTH+localX]
 
 			idx := z*VERTICES_PER_STRIDE + x
 			chunk.Vertices[idx] = Vertex{
@@ -109,7 +108,7 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo, waterData []uint8)
 				TexCoord: lin.Vec3{
 					float32(localX) / float32(MAP_LENGTH),
 					float32(localZ) / float32(MAP_LENGTH),
-					float32(isWater),
+					waterVal,
 				},
 			}
 		}
