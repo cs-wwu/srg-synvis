@@ -6,14 +6,13 @@ layout(binding = 0) uniform UBO {
     mat4 proj;
     mat4 normalM;
     mat4 planeDirection;
+    vec4 overlayColor;
     vec3 lightDir;
     float renderDistance;
     vec3 cameraPos;
     float time;
     float disableWarnings;
     float disableFog;
-    vec2 _pad;
-    vec4 overlayColor;
 } ubo;
 
 layout(location = 0) out vec4 outColor;

@@ -354,8 +354,9 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
+	app.AirspaceStreamer.Lock()
+
 	if app.CurrentAirspace == nil {
-		app.AirspaceStreamer.Lock()
 		for _, airspace := range app.AirspaceStreamer.Chunks {
 			if airspace != nil {
 				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
@@ -363,12 +364,10 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
 			}
 		}
-		app.AirspaceStreamer.Unlock()
 
 		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
 		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-		app.AirspaceStreamer.Lock()
 		for _, airspace := range app.AirspaceStreamer.Chunks {
 			if airspace != nil {
 				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
@@ -376,7 +375,6 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
 			}
 		}
-		app.AirspaceStreamer.Unlock()
 	} else {
 		color := airspaceColors[app.CurrentAirspace.Properties.Class]
 		colorBytes := *(*[16]byte)(unsafe.Pointer(&color))
@@ -387,6 +385,8 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 			0, 16, unsafe.Pointer(&colorBytes))
 		vk.CmdDraw(cmd, 6, 1, 0, 0)
 	}
+	app.AirspaceStreamer.Unlock()
+
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)
 	OrPanic(as.NewError(ret))
