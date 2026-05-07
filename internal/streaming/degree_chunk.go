@@ -15,9 +15,10 @@ import (
 type DegreeChunkStreamer[T any] struct {
 	sync.Mutex
 
-	Chunks  map[spatial.MapCoord]T
-	request chan spatial.MapCoord
-	pending map[spatial.MapCoord]bool
+	Chunks   map[spatial.MapCoord]T
+	request  chan spatial.MapCoord
+	pending  map[spatial.MapCoord]bool
+	shutdown chan struct{}
 }
 
 // TODO: These really should be consolidated. Also chunks aren't square.
@@ -33,21 +34,25 @@ type LatLonFloat struct {
 
 func NewDegreeStreamer[T any](builder func(spatial.MapCoord) T) *DegreeChunkStreamer[T] {
 	streamer := &DegreeChunkStreamer[T]{
-		Chunks:  make(map[spatial.MapCoord]T),
-		pending: make(map[spatial.MapCoord]bool),
-		request: make(chan spatial.MapCoord, 64),
+		Chunks:   make(map[spatial.MapCoord]T),
+		pending:  make(map[spatial.MapCoord]bool),
+		request:  make(chan spatial.MapCoord, 64),
+		shutdown: make(chan struct{}),
 	}
 
 	for range 8 {
 		go func() {
 			for {
-				pos := <-streamer.request
-				chunk := builder(pos)
-
-				streamer.Lock()
-				streamer.Chunks[pos] = chunk
-				delete(streamer.pending, pos)
-				streamer.Unlock()
+				select {
+				case <-streamer.shutdown:
+					return
+				case pos := <-streamer.request:
+					chunk := builder(pos)
+					streamer.Lock()
+					streamer.Chunks[pos] = chunk
+					delete(streamer.pending, pos)
+					streamer.Unlock()
+				}
 			}
 		}()
 	}
@@ -83,4 +88,8 @@ func (d *DegreeChunkStreamer[T]) GetLoaded() []T {
 		chunks = append(chunks, chunk)
 	}
 	return chunks
+}
+
+func (d *DegreeChunkStreamer[T]) Shutdown() {
+	close(d.shutdown)
 }
