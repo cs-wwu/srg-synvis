@@ -1130,7 +1130,7 @@ func (app *Application) prepareObstructionPipeline() {
 				Stride:    uint32(unsafe.Sizeof(ObstructionVertex{})),
 				InputRate: vk.VertexInputRateVertex,
 			}},
-			VertexAttributeDescriptionCount: 2,
+			VertexAttributeDescriptionCount: 3,
 			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
 				// Position
 				{
@@ -1145,6 +1145,13 @@ func (app *Application) prepareObstructionPipeline() {
 					Location: 1,
 					Format:   vk.FormatR32g32b32Sfloat,
 					Offset:   4 * 3,
+				},
+				// Normal
+				{
+					Binding:  0,
+					Location: 2,
+					Format:   vk.FormatR32g32b32Sfloat,
+					Offset:   4 * 6,
 				},
 			},
 		},
@@ -1190,7 +1197,7 @@ func (app *Application) prepareObstructionPipeline() {
 		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
 			SType:                 vk.StructureTypePipelineDepthStencilStateCreateInfo,
 			DepthTestEnable:       vk.True,
-			DepthWriteEnable:      vk.False,
+			DepthWriteEnable:      vk.True,
 			DepthCompareOp:        vk.CompareOpLessOrEqual,
 			DepthBoundsTestEnable: vk.False,
 			StencilTestEnable:     vk.False,
