@@ -9,12 +9,6 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-type Vertex struct {
-	Position lin.Vec3
-	TexCoord lin.Vec3
-	Normal   lin.Vec3
-}
-
 // NB: This gets cast to a byte slice, so it must have the exact same bytes
 // that the shader expects.
 type RoadVertex struct {
@@ -25,21 +19,6 @@ type RoadVertex struct {
 type ObstructionVertex struct {
 	Position vec3.T
 	Color    vec3.T
-}
-
-const VertexSize = int(unsafe.Sizeof(Vertex{}))
-
-func (v *Vertex) Data() []byte {
-	return (*[VertexSize]byte)(unsafe.Pointer(v))[:]
-}
-
-type Index uint32 // Be wary of integer overflow with large mesh
-
-const IndexSize = int(unsafe.Sizeof(Index(0)))
-
-func (u *Index) Data() []byte {
-	const m = 0x7fffffff
-	return (*[m]byte)(unsafe.Pointer(u))[:IndexSize]
 }
 
 type UniformBufferObject struct {
@@ -66,20 +45,6 @@ func (u *UniformBufferObject) Data() []byte {
 
 func (app *Application) Destroy() {}
 
-type Texture struct {
-	sampler vk.Sampler
-
-	image       vk.Image
-	imageLayout vk.ImageLayout
-
-	memAlloc *vk.MemoryAllocateInfo
-	mem      vk.DeviceMemory
-	view     vk.ImageView
-
-	texWidth  int32
-	texHeight int32
-}
-
 type RoadSquare struct {
 	vertices   *as.Buffer
 	indices    *as.Buffer
@@ -90,30 +55,6 @@ type ObstructionSquare struct {
 	vertices   *as.Buffer
 	indices    *as.Buffer
 	indexCount uint32
-}
-
-func (t *Texture) Destroy(dev vk.Device) {
-	if t.view != vk.NullImageView {
-		vk.DestroyImageView(dev, t.view, nil)
-		t.view = vk.NullImageView
-	}
-	if t.mem != vk.NullDeviceMemory {
-		vk.FreeMemory(dev, t.mem, nil)
-		t.mem = vk.NullDeviceMemory
-	}
-	if t.image != vk.NullImage {
-		vk.DestroyImage(dev, t.image, nil)
-		t.image = vk.NullImage
-	}
-	if t.sampler != vk.NullSampler {
-		vk.DestroySampler(dev, t.sampler, nil)
-		t.sampler = vk.NullSampler
-	}
-}
-
-func (t *Texture) DestroyImage(dev vk.Device) {
-	vk.FreeMemory(dev, t.mem, nil)
-	vk.DestroyImage(dev, t.image, nil)
 }
 
 type Depth struct {

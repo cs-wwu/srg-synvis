@@ -4,7 +4,6 @@ import (
 	"github.com/cs-wwu/srg-synvis/internal/rendering"
 )
 
-
 type UIComponent interface {
 	Render()
 	UseApp(app *rendering.Application)
@@ -25,5 +24,5 @@ func RenderUI() {
 func DeliverApp(app *rendering.Application) {
 	for _, component := range components {
 		component.UseApp(app)
-	}	
+	}
 }

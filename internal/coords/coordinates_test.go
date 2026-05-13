@@ -2,42 +2,13 @@ package coords
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
-
-// TestMapToWorldRoundtrip tests that converting from map coordinates to world coordinates
-// and back results in the original map coordinates
-func TestMapToWorldRoundtrip(t *testing.T) {
-	tests := []struct {
-		name  string
-		coord string
-	}{
-		{"SeattleArea", "n48w123"},
-		{"NorthwestQuadrant", "n00w001"},
-		{"NortheastQuadrant", "n00e000"},
-		{"SouthwestQuadrant", "s01w001"},
-		{"SoutheastQuadrant", "s01e000"},
-		{"OuterNorthwest", "n01w002"},
-		{"OuterNortheast", "n01e001"},
-		{"OuterSouthwest", "s02w002"},
-		{"OuterSoutheast", "s02e001"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			x, z := MapToWorld(tt.coord)
-			resultCoord := WorldToMap(x, z)
-
-			if resultCoord != tt.coord {
-				t.Errorf("MapToWorld -> WorldToMap roundtrip failed for %s: got %s, want %s",
-					tt.coord, resultCoord, tt.coord)
-				t.Errorf("World coordinates: (%d, %d)", x, z)
-			}
-		})
-	}
-}
 
 // TestWorldToMap tests that world coordinates map to the expected map tile
 func TestWorldToMap(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name     string
 		x        int
@@ -84,16 +55,14 @@ func TestWorldToMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := WorldToMap(tt.x, tt.z)
-			if result != tt.expected {
-				t.Errorf("WorldToMap(%d, %d) = %s; want %s",
-					tt.x, tt.z, result, tt.expected)
-			}
+			assert.Equal(tt.expected, result.String())
 		})
 	}
 }
 
 // TestWorldToPixel tests conversion from world coordinates to image pixel coordinates
 func TestWorldToPixel(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name      string
 		worldX    int
@@ -130,16 +99,15 @@ func TestWorldToPixel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resultX, resultZ := WorldToPixel(tt.worldX, tt.worldZ)
-			if resultX != tt.expectedX || resultZ != tt.expectedZ {
-				t.Errorf("WorldToPixel(%d, %d) = (%d, %d); want (%d, %d)",
-					tt.worldX, tt.worldZ, resultX, resultZ, tt.expectedX, tt.expectedZ)
-			}
+			assert.Equal(tt.expectedX, resultX)
+			assert.Equal(tt.expectedZ, resultZ)
 		})
 	}
 }
 
 // TestWorldToGPSFloat tests conversion from world coordinates to GPS coordinates
 func TestWorldToGPSFloat(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name        string
 		worldX      float32
@@ -162,16 +130,15 @@ func TestWorldToGPSFloat(t *testing.T) {
 
 			// Use epsilon for floating point comparison
 			const epsilon = 0.00001
-			if abs(lat-tt.expectedLat) > epsilon || abs(lon-tt.expectedLon) > epsilon {
-				t.Errorf("WorldToGPSFloat(%f, %f) = (%f, %f); want (%f, %f)",
-					tt.worldX, tt.worldZ, lat, lon, tt.expectedLat, tt.expectedLon)
-			}
+			assert.InDelta(tt.expectedLat, lat, epsilon)
+			assert.InDelta(tt.expectedLon, lon, epsilon)
 		})
 	}
 }
 
 // TestGPSToWorld tests conversion from GPS coordinates to world coordinates
 func TestGPSToWorld(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name      string
 		lat       float32
@@ -194,16 +161,15 @@ func TestGPSToWorld(t *testing.T) {
 
 			// Use epsilon for floating point comparison
 			const epsilon = 0.00001
-			if abs(x-tt.expectedX) > epsilon || abs(z-tt.expectedZ) > epsilon {
-				t.Errorf("GPSToWorld(%f, %f) = (%f, %f); want (%f, %f)",
-					tt.lat, tt.lon, x, z, tt.expectedX, tt.expectedZ)
-			}
+			assert.InDelta(tt.expectedX, x, epsilon)
+			assert.InDelta(tt.expectedZ, z, epsilon)
 		})
 	}
 }
 
 // TestGPSConversionRoundtrip tests that converting from GPS to world and back returns the original GPS coordinates
 func TestGPSConversionRoundtrip(t *testing.T) {
+	assert := assert.New(t)
 	tests := []struct {
 		name string
 		lat  float32
@@ -225,10 +191,8 @@ func TestGPSConversionRoundtrip(t *testing.T) {
 
 			// Use epsilon for floating point comparison
 			const epsilon = 0.00001
-			if abs(resultLat-tt.lat) > epsilon || abs(resultLon-tt.lon) > epsilon {
-				t.Errorf("Roundtrip conversion failed for (%f, %f): got (%f, %f)",
-					tt.lat, tt.lon, resultLat, resultLon)
-			}
+			assert.InDelta(tt.lat, resultLat, epsilon)
+			assert.InDelta(tt.lon, resultLon, epsilon)
 		})
 	}
 }

@@ -6,16 +6,19 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 const (
 	heightmapExtension = ".hgt.png"
 	watermapExtension  = ".swb.png"
 	textureExtension   = ".osm.png"
+	mapSize            = 3601 // Map dimensions (SRTM/NASADEM standard)
 )
 
 // loadFromDisk loads both heightmap and watermap from disk and converts to raw data.
-func (am *assetManager) loadFromDisk(coord string) (*MapData, error) {
+func (am *assetManager) loadFromDisk(coord spatial.MapCoord) (*MapData, error) {
 	// Load heightmap PNG and convert to raw data
 	heightmapPath := am.resolvePath(coord, fileTypeHeightmap)
 	heightmap, err := loadGray16Image(heightmapPath)
@@ -55,20 +58,18 @@ func (am *assetManager) loadFromDisk(coord string) (*MapData, error) {
 }
 
 // resolvePath builds the full file path for an asset.
-func (am *assetManager) resolvePath(coord string, fType fileType) string {
-	var extension string
+func (am *assetManager) resolvePath(coord spatial.MapCoord, fType fileType) string {
+	path := coord.String()
 	switch fType {
 	case fileTypeHeightmap:
-		extension = heightmapExtension
+		path += heightmapExtension
 	case fileTypeWatermap:
-		extension = watermapExtension
+		path += watermapExtension
 	case fileTypeTexture:
-		extension = textureExtension
-	default:
-		extension = ".unknown"
+		path += textureExtension
 	}
 
-	return filepath.Join(am.basePath, coord+extension)
+	return filepath.Join(am.basePath, path)
 }
 
 // gray16PixToArray efficiently converts Gray16.Pix to uint16 array.
@@ -190,23 +191,21 @@ func loadGrayImage(path string) (*image.Gray, error) {
 
 // validateMapDimensions ensures heightmap and watermap have correct dimensions.
 func validateMapDimensions(heightmap *image.Gray16, watermap *image.Gray) error {
-	const expectedSize = 3601
-
 	hBounds := heightmap.Bounds()
 
 	// Check heightmap dimensions
-	if hBounds.Dx() != expectedSize || hBounds.Dy() != expectedSize {
+	if hBounds.Dx() != mapSize || hBounds.Dy() != mapSize {
 		return fmt.Errorf("invalid heightmap dimensions: expected %dx%d, got %dx%d",
-			expectedSize, expectedSize, hBounds.Dx(), hBounds.Dy())
+			mapSize, mapSize, hBounds.Dx(), hBounds.Dy())
 	}
 
 	// Check watermap dimensions if it exists
 	if watermap != nil {
 		wBounds := watermap.Bounds()
 
-		if wBounds.Dx() != expectedSize || wBounds.Dy() != expectedSize {
+		if wBounds.Dx() != mapSize || wBounds.Dy() != mapSize {
 			return fmt.Errorf("invalid watermap dimensions: expected %dx%d, got %dx%d",
-				expectedSize, expectedSize, wBounds.Dx(), wBounds.Dy())
+				mapSize, mapSize, wBounds.Dx(), wBounds.Dy())
 		}
 
 		// Ensure dimensions match

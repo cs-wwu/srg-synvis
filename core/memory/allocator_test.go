@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type MathChunkPoolAllocator struct {
@@ -71,6 +73,8 @@ func (a *MathChunkPoolAllocator) FreeChunk(chunkID string, lodLevel int) bool {
 }
 
 func TestMathChunkPoolAllocator(t *testing.T) {
+	assert := assert.New(t)
+
 	slotCounts := []int{5, 3}
 	chunkSizes := []uint64{100, 50}
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
@@ -78,24 +82,18 @@ func TestMathChunkPoolAllocator(t *testing.T) {
 	// Allocate all slots in bucket 0
 	for i := range slotCounts[0] {
 		ok, offset := alloc.AllocateChunk("chunkA"+strconv.Itoa(i), 100, 0)
-		if !ok || offset != uint64(i)*100 {
-			t.Fatalf("failed to allocate chunk %d in bucket 0", i)
-		}
+		assert.True(ok)
+		assert.Equal(uint64(i)*100, offset)
 	}
 	// Next allocation should fail
 	ok, _ := alloc.AllocateChunk("chunkZ", 100, 0)
-	if ok {
-		t.Errorf("expected allocation to fail for full bucket")
-	}
+	assert.False(ok)
+
 	// Free a slot and reallocate
-	freed := alloc.FreeChunk("chunkA0", 0)
-	if !freed {
-		t.Errorf("failed to free chunkA0")
-	}
+	assert.True(alloc.FreeChunk("chunkA0", 0))
 	ok, offset := alloc.AllocateChunk("chunkY", 100, 0)
-	if !ok || offset != 0 {
-		t.Errorf("expected to reuse freed slot at offset 0, got %d", offset)
-	}
+	assert.True(ok)
+	assert.Equal(uint64(0), offset)
 }
 
 func TestMathChunkPoolAllocatorPrintStats(t *testing.T) {
@@ -118,6 +116,8 @@ func TestMathChunkPoolAllocatorPrintStats(t *testing.T) {
 }
 
 func TestMathChunkPoolAllocatorThreadSafety(t *testing.T) {
+	assert := assert.New(t)
+
 	slotCounts := []int{10}
 	chunkSizes := []uint64{100}
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
@@ -136,9 +136,7 @@ func TestMathChunkPoolAllocatorThreadSafety(t *testing.T) {
 	// All slots should be free
 	for i := range slotCounts[0] {
 		id := "chunk" + strconv.Itoa(i)
-		if alloc.FreeChunk(id, 0) {
-			t.Errorf("slot %d should already be free", i)
-		}
+		assert.False(alloc.FreeChunk(id, 0))
 	}
 }
 
@@ -170,6 +168,8 @@ func (d *mathDeferredFreeList) ProcessAll(allocator *MathChunkPoolAllocator) int
 func (d *mathDeferredFreeList) Count() int { return len(d.chunks) }
 
 func TestMathChunkPoolAllocatorDeferredFreeList(t *testing.T) {
+	assert := assert.New(t)
+
 	slotCounts := []int{3}
 	chunkSizes := []uint64{100}
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
@@ -179,46 +179,34 @@ func TestMathChunkPoolAllocatorDeferredFreeList(t *testing.T) {
 	deferred.Add("chunkA", 0)
 	deferred.Add("chunkB", 0)
 	count := deferred.ProcessAll(alloc)
-	if count != 2 {
-		t.Errorf("expected to free 2 chunks, got %d", count)
-	}
-	if deferred.Count() != 0 {
-		t.Errorf("expected deferred list to be empty")
-	}
+	assert.Equal(2, count)
+	assert.Equal(0, deferred.Count())
 }
 
 func TestMathChunkPoolAllocatorEdgeCases(t *testing.T) {
+	assert := assert.New(t)
+
 	slotCounts := []int{2}
 	chunkSizes := []uint64{100}
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
-	// Invalid LOD
-	if alloc.FreeChunk("foo", 1) {
-		t.Errorf("expected false for invalid LOD")
-	}
+	assert.False(alloc.FreeChunk("foo", 1))
 	ok, _ := alloc.AllocateChunk("foo", 100, 1)
-	if ok {
-		t.Errorf("expected false for invalid LOD")
-	}
-	// Over-sized chunk
+	assert.False(ok)
 	ok, _ = alloc.AllocateChunk("foo", 200, 0)
-	if ok {
-		t.Errorf("expected false for over-sized chunk")
-	}
+	assert.False(ok)
 }
 
 func TestMathChunkPoolAllocatorStatsAndVisualization(t *testing.T) {
+	assert := assert.New(t)
+
 	slotCounts := []int{2}
 	chunkSizes := []uint64{100}
 	alloc := NewMathChunkPoolAllocator(slotCounts, chunkSizes)
 	alloc.AllocateChunk("chunkA", 100, 0)
 	stats := allocStatsString(alloc)
-	if !strings.Contains(stats, "Used: 1") {
-		t.Errorf("expected stats to show 1 used slot")
-	}
+	assert.Contains(stats, "Used: 1")
 	memMap := allocMemoryMapString(alloc)
-	if !strings.Contains(memMap, "A") {
-		t.Errorf("expected memory map to show allocated slot")
-	}
+	assert.Contains(memMap, "A")
 }
 
 // Helper functions to simulate the output of GetDetailedStats and VisualizeMemoryMap for MathChunkPoolAllocator

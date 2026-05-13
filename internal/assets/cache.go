@@ -3,13 +3,15 @@ package assets
 import (
 	"container/list"
 	"sync"
+
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 )
 
 // mapCache implements an LRU cache for MapData.
 // It is thread-safe and tracks memory usage and evictions.
 type mapCache struct {
 	maxMaps     int
-	maps        map[string]*list.Element
+	maps        map[spatial.MapCoord]*list.Element
 	lru         *list.List
 	mu          sync.RWMutex
 	totalMemory int64
@@ -28,13 +30,13 @@ type cacheStats struct {
 func newMapCache(maxMaps int) *mapCache {
 	return &mapCache{
 		maxMaps: maxMaps,
-		maps:    make(map[string]*list.Element),
+		maps:    make(map[spatial.MapCoord]*list.Element),
 		lru:     list.New(),
 	}
 }
 
 // Get retrieves a map from the cache and marks it as recently used.
-func (c *mapCache) Get(coord string) *MapData {
+func (c *mapCache) Get(coord spatial.MapCoord) *MapData {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -78,7 +80,7 @@ func (c *mapCache) Put(data *MapData) {
 }
 
 // Has checks if a coordinate is in the cache without updating LRU.
-func (c *mapCache) Has(coord string) bool {
+func (c *mapCache) Has(coord spatial.MapCoord) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -87,11 +89,11 @@ func (c *mapCache) Has(coord string) bool {
 }
 
 // GetCoords returns all cached coordinates.
-func (c *mapCache) GetCoords() []string {
+func (c *mapCache) GetCoords() []spatial.MapCoord {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	coords := make([]string, 0, len(c.maps))
+	coords := make([]spatial.MapCoord, 0, len(c.maps))
 	for coord := range c.maps {
 		coords = append(coords, coord)
 	}
@@ -133,7 +135,7 @@ func (c *mapCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.maps = make(map[string]*list.Element)
+	c.maps = make(map[spatial.MapCoord]*list.Element)
 	c.lru = list.New()
 	c.totalMemory = 0
 }

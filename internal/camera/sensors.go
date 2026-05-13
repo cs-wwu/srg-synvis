@@ -2,9 +2,11 @@ package camera
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"os/exec"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 
@@ -17,34 +19,42 @@ const DAMP = 0.9 // Smoothing factor for sensor data
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
-	camera      *CameraImpl
-	testingMode bool // When true, skips smoothing for deterministic test results
+	camera           *Camera
+	smoothingEnabled bool // When true, smooths path through space
+	ctxGPS           context.Context
+	cancelGPS        context.CancelFunc
+	ctxHat           context.Context
+	cancelHat        context.CancelFunc
 }
 
-// SetTestingMode enables or disables the testing mode
-// When testing mode is enabled, smoothing will be disabled for deterministic test results
-func (sm *SensorManager) SetTestingMode(enabled bool) {
-	sm.testingMode = enabled
+// SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
+// TODO: After triage, smoothing enabled will just reroute to motion prediction.
+func (sm *SensorManager) SetSmoothing(enabled bool) {
+	sm.smoothingEnabled = enabled
 }
 
 // NewSensorManager creates a new sensor manager
-func NewSensorManager(camera *CameraImpl) *SensorManager {
+func NewSensorManager(camera *Camera) *SensorManager {
 	return &SensorManager{
-		camera:      camera,
-		testingMode: false,
+		camera:           camera,
+		smoothingEnabled: true,
+		ctxGPS:           nil,
+		cancelGPS:        nil,
+		ctxHat:           nil,
+		cancelHat:        nil,
 	}
 }
 
 // StartGPS connects to the GPSD service and gets lat, lon, and alt with TPV report
 // Runs as a separate goroutine
-func (sm *SensorManager) StartGPS() error {
+func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	// Connect to GPSD
 	gps, err := gpsd.Dial("localhost:2947")
 	if err != nil {
 		log.Println("Failed to connect to GPSD:", err)
 		return err
 	}
-	defer gps.Close()
+	// defer gps.Close()
 
 	// Store previous data in case of GPS fix issues
 	pos := sm.camera.Position()
@@ -68,8 +78,9 @@ func (sm *SensorManager) StartGPS() error {
 			newZ = oldZ + zdif
 		}
 
-		// Apply smoothing to reduce GPS jitter (skip in testing mode)
-		if !sm.testingMode {
+		// Apply smoothing to reduce GPS jitter
+		// Testing mode = no smoothing
+		if sm.smoothingEnabled {
 			newX, newY, newZ = Smoother32(newX, oldX, newY, oldY, newZ, oldZ)
 		}
 
@@ -92,14 +103,23 @@ func (sm *SensorManager) StartGPS() error {
 	done := gps.Watch()
 	<-done
 
-	return nil
+	select {
+	case <-ctx.Done():
+		log.Println("GPS: context cancelled, stopping GPS")
+		gps.Close()
+		return ctx.Err()
+	case <-done:
+		log.Println("GPS: watch ended")
+		return nil
+	}
 }
 
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
-func (sm *SensorManager) StartSensors(filename string) Mode {
-	cmd := exec.Command("python3", filename)
+func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
+	filename := "./internal/camera/hat.py"
+	cmd := exec.CommandContext(ctx, "python3", filename)
 
 	// Create a pipe for standard output
 	stdout, err := cmd.StdoutPipe()
@@ -114,6 +134,10 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		log.Println("Error starting sensor command:", err)
 		return StartCommand
 	}
+
+	defer func() {
+		_ = cmd.Wait()
+	}()
 
 	first := true
 	var oldYaw, oldRoll, oldPitch float64
@@ -136,8 +160,8 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 		}
 
 		// Invert pitch for correct orientation
-		pitch = -pitch
-		pitch = pitch - 3.14159/2
+		// pitch = -pitch
+		pitch = pitch + 3.14159/2
 
 		// Apply magnetic declination correction
 		if err := sm.applyMagneticDeclination(&yaw); err != nil {
@@ -163,12 +187,7 @@ func (sm *SensorManager) StartSensors(filename string) Mode {
 	}
 
 	// Wait for the command to finish
-	err = cmd.Wait()
-	if err != nil {
-		log.Println("Error waiting for sensor command:", err)
-		return Waiting
-	}
-
+	_ = cmd.Wait()
 	return Waiting
 }
 
@@ -186,7 +205,7 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	loc := egm96.NewLocationGeodetic(lat, lon, alt)
 
 	// Calculate magnetic field
-	mag, err := wmm.CalculateWMMMagneticField(loc, sm.camera.decimalYear)
+	mag, err := wmm.CalculateWMMMagneticField(loc, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to calculate magnetic field: %w", err)
 	}
@@ -194,8 +213,8 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 	// Apply declination correction (magnetic to true heading)
 	*yaw = *yaw + mag.D()
 
-	log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
-		mag.D(), lat, lon)
+	// log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
+	//	mag.D(), lat, lon)
 
 	return nil
 }

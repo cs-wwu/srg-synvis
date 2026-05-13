@@ -4,6 +4,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/xlab/linmath"
 )
 
@@ -14,11 +15,10 @@ import (
 type DegreeChunkStreamer[T any] struct {
 	sync.Mutex
 
-	Chunks map[LatLonInt]T
-
-	request chan LatLonInt
-
-	pending map[LatLonInt]bool
+	Chunks   map[spatial.MapCoord]T
+	request  chan spatial.MapCoord
+	pending  map[spatial.MapCoord]bool
+	shutdown chan struct{}
 }
 
 // TODO: These really should be consolidated. Also chunks aren't square.
@@ -27,32 +27,32 @@ const (
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 )
 
-type LatLonInt struct {
-	Lat int
-	Lon int
-}
 type LatLonFloat struct {
 	Lat float64
 	Lon float64
 }
 
-func NewDegreeStreamer[T any](builder func(LatLonInt) T) *DegreeChunkStreamer[T] {
+func NewDegreeStreamer[T any](builder func(spatial.MapCoord) T) *DegreeChunkStreamer[T] {
 	streamer := &DegreeChunkStreamer[T]{
-		Chunks:  make(map[LatLonInt]T),
-		pending: make(map[LatLonInt]bool),
-		request: make(chan LatLonInt, 64),
+		Chunks:   make(map[spatial.MapCoord]T),
+		pending:  make(map[spatial.MapCoord]bool),
+		request:  make(chan spatial.MapCoord, 64),
+		shutdown: make(chan struct{}),
 	}
 
 	for range 8 {
 		go func() {
 			for {
-				pos := <-streamer.request
-				chunk := builder(pos)
-
-				streamer.Lock()
-				streamer.Chunks[pos] = chunk
-				delete(streamer.pending, pos)
-				streamer.Unlock()
+				select {
+				case <-streamer.shutdown:
+					return
+				case pos := <-streamer.request:
+					chunk := builder(pos)
+					streamer.Lock()
+					streamer.Chunks[pos] = chunk
+					delete(streamer.pending, pos)
+					streamer.Unlock()
+				}
 			}
 		}()
 	}
@@ -63,19 +63,33 @@ func (d *DegreeChunkStreamer[T]) UpdatePos(pos linmath.Vec3) {
 	d.Lock()
 	defer d.Unlock()
 
-	lon_req := int(math.Round(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
-	lat_req := int(math.Round(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
+	lon_req := int(math.Floor(float64(pos[0]) / ARC_DEGREES_TO_SECONDS))
+	lat_req := int(math.Floor(float64(-pos[2]) / ARC_DEGREES_TO_SECONDS))
 
 	for lon := lon_req - 1; lon <= lon_req+1; lon++ {
 		for lat := lat_req - 1; lat <= lat_req+1; lat++ {
-			pos := LatLonInt{Lat: lat, Lon: lon}
+			pos := spatial.MapCoord{Lat: lat, Lon: lon}
 			_, exists := d.Chunks[pos]
 			_, isPending := d.pending[pos]
-
 			if !exists && !isPending {
 				d.pending[pos] = true
 				d.request <- pos
 			}
 		}
 	}
+}
+
+func (d *DegreeChunkStreamer[T]) GetLoaded() []T {
+	d.Lock()
+	defer d.Unlock()
+
+	chunks := make([]T, 0, len(d.Chunks))
+	for _, chunk := range d.Chunks {
+		chunks = append(chunks, chunk)
+	}
+	return chunks
+}
+
+func (d *DegreeChunkStreamer[T]) Shutdown() {
+	close(d.shutdown)
 }

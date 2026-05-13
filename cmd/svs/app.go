@@ -171,6 +171,7 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 		exitC <- struct{}{}
 		<-doneC
 		log.Println("Bye!")
+		return
 	})
 
 	if app.IsUncappedFPS() {
@@ -185,9 +186,8 @@ func runMainLoop(app *rendering.Application, window *glfw.Window, platform as.Pl
 	for {
 		select {
 		case <-exitC:
-			app.CimguiBackend.Cleanup()
-			app.Destroy()
 			platform.Destroy()
+			app.Destroy()
 			window.Destroy()
 			glfw.Terminate()
 			doneC <- struct{}{}

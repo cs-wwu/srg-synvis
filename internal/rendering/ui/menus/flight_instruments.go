@@ -12,11 +12,14 @@ import (
 
 type FlightInstruments struct {
 	ui.UIComponent
-	Gauge       *components.RectangleGauge
-	Speedometer *components.RectangleGauge
-	Compass     *components.RibbonCompass
-	Attitude    *components.AttitudeIndicator
-	app         *rendering.Application
+	Gauge             *components.RectangleGauge
+	Speedometer       *components.RectangleGauge
+	Compass           *components.RibbonCompass
+	Attitude          *components.AttitudeIndicator
+	AirspaceIndicator *components.AirspaceIndicator
+	currentAirspace   *rendering.Feature // nil when not in one
+
+	app *rendering.Application
 }
 
 var NORTH_VECTOR = linmath.Vec3{0, 0, -1}
@@ -81,15 +84,16 @@ func NewFlightInstruments() *FlightInstruments {
 	attitude.AttitudeAngleDegrees = 45
 
 	return &FlightInstruments{
-		Gauge:       altimeter,
-		Compass:     compass,
-		Speedometer: speedometer,
-		Attitude:    attitude,
+		Gauge:             altimeter,
+		Compass:           compass,
+		Speedometer:       speedometer,
+		Attitude:          attitude,
+		AirspaceIndicator: components.NewAirspaceIndicator(),
 	}
 }
 
 func (window *FlightInstruments) Render() {
-	cam := window.app.GetCamera()
+	cam := window.app.Camera
 	frontVector := cam.GetBasis()[1]
 	window.Compass.HeadingDegrees = linmath.RadiansToDegrees(float32(getCompassHeadingRadians(frontVector)))
 	window.Attitude.AttitudeAngleDegrees = linmath.RadiansToDegrees(-getCameraRoll(cam.GetBasis()))
@@ -99,10 +103,16 @@ func (window *FlightInstruments) Render() {
 	window.Speedometer.Value = cam.MeasureSpeed()
 
 	window.Attitude.Render()
-	window.Gauge.Value = window.app.GetCamera().Position()[1]
+	window.Gauge.Value = window.app.Camera.Position()[1]
 	window.Gauge.Render()
 	window.Compass.Render()
 	window.Speedometer.Render()
+
+	window.currentAirspace = window.app.CurrentAirspace
+	if window.currentAirspace != nil {
+		window.AirspaceIndicator.Airspace = window.currentAirspace
+		window.AirspaceIndicator.Render()
+	}
 }
 
 func (window *FlightInstruments) UseApp(app *rendering.Application) {
