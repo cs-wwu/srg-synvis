@@ -1,0 +1,69 @@
+\documentclass[journal ]{new-aiaa}
+% Add page numbering?
+\usepackage[utf8]{inputenc}
+\usepackage{textcomp}
+
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[version=4]{mhchem}
+\usepackage{siunitx}
+\usepackage{longtable,tabularx}
+\setlength\LTleft{0pt} 
+
+\title{Synthetic Vision System: An Exploration of Low-Cost Synthetic Vision in Visibility-Impaired Aviation Environments}
+
+\author{Katria Noonan \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\author{Navarro Cristani \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\author{Weston Kerkoff \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\author{Gage Kresl \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\author{Neil MacNeale \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\affil{Western Washington University, Bellingham, Washington, 98225}
+\author{See-Mong Tan \footnote{Senior Instructor, Western Washington University Computer Science Department}}
+\affil{Western Washington University, Bellingham, Washington, 98225}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Abstract here
+\end{abstract}
+
+\section{Introduction}
+\lettrine{M}{odern} aircraft cockpits are frequently equipped with a Synthetic Vision System (SVS), technology that displays a simulated environment of the pilot's surroundings comparable to how it would manifest in clearly-visible conditions \cite{nasa2009svs}. Stored terrain and environment data is combined with real-time GPS and sensor readings to map the current location and positioning of the aircraft and create an accurate picture on the simulated display. On normal flights, SVS improves pilot performance by increasing general situational awareness and reducing mental workload. The SVS also prevents potential controlled-flight-into-terrain (CFID) accidents, where the pilot is in full control of the aircraft and collides into terrain typically as a result of poor visibility \cite{nasa2003cfit}. Currently, SVS for individual pilots costs thousands of dollars; leading provider Aspen Avionics ranges in cost from \$9,995 to \$21,195 \cite{aspenavionicspricing}. Subscription-based models are also prevalent, with ForeFlight's SVS for mobile devices priced at \$260 annually \cite{foreflightpricing}. In this paper, we present the development and release of an open-source SVS designed for use by private pilots on resource-constrained embedded hardware, specifically the Raspberry Pi 5. The use of open data and the relatively low cost of the Raspberry Pi 5 aim to alleviate the current financial burden on private pilots seeking an SVS. In the future, our goal is to create a no-cost mobile application that functions as an SVS by leveraging the GPS and sensor data present inside modern smartphones.
+
+\section{Related Work}
+
+Development of SVS's began in the 1970s from NASA with a Path-in-the-Sky (PITS) display design, leveraging the developing technology of cathode-ray-tubes and microprocessors to conceptualize a system that would provide a pilot with air position and flight information relative to a pre-programmed path \cite{nasa1977pits}.
+
+% TALK ABOUT OTHER SVS - CAN BE SHORT
+
+\section{Methodology} % Could also be 'Implementation'
+
+The SVS is built in Go (golang) using Vulkan graphics API to render the simulation. These were chosen for the low-level control they allow, as well as for memory safety and synchronization. The SVS has two main components: the downloader and the simulation. As the SVS will not be able to rely on internet connection when in use, all data must be pre-downloaded and stored beforehand. This includes terrain data sourced from NASA, road data sourced from OSM, and obstruction and airspace data sourced from the FAA. A user command will specify the region and type of data to download.
+% Discuss format of terrain data and protobufs for roads/obstructions
+Obstruction data is sourced from the FAA's Digital Obstacle File (DOF), updated every 56 days. Relevant fields, specifically location, type of obstruction, and quantity, are stored for each obstruction, which is grouped into coordinate squares. Each obstruction coordinate square is then marshaled into a protocol buffer (protobuf). When the simulation is run, relevant coordinate squares are unmarshaled and rendered as their chunks are loaded. The shape of each obstruction is rendered according to its type; typically an appropriately-sized pyramid or rectangular prism. If multiple obstructions are present in one location, they are sized down and rendered evenly around the given centralized point.
+% Not all of this is necessary, we probably want to spend more time talking about the rendering pipeline over the individual rendering decisions of each aspect
+% Discuss KMD here?
+The simulation component is what actually runs during a flight. At a high-level, it converts all the stored data into Vulkan-friendly vertex and index buffers to get rendered on the display. Due to the large amounts of data and the extended amount of time the SVS aims to run for, rendered data is portioned out with a chunking system and level-of-detail (LOD) rendering.
+
+% EXPLAIN BEGINNING STEPS OF PROJECT AND OVERALL DESIGN
+    % CHOOSING VULKAN & GO, EXPLAIN RASPBERRY PI
+% EXPLAIN OVERALL APROACH
+    % CHUNKING SYSTEM, TERRAIN GENERATION & MANAGEMENT
+    % DOWNLOADER, PROTOBUFS
+    % ROADS, OBSTRUCTIONS, AIRSPACES
+    % INTERPOLATION
+    % UI
+
+\section{Results}
+
+% CURRENT STATE OF SYSTEM
+% RUNNING AT 60FPS, ABLE TO GENERATE TERRAIN/ROADS WORLDWIDE, OBSTRUCTIONS/AIRSPACES WITHIN U.S.
+% FUTURE GOALS (is that here or another section?)
+The current version of the SVS runs at a stable 60 frames-per-second on the Raspberry Pi 5. It is able to generate terrain and roads worldwide, and obstructions and airspaces within the U.S. and several select surrounding areas, such as parts of Canada and Mexico.
+
+\section{Conclusion} % Could also have 'Discussion' section before this
+
+\bibliography{references}
+
+\end{document}
