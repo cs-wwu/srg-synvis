@@ -113,7 +113,7 @@ var airspaceColors = map[string][4]float32{
 	"B": {0.0, 0.0, 0.5, 0.3},  // Dark blue - major airport terminal areas
 	"C": {0.8, 0.0, 0.8, 0.3},  // Magenta - medium airport areas
 	"D": {0.0, 0.0, 1.0, 0.25}, // Blue - smaller controlled airports
-	"E": {0.5, 0.5, 0.5, 0.15}, // Gray - controlled airspace (transparent)
+	"E": {0.5, 0.5, 0.5, 0.25}, // Gray - controlled airspace (transparent)
 	"F": {0.0, 0.5, 0.0, 0.2},  // Green - special use (rare in US)
 	"G": {0.3, 0.3, 0.3, 0.1},  // Light gray - uncontrolled (very transparent)
 }

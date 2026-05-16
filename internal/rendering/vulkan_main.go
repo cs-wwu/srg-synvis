@@ -354,38 +354,58 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	app.AirspaceStreamer.Lock()
+	currentAirspace := app.CurrentAirspace
 
-	if app.CurrentAirspace == nil {
-		for _, airspace := range app.AirspaceStreamer.Chunks {
-			if airspace != nil {
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			isCurrentChunk := false
+			if currentAirspace != nil {
+				for j := range airspace.features {
+					if &airspace.features[j] == currentAirspace {
+						isCurrentChunk = true
+						break
+					}
+				}
+			}
+			if !isCurrentChunk {
 				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
 				vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
 				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
 			}
 		}
+	}
 
-		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
-		vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
+	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
+	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-		for _, airspace := range app.AirspaceStreamer.Chunks {
-			if airspace != nil {
+	for _, airspace := range app.AirspaceStreamer.Chunks {
+		if airspace != nil {
+			isCurrentChunk := false
+			if currentAirspace != nil {
+				for j := range airspace.features {
+					if &airspace.features[j] == currentAirspace {
+						isCurrentChunk = true
+						break
+					}
+				}
+			}
+			if !isCurrentChunk {
 				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
 				vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
 				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
 			}
 		}
-	} else {
-		color := airspaceColors[app.CurrentAirspace.Properties.Class]
+	}
+
+	if currentAirspace != nil {
+		color := airspaceColors[currentAirspace.Properties.Class]
 		colorBytes := *(*[16]byte)(unsafe.Pointer(&color))
-
 		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.fullscreenOverlayPipeline)
 		vk.CmdPushConstants(cmd, app.pipelineLayout,
 			vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
 			0, 16, unsafe.Pointer(&colorBytes))
 		vk.CmdDraw(cmd, 6, 1, 0, 0)
 	}
-	app.AirspaceStreamer.Unlock()
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)

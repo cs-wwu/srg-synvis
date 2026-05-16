@@ -122,6 +122,9 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		height := builder.heightInfo.Height(x, y)
 		lowerAlt := toWorldHeightAirspace(float32(props.AltitudeFloor + int(height) + 10))
 		upperAlt := toWorldHeightAirspace(float32(props.AltitudeCeiling))
+		if upperAlt < 0 {
+			upperAlt = 100000
+		}
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
 			Position: [3]float32{float32(x), float32(lowerAlt), float32(y)},
@@ -265,6 +268,9 @@ func isInsideAirspace(pos [3]float32, features []Feature) *Feature {
 		// Check altitude bounds first
 		low := int(math.Min(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
 		high := int(math.Max(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
+		if float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling))) < 0 {
+			high = 100000
+		}
 
 		if altitude < low || altitude > high {
 			continue
