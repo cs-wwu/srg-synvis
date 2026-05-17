@@ -511,7 +511,6 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		log.Printf("vulkan: error loading airspace %s: %v", airspaceFile, err)
 		return nil
 	}
-
 	err = json.Unmarshal(file, &geojson)
 	if err != nil {
 		log.Printf("vulkan: error unmarshaling airspace %s: %v", airspaceFile, err)
@@ -523,38 +522,43 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil
 	}
-
 	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
-	builder := newAirspaceBuilder(heightInfo)
-	instances := make([]AirspaceInstance, len(geojson.Features))
 
-	for i, airspace := range geojson.Features {
-		renderAirspace(builder, airspace, airspaceColors[airspace.Properties.Class])
-		instances[i] = AirspaceInstance{
-			LowerAlt: float32(airspace.Properties.AltitudeFloor),
-			UpperAlt: float32(airspace.Properties.AltitudeCeiling),
-			Color:    airspaceColors[airspace.Properties.Class],
-		}
+	airspaceFeatures := make([]AirspaceFeature, 0, len(geojson.Features))
+
+	for _, f := range geojson.Features {
+		builder := newAirspaceBuilder(heightInfo)
+		color := airspaceColors[f.Properties.Class]
+		renderAirspace(builder, f, color)
+
+		vertices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.vertexBytes(),
+			vk.BufferUsageVertexBufferBit,
+		)
+		indices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.indexBytes(),
+			vk.BufferUsageIndexBufferBit,
+		)
+
+		airspaceFeatures = append(airspaceFeatures, AirspaceFeature{
+			vertices:   vertices,
+			indices:    indices,
+			indexCount: uint32(len(builder.indices)),
+			instance: AirspaceInstance{
+				LowerAlt: float32(f.Properties.AltitudeFloor),
+				UpperAlt: float32(f.Properties.AltitudeCeiling),
+				Color:    color,
+			},
+			feature: f,
+		})
 	}
 
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
 	return &Airspace{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-		features:   geojson.Features,
+		features: airspaceFeatures,
 	}
 }
 

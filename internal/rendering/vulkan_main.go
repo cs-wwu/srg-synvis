@@ -103,11 +103,7 @@ func (app *Application) VulkanContextCleanup() error {
 		if stream == nil {
 			continue
 		}
-		if stream.instances != nil {
-			stream.instances.Destroy()
-		}
-		stream.indices.Destroy()
-		stream.vertices.Destroy()
+		destroyAirspace(stream)
 	}
 	println("Destroyed Airspace stream Buffers and Device Memory")
 
@@ -144,6 +140,20 @@ func (app *Application) VulkanContextCleanup() error {
 	println("Destroyed depth")
 
 	return nil
+}
+
+func destroyAirspace(airspace *Airspace) {
+	if airspace == nil {
+		return
+	}
+	for _, af := range airspace.features {
+		if af.vertices != nil {
+			af.vertices.Destroy()
+		}
+		if af.indices != nil {
+			af.indices.Destroy()
+		}
+	}
 }
 
 func (app *Application) NextFrame(deltaTime time.Duration) {
@@ -357,21 +367,17 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	currentAirspace := app.CurrentAirspace
 
 	for _, airspace := range app.AirspaceStreamer.Chunks {
-		if airspace != nil {
-			isCurrentChunk := false
-			if currentAirspace != nil {
-				for j := range airspace.features {
-					if &airspace.features[j] == currentAirspace {
-						isCurrentChunk = true
-						break
-					}
-				}
+		if airspace == nil {
+			continue
+		}
+		for j := range airspace.features {
+			af := &airspace.features[j]
+			if currentAirspace != nil && af.feature.Properties.Name == currentAirspace.Properties.Name {
+				continue
 			}
-			if !isCurrentChunk {
-				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
-				vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
-				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
-			}
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{af.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, af.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, af.indexCount, 1, 0, 0, 0)
 		}
 	}
 
@@ -379,21 +385,17 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
 	for _, airspace := range app.AirspaceStreamer.Chunks {
-		if airspace != nil {
-			isCurrentChunk := false
-			if currentAirspace != nil {
-				for j := range airspace.features {
-					if &airspace.features[j] == currentAirspace {
-						isCurrentChunk = true
-						break
-					}
-				}
+		if airspace == nil {
+			continue
+		}
+		for j := range airspace.features {
+			af := &airspace.features[j]
+			if currentAirspace != nil && af.feature.Properties.Name == currentAirspace.Properties.Name {
+				continue
 			}
-			if !isCurrentChunk {
-				vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
-				vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
-				vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
-			}
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{af.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, af.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, af.indexCount, 1, 0, 0, 0)
 		}
 	}
 
