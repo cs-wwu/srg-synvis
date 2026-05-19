@@ -109,11 +109,7 @@ func (app *Application) VulkanContextCleanup() error {
 			continue
 		}
 
-		if stream.instances != nil {
-			stream.instances.Destroy()
-		}
-		stream.indices.Destroy()
-		stream.vertices.Destroy()
+		destroyAirspace(stream)
 	}
 	println("Destroyed Airspace stream Buffers and Device Memory")
 
