@@ -99,11 +99,21 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.FreeMemory(dev, app.skyboxVertexMemory, nil)
 	println("Freed device memory")
 
+	app.AirspaceStreamer.Shutdown()
+	app.ObstructionStreamer.Shutdown()
+	app.RoadStreamer.Shutdown()
+	println("Shutdown streamer goroutines")
+
 	for _, stream := range app.AirspaceStreamer.GetLoaded() {
 		if stream == nil {
 			continue
 		}
-		destroyAirspace(stream)
+
+		if stream.instances != nil {
+			stream.instances.Destroy()
+		}
+		stream.indices.Destroy()
+		stream.vertices.Destroy()
 	}
 	println("Destroyed Airspace stream Buffers and Device Memory")
 
@@ -111,6 +121,7 @@ func (app *Application) VulkanContextCleanup() error {
 		if stream == nil {
 			continue
 		}
+
 		stream.indices.Destroy()
 		stream.vertices.Destroy()
 	}
@@ -120,6 +131,7 @@ func (app *Application) VulkanContextCleanup() error {
 		if stream == nil {
 			continue
 		}
+
 		stream.indices.Destroy()
 		stream.vertices.Destroy()
 	}
