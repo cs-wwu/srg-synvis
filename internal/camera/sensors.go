@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os/exec"
 	"time"
 
@@ -13,14 +14,26 @@ import (
 	"github.com/stratoberry/go-gpsd"
 	"github.com/westphae/geomag/pkg/egm96"
 	"github.com/westphae/geomag/pkg/wmm"
+	lin "github.com/xlab/linmath"
 )
 
-const DAMP = 0.9 // Smoothing factor for sensor data
+const DAMP = 0.9               // Smoothing factor for sensor data
+const CORRECTION_DISTANCE = 50 // max distance error before position correction
+
+// Stores lat, long, and alt and the time the reading thereof occurred.
+// Time will be useful for retroactive path construction
+// for interpolation and other future additions
+type GPSReading struct {
+	position lin.Vec3
+	occurred time.Time
+	velocity lin.Vec3
+}
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
 	camera           *Camera
-	smoothingEnabled bool // When true, smooths path through space
+	smoothingEnabled bool         // When true, smooths path through space
+	gpsRecordings    []GPSReading // rolling buffer of raw position readings
 	ctxGPS           context.Context
 	cancelGPS        context.CancelFunc
 	ctxHat           context.Context
@@ -63,9 +76,28 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	oldZ := pos[2]
 	var xdif, ydif, zdif float32
 
+	if sm.smoothingEnabled && len(sm.gpsRecordings) == 0 {
+		sm.gpsRecordings = append(sm.gpsRecordings, GPSReading{
+			position: pos,
+			occurred: time.Now(),
+			velocity: lin.Vec3{0, 0, 0},
+		})
+		log.Println("Setup: Initial position recorded.")
+	}
+
 	// Set up the TPV function that will run indefinitely
 	tpvFilter := func(r any) {
 		report := r.(*gpsd.TPVReport)
+
+		if sm.smoothingEnabled {
+			if report.Mode == gpsd.NoFix || report.Mode == gpsd.NoValueSeen {
+				log.Println("GPS: No fix, using predicted position based on previous movement")
+				return
+			}
+			sm.pushGPS(report)
+			return
+		}
+
 		// Convert GPS coordinates to world coordinates
 		newY := float32(report.Alt) * HEIGHT_CONVERSION
 		newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
@@ -112,6 +144,122 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 		log.Println("GPS: watch ended")
 		return nil
 	}
+}
+
+// Push a reading based off TPV report (overwrites oldest when full)
+// Ensure a valid update has been delivered before you call this!
+func (sm *SensorManager) pushGPS(report *gpsd.TPVReport) {
+	// Convert GPS coordinates to world coordinates
+	newY := float32(report.Alt) * HEIGHT_CONVERSION
+	newX, newZ := coords.GPSToWorld(float32(report.Lat), float32(report.Lon))
+	newPos := lin.Vec3{newX, newY, newZ}
+
+	// cache position, occurred time, and velocity
+	// time
+	t := time.Now()
+	// vel
+	var vel lin.Vec3
+	if len(sm.gpsRecordings) > 0 {
+		last := sm.gpsRecordings[len(sm.gpsRecordings)-1]
+		dt := float32(t.Sub(last.occurred).Seconds())
+		if dt > 0 {
+			vel = lin.Vec3{
+				(newPos[0] - last.position[0]) / dt,
+				(newPos[1] - last.position[1]) / dt,
+				(newPos[2] - last.position[2]) / dt,
+			}
+		}
+	}
+
+	// Construct the reading to be used for future reference
+	reading := GPSReading{
+		position: newPos,
+		occurred: t,
+		velocity: vel,
+	}
+
+	// Construct new spline iff buffer is now full. otherwise just add new reading
+	if len(sm.gpsRecordings) < 3 {
+		sm.gpsRecordings = append(sm.gpsRecordings, reading)
+		return
+	}
+
+	// shift buffer
+	sm.gpsRecordings[0] = sm.gpsRecordings[1]
+	sm.gpsRecordings[1] = sm.gpsRecordings[2]
+	sm.gpsRecordings[2] = reading
+
+	// Update interarrival time
+	mh := sm.camera.motionHandler
+	if mh != nil && mh.splineManager != nil {
+		dt := sm.gpsRecordings[2].occurred.Sub(sm.gpsRecordings[1].occurred).Seconds()
+		if dt > 0 {
+			if mh.splineManager.averageGPSInterval == 0 {
+				mh.splineManager.averageGPSInterval = dt
+			} else {
+				mh.splineManager.averageGPSInterval = 0.7*mh.splineManager.averageGPSInterval + 0.3*dt
+			}
+		}
+		mh.FeedGPSUpdate()
+	}
+}
+
+// New GPS update.
+func (mh *MotionHandler) FeedGPSUpdate() {
+	if len(mh.camera.sensorManager.gpsRecordings) < 3 {
+		return
+	}
+	spline := mh.splineManager
+	g := mh.camera.sensorManager.gpsRecordings
+
+	// Where camera actually is
+	camPos := mh.camera.Position()
+
+	// error between current camera position and current gps fix
+	posErrorX := math.Abs(float64(camPos[0] - g[2].position[0]))
+	posErrorY := math.Abs(float64(camPos[1] - g[2].position[1]))
+	posErrorZ := math.Abs(float64(camPos[2] - g[2].position[2]))
+	magnitude := math.Sqrt(posErrorX*posErrorX + posErrorY*posErrorY + posErrorZ*posErrorZ)
+	// if error in predicted position vs. actual position exceeds allowance
+	// then correct. harsh for now. TODO: implement smoothing w/ lerp?
+	if magnitude >= CORRECTION_DISTANCE {
+		mh.camera.SetPosition(g[2].position)
+	}
+
+	// Current velocity from GPS
+	v2 := g[2].velocity
+
+	// Compute p0 so tangent at p1 matches current velocity
+	// Step backward from camera position along velocity direction
+	camVel := mh.camera.smoothedVel
+	speed := camVel.Len()
+	var p0 lin.Vec3
+	if speed > 0.1 {
+		backDist := speed * float32(spline.averageGPSInterval)
+		var velDir lin.Vec3
+		velDir.Norm(&camVel)
+		p0 = lin.Vec3{
+			camPos[0] - velDir[0]*backDist,
+			camPos[1] - velDir[1]*backDist,
+			camPos[2] - velDir[2]*backDist,
+		}
+	} else {
+		// Fallback if stationary
+		p0 = g[1].position
+	}
+
+	// Predictions for p2, p3
+	pred1 := mh.PredictPosition(1.0)
+	pred2 := mh.PredictPosition(2.0)
+
+	spline.currentSplineData = &SplineData{
+		p0: p0,     // control point
+		p1: camPos, // camera position (start)
+		p2: pred1,  // predicted (end)
+		p3: pred2,  // far prediction (control point)
+	}
+	spline.splineStartTime = time.Now()
+	spline.currentVelocity = v2
 }
 
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe

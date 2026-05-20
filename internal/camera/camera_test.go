@@ -141,11 +141,44 @@ func (m *MockGPSD) Close() {
 // Test utility functions
 
 const floatTolerance = 0.05
+const eps = 1e-5
 
 func assertVec3InDelta(assert *assert.Assertions, expected, actual lin.Vec3) {
 	assert.InDelta(expected[0], actual[0], floatTolerance)
 	assert.InDelta(expected[1], actual[1], floatTolerance)
 	assert.InDelta(expected[2], actual[2], floatTolerance)
+}
+
+func float32Close(a, b float32) bool {
+	return math.Abs(float64(a-b)) < eps
+}
+
+func vec3Close(a, b lin.Vec3) bool {
+	return float32Close(a[0], b[0]) && float32Close(a[1], b[1]) && float32Close(a[2], b[2])
+}
+
+func newTestMotionHandler() *MotionHandler {
+	posVal := lin.Vec3{0, 0, 0}
+	frontVal := lin.Vec3{1, 0, 0}
+	rightVal := lin.Vec3{0, 0, 1}
+	upVal := lin.Vec3{0, 1, 0}
+
+	cam := &Camera{
+		pos:   &posVal,
+		front: &frontVal,
+		right: &rightVal,
+		up:    &upVal,
+	}
+	cam.sensorManager = &SensorManager{
+		camera:           cam,
+		smoothingEnabled: true,
+	}
+	mh := &MotionHandler{
+		camera:        cam,
+		splineManager: &SplineManager{averageGPSInterval: 1.0},
+	}
+	cam.motionHandler = mh
+	return mh
 }
 
 // Camera Initialization Tests
@@ -351,6 +384,142 @@ func TestGPSValidFix(t *testing.T) {
 	assert.InDelta(expectedZ, pos[2], floatTolerance)
 }
 
+func TestOldestOut(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	for i := 0; i < 3; i++ {
+		sm.pushGPS(&gpsd.TPVReport{
+			Lat:  47.6 + float64(i)*0.0001,
+			Lon:  -122.3,
+			Alt:  100,
+			Mode: gpsd.Mode3D,
+		})
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	secondReadingPos := sm.gpsRecordings[1].position
+
+	sm.pushGPS(&gpsd.TPVReport{
+		Lat:  47.6 + 3*0.0001,
+		Lon:  -122.3,
+		Alt:  100,
+		Mode: gpsd.Mode3D,
+	})
+
+	if len(sm.gpsRecordings) != 3 {
+		t.Errorf("buffer size should remain 3 after shift, got %d", len(sm.gpsRecordings))
+	}
+	if !vec3Close(sm.gpsRecordings[0].position, secondReadingPos) {
+		t.Errorf("after shift, gpsRecordings[0] = %v, expected previous gpsRecordings[1] = %v",
+			sm.gpsRecordings[0].position, secondReadingPos)
+	}
+}
+
+func TestVelocityCalculation(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	sm.pushGPS(&gpsd.TPVReport{Lat: 47.6, Lon: -122.3, Alt: 100, Mode: gpsd.Mode3D})
+	time.Sleep(10 * time.Millisecond)
+
+	sm.pushGPS(&gpsd.TPVReport{Lat: 47.6001, Lon: -122.3, Alt: 100, Mode: gpsd.Mode3D})
+
+	if len(sm.gpsRecordings) < 2 {
+		t.Fatalf("expected at least 2 readings, got %d", len(sm.gpsRecordings))
+	}
+
+	secondVel := sm.gpsRecordings[1].velocity
+	if secondVel[0] == 0 && secondVel[1] == 0 && secondVel[2] == 0 {
+		t.Errorf("expected non-zero velocity on second reading after position change, got %v", secondVel)
+	}
+}
+
+func TestSplineBuild(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	if mh.splineManager.currentSplineData != nil {
+		t.Errorf("splineData should be nil before any GPS reports")
+	}
+
+	for i := 0; i < 4; i++ {
+		sm.pushGPS(&gpsd.TPVReport{
+			Lat:  47.6 + float64(i)*0.0001,
+			Lon:  -122.3,
+			Alt:  100,
+			Mode: gpsd.Mode3D,
+		})
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	if mh.splineManager.currentSplineData == nil {
+		t.Errorf("expected splineData to be populated after 4th pushGPS triggered FeedGPSUpdate, got nil")
+	}
+}
+
+func TestInsufficientReadings(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	now := time.Now()
+	sm.gpsRecordings = []GPSReading{
+		{position: lin.Vec3{0, 0, 0}, occurred: now.Add(-time.Second), velocity: lin.Vec3{10, 0, 0}},
+		{position: lin.Vec3{10, 0, 0}, occurred: now, velocity: lin.Vec3{10, 0, 0}},
+	}
+
+	mh.FeedGPSUpdate()
+
+	if mh.splineManager.currentSplineData != nil {
+		t.Errorf("FeedGPSUpdate should not build spline with <3 readings, got %v",
+			mh.splineManager.currentSplineData)
+	}
+}
+
+func TestSplineData(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	now := time.Now()
+	sm.gpsRecordings = []GPSReading{
+		{position: lin.Vec3{0, 0, 0}, occurred: now.Add(-2 * time.Second), velocity: lin.Vec3{10, 0, 0}},
+		{position: lin.Vec3{10, 0, 0}, occurred: now.Add(-1 * time.Second), velocity: lin.Vec3{10, 0, 0}},
+		{position: lin.Vec3{20, 0, 0}, occurred: now, velocity: lin.Vec3{10, 0, 0}},
+	}
+
+	mh.FeedGPSUpdate()
+
+	spline := mh.splineManager.currentSplineData
+	if spline == nil {
+		t.Fatalf("expected splineData to be populated, got nil")
+	}
+	if !vec3Close(spline.p1, mh.camera.Position()) {
+		t.Errorf("spline.p1 should match current camera position %v, got %v",
+			mh.camera.Position(), spline.p1)
+	}
+}
+
+func TestFeedLargeError(t *testing.T) {
+	mh := newTestMotionHandler()
+	sm := mh.camera.sensorManager
+
+	now := time.Now()
+
+	farPos := lin.Vec3{1000, 0, 0}
+	sm.gpsRecordings = []GPSReading{
+		{position: lin.Vec3{0, 0, 0}, occurred: now.Add(-2 * time.Second), velocity: lin.Vec3{500, 0, 0}},
+		{position: lin.Vec3{500, 0, 0}, occurred: now.Add(-1 * time.Second), velocity: lin.Vec3{500, 0, 0}},
+		{position: farPos, occurred: now, velocity: lin.Vec3{500, 0, 0}},
+	}
+
+	mh.FeedGPSUpdate()
+
+	if !vec3Close(mh.camera.Position(), farPos) {
+		t.Errorf("expected camera position to snap to g[2].position %v on large correction, got %v",
+			farPos, mh.camera.Position())
+	}
+}
+
 // Sensor Data Tests
 
 func TestSensorDataStructure(t *testing.T) {
@@ -460,4 +629,185 @@ func TestResetOrientation(t *testing.T) {
 	assertVec3InDelta(assert, expectedFront, front)
 	assertVec3InDelta(assert, expectedRight, right)
 	assertVec3InDelta(assert, expectedUp, up)
+}
+
+// Spline Math Tests
+
+func TestSlerp(t *testing.T) {
+	x := lin.Vec3{1, 0, 0}
+	z := lin.Vec3{0, 0, 1}
+
+	got := Slerp(x, z, 0)
+	if !vec3Close(got, x) {
+		t.Errorf("Slerp(x, z, 0) = %v, want %v", got, x)
+	}
+	got = Slerp(x, z, 1)
+	if !vec3Close(got, z) {
+		t.Errorf("Slerp(x, z, 1) = %v, want %v", got, z)
+	}
+	got = Slerp(x, z, 0.5)
+	half := float32(math.Sqrt2 / 2)
+	want := lin.Vec3{half, 0, half}
+	if !vec3Close(got, want) {
+		t.Errorf("Slerp(x, z, 0.5) = %v, want %v", got, want)
+	}
+}
+
+func TestSignedAngle(t *testing.T) {
+	axis := lin.Vec3{0, 1, 0}
+	x := lin.Vec3{1, 0, 0}
+	z := lin.Vec3{0, 0, 1}
+	negz := lin.Vec3{0, 0, -1}
+
+	got := SignedAngle(x, z, axis)
+	if math.Abs(math.Abs(got)-90) > 1e-3 {
+		t.Errorf("SignedAngle(+X, +Z, +Y) magnitude = %v, want 90", got)
+	}
+
+	gotOpp := SignedAngle(x, negz, axis)
+	if math.Signbit(got) == math.Signbit(gotOpp) {
+		t.Errorf("SignedAngle did not flip sign for opposite turn: %v then %v", got, gotOpp)
+	}
+
+	gotSame := SignedAngle(x, x, axis)
+	if math.Abs(gotSame) > 1e-3 {
+		t.Errorf("SignedAngle(v, v) = %v, want ~0", gotSame)
+	}
+}
+
+func TestGetT(t *testing.T) {
+	mh := &MotionHandler{}
+	a := lin.Vec3{0, 0, 0}
+	b := lin.Vec3{1, 0, 0}
+
+	got := mh.GetT(a, b, 0)
+	if math.Abs(got-1.0) > eps {
+		t.Errorf("GetT(unit-apart, 0) = %v, want 1.0", got)
+	}
+
+	t1 := mh.GetT(a, b, 0)
+	t2 := mh.GetT(b, lin.Vec3{3, 0, 0}, t1)
+	if t2 <= t1 {
+		t.Errorf("knots not monotonic: t1=%v, t2=%v", t1, t2)
+	}
+}
+
+func TestSplineEndpoints(t *testing.T) {
+	mh := &MotionHandler{}
+	data := &SplineData{
+		p0: lin.Vec3{0, 0, 0},
+		p1: lin.Vec3{1, 0, 0},
+		p2: lin.Vec3{2, 0, 0},
+		p3: lin.Vec3{3, 0, 0},
+	}
+
+	got0 := mh.CentCatmullRom(0, data)
+	if !vec3Close(got0, data.p1) {
+		t.Errorf("CentCatmullRom(0) = %v, want %v (p1)", got0, data.p1)
+	}
+
+	got1 := mh.CentCatmullRom(1, data)
+	if !vec3Close(got1, data.p2) {
+		t.Errorf("CentCatmullRom(1) = %v, want %v (p2)", got1, data.p2)
+	}
+}
+
+func TestStraightLineInterp(t *testing.T) {
+	mh := &MotionHandler{}
+	data := &SplineData{
+		p0: lin.Vec3{0, 0, 0},
+		p1: lin.Vec3{1, 0, 0},
+		p2: lin.Vec3{2, 0, 0},
+		p3: lin.Vec3{3, 0, 0},
+	}
+	for _, tParam := range []float64{0.1, 0.25, 0.5, 0.75, 0.9} {
+		got := mh.CentCatmullRom(tParam, data)
+		if math.Abs(float64(got[1])) > 1e-4 || math.Abs(float64(got[2])) > 1e-4 {
+			t.Errorf("CentCatmullRom(%v) drifted off the X-axis: %v", tParam, got)
+		}
+		if got[0] < 1 || got[0] > 2 {
+			t.Errorf("CentCatmullRom(%v).x = %v, expected within [1, 2]", tParam, got[0])
+		}
+	}
+}
+
+// Turn Calculation Tests
+
+func TestTurnStraight(t *testing.T) {
+	mh := newTestMotionHandler()
+	v := lin.Vec3{10, 0, 0}
+	info := mh.CalculateTurn(v, v, lin.Vec3{0, 0, 0})
+	if math.Abs(info.angularVel) > 1e-3 {
+		t.Errorf("straight motion should give ~0 angular velocity, got %v", info.angularVel)
+	}
+	if info.turnRadius < 1000 {
+		t.Errorf("straight motion should give very large turn radius, got %v", info.turnRadius)
+	}
+}
+
+func TestRightTurn(t *testing.T) {
+	mh := newTestMotionHandler()
+	v1 := lin.Vec3{10, 0, 0}
+	v2 := lin.Vec3{0, 0, 10}
+	info := mh.CalculateTurn(v1, v2, lin.Vec3{0, 0, 0})
+	if math.Abs(info.angularVel) < 1 {
+		t.Errorf("90° turn should give significant angular velocity, got %v", info.angularVel)
+	}
+}
+
+func TestTurnRadiusCalculation(t *testing.T) {
+	mh := newTestMotionHandler()
+	v1 := lin.Vec3{10, 0, 0}
+	v2 := lin.Vec3{10, 0, 1}
+	accel := lin.Vec3{0, 0, 1}
+	info := mh.CalculateTurn(v1, v2, accel)
+	if info.turnRadius < 50 || info.turnRadius > 150 {
+		t.Errorf("turnRadius for speed≈10 hAccel≈1 should be near 100, got %v", info.turnRadius)
+	}
+}
+
+// Position Prediction Tests
+
+func TestInsufficientData(t *testing.T) {
+	mh := newTestMotionHandler()
+	pos := mh.PredictPosition(1.0)
+	expected := mh.GetMotionState().Position
+	if !vec3Close(pos, expected) {
+		t.Errorf("with < 3 GPS readings, expected current pos %v, got %v", expected, pos)
+	}
+}
+
+func TestStraightLine(t *testing.T) {
+	mh := newTestMotionHandler()
+
+	now := time.Now()
+	mh.camera.sensorManager.gpsRecordings = []GPSReading{
+		{position: lin.Vec3{0, 0, 0}, occurred: now.Add(-2 * time.Second), velocity: lin.Vec3{10, 0, 0}},
+		{position: lin.Vec3{10, 0, 0}, occurred: now.Add(-1 * time.Second), velocity: lin.Vec3{10, 0, 0}},
+		{position: lin.Vec3{20, 0, 0}, occurred: now, velocity: lin.Vec3{10, 0, 0}},
+	}
+
+	pred := mh.PredictPosition(1.0)
+	expected := lin.Vec3{30, 0, 0}
+	if !vec3Close(pred, expected) {
+		t.Errorf("straight-line prediction = %v, want %v", pred, expected)
+	}
+}
+
+func TestPredictCurved(t *testing.T) {
+	mh := newTestMotionHandler()
+	info := &TurnInfo{
+		angularVel: 0.5,
+		turnRadius: 10000,
+		curvedDir:  lin.Vec3{1, 0, 0},
+	}
+	vel := lin.Vec3{10, 0, 0}
+	start := lin.Vec3{0, 0, 0}
+	pred := mh.PredictCurved(start, vel, info, 1.0)
+	if math.Abs(float64(pred[0])-10) > 1 {
+		t.Errorf("nearly-straight curved prediction X = %v, expected near 10", pred[0])
+	}
+	if math.Abs(float64(pred[2])) > 1 {
+		t.Errorf("nearly-straight curved prediction Z = %v, expected near 0", pred[2])
+	}
 }
