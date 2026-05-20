@@ -18,6 +18,7 @@ type FlightInstruments struct {
 	Attitude          *components.AttitudeIndicator
 	AttitudeDial      *components.AttitudeDial
 	AirspaceIndicator *components.AirspaceIndicator
+	PitchIndicator    *components.PitchIndicator
 	currentAirspace   *rendering.Feature // nil when not in one
 
 	app *rendering.Application
@@ -85,6 +86,7 @@ func NewFlightInstruments() *FlightInstruments {
 	attitude.AttitudeAngleDegrees = 45
 
 	attitudeDial := components.NewAttitudeDial()
+	pitchIndicator := components.NewPitchIndicator()
 
 	return &FlightInstruments{
 		Gauge:             altimeter,
@@ -92,6 +94,7 @@ func NewFlightInstruments() *FlightInstruments {
 		Speedometer:       speedometer,
 		Attitude:          attitude,
 		AttitudeDial:      attitudeDial,
+		PitchIndicator:    pitchIndicator,
 		AirspaceIndicator: components.NewAirspaceIndicator(),
 	}
 }
@@ -103,6 +106,7 @@ func (window *FlightInstruments) Render() {
 	window.Attitude.AttitudeAngleDegrees = linmath.RadiansToDegrees(-getCameraRoll(cam.GetBasis()))
 	window.AttitudeDial.AttitudeAngleDegrees = window.Attitude.AttitudeAngleDegrees
 	window.Attitude.PitchAngleDegrees = getCameraPitch(cam.GetBasis())
+	window.PitchIndicator.PitchAngleDegrees = window.Attitude.PitchAngleDegrees
 
 	window.Speedometer.Value = cam.MeasureSpeed()
 
@@ -112,6 +116,7 @@ func (window *FlightInstruments) Render() {
 	window.Compass.Render()
 	window.Speedometer.Render()
 	window.AttitudeDial.Render()
+	window.PitchIndicator.Render()
 
 	window.currentAirspace = window.app.CurrentAirspace
 	if window.currentAirspace != nil {
