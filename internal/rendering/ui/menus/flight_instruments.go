@@ -106,7 +106,8 @@ func (window *FlightInstruments) Render() {
 	window.Attitude.AttitudeAngleDegrees = linmath.RadiansToDegrees(-getCameraRoll(cam.GetBasis()))
 	window.AttitudeDial.AttitudeAngleDegrees = window.Attitude.AttitudeAngleDegrees
 	window.Attitude.PitchAngleDegrees = getCameraPitch(cam.GetBasis())
-	window.PitchIndicator.PitchAngleDegrees = window.Attitude.PitchAngleDegrees
+	window.PitchIndicator.PitchAngleDegrees = linmath.RadiansToDegrees(window.Attitude.PitchAngleDegrees)
+	window.PitchIndicator.AttitudeAngleDegrees = window.Attitude.AttitudeAngleDegrees
 
 	window.Speedometer.Value = cam.MeasureSpeed()
 
