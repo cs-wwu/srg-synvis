@@ -62,7 +62,7 @@ func (t *HeightInfo) IsWater(worldX, worldZ int) bool {
 	tileX := int(math.Floor(float64(worldX) / 3600))
 	tileZ := int(math.Floor(float64(-worldZ) / 3600)) // negated
 	localX := worldX - tileX*3600
-	localZ := (-worldZ) - tileZ*3600
+	localZ := 3600 - ((-worldZ) - tileZ*3600)
 
 	h, ok := t.tileMap[spatial.MapCoord{Lon: tileX, Lat: tileZ}]
 	if !ok {
@@ -75,7 +75,7 @@ func (t *HeightInfo) sample(worldX, worldZ int) float32 {
 	tileX := int(math.Floor(float64(worldX) / 3600))
 	tileZ := int(math.Floor(float64(-worldZ) / 3600)) // negated
 	localX := worldX - tileX*3600
-	localZ := (-worldZ) - tileZ*3600
+	localZ := 3600 - ((-worldZ) - tileZ*3600)
 
 	h, ok := t.tileMap[spatial.MapCoord{Lon: tileX, Lat: tileZ}]
 	if !ok {
