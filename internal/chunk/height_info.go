@@ -28,9 +28,6 @@ func newChunkHeightInfo(data *assets.MapData) *chunkHeightInfo {
 	}
 }
 
-func (t *HeightInfo) addTile(pos spatial.MapCoord, data []uint16) {
-}
-
 func NewHeightInfo(assetManager assets.AssetManager, pos spatial.MapCoord) *HeightInfo {
 	heightInfo := &HeightInfo{tileMap: make(map[spatial.MapCoord]chunkHeightInfo)}
 
