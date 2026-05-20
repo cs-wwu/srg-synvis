@@ -5,6 +5,7 @@ import (
 
 	"github.com/cs-wwu/srg-synvis/internal/rendering/ui"
 	"github.com/elokore/cimgui-go-vulkan/imgui"
+	"github.com/xlab/linmath"
 )
 
 type AttitudeIndicator struct {
@@ -28,7 +29,7 @@ func NewAttitudeIndicator(size ui.UDim) *AttitudeIndicator {
 
 func getVerticalOffset(pitch float32) float32 {
 	screenHeight := ui.UDimFromScale(0, 1).ToSize().Y
-	var fov float64 = 60
+	var fov float64 = float64(linmath.DegreesToRadians(60))
 	focalLengthPixels := screenHeight / (2 * float32(math.Tan(fov/2)))
 	return -focalLengthPixels * float32(math.Tan(float64(pitch)))
 }
@@ -48,7 +49,8 @@ func (indicator *AttitudeIndicator) Render() {
 	endpointVector := lineDirection.Mul(sizePixels.X / 2)
 	lineColor := imgui.ColorConvertFloat4ToU32(imgui.NewVec4(200, 200, 200, 255))
 
-	position := ui.NewUDim(0.5, 0, 0.5, 0)
+	yOffset := getVerticalOffset(indicator.PitchAngleDegrees)
+	position := ui.NewUDim(0.5, 0, 0.5, -yOffset)
 	p1 := position.ToPosition().Sub(endpointVector)
 	p2 := position.ToPosition().Add(endpointVector)
 	drawList.AddLineV(p1, p2, lineColor, sizePixels.Y)

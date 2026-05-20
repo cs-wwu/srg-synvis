@@ -16,6 +16,7 @@ type FlightInstruments struct {
 	Speedometer       *components.RectangleGauge
 	Compass           *components.RibbonCompass
 	Attitude          *components.AttitudeIndicator
+	AttitudeDial      *components.AttitudeDial
 	AirspaceIndicator *components.AirspaceIndicator
 	currentAirspace   *rendering.Feature // nil when not in one
 
@@ -80,14 +81,17 @@ func NewFlightInstruments() *FlightInstruments {
 	speedometer.MajorInterval = 10
 	speedometer.MeterRange = 80
 
-	attitude := components.NewAttitudeIndicator(*ui.NewUDim(0.5, 0, 0, 2))
+	attitude := components.NewAttitudeIndicator(*ui.NewUDim(2, 0, 0, 2))
 	attitude.AttitudeAngleDegrees = 45
+
+	attitudeDial := components.NewAttitudeDial()
 
 	return &FlightInstruments{
 		Gauge:             altimeter,
 		Compass:           compass,
 		Speedometer:       speedometer,
 		Attitude:          attitude,
+		AttitudeDial:      attitudeDial,
 		AirspaceIndicator: components.NewAirspaceIndicator(),
 	}
 }
@@ -97,9 +101,9 @@ func (window *FlightInstruments) Render() {
 	frontVector := cam.GetBasis()[1]
 	window.Compass.HeadingDegrees = linmath.RadiansToDegrees(float32(getCompassHeadingRadians(frontVector)))
 	window.Attitude.AttitudeAngleDegrees = linmath.RadiansToDegrees(-getCameraRoll(cam.GetBasis()))
-	window.Attitude.PitchAngleDegrees = linmath.RadiansToDegrees(getCameraPitch(cam.GetBasis()))
+	window.AttitudeDial.AttitudeAngleDegrees = window.Attitude.AttitudeAngleDegrees
+	window.Attitude.PitchAngleDegrees = getCameraPitch(cam.GetBasis())
 
-	println(window.Attitude.PitchAngleDegrees)
 	window.Speedometer.Value = cam.MeasureSpeed()
 
 	window.Attitude.Render()
@@ -107,6 +111,7 @@ func (window *FlightInstruments) Render() {
 	window.Gauge.Render()
 	window.Compass.Render()
 	window.Speedometer.Render()
+	window.AttitudeDial.Render()
 
 	window.currentAirspace = window.app.CurrentAirspace
 	if window.currentAirspace != nil {
