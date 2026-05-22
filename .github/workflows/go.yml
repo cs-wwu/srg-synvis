@@ -35,7 +35,9 @@ jobs:
             libxi-dev \
             libxxf86vm-dev \
             libxcursor-dev \
-            libxinerama-dev
+            libxinerama-dev \
+            libxkbcommon-dev \
+            libwayland-dev
 
       # Ensure that we have Go libraries installed
       - name: Enter application and download dependencies

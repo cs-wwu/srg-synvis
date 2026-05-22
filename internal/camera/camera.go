@@ -6,7 +6,7 @@ import (
 	"math"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
-	"github.com/elokore/glfw/v3.4/glfw"
+	"github.com/go-gl/glfw/v3.4/glfw"
 	lin "github.com/xlab/linmath"
 )
 
