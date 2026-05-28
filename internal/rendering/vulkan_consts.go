@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/camera"
+	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/models"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	"github.com/elokore/cimgui-go-vulkan/backend"
@@ -73,7 +74,7 @@ type Application struct {
 	Cfg models.AppConfig
 
 	Camera        *camera.Camera
-	StreamManager *StreamManager
+	ChunkManager  *chunk.ChunkManager
 	WindowHandle  *glfw.Window
 	CimguiBackend backend.Backend[glfwvulkanbackend.GLFWWindowFlags]
 
@@ -88,6 +89,9 @@ type Application struct {
 }
 
 const (
+	CHUNK_SIZE = 144 // Same as before for compatibility
+	MAP_FOLDER = "assets/maps/"
+
 	ARC_DEGREES_TO_MINUTES = 60.0
 	ARC_DEGREES_TO_SECONDS = ARC_DEGREES_TO_MINUTES * 60.0
 )

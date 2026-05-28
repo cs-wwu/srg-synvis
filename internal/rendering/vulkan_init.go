@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
+	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/cs-wwu/srg-synvis/internal/chunk"
 	"github.com/cs-wwu/srg-synvis/internal/streaming"
 	as "github.com/vulkan-go/asche"
@@ -518,13 +519,7 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for airspace: %v", err)
-		return nil
-	}
-
-	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(app.ChunkManager.AssetManager, pos)
 	builder := newAirspaceBuilder(heightInfo)
 	instances := make([]AirspaceInstance, len(geojson.Features))
 
@@ -1721,8 +1716,6 @@ func (app *Application) prepareFramebuffers() {
 
 func (app *Application) VulkanContextPrepare() error {
 	dim := app.Context().SwapchainDimensions()
-	dev := app.Context().Device()
-	memProps := app.Context().Platform().MemoryProperties()
 	app.height = dim.Height
 	app.width = dim.Width
 
@@ -1731,9 +1724,12 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareTextures()
 
 	// Initialize StreamManager
-	app.StreamManager = NewStreamManager(&dev, &memProps, app.Cfg)
-	app.StreamManager.UpdateCameraPosition(app.Camera.Position())
-	app.StreamManager.Start()
+	app.ChunkManager = chunk.NewChunkManager(
+		assets.NewAssetManager(MAP_FOLDER, 50),
+		app.Context().Device(),
+		app.Context().Platform().MemoryProperties(),
+	)
+	app.ChunkManager.UpdatePos(app.Camera.Position())
 
 	app.RoadStreamer = streaming.NewDegreeStreamer(app.buildRoad)
 	app.RoadStreamer.UpdatePos(app.Camera.Position())

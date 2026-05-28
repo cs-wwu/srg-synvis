@@ -72,12 +72,7 @@ func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
 		return nil
 	}
 
-	mapData, err := app.StreamManager.assetManager.LoadMapData(pos)
-	if err != nil {
-		log.Printf("vulkan: error loading map data for road square %s: %v", roadFile, err)
-		return nil
-	}
-	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
+	heightInfo := chunk.NewHeightInfo(app.ChunkManager.AssetManager, pos)
 	builder := newRoadBuilder(heightInfo)
 
 	for _, road := range roadSquare.Roads {

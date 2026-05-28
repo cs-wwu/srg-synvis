@@ -27,7 +27,7 @@ func parseConfig() models.AppConfig {
 	flag.IntVar(&config.MonitorNum, "monitor", 0, "Monitor selection (0 = windowed, 1 = primary monitor, etc.)")
 
 	// New flags
-	renderDistance := flag.Float64("render-distance", 150.0, "Maximum render distance in kilometers")
+	renderDistance := flag.Float64("render-distance", 15000.0, "Maximum render distance in kilometers")
 
 	// Enhanced position flag
 	startPosString := flag.String("pos", "48.5,-122.5,2600", "Starting Camera Position (lat,lon,height) where height is in meters")
