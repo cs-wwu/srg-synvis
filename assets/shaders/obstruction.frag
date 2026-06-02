@@ -1,6 +1,6 @@
 #version 450
 
-layout(binding = 0) uniform UBO {
+layout(std140, binding = 0) uniform UBO {
     mat4 model;
     mat4 view;
     mat4 proj;
