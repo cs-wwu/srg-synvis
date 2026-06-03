@@ -2,6 +2,22 @@
 
 Synthetic Vision System (SVS) for Systems Research Group at WWU
 
+Our Synthetic Vision System (SVS) was created with the goal to develop an open-source SVS that runs on low-cost hardware, prioritizing memory safety, modern tools, and overall performance. Currently, all SVS’s are proprietary or subscription-based, with costs ranging in the thousands. In contrast, a complete setup running our SVS on a Raspberry Pi 5 can be built for under $300, a more realistic option for private pilots. Synthetic vision dramatically enhances pilot safety, both in terms of general awareness and terrain-related crash prevention. By offering a secure, customizable, and affordable open-source alternative, our system aims to make this valuable technology accessible to more pilots. To our knowledge, this is the first fully open-source SVS designed to run efficiently on accessible consumer hardware.
+
+We decided to use Go for its safety guarantees, paired with the Vulkan graphics API on a Raspberry Pi 5. Vulkan was selected for its low-level control over rendering, despite increased verbosity. This choice enabled us to build a custom graphics engine and rendering pipeline with integrated shading. To support accurate mesh rendering, we implemented a coordinate system and a virtual camera.
+
+Heightmaps and water data were sourced from publicly available NASA datasets, with each coordinate square individually downloadable. For real-time location and orientation, we used the Adafruit Ultimate GPS and the Raspberry 5 Sense Hat. The GPS provides latitude, longitude, and altitude, while the Sense Hat’s accelerometer and gyroscope supply orientation data. We manually calibrated this input using the World Magnetic Model. A debug mode allows users to freely navigate the virtual terrain via keyboard input, while the full system uses real-time sensor fusion for accurate, meter-level positioning anywhere on Earth.
+
+Roadways, obstructions, and airspaces were also implemented. Roads are downloaded from the open-source OpenStreetMap (OSM) project, while obstructions and airspaces are sourced from the FAA. To minimize storage overhead, roads and obstructions compacted into coordinate squares and stored in protobufs to be unmarshaled in the rendering pipeline. Airspaces are in GeoJSON format, and similarly grouped into coordinate squares.
+
+UI features including a compass, altimeter, speedometer, and attitude indicator were implemented using a custom Go wrapper to interact with Vulkan. 
+
+To improve performance, we implemented level-of-detail (LOD) rendering and a quad-tree chunk management system. These strategies allow the engine to dynamically update terrain as the user moves, minimizing lag. LOD techniques significantly reduce memory usage, making the project feasible on the Raspberry Pi’s limited VRAM.
+
+Through extensive optimization, our system achieves a stable 60 frames per second on the Raspberry Pi 5. Users can choose between keyboard navigation or real-time control via live sensor fusion. Terrain is procedurally generated around the user’s position, enabling smooth continuous exploration.
+
+In the future, we plan to continue working on the current build for further optimizations and features. We also plan to port to mobile, increasing SVS accessibility further.
+
 ## Running the Application
 
 ```bash
