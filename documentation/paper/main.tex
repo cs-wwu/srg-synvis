@@ -14,7 +14,7 @@
 
 \author{Katria Noonan \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
 \author{Navarro Cristani \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
-\author{Weston Kerkoff \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
+\author{Weston Kerkof \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
 \author{Gage Kresl \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
 \author{Neil MacNeale \footnote{Undergraduate Researcher, Western Washington University Computer Science Department}}
 \affil{Western Washington University, Bellingham, Washington, 98225}
@@ -50,6 +50,10 @@ Airspace data is sourced from the FAA and filtered by user-specified parameters 
 % Discuss KMD here?
 \\
 The simulation component is what actually runs during a flight. At a high-level, it converts all the stored data into Vulkan-friendly vertex and index buffers to get rendered on the display. Due to the large amounts of data and the extended amount of time the SVS aims to run for, rendered data is portioned out with a chunking system and level-of-detail (LOD) rendering.
+\\
+The user interface is built with "Dear-Imgui", a lightweight, widely used graphical user interface library that supports many graphics APIs including Vulkan. Integrating Dear-Imgui required the use of a wrapper due to the library being written in C++ and the synthetic vision system being written in Go. The go wrapper support for Vulkan was poor across many possible options. Cimgui-go was selected due to how it supported multiple graphics APIs with its modular design. This allowed us to add Vulkan support to the wrapper that enabled its integration into the project.
+\\
+A basic UI framework was built on top of the wrapper that allowed for a components based approach to creating UI elements. With this framework a collection of flight instruments were created for use by the pilot including a compass, altimeter, speedometer and an attitude indicator.
 
 \section{Results}
 
