@@ -70,6 +70,7 @@ func (app *Application) VulkanContextCleanup() error {
 	vk.DestroyPipeline(dev, app.pipeline, nil)
 	vk.DestroyPipeline(dev, app.airspacePipeline, nil)
 	vk.DestroyPipeline(dev, app.airspaceStencilPipeline, nil)
+	vk.DestroyPipeline(dev, app.fullscreenOverlayPipeline, nil)
 	vk.DestroyPipeline(dev, app.obstructionPipeline, nil)
 	vk.DestroyPipeline(dev, app.planePipeline, nil)
 	vk.DestroyPipeline(dev, app.roadPipeline, nil)
@@ -108,11 +109,7 @@ func (app *Application) VulkanContextCleanup() error {
 			continue
 		}
 
-		if stream.instances != nil {
-			stream.instances.Destroy()
-		}
-		stream.indices.Destroy()
-		stream.vertices.Destroy()
+		destroyAirspace(stream)
 	}
 	println("Destroyed Airspace stream Buffers and Device Memory")
 
@@ -153,10 +150,32 @@ func (app *Application) VulkanContextCleanup() error {
 	return nil
 }
 
+func destroyAirspace(airspace *Airspace) {
+	if airspace == nil {
+		return
+	}
+	for _, af := range airspace.features {
+		if af.vertices != nil {
+			af.vertices.Destroy()
+		}
+		if af.indices != nil {
+			af.indices.Destroy()
+		}
+	}
+}
+
 func (app *Application) NextFrame(deltaTime time.Duration) {
 	app.statsTracker.StartFrame()
 
 	app.frameCount++
+
+	if app.CurrentAirspace != nil {
+		color := airspaceColors[app.CurrentAirspace.Properties.Class]
+		color[3] = 0.2 // overlay intensity
+		app.ubo.OverlayColor = color
+	} else {
+		app.ubo.OverlayColor = [4]float32{0, 0, 0, 0}
+	}
 
 	// Update the camera and UBO
 	app.ubo.Time = float32(math.Mod(glfw.GetTime(), 3600.0))
@@ -349,31 +368,54 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 	}
 	app.ObstructionStreamer.Unlock()
 
+	// Draw Airspaces
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspacePipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	app.AirspaceStreamer.Lock()
+	currentAirspace := app.CurrentAirspace
+
 	for _, airspace := range app.AirspaceStreamer.Chunks {
-		if airspace != nil {
-			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
-			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
-			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		if airspace == nil {
+			continue
+		}
+		for j := range airspace.features {
+			af := &airspace.features[j]
+			if currentAirspace != nil && af.feature.Properties.Name == currentAirspace.Properties.Name {
+				continue
+			}
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{af.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, af.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, af.indexCount, 1, 0, 0, 0)
 		}
 	}
-	app.AirspaceStreamer.Unlock()
 
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.airspaceStencilPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout, 0, 1, []vk.DescriptorSet{res.DescriptorSet()}, 0, nil)
 
-	app.AirspaceStreamer.Lock()
 	for _, airspace := range app.AirspaceStreamer.Chunks {
-		if airspace != nil {
-			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{airspace.vertices.Buffer}, []vk.DeviceSize{0})
-			vk.CmdBindIndexBuffer(cmd, airspace.indices.Buffer, 0, vk.IndexTypeUint32)
-			vk.CmdDrawIndexed(cmd, airspace.indexCount, 1, 0, 0, 0)
+		if airspace == nil {
+			continue
+		}
+		for j := range airspace.features {
+			af := &airspace.features[j]
+			if currentAirspace != nil && af.feature.Properties.Name == currentAirspace.Properties.Name {
+				continue
+			}
+			vk.CmdBindVertexBuffers(cmd, 0, 1, []vk.Buffer{af.vertices.Buffer}, []vk.DeviceSize{0})
+			vk.CmdBindIndexBuffer(cmd, af.indices.Buffer, 0, vk.IndexTypeUint32)
+			vk.CmdDrawIndexed(cmd, af.indexCount, 1, 0, 0, 0)
 		}
 	}
-	app.AirspaceStreamer.Unlock()
+
+	if currentAirspace != nil {
+		color := airspaceColors[currentAirspace.Properties.Class]
+		colorBytes := *(*[16]byte)(unsafe.Pointer(&color))
+		vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.fullscreenOverlayPipeline)
+		vk.CmdPushConstants(cmd, app.pipelineLayout,
+			vk.ShaderStageFlags(vk.ShaderStageFragmentBit),
+			0, 16, unsafe.Pointer(&colorBytes))
+		vk.CmdDraw(cmd, 6, 1, 0, 0)
+	}
 
 	vk.CmdEndRenderPass(cmd)
 	ret = vk.EndCommandBuffer(cmd)
