@@ -11,7 +11,7 @@ import (
 
 	_ "github.com/cs-wwu/srg-synvis/internal/rendering/ui/menus"
 	"github.com/elokore/cimgui-go-vulkan/imgui"
-	"github.com/elokore/glfw/v3.4/glfw"
+	"github.com/go-gl/glfw/v3.4/glfw"
 	vk "github.com/vulkan-go/vulkan"
 	"github.com/xlab/closer"
 )

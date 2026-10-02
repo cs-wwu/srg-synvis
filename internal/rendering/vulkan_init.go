@@ -511,7 +511,6 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		log.Printf("vulkan: error loading airspace %s: %v", airspaceFile, err)
 		return nil
 	}
-
 	err = json.Unmarshal(file, &geojson)
 	if err != nil {
 		log.Printf("vulkan: error unmarshaling airspace %s: %v", airspaceFile, err)
@@ -523,38 +522,43 @@ func (app *Application) buildAirspace(pos spatial.MapCoord) *Airspace {
 		log.Printf("vulkan: error loading map data for airspace: %v", err)
 		return nil
 	}
-
 	heightInfo := chunk.NewHeightInfo(mapData.HeightData)
-	builder := newAirspaceBuilder(heightInfo)
-	instances := make([]AirspaceInstance, len(geojson.Features))
 
-	for i, airspace := range geojson.Features {
-		renderAirspace(builder, airspace, airspaceColors[airspace.Properties.Class])
-		instances[i] = AirspaceInstance{
-			LowerAlt: float32(airspace.Properties.AltitudeFloor),
-			UpperAlt: float32(airspace.Properties.AltitudeCeiling),
-			Color:    airspaceColors[airspace.Properties.Class],
-		}
+	airspaceFeatures := make([]AirspaceFeature, 0, len(geojson.Features))
+
+	for _, f := range geojson.Features {
+		builder := newAirspaceBuilder(heightInfo)
+		color := airspaceColors[f.Properties.Class]
+		renderAirspace(builder, f, color)
+
+		vertices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.vertexBytes(),
+			vk.BufferUsageVertexBufferBit,
+		)
+		indices := as.CreateBuffer(
+			app.Context().Device(),
+			app.Context().Platform().MemoryProperties(),
+			builder.indexBytes(),
+			vk.BufferUsageIndexBufferBit,
+		)
+
+		airspaceFeatures = append(airspaceFeatures, AirspaceFeature{
+			vertices:   vertices,
+			indices:    indices,
+			indexCount: uint32(len(builder.indices)),
+			instance: AirspaceInstance{
+				LowerAlt: float32(f.Properties.AltitudeFloor),
+				UpperAlt: float32(f.Properties.AltitudeCeiling),
+				Color:    color,
+			},
+			feature: f,
+		})
 	}
 
-	vertices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.vertexBytes(),
-		vk.BufferUsageVertexBufferBit,
-	)
-	indices := as.CreateBuffer(
-		app.Context().Device(),
-		app.Context().Platform().MemoryProperties(),
-		builder.indexBytes(),
-		vk.BufferUsageIndexBufferBit,
-	)
-
 	return &Airspace{
-		vertices:   vertices,
-		indices:    indices,
-		indexCount: uint32(len(builder.indices)),
-		features:   geojson.Features,
+		features: airspaceFeatures,
 	}
 }
 
@@ -1500,6 +1504,101 @@ func (app *Application) prepareAirspaceStencilPipeline() {
 	app.airspaceStencilPipeline = airspaceStencilPipeline[0]
 }
 
+func (app *Application) prepareFullscreenOverlayPipeline() {
+	dev := app.Context().Device()
+
+	vs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/insideAirspace.vert.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, vs, nil)
+	fs, err := as.LoadShaderModule(dev, FileToBytes("assets/shaders/insideAirspace.frag.spv"))
+	OrPanic(err)
+	defer vk.DestroyShaderModule(dev, fs, nil)
+
+	pipelineInfo := vk.GraphicsPipelineCreateInfo{
+		SType:      vk.StructureTypeGraphicsPipelineCreateInfo,
+		Layout:     app.pipelineLayout,
+		RenderPass: app.renderPass,
+
+		PDynamicState: &vk.PipelineDynamicStateCreateInfo{
+			SType:             vk.StructureTypePipelineDynamicStateCreateInfo,
+			DynamicStateCount: 2,
+			PDynamicStates: []vk.DynamicState{
+				vk.DynamicStateScissor,
+				vk.DynamicStateViewport,
+			},
+		},
+
+		PVertexInputState: &vk.PipelineVertexInputStateCreateInfo{
+			SType: vk.StructureTypePipelineVertexInputStateCreateInfo,
+		},
+
+		PInputAssemblyState: &vk.PipelineInputAssemblyStateCreateInfo{
+			SType:    vk.StructureTypePipelineInputAssemblyStateCreateInfo,
+			Topology: vk.PrimitiveTopologyTriangleList,
+		},
+
+		PRasterizationState: &vk.PipelineRasterizationStateCreateInfo{
+			SType:       vk.StructureTypePipelineRasterizationStateCreateInfo,
+			PolygonMode: vk.PolygonModeFill,
+			CullMode:    vk.CullModeFlags(vk.CullModeNone),
+			FrontFace:   vk.FrontFaceCounterClockwise,
+			LineWidth:   1.0,
+		},
+
+		PColorBlendState: &vk.PipelineColorBlendStateCreateInfo{
+			SType:           vk.StructureTypePipelineColorBlendStateCreateInfo,
+			AttachmentCount: 1,
+			PAttachments: []vk.PipelineColorBlendAttachmentState{{
+				ColorWriteMask:      0xF,
+				BlendEnable:         vk.True,
+				SrcColorBlendFactor: vk.BlendFactorSrcAlpha,
+				DstColorBlendFactor: vk.BlendFactorOneMinusSrcAlpha,
+				ColorBlendOp:        vk.BlendOpAdd,
+				SrcAlphaBlendFactor: vk.BlendFactorOne,
+				DstAlphaBlendFactor: vk.BlendFactorZero,
+				AlphaBlendOp:        vk.BlendOpAdd,
+			}},
+		},
+
+		PMultisampleState: &vk.PipelineMultisampleStateCreateInfo{
+			SType:                vk.StructureTypePipelineMultisampleStateCreateInfo,
+			RasterizationSamples: vk.SampleCount1Bit,
+		},
+
+		PViewportState: &vk.PipelineViewportStateCreateInfo{
+			SType:         vk.StructureTypePipelineViewportStateCreateInfo,
+			ScissorCount:  1,
+			ViewportCount: 1,
+		},
+
+		PDepthStencilState: &vk.PipelineDepthStencilStateCreateInfo{
+			SType:             vk.StructureTypePipelineDepthStencilStateCreateInfo,
+			DepthTestEnable:   vk.False,
+			DepthWriteEnable:  vk.False,
+			StencilTestEnable: vk.False,
+		},
+
+		StageCount: 2,
+		PStages: []vk.PipelineShaderStageCreateInfo{{
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageVertexBit,
+			Module: vs,
+			PName:  "main\x00",
+		}, {
+			SType:  vk.StructureTypePipelineShaderStageCreateInfo,
+			Stage:  vk.ShaderStageFragmentBit,
+			Module: fs,
+			PName:  "main\x00",
+		}},
+	}
+
+	pipeline := make([]vk.Pipeline, 1)
+	ret := vk.CreateGraphicsPipelines(dev, app.pipelineCache, 1,
+		[]vk.GraphicsPipelineCreateInfo{pipelineInfo}, nil, pipeline)
+	OrPanic(as.NewError(ret))
+	app.fullscreenOverlayPipeline = pipeline[0]
+}
+
 func (app *Application) preparePipeline() {
 	dev := app.Context().Device()
 
@@ -1750,7 +1849,7 @@ func (app *Application) VulkanContextPrepare() error {
 
 	app.AirspaceStreamer = streaming.NewDegreeStreamer(app.buildAirspace)
 	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
-	app.currentAirspace = nil
+	app.CurrentAirspace = nil
 
 	app.prepareUniformBuffers()
 	app.prepareDescriptorLayout()
@@ -1762,6 +1861,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.preparePlanePipeline()
 	app.prepareAirspacePipeline()
 	app.prepareAirspaceStencilPipeline()
+	app.prepareFullscreenOverlayPipeline()
 	app.prepareRoadPipeline()
 	app.prepareObstructionPipeline()
 	app.prepareDescriptorPool()

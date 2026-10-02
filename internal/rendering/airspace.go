@@ -1,7 +1,6 @@
 package rendering
 
 import (
-	"fmt"
 	"math"
 	"unsafe"
 
@@ -41,12 +40,16 @@ type AirspaceVertex struct {
 	Color    [4]float32
 }
 
-type Airspace struct {
+type AirspaceFeature struct {
 	vertices   *as.Buffer
 	indices    *as.Buffer
-	instances  *as.Buffer
 	indexCount uint32
-	features   []Feature
+	instance   AirspaceInstance
+	feature    Feature
+}
+
+type Airspace struct {
+	features []AirspaceFeature
 }
 
 type AirspaceInstance struct {
@@ -123,6 +126,9 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 		height := builder.heightInfo.Height(x, y)
 		lowerAlt := toWorldHeightAirspace(float32(props.AltitudeFloor + int(height) + 10))
 		upperAlt := toWorldHeightAirspace(float32(props.AltitudeCeiling))
+		if upperAlt < 0 {
+			upperAlt = 100000
+		}
 
 		bottomIds[i] = builder.addVertex(AirspaceVertex{
 			Position: [3]float32{float32(x), float32(lowerAlt), float32(y)},
@@ -145,24 +151,16 @@ func renderAirspace(builder *AirspaceBuilder, feature Feature, color [4]float32)
 			bottomIds[bottomTriangles[i+2]],
 			bottomIds[bottomTriangles[i+1]])
 
-		// Top cap - both sides
-		builder.addTriangle(topIds[bottomTriangles[i]],
-			topIds[bottomTriangles[i+1]],
-			topIds[bottomTriangles[i+2]])
+		// Top cap - just top side is needed
 		builder.addTriangle(topIds[bottomTriangles[i]],
 			topIds[bottomTriangles[i+2]],
 			topIds[bottomTriangles[i+1]])
 	}
 
-	// Build walls - both sides
 	for i := range n {
 		nextI := (i + 1) % n
-		// Outside face
 		builder.addTriangle(bottomIds[i], topIds[i], bottomIds[nextI])
 		builder.addTriangle(topIds[i], topIds[nextI], bottomIds[nextI])
-		// Inside face
-		builder.addTriangle(bottomIds[i], bottomIds[nextI], topIds[i])
-		builder.addTriangle(topIds[i], bottomIds[nextI], topIds[nextI])
 	}
 }
 
@@ -264,28 +262,27 @@ func pointInTriangle(p, a, b, c []float64) bool {
 	return (u >= 0) && (v >= 0) && (u+v < 1)
 }
 
-func isInsideAirspace(pos [3]float32, features []Feature) *Feature {
+func isInsideAirspace(pos [3]float32, features []AirspaceFeature) *Feature {
 	altitude := int(pos[1])
-
-	// Convert world coords to lat/lon
 	lat, lon := coords.WorldToGPSFloat(pos[0], pos[2])
 
 	for i := range features {
-		// Check altitude bounds first
-		low := int(math.Min(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
-		high := int(math.Max(float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeFloor))), float64(toWorldHeightAirspace(float32(features[i].Properties.AltitudeCeiling)))))
-
+		f := &features[i]
+		low := int(math.Min(float64(toWorldHeightAirspace(float32(f.feature.Properties.AltitudeFloor))),
+			float64(toWorldHeightAirspace(float32(f.feature.Properties.AltitudeCeiling)))))
+		high := int(math.Max(float64(toWorldHeightAirspace(float32(f.feature.Properties.AltitudeFloor))),
+			float64(toWorldHeightAirspace(float32(f.feature.Properties.AltitudeCeiling)))))
+		if float64(toWorldHeightAirspace(float32(f.feature.Properties.AltitudeCeiling))) < 0 {
+			high = 100000
+		}
 		if altitude < low || altitude > high {
 			continue
 		}
-
-		// 2D point-in-polygon check (lon/x, lat/y)
-		outer := features[i].Geometry.Coordinates[0] // type [][]float64
+		outer := f.feature.Geometry.Coordinates[0]
 		if pointInRing(float64(lon), float64(lat), outer) {
-			return &features[i] // Inside this airspace
+			return &f.feature
 		}
 	}
-
 	return nil
 }
 
@@ -309,21 +306,14 @@ func pointInRing(x, y float64, ring [][]float64) bool {
 
 func (app *Application) UpdateCurrentAirspace() {
 	cameraPos := app.Camera.Position()
-
-	// Get all loaded airspace chunks
-	loadedChunks := app.AirspaceStreamer.GetLoaded()
-
-	// Check features in all loaded chunks
-	for _, chunk := range loadedChunks {
+	for _, chunk := range app.AirspaceStreamer.GetLoaded() {
 		if chunk == nil {
 			continue
 		}
 		if inside := isInsideAirspace(cameraPos, chunk.features); inside != nil {
-			app.currentAirspace = inside
-			fmt.Printf("Current airspace: %s\n", inside.Properties.Name)
+			app.CurrentAirspace = inside
 			return
 		}
 	}
-
-	app.currentAirspace = nil
+	app.CurrentAirspace = nil
 }

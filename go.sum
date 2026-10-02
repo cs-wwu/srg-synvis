@@ -1,9 +1,9 @@
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121015643-83ae24cbf143 h1:LuhtV/ZvpOBqEM4qMoCp2udrsgH9rA/giBMncFAOaOE=
-github.com/elokore/cimgui-go-vulkan v0.0.0-20260121015643-83ae24cbf143/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
-github.com/elokore/glfw/v3.4/glfw v0.0.0-20251221231958-c1dc85df2170 h1:8erI7Buk8dSAVxBmQxiTnJDESbIoEesxEN8ZzjZcOE0=
-github.com/elokore/glfw/v3.4/glfw v0.0.0-20251221231958-c1dc85df2170/go.mod h1:uDdZ02tbI9khxEJbHKBCgnCgbe6Wxjjf5oG9eQjvFRw=
+github.com/elokore/cimgui-go-vulkan v0.0.0-20260415212211-f5a7b491908d h1:96Kv4uEcg0cXYi8b0czt7PGknKBBQdY1EJBA6SExqIc=
+github.com/elokore/cimgui-go-vulkan v0.0.0-20260415212211-f5a7b491908d/go.mod h1:CGO3/43BMQkgNZNf2dLYrGCkcykIZCCS2boofPKm2fI=
+github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1 h1:nIVzcwqIaO1mK8LFr0fGkKpgQD4wJDDHRyv4t5k40Ps=
+github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -28,11 +28,12 @@ type UniformBufferObject struct {
 	Projection      lin.Mat4x4 // camera to clip and screen space
 	NormalM         lin.Mat4x4 // for lighting
 	PlaneDirection  lin.Mat4x4
-	LightDir        lin.Vec3 // Light direction
-	RenderDistance  float32  // Maximum render distance
-	CameraPos       lin.Vec3 // camera position for terrain warnings
-	Time            float32  // Animation time
-	DisableWarnings float32  // 1.0 = disabled, 0.0 = enabled (match shader)
+	OverlayColor    [4]float32 // Overlay color for being inside airspace
+	LightDir        lin.Vec3   // Light direction
+	RenderDistance  float32    // Maximum render distance
+	CameraPos       lin.Vec3   // camera position for terrain warnings
+	Time            float32    // Animation time
+	DisableWarnings float32    // 1.0 = disabled, 0.0 = enabled (match shader)
 	DisableFog      float32
 }
 
