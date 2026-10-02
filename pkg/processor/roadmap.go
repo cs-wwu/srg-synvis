@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,6 +60,7 @@ var widths = map[string]float64{
 }
 
 var ErrRateLimited = errors.New("rate limited by OSM")
+var ErrGatewayTimeout = errors.New("504 gateway timeout from OSM")
 
 // Make an api request to overpass-api, process the data into and overpassResponse data type
 func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
@@ -82,7 +84,17 @@ func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 	out body;
 	`
 	var osmData OverpassResponse
-	resp, err := http.Post(OSMURL, "application/x-www-form-urlencoded", strings.NewReader("data="+query))
+	form := url.Values{}
+	form.Set("data", query)
+
+	req, err := http.NewRequest(http.MethodPost, OSMURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return osmData, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "WWU-SynVis-ResearchGroup")
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return osmData, fmt.Errorf("failed to make post request to %v: %w", OSMURL, err)
 	}
@@ -90,6 +102,8 @@ func MakeRoadApiRequest(lat int, lon int) (OverpassResponse, error) {
 
 	if resp.StatusCode == http.StatusTooManyRequests {
 		return osmData, ErrRateLimited
+	} else if resp.StatusCode == http.StatusGatewayTimeout {
+		return osmData, ErrGatewayTimeout
 	} else if resp.StatusCode != http.StatusOK {
 		return osmData, fmt.Errorf("received non-200 response: %d", resp.StatusCode)
 	}
@@ -211,8 +225,8 @@ func generateRoadSquare(outputDir string, lat int, lon int) error {
 		osmData, err = MakeRoadApiRequest(lat, lon)
 		if err == nil {
 			break
-		} else if errors.Is(err, ErrRateLimited) {
-			log.Printf("Rate limit from OSM, retrying in %v\n", time.Duration(delay)*time.Second)
+		} else if errors.Is(err, ErrRateLimited) || errors.Is(err, ErrGatewayTimeout) {
+			log.Printf("Received error %v, retrying in %v\n", err, time.Duration(delay)*time.Second)
 			time.Sleep(time.Duration(delay) * time.Second)
 			delay *= 2.0
 			attempts++
