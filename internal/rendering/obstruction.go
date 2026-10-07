@@ -70,10 +70,10 @@ var obsShapesMap = map[string]Shape{
 	"TANK":               Building,
 	"BALLOON":            Unmapped,
 	"TETRAHEDRON":        Unmapped, // Not found in data
-	"TOWER":              Pyramid,
+	"TOWER":              PyramidSmall,
 	"TRAMWAY":            Building,
 	"TRAMWAY PYLON":      Unmapped, // Not found in data
-	"T-L TWR":            Pyramid,
+	"T-L TWR":            PyramidSmall,
 	"UTILITY POLE":       PyramidSmall,
 	"VERTICAL STRUCTURE": Building,
 	"WALL":               Unmapped,
@@ -91,7 +91,7 @@ type ObstructionBuilder struct {
 }
 
 const (
-	OBSTRUCTION_BASE_RADIUS = 3.0
+	OBSTRUCTION_BASE_RADIUS = 2.5
 )
 
 var (
@@ -312,6 +312,20 @@ func (builder *ObstructionBuilder) addVertex(vertex ObstructionVertex) (id uint3
 }
 
 func (builder *ObstructionBuilder) addTriangle(a, b, c uint32) {
+	v0 := builder.vertices[a]
+	v1 := builder.vertices[b]
+	v2 := builder.vertices[c]
+
+	edge1 := v1.Position.Sub(&v0.Position)
+	edge2 := v2.Position.Sub(&v0.Position)
+
+	normal := crossVec(*edge1, *edge2)
+	normal.Normalize()
+
+	builder.vertices[a].Normal = normal
+	builder.vertices[b].Normal = normal
+	builder.vertices[c].Normal = normal
+
 	builder.indices = append(builder.indices, a, b, c)
 }
 
@@ -339,4 +353,11 @@ func (builder *ObstructionBuilder) indexBytes() []byte {
 
 	size := len(builder.indices) * int(unsafe.Sizeof(uint32(0)))
 	return unsafe.Slice((*byte)(unsafe.Pointer(&builder.indices[0])), size)
+}
+
+func crossVec(a vec3.T, b vec3.T) vec3.T {
+	x := a[1]*b[2] - a[2]*b[1]
+	y := a[2]*b[0] - a[0]*b[2]
+	z := a[0]*b[1] - a[1]*b[0]
+	return vec3.T{x, y, z}
 }
