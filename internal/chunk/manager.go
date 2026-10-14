@@ -79,7 +79,7 @@ func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProp
 		requests:      make(chan *spatial.QuadTreeNode[renderChunk], 1024),
 		completed:     make(chan completion, 64),
 	}
-	for range 32 {
+	for range 4 {
 		go c.runWorker()
 	}
 	return c
