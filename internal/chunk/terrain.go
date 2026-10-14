@@ -192,7 +192,7 @@ func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryPro
 		copy(vertexData[i*VertexSize:], vertex.Data())
 	}
 	vb := as.CreateBuffer(device, memProps, vertexData, vk.BufferUsageVertexBufferBit)
-	out.vertexBuffer = vb.Buffer
+	out.vertexBuffer = vb
 
 	// Index buffer
 	indexData := make([]byte, len(chunk.Indices)*IndexSize)
@@ -200,7 +200,7 @@ func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryPro
 		binary.LittleEndian.PutUint32(indexData[i*IndexSize:], uint32(index))
 	}
 	ib := as.CreateBuffer(device, memProps, indexData, vk.BufferUsageIndexBufferBit)
-	out.indexBuffer = ib.Buffer
+	out.indexBuffer = ib
 
 	out.indexCount = uint32(len(chunk.Indices))
 	return

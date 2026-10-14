@@ -31,6 +31,21 @@ func (qt *QuadTree[T]) Leaves() iter.Seq[*QuadTreeNode[T]] {
 	}
 }
 
+// Walk calls f on every node in the tree, leaves and internal nodes alike.
+func (qt *QuadTree[T]) Walk(f func(*QuadTreeNode[T])) {
+	qt.root.walk(f)
+}
+
+func (n *QuadTreeNode[T]) walk(f func(*QuadTreeNode[T])) {
+	f(n)
+	if n.IsLeaf() {
+		return
+	}
+	for _, child := range n.children {
+		child.walk(f)
+	}
+}
+
 func (n *QuadTreeNode[T]) walkLeaves(yield func(*QuadTreeNode[T]) bool) bool {
 	if n.IsLeaf() {
 		return yield(n)
