@@ -1,6 +1,8 @@
 package chunk
 
 import (
+	"sync"
+
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/assets"
 	"github.com/ungerik/go3d/float64/vec3"
@@ -27,6 +29,11 @@ type ChunkManager struct {
 	splitRequests map[*spatial.QuadTreeNode[renderChunk]]struct{}
 	requests      chan *spatial.QuadTreeNode[renderChunk]
 	completed     chan completion
+
+	// Closed by Destroy to tell the workers to exit. `workers` is used to wait
+	// for them.
+	stop    chan struct{}
+	workers sync.WaitGroup
 }
 
 // The lifecycle of a renderChunk's GPU memory:
@@ -78,21 +85,41 @@ func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProp
 		splitRequests: map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
 		requests:      make(chan *spatial.QuadTreeNode[renderChunk], 1024),
 		completed:     make(chan completion, 64),
+		stop:          make(chan struct{}),
 	}
 	for range 4 {
+		c.workers.Add(1)
 		go c.runWorker()
 	}
 	return c
 }
 
 func (c *ChunkManager) runWorker() {
-	for node := range c.requests {
+	defer c.workers.Done()
+
+	for {
+		var node *spatial.QuadTreeNode[renderChunk]
+		select {
+		case <-c.stop:
+			return
+		case node = <-c.requests:
+		}
+
 		// Split the node `c` into 4, then build those 4 renderChunks, then send em back.
 		chunks := [4]renderChunk{}
 		for i, pos := range node.DirectChildrenPositions() {
 			chunks[i] = c.buildChunk(pos, node.Size()/2)
 		}
-		c.completed <- completion{node: node, chunks: chunks}
+
+		select {
+		case c.completed <- completion{node: node, chunks: chunks}:
+		case <-c.stop:
+			// Nobody will receive these, so free them here.
+			for i := range chunks {
+				chunks[i].free()
+			}
+			return
+		}
 	}
 }
 
@@ -219,10 +246,11 @@ func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float6
 	return delta.Length()
 }
 
-// Destroy frees every chunk. The caller must have waited for the device to be
-// idle.
+// Destroy stops the workers, waits for them to exit, and then frees every
+// chunk. The caller must have waited for the device to be idle.
 func (c *ChunkManager) Destroy() {
-	close(c.requests)
+	close(c.stop)
+	c.workers.Wait()
 
 	for {
 		select {
