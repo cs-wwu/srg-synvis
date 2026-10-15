@@ -26,8 +26,12 @@ type ChunkManager struct {
 	// Incremented once per RenderChunks call.
 	frame uint64
 
-	splitRequests map[*spatial.QuadTreeNode[renderChunk]]struct{}
-	requests      chan *spatial.QuadTreeNode[renderChunk]
+	// Maps a node to the id of its in-flight split request. A completion is only
+	// applied if its id still matches, so results for a node that was merged
+	// (and possibly split again) since the request are discarded.
+	splitRequests map[*spatial.QuadTreeNode[renderChunk]]uint64
+	nextRequest   uint64
+	requests      chan splitRequest
 	completed     chan completion
 
 	// Closed by Destroy to tell the workers to exit. `workers` is used to wait
@@ -71,8 +75,14 @@ type retiredChunk struct {
 // a guarantee.
 const retireDelay = 8
 
+type splitRequest struct {
+	node *spatial.QuadTreeNode[renderChunk]
+	id   uint64
+}
+
 type completion struct {
 	node   *spatial.QuadTreeNode[renderChunk]
+	id     uint64
 	chunks [4]renderChunk
 }
 
@@ -82,8 +92,8 @@ func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProp
 		device:        device,
 		memProps:      memProps,
 		chunks:        spatial.NewQuadTree[renderChunk](1024 * 1024),
-		splitRequests: map[*spatial.QuadTreeNode[renderChunk]]struct{}{},
-		requests:      make(chan *spatial.QuadTreeNode[renderChunk], 1024),
+		splitRequests: map[*spatial.QuadTreeNode[renderChunk]]uint64{},
+		requests:      make(chan splitRequest, 1024),
 		completed:     make(chan completion, 64),
 		stop:          make(chan struct{}),
 	}
@@ -98,12 +108,13 @@ func (c *ChunkManager) runWorker() {
 	defer c.workers.Done()
 
 	for {
-		var node *spatial.QuadTreeNode[renderChunk]
+		var req splitRequest
 		select {
 		case <-c.stop:
 			return
-		case node = <-c.requests:
+		case req = <-c.requests:
 		}
+		node := req.node
 
 		// Split the node `c` into 4, then build those 4 renderChunks, then send em back.
 		chunks := [4]renderChunk{}
@@ -112,7 +123,7 @@ func (c *ChunkManager) runWorker() {
 		}
 
 		select {
-		case c.completed <- completion{node: node, chunks: chunks}:
+		case c.completed <- completion{node: node, id: req.id, chunks: chunks}:
 		case <-c.stop:
 			// Nobody will receive these, so free them here.
 			for i := range chunks {
@@ -138,16 +149,21 @@ outer:
 	for {
 		select {
 		case completion := <-c.completed:
-			// Double check that it's still a leaf. If not, these chunks never
-			// reached the GPU, so they can be freed right away.
-			if !completion.node.IsLeaf() {
+			// The request is stale if the node was merged since (which clears its
+			// entry, and a later split gets a new id), or if it's no longer a leaf.
+			// These chunks never reached the GPU, so they can be freed right away.
+			id, ok := c.splitRequests[completion.node]
+			current := ok && id == completion.id
+			if current {
+				delete(c.splitRequests, completion.node)
+			}
+			if !current || !completion.node.IsLeaf() {
 				for i := range completion.chunks {
 					completion.chunks[i].free()
 				}
 				continue
 			}
 
-			delete(c.splitRequests, completion.node)
 			children := c.chunks.Split(completion.node)
 			for i, child := range children {
 				child.Value = completion.chunks[i]
@@ -176,6 +192,7 @@ outer:
 		if parent.IsLeaf() {
 			continue
 		}
+		delete(c.splitRequests, parent)
 		for child := range parent.Children() {
 			delete(c.splitRequests, child)
 			c.retire(child.Value)
@@ -210,9 +227,11 @@ func (c *ChunkManager) freeRetired() {
 
 func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 	if _, ok := c.splitRequests[leaf]; !ok {
+		id := c.nextRequest + 1
 		select {
-		case c.requests <- leaf:
-			c.splitRequests[leaf] = struct{}{}
+		case c.requests <- splitRequest{node: leaf, id: id}:
+			c.nextRequest = id
+			c.splitRequests[leaf] = id
 		default:
 			// Queue full, will retry next frame.
 		}
