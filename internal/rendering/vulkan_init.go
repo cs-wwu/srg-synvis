@@ -490,7 +490,7 @@ func (app *Application) prepareTextures() {
 
 		var view vk.ImageView
 		ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
-			SType:    vk.StructureTypeSamplerCreateInfo,
+			SType:    vk.StructureTypeImageViewCreateInfo,
 			Image:    tex.image,
 			ViewType: vk.ImageViewType2d,
 			Format:   TextureFormat,
