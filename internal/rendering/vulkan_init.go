@@ -1723,7 +1723,7 @@ func (app *Application) VulkanContextPrepare() error {
 	app.prepareDepth()
 	app.prepareTextures()
 
-	// Initialize StreamManager
+	// Initialize ChunkManager
 	app.ChunkManager = chunk.NewChunkManager(
 		assets.NewAssetManager(MAP_FOLDER, 50),
 		app.Context().Device(),

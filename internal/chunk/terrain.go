@@ -2,7 +2,6 @@ package chunk
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/cs-wwu/srg-synvis/core/spatial"
 	"github.com/cs-wwu/srg-synvis/internal/coords"
@@ -43,13 +42,7 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 	chunk.calculateIndices()
 	chunk.calculateNormals()
 
-	out, err := chunk.upload(c.device, c.memProps)
-	if err != nil {
-		fmt.Printf("Failed to upload chunk: %v\n", err)
-		return renderChunk{}
-	}
-
-	return out
+	return chunk.upload(c.device, c.memProps)
 }
 
 // Calculate vertices and texcoords for a chunk
@@ -67,13 +60,9 @@ func (chunk *Chunk) calculateVertices(heightInfo *HeightInfo) {
 
 			height := heightInfo.Height(float32(worldX), float32(worldZ))
 
-			isWater := heightInfo.IsWater(worldX, worldZ)
 			var waterVal float32
-			// Seriously go? No one-liners??
-			if isWater {
+			if heightInfo.IsWater(worldX, worldZ) {
 				waterVal = 1.0
-			} else {
-				waterVal = 0.0
 			}
 
 			localX, localZ := coords.WorldToPixel(worldX, worldZ)
@@ -161,7 +150,7 @@ func (chunk *Chunk) calculateNormals() {
 	chunk.Vertices[lastIdx].Normal = chunk.Vertices[lastIdx-1].Normal
 }
 
-func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) (out renderChunk, err error) {
+func (chunk *Chunk) upload(device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) (out renderChunk) {
 	// Vertex buffer
 	vertexData := make([]byte, len(chunk.Vertices)*VertexSize)
 	for i, vertex := range chunk.Vertices {

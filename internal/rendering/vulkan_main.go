@@ -64,7 +64,7 @@ func (app *Application) VulkanContextCleanup() error {
 
 	// Stop background workers before destroying resources
 	app.ChunkManager.Destroy()
-	println("Destroyed stream manager")
+	println("Destroyed chunk manager")
 	app.CimguiBackend.Cleanup()
 
 	vk.DestroyPipeline(dev, app.pipeline, nil)
@@ -164,9 +164,9 @@ func (app *Application) NextFrame(deltaTime time.Duration) {
 	cameraPos := app.Camera.Position()
 	app.ubo.CameraPos = cameraPos
 
-	// Update the camera position in the stream manager (non-blocking)
-	// This will trigger background chunk loading/unloading
-	app.ChunkManager.UpdatePos(app.Camera.Position())
+	// Update the camera position in the chunk manager. Chunk splitting and
+	// merging happens on the next RenderChunks call.
+	app.ChunkManager.UpdatePos(cameraPos)
 	app.RoadStreamer.UpdatePos(app.Camera.Position())
 	app.ObstructionStreamer.UpdatePos(app.Camera.Position())
 	app.AirspaceStreamer.UpdatePos(app.Camera.Position())
