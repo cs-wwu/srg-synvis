@@ -264,14 +264,29 @@ func (c *ChunkManager) requestSplit(leaf *spatial.QuadTreeNode[renderChunk]) {
 	}
 }
 
+// Split and merge thresholds. Distances are in world units (arcseconds), and
+// are independent of the camera far plane, which is much further away. Each
+// split threshold is lower than its merge threshold, so that chunks near the
+// boundary don't flip between split and merged.
+const (
+	// Leaves further than this are never split.
+	splitMaxDistance = 8000
+	// A leaf is split while it is closer than this many chunk widths.
+	splitSizeRatio = 2.0
+	// Parents further than this are always merged.
+	mergeMinDistance = 10000
+	// A parent is merged once it is further than this many chunk widths.
+	mergeSizeRatio = 2.5
+)
+
 func (c *ChunkManager) tooCoarse(leaf *spatial.QuadTreeNode[renderChunk]) bool {
 	d := c.distance(leaf)
-	return d < 8000 && d/float64(leaf.Size()) < 2.0
+	return d < splitMaxDistance && d/float64(leaf.Size()) < splitSizeRatio
 }
 
 func (c *ChunkManager) tooFine(leaf *spatial.QuadTreeNode[renderChunk]) bool {
 	d := c.distance(leaf)
-	return d > 10000 || c.distance(leaf)/float64(leaf.Size()) > 2.5
+	return d > mergeMinDistance || d/float64(leaf.Size()) > mergeSizeRatio
 }
 
 func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float64 {
