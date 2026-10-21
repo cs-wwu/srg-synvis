@@ -47,6 +47,9 @@ type ChunkManager struct {
 	destroyOnce sync.Once
 
 	stats RenderStats
+
+	// Frees a chunk's GPU memory. A field so that tests can run without Vulkan.
+	release func(*renderChunk)
 }
 
 // RenderStats describes what the last RenderChunks call recorded.
@@ -116,6 +119,7 @@ func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProp
 		requests:      make(chan splitRequest, 1024),
 		completed:     make(chan completion, 64),
 		stop:          make(chan struct{}),
+		release:       (*renderChunk).free,
 	}
 	for range 4 {
 		c.workers.Add(1)
@@ -147,7 +151,7 @@ func (c *ChunkManager) runWorker() {
 		case <-c.stop:
 			// Nobody will receive these, so free them here.
 			for i := range chunks {
-				chunks[i].free()
+				c.release(&chunks[i])
 			}
 			return
 		}
@@ -179,7 +183,7 @@ outer:
 			}
 			if !current || !completion.node.IsLeaf() {
 				for i := range completion.chunks {
-					completion.chunks[i].free()
+					c.release(&completion.chunks[i])
 				}
 				continue
 			}
@@ -245,7 +249,7 @@ func (c *ChunkManager) retire(chunk renderChunk) {
 func (c *ChunkManager) freeRetired() {
 	n := 0
 	for n < len(c.retired) && c.frame-c.retired[n].frame >= c.retireDelay {
-		c.retired[n].chunk.free()
+		c.release(&c.retired[n].chunk)
 		n++
 	}
 	c.retired = c.retired[n:]
@@ -321,7 +325,7 @@ func (c *ChunkManager) destroy() {
 		select {
 		case completion := <-c.completed:
 			for i := range completion.chunks {
-				completion.chunks[i].free()
+				c.release(&completion.chunks[i])
 			}
 			continue
 		default:
@@ -330,11 +334,11 @@ func (c *ChunkManager) destroy() {
 	}
 
 	for _, r := range c.retired {
-		r.chunk.free()
+		c.release(&r.chunk)
 	}
 	c.retired = nil
 	c.chunks.Walk(func(n *spatial.QuadTreeNode[renderChunk]) {
-		n.Value.free()
+		c.release(&n.Value)
 	})
 }
 
