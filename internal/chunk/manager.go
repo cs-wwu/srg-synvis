@@ -42,8 +42,9 @@ type ChunkManager struct {
 
 	// Closed by Destroy to tell the workers to exit. `workers` is used to wait
 	// for them.
-	stop    chan struct{}
-	workers sync.WaitGroup
+	stop        chan struct{}
+	workers     sync.WaitGroup
+	destroyOnce sync.Once
 
 	stats RenderStats
 }
@@ -291,8 +292,13 @@ func (c *ChunkManager) distance(chunk *spatial.QuadTreeNode[renderChunk]) float6
 }
 
 // Destroy stops the workers, waits for them to exit, and then frees every
-// chunk. The caller must have waited for the device to be idle.
+// chunk. The caller must have waited for the device to be idle. Calling it
+// more than once is a no-op.
 func (c *ChunkManager) Destroy() {
+	c.destroyOnce.Do(c.destroy)
+}
+
+func (c *ChunkManager) destroy() {
 	close(c.stop)
 	c.workers.Wait()
 
