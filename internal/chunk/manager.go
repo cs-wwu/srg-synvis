@@ -38,6 +38,22 @@ type ChunkManager struct {
 	// for them.
 	stop    chan struct{}
 	workers sync.WaitGroup
+
+	stats RenderStats
+}
+
+// RenderStats describes what the last RenderChunks call recorded.
+type RenderStats struct {
+	// Number of chunks drawn, which is also the number of draw calls.
+	Chunks int
+	// Number of indices submitted. Triangle strips, so this is also roughly the
+	// number of vertices processed.
+	Indices int
+}
+
+// Stats returns the stats from the last RenderChunks call.
+func (c *ChunkManager) Stats() RenderStats {
+	return c.stats
 }
 
 // The lifecycle of a renderChunk's GPU memory:
@@ -200,8 +216,14 @@ outer:
 		c.chunks.Merge(parent)
 	}
 
+	c.stats = RenderStats{}
 	for leaf := range c.chunks.Leaves() {
+		if leaf.Value.indexCount == 0 {
+			continue
+		}
 		leaf.Value.Render(cmd)
+		c.stats.Chunks++
+		c.stats.Indices += int(leaf.Value.indexCount)
 	}
 }
 

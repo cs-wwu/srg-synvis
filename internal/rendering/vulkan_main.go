@@ -295,6 +295,14 @@ func (app *Application) updateCommandBuffer(res *as.SwapchainImageResources, cmd
 
 	app.ChunkManager.RenderChunks(cmd)
 
+	chunkStats := app.ChunkManager.Stats()
+	app.statsTracker.UpdateRenderingStats(
+		chunkStats.Indices,
+		chunkStats.Indices/3,
+		chunkStats.Chunks, // draw calls
+		chunkStats.Chunks, // chunk count
+	)
+
 	// Draw roads
 	vk.CmdBindPipeline(cmd, vk.PipelineBindPointGraphics, app.roadPipeline)
 	vk.CmdBindDescriptorSets(cmd, vk.PipelineBindPointGraphics, app.pipelineLayout,
