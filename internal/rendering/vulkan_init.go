@@ -179,16 +179,32 @@ func (app *Application) updateUBO() {
 	app.ubo.View = app.Camera.ViewMatrix()
 }
 
+// chooseDepthFormat returns the first depth format that the GPU can use as an
+// optimally tiled depth/stencil attachment.
+func (app *Application) chooseDepthFormat() vk.Format {
+	gpu := app.Context().Platform().PhysicalDevice()
+	for _, format := range depthFormatCandidates {
+		var props vk.FormatProperties
+		vk.GetPhysicalDeviceFormatProperties(gpu, format, &props)
+		props.Deref()
+
+		if props.OptimalTilingFeatures&vk.FormatFeatureFlags(vk.FormatFeatureDepthStencilAttachmentBit) != 0 {
+			return format
+		}
+	}
+	panic("vulkan: no supported depth/stencil format")
+}
+
 // Prepare depth buffers
 func (app *Application) prepareDepth() {
 	dev := app.Context().Device()
 	app.depth = &Depth{
-		format: DepthFormat,
+		format: app.chooseDepthFormat(),
 	}
 	ret := vk.CreateImage(dev, &vk.ImageCreateInfo{
 		SType:     vk.StructureTypeImageCreateInfo,
 		ImageType: vk.ImageType2d,
-		Format:    DepthFormat,
+		Format:    app.depth.format,
 		Extent: vk.Extent3D{
 			Width:  app.width,
 			Height: app.height,
@@ -226,7 +242,7 @@ func (app *Application) prepareDepth() {
 	var view vk.ImageView
 	ret = vk.CreateImageView(dev, &vk.ImageViewCreateInfo{
 		SType:  vk.StructureTypeImageViewCreateInfo,
-		Format: DepthFormat,
+		Format: app.depth.format,
 		SubresourceRange: vk.ImageSubresourceRange{
 			AspectMask: vk.ImageAspectFlags(vk.ImageAspectDepthBit),
 			LevelCount: 1,

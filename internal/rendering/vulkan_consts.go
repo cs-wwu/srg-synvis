@@ -104,9 +104,16 @@ var texEnabled = []string{
 }
 
 const (
-	DepthFormat   = vk.FormatD24UnormS8Uint
 	TextureFormat = vk.FormatR8g8b8a8Unorm
 )
+
+// Depth formats to try, in order. The airspace pass uses the stencil buffer, so
+// they all need a stencil aspect. D24S8 isn't supported on most AMD GPUs, but
+// D32S8 is.
+var depthFormatCandidates = []vk.Format{
+	vk.FormatD24UnormS8Uint,
+	vk.FormatD32SfloatS8Uint,
+}
 
 var airspaceColors = map[string][4]float32{
 	"A": {0.8, 0.0, 0.0, 0.4},  // Red - highest priority controlled airspace
