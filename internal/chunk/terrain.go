@@ -11,23 +11,12 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-type LODLevel int
-
 // Nodes larger than this are not meshed.
 const MAX_CHUNK_SIZE = 8192
 
 // Leaves are not split to be smaller than this. Also, the number of vertices
 // in every chunk.
 const MIN_CHUNK_SIZE = 64
-
-const (
-	LOD_0 LODLevel = iota // Full detail
-	LOD_1                 // Half detail
-	LOD_2                 // Quarter detail
-	LOD_3                 // Eighth detail
-	LOD_4                 // Sixteenth detail
-	LOD_COUNT
-)
 
 type Chunk struct {
 	Vertices []Vertex
@@ -61,19 +50,6 @@ func (c *ChunkManager) buildChunk(pos spatial.GridCoord, size uint) renderChunk 
 	}
 
 	return out
-}
-
-// Loads a specific chunk into memory, x and z are the upper-left corner of
-// the chunk (world is in arcsecond coordinates)
-// Note that the world is Latitude by Longitude times 3600 (arcseconds):
-//
-//	<-    3600 * 360   ->
-//	--------------------- ▲
-//	|      World        | 3600 * 180
-//	--------------------- ▼
-
-func ChunkKey(chunkX, chunkZ int) string {
-	return fmt.Sprintf("%d,%d", chunkX, chunkZ)
 }
 
 // Calculate vertices and texcoords for a chunk
