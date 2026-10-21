@@ -1728,6 +1728,7 @@ func (app *Application) VulkanContextPrepare() error {
 		assets.NewAssetManager(MAP_FOLDER, 50),
 		app.Context().Device(),
 		app.Context().Platform().MemoryProperties(),
+		len(app.Context().SwapchainImageResources()),
 	)
 	app.ChunkManager.UpdatePos(app.Camera.Position())
 

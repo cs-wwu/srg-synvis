@@ -23,6 +23,12 @@ type ChunkManager struct {
 	// Chunks that were merged away and are waiting for the GPU to finish with
 	// them. See retire().
 	retired []retiredChunk
+	// How many RenderChunks calls to wait before freeing a retired chunk. A
+	// command buffer that recorded the chunk can still be executing until the
+	// swapchain has cycled through every image, so this is the number of
+	// swapchain images plus one. The render loop has no per-frame fences, so
+	// this is a conservative bound rather than a guarantee.
+	retireDelay uint64
 	// Incremented once per RenderChunks call.
 	frame uint64
 
@@ -84,13 +90,6 @@ type retiredChunk struct {
 	frame uint64
 }
 
-// How many RenderChunks calls to wait before freeing a retired chunk. This
-// needs to be at least the number of swapchain images, as a command buffer
-// that recorded the chunk may still be executing for that long. The render
-// loop has no per-frame fences, so this is a conservative constant rather than
-// a guarantee.
-const retireDelay = 8
-
 type splitRequest struct {
 	node *spatial.QuadTreeNode[renderChunk]
 	id   uint64
@@ -102,11 +101,15 @@ type completion struct {
 	chunks [4]renderChunk
 }
 
-func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProps vk.PhysicalDeviceMemoryProperties) *ChunkManager {
+// NewChunkManager creates a manager and starts its workers. `swapchainImages` is
+// the number of swapchain images, which bounds how many frames can be in
+// flight at once.
+func NewChunkManager(assetManager assets.AssetManager, device vk.Device, memProps vk.PhysicalDeviceMemoryProperties, swapchainImages int) *ChunkManager {
 	c := &ChunkManager{
 		AssetManager:  assetManager,
 		device:        device,
 		memProps:      memProps,
+		retireDelay:   uint64(swapchainImages) + 1,
 		chunks:        spatial.NewQuadTree[renderChunk](1024 * 1024),
 		splitRequests: map[*spatial.QuadTreeNode[renderChunk]]uint64{},
 		requests:      make(chan splitRequest, 1024),
@@ -240,7 +243,7 @@ func (c *ChunkManager) retire(chunk renderChunk) {
 // ordered by frame, so we only need to look at the front.
 func (c *ChunkManager) freeRetired() {
 	n := 0
-	for n < len(c.retired) && c.frame-c.retired[n].frame >= retireDelay {
+	for n < len(c.retired) && c.frame-c.retired[n].frame >= c.retireDelay {
 		c.retired[n].chunk.free()
 		n++
 	}
