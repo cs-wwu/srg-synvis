@@ -235,8 +235,6 @@ func NewPlatform(app Application) (pFace Platform, err error) {
 		PQueueCreateInfos:       queueInfos,
 		EnabledExtensionCount:   uint32(len(deviceExtensions)),
 		PpEnabledExtensionNames: deviceExtensions,
-		EnabledLayerCount:       uint32(len(validationLayers)),
-		PpEnabledLayerNames:     validationLayers,
 		PEnabledFeatures:        features,
 	}, nil, &device)
 	orPanic(NewError(ret))
