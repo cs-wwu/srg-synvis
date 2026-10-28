@@ -1,0 +1,63 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: # Builds the artifact without publishing a release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          # Raspberry Pi (64-bit OS); native build since cgo can't cross-compile easily
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: ./go.mod
+          cache-dependency-path: ./go.sum
+
+      - name: Install Graphics and Vulkan Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            mesa-vulkan-drivers \
+            vulkan-tools \
+            libvulkan-dev \
+            vulkan-utility-libraries-dev \
+            spirv-tools \
+            libglfw3-dev \
+            libglm-dev \
+            libxi-dev \
+            libxxf86vm-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libxkbcommon-dev \
+            libwayland-dev
+
+      - name: Build
+        run: |
+          go build -trimpath -ldflags "-s -w" -o svs-linux-${{ matrix.arch }} ./cmd/svs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: svs-linux-${{ matrix.arch }}
+          path: svs-linux-${{ matrix.arch }}
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: svs-linux-${{ matrix.arch }}
