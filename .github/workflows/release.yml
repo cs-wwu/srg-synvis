@@ -40,32 +40,16 @@ jobs:
 
       - name: Build
         run: |
-          go build -trimpath -ldflags "-s -w" -o dist/svs ./cmd/svs
-          go build -trimpath -ldflags "-s -w" -o dist/download ./cmd/download
-
-      # The binary loads shaders, fonts, models, etc. from ./assets at runtime
-      - name: Package
-        run: |
-          NAME="svs-${GITHUB_REF_NAME}-linux-amd64"
-          mkdir -p "$NAME"
-          cp dist/svs dist/download LICENSE README.md .env.example "$NAME"/
-          cp -r assets "$NAME"/assets
-          tar -czf "$NAME.tar.gz" "$NAME"
-          sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
-          echo "ARCHIVE=$NAME.tar.gz" >> "$GITHUB_ENV"
+          go build -trimpath -ldflags "-s -w" -o svs-linux-amd64 ./cmd/svs
 
       - uses: actions/upload-artifact@v4
         with:
           name: svs-linux-amd64
-          path: |
-            ${{ env.ARCHIVE }}
-            ${{ env.ARCHIVE }}.sha256
+          path: svs-linux-amd64
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            ${{ env.ARCHIVE }}
-            ${{ env.ARCHIVE }}.sha256
+          files: svs-linux-amd64
