@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
+	"github.com/cs-wwu/srg-synvis/internal/recording"
 
 	"github.com/stratoberry/go-gpsd"
 	"github.com/westphae/geomag/pkg/egm96"
@@ -86,6 +87,14 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 
 		// Update camera position
 		sm.camera.updatePosition(newX, newZ, newY)
+
+		// Log it!
+		recording.Logger.Log(&recording.EventGpsPoint{
+			Latitude:  float64(report.Lat),
+			Longitude: float64(report.Lon),
+			Altitude:  float64(report.Alt),
+			Speed:     float64(report.Speed),
+		})
 
 		// Log movement delta for prediction
 		xdif = newX - oldX
@@ -167,6 +176,12 @@ func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 		if err := sm.applyMagneticDeclination(&yaw); err != nil {
 			log.Printf("Warning: Could not apply magnetic declination: %v", err)
 		}
+
+		recording.Logger.Log(&recording.EventHatOrientation{
+			Pitch: pitch,
+			Roll:  roll,
+			Yaw:   yaw,
+		})
 
 		// Apply smoothing to reduce sensor noise
 		if !first {
