@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "github.com/cs-wwu/srg-synvis/assets/chunks/roads";
+
+message Road {
+  string type = 1;
+  repeated Point points = 2;
+}
+
+message Point {
+  double lat = 1;
+  double lon = 2;
+}
+
+message RoadSquare {
+  int32 lat_deg = 1;
+  int32 lon_deg = 2;
+  repeated Road roads = 3;
+}

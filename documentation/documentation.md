@@ -20,15 +20,17 @@ kmd/
 │   │   │   └── kotlin/
 │   │   │       └── com/jeetbrains/greeting/kmd/
 │   │   │           ├── DownloadManager.kt       # expect declarations
-│   │   │           └── BoundingBox.kt           # shared data model
+│   │   │           └── App.kt                   # screen format with buttons and state coordinate definitions
 │   │   │
 │   │   ├── jvmMain/             # JVM/Desktop-specific code
 │   │   │   ├── kotlin/
 │   │   │   │   └── com/jeetbrains/greeting/kmd/
 │   │   │   │       ├── DownloadManager.jvm.kt   # Desktop implementation
-│   │   │   │       ├── nasa.kt                  # NASA data downloader
 │   │   │   │       ├── faa.kt                   # FAA data processor
-│   │   │   │       └── osm.kt                   # OSM data fetcher
+│   │   │   │       ├── heightmap.kt             # .hgt to PNG processor
+│   │   │   │       ├── nasa.kt                  # NASA data downloader (heightmaps)
+│   │   │   │       ├── road.kt                  # OSM road fetcher
+│   │   │   │       └── water.kt                 # .swb to PNG processor
 │   │   │   ├── java/                            # Generated protobuf classes
 │   │   │   │   ├── obs/Faa.java
 │   │   │   │   └── RoadOuterClass.java
@@ -46,12 +48,24 @@ kmd/
 ### Nasa Earthdata (Elevation Data)
 **Purpose:** Downloads NASADEM heightmap tiles for terrain elevation data.
 
-**File:** `nasa.kt`
+**Files:** 
+- `nasa.kt` - Download + extraction
+- `heightmap.kt` heightmap to PNG conversion
+- `water.kt` watermap to PNG conversion
 
 **Key Functions:**
+nasa.kt:
 - `downloadHeightmaps(heightmaps: List<String>, directoryPath: String)` - Downloads NASA elevation tiles
-- `heightmapToURL(heightmap: String)` - Converts tile IDs (e.g., "n48w123") to NASA download URLs
-- `unzip(zipFile: String, targetDir: String)` - Extracts downloaded zip archives
+- `processHeightmaps(heightmaps: List<String>, directoryPath: String)` - Unzips and converts NASA tiles to pngs
+
+heightmap.kt:
+- `heightmapToPng(heightmapFilepath: String, pngFilepath: String)` - Converts 16-bit elevation data to grayscale PNG
+- `Elevations` class - Parses big-endian int16 elevation grid (3601×3601)
+- `ElevationPixels` class - Normalizes signed int16 (-32768 to 32767) to unsigned uint16 (0 to 65535)
+
+water.kt:
+- `watermapToPng(waterFilepath: String, pngFilepath: String)` - Converts 8-bit water/land mask to grayscale PNG
+- `Water class` - Parses uint8 water data grid (3601×3601)
 
 **Authentication:**
 - Requires `EARTHDATA_TOKEN` environment variable
@@ -60,7 +74,23 @@ kmd/
 **Data Format:**
 - Tile naming: `[ns]DD[ew]DDD` (e.g., "n48w123" = 48°N, 123°W)
 - Coverage: 1° × 1° tiles
-- Output: `.hgt` heightmap files
+- Input files in zip:
+    - .hgt - 16-bit signed elevation data (big-endian)
+    - .swb - 8-bit water body mask
+- Output:
+    - *_elevation.png - 16-bit grayscale PNG (TYPE_USHORT_GRAY)
+    - *_water.png - 8-bit grayscale PNG (TYPE_BYTE_GRAY)
+
+**Processing Details**
+The heightmap conversion preserves full 16-bit dynamic range:
+1. Read 3601×3601 grid of int16 values in big-endian format
+2. Normalize to uint16 range via bit reinterpretation: (value & 0xFFFF + 32768) & 0xFFFF. Need explicit bit masking to work with Kotlin's `.toInt()` performing sign extension.
+3. Write as TYPE_USHORT_GRAY BufferedImage with PNG compression
+
+The watermap conversion is simpler:
+1. Read 3601×3601 grid of uint8 values
+2. Write as TYPE_BYTE_GRAY BufferedImage
+
 
 ### FAA Digital Obstable File (Obstruction Data)
 **Purpose:** Processes FAA obstruction data (towers, buildings, etc.) for aviation safety.
@@ -86,22 +116,30 @@ kmd/
 ### OpenStreetMap (Aeroway Data)
 **Purpose:** Fetches airport infrastructure data (hangars, terminals, towers) from OSM.
 
-**File:** `osm.kt`
+**File:** 
+- `road.kt` : raod, railway, and runway data
 
 **Key Functions:**
-- `generateAirData(maps: List<List<Int>>, apiUrl: String)` - Fetches aeroway data for coordinate squares
-- `makeAirApiRequest(apiUrl: String, map: List<Int>)` - Queries Overpass API
-- `storeAirData(ways: List, nodes: Map, airType: String)` - Converts OSM ways to point lists
+- `generateRoadProtobufs(heightmaps: List<String>)` - Main entry point, generates road data for tiles
+- `makeRoadApiRequest(lat: Int, lon: Int)` - Queries Overpass API for road/railway/aeroway features
+- `parseHeightmapToCoords(heightmap: String)` - Converts tile IDs to coordinates
+- `generateRoadSquare(outputDir: File, lat: Int, lon: Int)` - Generates single protobuf file with retry logic
 
 **API:**
 - Uses [Overpass API](https://overpass-api.de/api/interpreter)
-- Queries for `aeroway=hangar|terminal|tower` tags
+- Road queries: `highway=motorway|trunk|primary|secondary|tertiary, railway=rail|light_rail|tram, aeroway=runway|airstrip|taxiway`
 - Returns JSON with node/way geometry
 
+**Rate Limiting:**
+- Exponential backoff on 429 responses
+- Maximum 10 retry attempts
+- Initial delay: 1 second, doubles each retry
+- Sequential processing to avoid overwhelming API
 **Data Format:**
 - Input: OSM JSON via Overpass API
-- Processing: Resolves way node references, extracts elevation tags
-- Output: Lists of `OSMPoint` (lat, lon, height)
+- Processing: Resolves way node references, extracts tags and geometry
+- Output: Protocol Buffer .pb files per coordinate square
+- Road Type Widths: The system includes predefined visual widths for different road types:
 
 
 ### Download Manager
