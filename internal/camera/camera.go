@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/cs-wwu/srg-synvis/internal/coords"
 	"github.com/go-gl/glfw/v3.4/glfw"
@@ -29,6 +30,12 @@ type Camera struct {
 	yaw   float64 // Yaw relative to start
 	roll  float64 // Roll angle relative to start
 
+	// Motion parameters
+	prevPos     *lin.Vec3
+	prevPosTime time.Time
+	smoothedVel lin.Vec3
+	planePitch  float64 // Pitch angle of the plane based on movement
+
 	// Component managers
 	inputProcessor *InputProcessor
 	sensorManager  *SensorManager
@@ -48,6 +55,11 @@ var (
 	MAP_NORTH = lin.Vec3{0.0, 0.0, 1.0}
 	// Distance above the plane to be in the map view.
 	MAP_OFFSET = float32(10.0)
+)
+
+const (
+	ROTATION_THRESHOLD = 1e-3
+	ROTATION_DAMPING   = 0.075
 )
 
 // NewCamera creates and initializes a new Camera
@@ -230,6 +242,102 @@ func (c *Camera) Update(deltaTime float32) {
 	distance := posDelta.Len()
 	c.measuredSpeed = distance / deltaTime
 	c.lastFramePos = currentPos
+
+	mh := c.motionHandler
+	if mh == nil || mh.splineManager == nil {
+		return
+	}
+	sm := mh.splineManager
+	if sm.currentSplineData == nil {
+		return
+	}
+	elapsed := time.Since(sm.splineStartTime).Seconds()
+	t := elapsed / sm.averageGPSInterval
+
+	var newPos lin.Vec3
+	if t < 1.0 {
+		pos := mh.CentCatmullRom(t, sm.currentSplineData)
+		newPos = pos
+	} else {
+		// TODO this is not even really dead reckoning yet
+		// timeout/late update logic, should just continue
+		// on path for now
+		endPos := mh.CentCatmullRom(1.0, sm.currentSplineData)
+		overtime := float32(elapsed - sm.averageGPSInterval)
+		newPos = lin.Vec3{
+			endPos[0] + c.smoothedVel[0]*overtime,
+			endPos[1] + c.smoothedVel[1]*overtime,
+			endPos[2] + c.smoothedVel[2]*overtime,
+		}
+		c.updatePosition(newPos[0], newPos[2], newPos[1])
+		return
+	}
+	c.updatePosition(newPos[0], newPos[2], newPos[1])
+
+	// Update the forward vector of the camera
+	cur := c.Position()
+	if c.prevPos == nil {
+		prev := lin.Vec3{cur[0], cur[1], cur[2]}
+		c.prevPos = &prev
+		c.prevPosTime = time.Now()
+	} else {
+		deltaPos := lin.Vec3{
+			cur[0] - (*c.prevPos)[0],
+			cur[1] - (*c.prevPos)[1],
+			cur[2] - (*c.prevPos)[2],
+		}
+
+		// Calculate horizontal distance for pitch calculation
+		horizontalDist := math.Sqrt(float64(deltaPos[0]*deltaPos[0] + deltaPos[2]*deltaPos[2]))
+
+		// Calculate pitch from vertical movement (smoothed)
+		if horizontalDist > ROTATION_THRESHOLD {
+			targetPitch := math.Atan2(float64(deltaPos[1]), horizontalDist)
+			// Smooth the pitch
+			c.planePitch = c.planePitch + (targetPitch-c.planePitch)*ROTATION_DAMPING
+		}
+
+		deltaPos[1] = 0 // flatten to horizontal
+
+		if float64(deltaPos[0]*deltaPos[0]+deltaPos[2]*deltaPos[2]) > ROTATION_THRESHOLD {
+			deltaPos.Norm(&deltaPos)
+			smoothedView := lin.Vec3{
+				(*c.front)[0] + (deltaPos[0]-(*c.front)[0])*float32(ROTATION_DAMPING),
+				(*c.front)[1] + (deltaPos[1]-(*c.front)[1])*float32(ROTATION_DAMPING),
+				(*c.front)[2] + (deltaPos[2]-(*c.front)[2])*float32(ROTATION_DAMPING),
+			}
+			smoothedView.Norm(&smoothedView)
+
+			var right lin.Vec3
+			right.MultCross(&smoothedView, &MAP_UP)
+			right.Norm(&right)
+
+			var up lin.Vec3
+			up.MultCross(&right, &smoothedView)
+			up.Norm(&up)
+
+			c.updateVectors(smoothedView, right, up)
+		}
+
+		dt := time.Since(c.prevPosTime).Seconds()
+		if dt > 0.001 {
+			dtf := float32(dt)
+			frameVel := lin.Vec3{
+				(cur[0] - (*c.prevPos)[0]) / dtf,
+				(cur[1] - (*c.prevPos)[1]) / dtf,
+				(cur[2] - (*c.prevPos)[2]) / dtf,
+			}
+			c.smoothedVel[0] = 0.5*frameVel[0] + 0.5*c.smoothedVel[0]
+			c.smoothedVel[1] = 0.5*frameVel[1] + 0.5*c.smoothedVel[1]
+			c.smoothedVel[2] = 0.5*frameVel[2] + 0.5*c.smoothedVel[2]
+		}
+
+		// update baseline for next frame
+		(*c.prevPos)[0] = cur[0]
+		(*c.prevPos)[1] = cur[1]
+		(*c.prevPos)[2] = cur[2]
+		c.prevPosTime = time.Now()
+	}
 }
 
 // GetPositionString returns a human-readable position string
