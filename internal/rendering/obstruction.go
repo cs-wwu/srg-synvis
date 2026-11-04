@@ -322,11 +322,22 @@ func (builder *ObstructionBuilder) addTriangle(a, b, c uint32) {
 	normal := crossVec(*edge1, *edge2)
 	normal.Normalize()
 
-	builder.vertices[a].Normal = normal
-	builder.vertices[b].Normal = normal
-	builder.vertices[c].Normal = normal
+	// Duplicate vertices so each triangle has independent normals
+	v0 = builder.vertices[a]
+	v1 = builder.vertices[b]
+	v2 = builder.vertices[c]
 
-	builder.indices = append(builder.indices, a, b, c)
+	v0.Normal = normal
+	v1.Normal = normal
+	v2.Normal = normal
+
+	newa := builder.addVertex(v0)
+	newb := builder.addVertex(v1)
+	newc := builder.addVertex(v2)
+
+	// Reference new vertices
+	builder.indices = append(builder.indices, newa, newb, newc)
+
 }
 
 func newObstructionBuilder(heightInfo *chunk.HeightInfo) *ObstructionBuilder {
