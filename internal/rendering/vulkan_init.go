@@ -152,6 +152,7 @@ func (app *Application) initUBO() {
 
 func (app *Application) updateUBO() {
 	aspectRatio := float32(app.width) / float32(app.height)
+	app.ubo.ViewportHeight = float32(app.height)
 
 	if app.Camera.MapView() {
 		ortho := lin.Mat4x4{}
@@ -1030,22 +1031,18 @@ func (app *Application) prepareRoadPipeline() {
 				Stride:    uint32(unsafe.Sizeof(RoadVertex{})),
 				InputRate: vk.VertexInputRateVertex,
 			}},
-			VertexAttributeDescriptionCount: 2,
+			VertexAttributeDescriptionCount: 4,
 			PVertexAttributeDescriptions: []vk.VertexInputAttributeDescription{
 				// Position
-				{
-					Binding:  0,
-					Location: 0,
-					Format:   vk.FormatR32g32b32Sfloat,
-					Offset:   0,
-				},
+				{Binding: 0, Location: 0, Format: vk.FormatR32g32b32Sfloat, Offset: 0},
 				// Color
-				{
-					Binding:  0,
-					Location: 1,
-					Format:   vk.FormatR32g32b32Sfloat,
-					Offset:   4 * 3,
-				},
+				{Binding: 0, Location: 1, Format: vk.FormatR32g32b32Sfloat, Offset: 4 * 3},
+				// Normal (x, z)
+				{Binding: 0, Location: 2, Format: vk.FormatR32g32Sfloat,
+					Offset: uint32(unsafe.Offsetof(RoadVertex{}.NormalX))},
+				// Side, half-width
+				{Binding: 0, Location: 3, Format: vk.FormatR32g32Sfloat,
+					Offset: uint32(unsafe.Offsetof(RoadVertex{}.Side))},
 			},
 		},
 

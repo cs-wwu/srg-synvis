@@ -16,6 +16,28 @@ import (
 	"github.com/ungerik/go3d/vec3"
 )
 
+// RoadVertex is one edge vertex of a road ribbon. Instead of storing the final
+// edge position, it stores the road's centerline point plus the direction and
+// distance to push sideways. The vertex shader does the pushing so that it can
+// widen the road to a minimum on-screen width when the camera is far away.
+//
+// Memory layout (40 bytes, no padding) must match the pipeline's vertex input:
+//
+//	location 0: vec3 Position   offset 0
+//	location 1: vec3 Color      offset 12
+//	location 2: vec2 Normal     offset 24  (NormalX, NormalZ)
+//	location 3: vec2 SideHalfW  offset 32  (Side, HalfW)
+//
+// NOTE: this replaces the existing RoadVertex definition. Delete the old one.
+type RoadVertex struct {
+	Position vec3.T  // road centerline point (x, height, z)
+	Color    vec3.T  //
+	NormalX  float32 // unit sideways direction in the xz plane
+	NormalZ  float32 //
+	Side     float32 // -1 or +1: which side of the centerline this vertex is on
+	HalfW    float32 // real half-width of the road in world units
+}
+
 type RoadBuilder struct {
 	heightInfo *chunk.HeightInfo
 	vertices   []RoadVertex
@@ -56,6 +78,7 @@ var ROAD_TYPES = map[string]RoadType{
 const (
 	ROAD_OFFSET            = float32(1.0)
 	SIMPLIFICATION_EPSILON = 0.2 // 0.2 arcseconds (20 feet at the equator)
+	CORNER_DISTANCE        = 2.0 // base corner arc distance, reset for every corner
 )
 
 func (app *Application) buildRoad(pos spatial.MapCoord) *RoadSquare {
@@ -129,22 +152,18 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 	builder.color = ty.Color
 	width := ty.Width
 	half_w := width / 2.0
-	distance := 2.0
 	min_angle := math.Pi / 12 // 15 degrees
 
 	var prev_left, prev_right uint32
 
+	// Start cap. The left vertex sits on the -normal side, the right on +normal.
 	{
 		p0 := points[0]
 		p1 := points[1]
 		dir := p1.Subed(&p0)
 		dir.Normalize()
 		normal := perpendicular(dir)
-		normal_half_w := normal.Scaled(half_w)
-		left := p0.Subed(&normal_half_w)
-		right := p0.Added(&normal_half_w)
-		prev_left = builder.addPoint(left)
-		prev_right = builder.addPoint(right)
+		prev_left, prev_right = builder.addPair(p0, normal, half_w, -1)
 	}
 
 	for i := range points {
@@ -168,8 +187,15 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 			norm2.Scale(-1.0)
 		}
 
-		angle := math.Acos(vec2.Dot(&dir1, &dir2))
+		// Clamp: floating point error can push the dot product slightly outside
+		// [-1, 1], which would make Acos return NaN.
+		dot := math.Max(-1.0, math.Min(1.0, vec2.Dot(&dir1, &dir2)))
+		angle := math.Acos(dot)
 		half_angle := (math.Pi - angle) / 2
+
+		// Per-corner distance. This used to be shared across the whole road, so
+		// one sharp corner changed the arc radius of every later corner.
+		distance := CORNER_DISTANCE
 		radius := distance / math.Tan(half_angle)
 		if radius > distance*2 {
 			radius = distance * 2
@@ -182,28 +208,28 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 		origin.Add(&norm1_scaled)
 
 		steps := int(math.Ceil(angle / min_angle))
+		if steps < 1 {
+			steps = 1
+		}
 		per_step := 1.0 / float64(steps)
+
+		// With the normal flipped for left-handed turns, the centerline point is
+		// origin - norm*distance. The old "outside" edge was that point pushed by
+		// -norm*width/2 (side -1), and the old "inside" edge by +norm*width/2
+		// (side +1). Which of those is the left vertex depends on handedness.
+		leftSide := float32(-1)
+		if lefthanded {
+			leftSide = 1
+		}
 
 		t := 0.0
 		for range steps + 1 {
 			norm := slerp(norm1, norm2, t)
 
-			norm_scaled := norm.Scaled(distance + width/2)
-			outside := origin.Subed(&norm_scaled)
-			norm_scaled = norm.Scaled(distance - width/2)
-			inside := origin.Subed(&norm_scaled)
+			norm_scaled := norm.Scaled(distance)
+			center := origin.Subed(&norm_scaled)
 
-			var left, right vec2.T
-			if lefthanded {
-				left = inside
-				right = outside
-			} else {
-				left = outside
-				right = inside
-			}
-
-			curr_left := builder.addPoint(left)
-			curr_right := builder.addPoint(right)
+			curr_left, curr_right := builder.addPair(center, norm, half_w, leftSide)
 
 			builder.addTriangle(prev_left, prev_right, curr_left)
 			builder.addTriangle(curr_left, prev_right, curr_right)
@@ -215,17 +241,14 @@ func renderRoad(builder *RoadBuilder, road *pb.Road) {
 		}
 	}
 
+	// End cap.
 	{
 		p0 := points[len(points)-2]
 		p1 := points[len(points)-1]
 		dir := p1.Subed(&p0)
 		dir.Normalize()
 		normal := perpendicular(dir)
-		normal_half_w := normal.Scaled(half_w)
-		left := p1.Subed(&normal_half_w)
-		right := p1.Added(&normal_half_w)
-		curr_left := builder.addPoint(left)
-		curr_right := builder.addPoint(right)
+		curr_left, curr_right := builder.addPair(p1, normal, half_w, -1)
 
 		builder.addTriangle(prev_left, prev_right, curr_left)
 		builder.addTriangle(curr_left, prev_right, curr_right)
@@ -237,9 +260,15 @@ func perpendicular(v vec2.T) vec2.T {
 }
 
 func slerp(a, b vec2.T, t float64) vec2.T {
-	angle := math.Acos(vec2.Dot(&a, &b))
-	f1 := math.Sin(angle*(1-t)) / math.Sin(angle)
-	f2 := math.Sin(angle*t) / math.Sin(angle)
+	dot := math.Max(-1.0, math.Min(1.0, vec2.Dot(&a, &b)))
+	angle := math.Acos(dot)
+	s := math.Sin(angle)
+	// Nearly parallel vectors: sin(angle) is ~0 and the formula divides by it.
+	if math.Abs(s) < 1e-6 {
+		return a
+	}
+	f1 := math.Sin(angle*(1-t)) / s
+	f2 := math.Sin(angle*t) / s
 	return vec2.T{a[0]*f1 + b[0]*f2, a[1]*f1 + b[1]*f2}
 }
 
@@ -291,13 +320,29 @@ func newRoadBuilder(heightInfo *chunk.HeightInfo) *RoadBuilder {
 	}
 }
 
-func (r *RoadBuilder) addPoint(point vec2.T) uint32 {
-	height := r.heightInfo.Height(float32(point[0]), float32(point[1]))
+// addPair emits the left and right edge vertices for one centerline point and
+// returns their indices. Both share the same centerline position (and height
+// sampled at it); the vertex shader pushes them apart along `normal`.
+//
+// leftSide is the sign (-1 or +1) of the side the LEFT vertex sits on along
+// `normal`; the right vertex gets the opposite sign.
+func (r *RoadBuilder) addPair(center vec2.T, normal vec2.T, halfW float64, leftSide float32) (left, right uint32) {
+	height := r.heightInfo.Height(float32(center[0]), float32(center[1]))
 	height += ROAD_OFFSET
-	return r.addVertex(RoadVertex{
-		Position: vec3.T{float32(point[0]), height, float32(point[1])},
-		Color:    r.color,
-	})
+
+	emit := func(side float32) uint32 {
+		return r.addVertex(RoadVertex{
+			Position: vec3.T{float32(center[0]), height, float32(center[1])},
+			Color:    r.color,
+			NormalX:  float32(normal[0]),
+			NormalZ:  float32(normal[1]),
+			Side:     side,
+			HalfW:    float32(halfW),
+		})
+	}
+	left = emit(leftSide)
+	right = emit(-leftSide)
+	return
 }
 
 func (r *RoadBuilder) addVertex(vertex RoadVertex) (id uint32) {
