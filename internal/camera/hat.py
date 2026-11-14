@@ -3,32 +3,27 @@ import time
 
 sense = SenseHat()
 
-# IMU fusion inputs: (compass, gyroscope, accelerometer).
-# Default is all three on. The compass is what makes yaw noisy; leave it on
-# for an absolute heading. To test whether the magnetometer is the source of
-# the rocking, try (False, True, True): yaw will then drift slowly instead
-# of wobbling.
-# sense.set_imu_config(False, True, True)
+# IMU fusion inputs: (compass, gyroscope, accelerometer). Default is all three.
+# sense.set_imu_config(False, True, True)  # compass off: yaw drifts instead of wobbling
 
-# Poll at a fixed rate. The old loop had no delay, so it re-read the same
-# IMU sample thousands of times per second (pegging a Pi core and flooding
-# the Go side with duplicate lines).
-POLL_SECONDS = 0.01  # ~100 Hz
+# Talk to RTIMULib directly so we read each real IMU sample exactly once.
+#  - The original loop re-read the same sample thousands of times per second
+#    (duplicates flooding the Go side).
+#  - A fixed sleep (my previous version) can fall out of step with the IMU's own
+#    sample rate; RTIMULib is meant to be polled at its poll interval.
+imu = sense._imu
+POLL = max(imu.IMUGetPollInterval() / 1000.0, 0.002)  # seconds
 
 
 def main():
-    next_t = time.monotonic()
     while True:
-        orientation = sense.get_orientation_radians()
-        # Order is yaw, pitch, roll. The Go side must parse it in this order.
-        print([orientation["yaw"], orientation["pitch"], orientation["roll"]], flush=True)
-
-        next_t += POLL_SECONDS
-        delay = next_t - time.monotonic()
-        if delay > 0:
-            time.sleep(delay)
-        else:
-            next_t = time.monotonic()  # fell behind; don't try to catch up
+        if imu.IMURead():
+            d = imu.getIMUData()
+            if d.get("fusionPoseValid"):
+                roll, pitch, yaw = d["fusionPose"]  # RTIMULib order: roll, pitch, yaw
+                # Output order is yaw, pitch, roll (unchanged, matches the Go parser's input)
+                print([yaw, pitch, roll], flush=True)
+        time.sleep(POLL / 2)
 
 
 if __name__ == "__main__":
