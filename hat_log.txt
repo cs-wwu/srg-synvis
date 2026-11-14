@@ -1,0 +1,169 @@
+IMU poll interval: 4.0 ms
+[status] t=1s IMURead true=0 false=436 valid=None
+[status] t=2s IMURead true=0 false=435 valid=None
+[fallback] sense.get_orientation_radians(): yaw +20.5 pitch -1.0 roll -117.5 deg
+rate   0.5 Hz | r  -117.5 p    -1.0 y   +20.5 | q(+0.512 -0.840 -0.156 +0.085) | |mag|  16.6 uT
+rate   0.5 Hz | r  -117.7 p    -1.0 y   +19.0 | q(+0.511 -0.843 -0.146 +0.078) | |mag|  45.1 uT
+rate   0.5 Hz | r  -117.9 p    -1.0 y   +18.1 | q(+0.511 -0.845 -0.140 +0.074) | |mag|  45.9 uT
+rate   0.5 Hz | r  -118.0 p    -1.1 y   +18.1 | q(+0.510 -0.846 -0.139 +0.073) | |mag|  46.2 uT
+[status] t=3s IMURead true=65 false=82 valid=True
+rate  73.6 Hz | r  -118.1 p    -1.1 y   +18.2 | q(+0.509 -0.846 -0.140 +0.073) | |mag|  46.5 uT
+rate  73.6 Hz | r  -118.1 p    -1.1 y   +18.1 | q(+0.509 -0.846 -0.140 +0.073) | |mag|  46.1 uT
+rate  73.6 Hz | r  -118.1 p    -1.1 y   +17.8 | q(+0.509 -0.847 -0.138 +0.072) | |mag|  46.0 uT
+rate  73.6 Hz | r  -118.2 p    -1.1 y   +18.2 | q(+0.509 -0.846 -0.140 +0.073) | |mag|  46.2 uT
+[status] t=4s IMURead true=74 false=91 valid=True
+rate  73.6 Hz | r  -118.2 p    -1.1 y   +18.5 | q(+0.508 -0.846 -0.143 +0.074) | |mag|  46.0 uT
+rate  73.6 Hz | r  -118.2 p    -1.1 y   +18.8 | q(+0.508 -0.845 -0.145 +0.075) | |mag|  45.8 uT
+rate  73.6 Hz | r  -118.2 p    -1.1 y   +14.5 | q(+0.511 -0.850 -0.113 +0.057) | |mag|  45.6 uT
+rate  73.6 Hz | r  -112.8 p    -2.4 y    +2.1 | q(+0.554 -0.832 -0.027 -0.007) | |mag|  37.1 uT
+[status] t=5s IMURead true=74 false=91 valid=True
+rate  73.0 Hz | r  -112.3 p    -2.5 y   -15.7 | q(+0.549 -0.824 +0.101 -0.094) | |mag|  30.1 uT
+rate  73.0 Hz | r  -111.8 p    +0.4 y   -36.9 | q(+0.532 -0.785 +0.264 -0.175) | |mag|  28.0 uT
+rate  73.0 Hz | r  -110.7 p    -0.2 y   -69.7 | q(+0.466 -0.675 +0.469 -0.326) | |mag|  26.7 uT
+rate  73.0 Hz | r  -111.2 p    +0.1 y   -95.7 | q(+0.379 -0.554 +0.612 -0.418) | |mag|  29.0 uT
+[status] t=6s IMURead true=73 false=91 valid=True
+rate  72.9 Hz | r  -111.7 p    +0.7 y  -118.8 | q(+0.290 -0.418 +0.714 -0.481) | |mag|  30.5 uT
+rate  72.9 Hz | r  -112.0 p    -2.3 y  -140.3 | q(+0.174 -0.292 +0.776 -0.531) | |mag|  34.3 uT
+rate  72.9 Hz | r  -111.8 p    -2.5 y  -157.6 | q(+0.091 -0.173 +0.810 -0.553) | |mag|  38.9 uT
+rate  72.9 Hz | r  -112.9 p    -3.2 y  -170.2 | q(+0.024 -0.087 +0.829 -0.552) | |mag|  43.3 uT
+[status] t=7s IMURead true=72 false=95 valid=True
+rate  71.6 Hz | r  -111.9 p    -1.6 y  -172.8 | q(+0.024 -0.060 +0.826 -0.559) | |mag|  41.5 uT
+rate  71.6 Hz | r  -110.1 p    -0.2 y  -163.4 | q(+0.081 -0.119 +0.811 -0.567) | |mag|  37.8 uT
+rate  71.6 Hz | r  -109.5 p    -1.7 y  -143.2 | q(+0.171 -0.266 +0.772 -0.552) | |mag|  31.8 uT
+rate  71.6 Hz | r  -108.6 p    -3.2 y  -123.6 | q(+0.255 -0.398 +0.708 -0.525) | |mag|  27.8 uT
+[status] t=8s IMURead true=72 false=102 valid=True
+rate  70.5 Hz | r  -109.1 p    -2.5 y   -93.3 | q(+0.386 -0.568 +0.583 -0.434) | |mag|  28.2 uT
+rate  70.5 Hz | r  -108.4 p    -5.4 y   -54.5 | q(+0.502 -0.733 +0.347 -0.301) | |mag|  29.5 uT
+rate  70.5 Hz | r  -111.6 p    -4.0 y   -14.8 | q(+0.554 -0.822 +0.087 -0.101) | |mag|  34.7 uT
+[status] t=9s IMURead true=71 false=96 valid=True
+rate  70.5 Hz | r  -112.3 p    -3.9 y   +20.3 | q(+0.553 -0.814 -0.165 +0.070) | |mag|  40.9 uT
+rate  71.7 Hz | r  -114.7 p    -2.6 y   +51.6 | q(+0.494 -0.753 -0.377 +0.217) | |mag|  45.1 uT
+rate  71.7 Hz | r  -119.5 p    -0.2 y   +79.6 | q(+0.388 -0.663 -0.554 +0.321) | |mag|  50.9 uT
+rate  71.7 Hz | r  -120.1 p    +0.5 y   +99.8 | q(+0.318 -0.560 -0.661 +0.384) | |mag|  53.8 uT
+[status] t=10s IMURead true=74 false=93 valid=True
+rate  71.7 Hz | r  -121.6 p    +2.3 y  +114.6 | q(+0.248 -0.480 -0.729 +0.420) | |mag|  52.8 uT
+rate  72.9 Hz | r  -125.0 p    +5.5 y  +127.3 | q(+0.166 -0.413 -0.784 +0.433) | |mag|  55.4 uT
+rate  72.9 Hz | r  -126.6 p    +8.1 y  +134.7 | q(+0.114 -0.373 -0.810 +0.438) | |mag|  55.5 uT
+rate  72.9 Hz | r  -126.4 p    +8.4 y  +131.6 | q(+0.125 -0.395 -0.798 +0.437) | |mag|  55.8 uT
+[status] t=11s IMURead true=72 false=95 valid=True
+rate  72.9 Hz | r  -126.5 p    +8.6 y  +128.3 | q(+0.136 -0.418 -0.787 +0.433) | |mag|  54.5 uT
+rate  72.0 Hz | r  -129.9 p   +13.3 y  +128.9 | q(+0.087 -0.432 -0.791 +0.425) | |mag|  56.5 uT
+rate  72.0 Hz | r  -135.5 p   +15.5 y  +129.6 | q(+0.047 -0.436 -0.808 +0.393) | |mag|  60.6 uT
+rate  72.0 Hz | r  -134.4 p   +12.3 y  +124.3 | q(+0.092 -0.465 -0.791 +0.387) | |mag|  60.3 uT
+[status] t=12s IMURead true=73 false=92 valid=True
+rate  72.0 Hz | r  -123.6 p    -5.1 y  +104.5 | q(+0.320 -0.523 -0.709 +0.349) | |mag|  50.0 uT
+rate  72.0 Hz | r  -104.2 p   -16.9 y   +66.1 | q(+0.573 -0.605 -0.501 +0.234) | |mag|  36.0 uT
+rate  72.0 Hz | r   -90.8 p   -13.4 y   +52.5 | q(+0.662 -0.598 -0.387 +0.234) | |mag|  26.0 uT
+rate  72.0 Hz | r  -100.4 p   -16.7 y   +59.7 | q(+0.605 -0.613 -0.459 +0.218) | |mag|  29.7 uT
+[status] t=13s IMURead true=71 false=95 valid=True
+rate  72.0 Hz | r   -92.3 p   -18.3 y   +58.3 | q(+0.653 -0.568 -0.443 +0.233) | |mag|  25.6 uT
+rate  71.5 Hz | r   -78.5 p   -21.5 y   +47.9 | q(+0.743 -0.509 -0.385 +0.201) | |mag|  21.3 uT
+rate  71.5 Hz | r   -65.8 p   -17.7 y   +25.3 | q(+0.828 -0.496 -0.243 +0.100) | |mag|  22.4 uT
+rate  71.5 Hz | r   -43.6 p   -17.3 y    -3.7 | q(+0.916 -0.371 -0.128 -0.085) | |mag|  30.5 uT
+[status] t=14s IMURead true=73 false=94 valid=True
+rate  71.5 Hz | r   -30.2 p   -14.2 y   -25.2 | q(+0.928 -0.278 -0.060 -0.240) | |mag|  38.3 uT
+rate  71.6 Hz | r   -13.7 p   -11.9 y   -47.9 | q(+0.897 -0.151 -0.046 -0.412) | |mag|  48.2 uT
+rate  71.6 Hz | r    -7.3 p    -8.9 y   -63.6 | q(+0.843 -0.095 -0.032 -0.529) | |mag|  53.4 uT
+rate  71.6 Hz | r    -6.6 p    -6.2 y   -76.3 | q(+0.782 -0.078 -0.007 -0.618) | |mag|  55.5 uT
+[status] t=15s IMURead true=70 false=98 valid=True
+rate  71.6 Hz | r    -7.8 p    -3.9 y   -86.5 | q(+0.725 -0.073 +0.022 -0.685) | |mag|  56.2 uT
+rate  70.9 Hz | r   -28.3 p    -5.1 y   -90.7 | q(+0.673 -0.202 +0.144 -0.697) | |mag|  47.3 uT
+rate  70.9 Hz | r   -75.8 p   -10.3 y   -79.7 | q(+0.568 -0.515 +0.337 -0.546) | |mag|  22.2 uT
+JUMP yaw     -4.24 deg in one sample (t=15.94)
+rate  70.9 Hz | r  -103.1 p    -7.3 y   -53.7 | q(+0.531 -0.715 +0.318 -0.325) | |mag|  26.6 uT
+JUMP yaw     -4.23 deg in one sample (t=16.01)
+JUMP yaw     -4.22 deg in one sample (t=16.02)
+JUMP yaw     -4.11 deg in one sample (t=16.04)
+JUMP yaw     -4.10 deg in one sample (t=16.05)
+[status] t=16s IMURead true=71 false=99 valid=True
+JUMP yaw     -4.12 deg in one sample (t=16.08)
+rate  70.9 Hz | r  -127.9 p    +0.5 y  -104.5 | q(+0.272 -0.548 +0.712 -0.345) | |mag|  44.5 uT
+rate  70.9 Hz | r  -158.3 p    +2.5 y  -156.5 | q(+0.060 -0.196 +0.962 -0.180) | |mag|  63.4 uT
+rate  70.9 Hz | r  -178.7 p    -1.1 y  +172.1 | q(-0.010 +0.069 +0.997 -0.011) | |mag|  77.1 uT
+rate  70.9 Hz | r  +178.6 p    -0.2 y  +152.9 | q(+0.001 +0.234 +0.972 +0.012) | |mag|  79.5 uT
+[status] t=17s IMURead true=73 false=95 valid=True
+rate  70.9 Hz | r  +176.6 p    -0.7 y  +139.6 | q(+0.004 +0.345 +0.938 +0.030) | |mag|  80.7 uT
+rate  72.0 Hz | r  +176.1 p    -1.2 y  +129.9 | q(+0.005 +0.423 +0.905 +0.035) | |mag|  81.2 uT
+rate  72.0 Hz | r  +177.5 p    -0.7 y  +123.0 | q(+0.005 +0.477 +0.879 +0.022) | |mag|  80.7 uT
+rate  72.0 Hz | r  -172.1 p    +0.1 y  +117.2 | q(-0.035 +0.520 +0.852 -0.059) | |mag|  76.5 uT
+[status] t=18s IMURead true=73 false=90 valid=True
+rate  73.6 Hz | r  -149.1 p    +4.2 y  +113.4 | q(-0.117 +0.537 +0.800 -0.242) | |mag|  62.5 uT
+rate  73.6 Hz | r  -124.3 p    +3.1 y  +108.5 | q(-0.254 +0.526 +0.710 -0.393) | |mag|  44.2 uT
+rate  73.6 Hz | r   -94.8 p    +0.4 y  +104.1 | q(-0.414 +0.454 +0.579 -0.535) | |mag|  22.3 uT
+rate  73.6 Hz | r   -72.2 p    -5.7 y   +83.8 | q(-0.620 +0.411 +0.423 -0.517) | |mag|  20.3 uT
+[status] t=19s IMURead true=73 false=93 valid=True
+rate  71.5 Hz | r   -49.7 p   -10.9 y   +33.1 | q(-0.877 +0.377 +0.202 -0.219) | |mag|  28.6 uT
+rate  71.5 Hz | r   -24.2 p   -16.5 y    -2.4 | q(-0.967 +0.210 +0.135 +0.050) | |mag|  43.5 uT
+rate  71.5 Hz | r   -14.6 p   -16.1 y   -28.0 | q(-0.949 +0.156 +0.104 +0.255) | |mag|  49.7 uT
+[status] t=20s IMURead true=71 false=93 valid=True
+rate  71.5 Hz | r   -15.2 p   -16.0 y   -47.6 | q(-0.891 +0.175 +0.073 +0.413) | |mag|  49.4 uT
+rate  72.6 Hz | r   -30.4 p   -13.6 y   -60.4 | q(-0.813 +0.283 -0.033 +0.509) | |mag|  41.2 uT
+rate  72.6 Hz | r   -68.3 p    -7.1 y   -62.7 | q(-0.687 +0.505 -0.248 +0.459) | |mag|  22.2 uT
+rate  72.6 Hz | r   -97.7 p    -1.7 y   -42.1 | q(-0.610 +0.706 -0.261 +0.246) | |mag|  21.5 uT
+JUMP yaw     -4.60 deg in one sample (t=20.90)
+JUMP yaw     -4.49 deg in one sample (t=20.91)
+JUMP yaw     -4.47 deg in one sample (t=20.92)
+JUMP yaw     -4.38 deg in one sample (t=20.93)
+JUMP yaw     -4.41 deg in one sample (t=20.95)
+JUMP yaw     -4.38 deg in one sample (t=20.97)
+JUMP yaw     -4.22 deg in one sample (t=20.98)
+JUMP yaw     -4.20 deg in one sample (t=20.99)
+JUMP yaw     -4.19 deg in one sample (t=21.01)
+JUMP yaw     -4.07 deg in one sample (t=21.03)
+[status] t=21s IMURead true=74 false=87 valid=True
+rate  72.6 Hz | r  -121.3 p    +0.4 y  -105.9 | q(-0.298 +0.524 -0.697 +0.389) | |mag|  38.9 uT
+rate  71.9 Hz | r  -126.5 p    -0.1 y  -156.0 | q(-0.093 +0.186 -0.873 +0.441) | |mag|  46.1 uT
+JUMP yaw     +5.58 deg in one sample (t=21.56)
+JUMP yaw     +5.39 deg in one sample (t=21.57)
+JUMP yaw     +5.50 deg in one sample (t=21.58)
+JUMP yaw     +5.25 deg in one sample (t=21.60)
+JUMP yaw     +5.23 deg in one sample (t=21.61)
+JUMP yaw     +5.09 deg in one sample (t=21.63)
+JUMP yaw     +4.83 deg in one sample (t=21.64)
+rate  71.9 Hz | r  -121.0 p    +0.4 y  -142.8 | q(-0.160 +0.276 -0.825 +0.466) | |mag|  43.4 uT
+JUMP yaw     +4.51 deg in one sample (t=21.72)
+JUMP yaw     +4.56 deg in one sample (t=21.73)
+JUMP yaw     +4.73 deg in one sample (t=21.77)
+JUMP yaw     +4.96 deg in one sample (t=21.86)
+JUMP yaw     +4.81 deg in one sample (t=21.87)
+JUMP yaw     +4.63 deg in one sample (t=21.89)
+JUMP yaw     +4.47 deg in one sample (t=21.90)
+rate  71.9 Hz | r  -118.9 p    +3.6 y  -139.8 | q(-0.200 +0.281 -0.814 +0.468) | |mag|  39.4 uT
+JUMP yaw     +4.37 deg in one sample (t=21.91)
+JUMP yaw     +4.22 deg in one sample (t=21.93)
+JUMP yaw     +4.18 deg in one sample (t=21.94)
+JUMP yaw     +4.11 deg in one sample (t=21.95)
+JUMP yaw     +4.07 deg in one sample (t=21.97)
+[status] t=22s IMURead true=71 false=98 valid=True
+rate  71.9 Hz | r  -115.8 p    +2.7 y   -71.9 | q(-0.442 +0.678 -0.508 +0.296) | |mag|  38.2 uT
+rate  72.1 Hz | r  -113.7 p    -0.0 y   -29.7 | q(-0.529 +0.809 -0.215 +0.140) | |mag|  36.4 uT
+rate  72.1 Hz | r  -115.4 p    -0.5 y   -12.9 | q(-0.531 +0.840 -0.093 +0.064) | |mag|  36.0 uT
+rate  72.1 Hz | r  -117.4 p    -0.2 y    -9.7 | q(-0.518 +0.851 -0.072 +0.046) | |mag|  36.1 uT
+[status] t=23s IMURead true=73 false=93 valid=True
+rate  72.1 Hz | r  -117.8 p    -0.1 y    -7.7 | q(-0.516 +0.854 -0.057 +0.035) | |mag|  35.4 uT
+rate  72.5 Hz | r  -118.0 p    -0.0 y    -6.4 | q(-0.514 +0.856 -0.047 +0.029) | |mag|  35.7 uT
+rate  72.5 Hz | r  -118.2 p    -0.0 y    -5.1 | q(-0.513 +0.857 -0.038 +0.023) | |mag|  35.6 uT
+rate  72.5 Hz | r  -118.3 p    -0.1 y    -4.2 | q(-0.513 +0.858 -0.031 +0.019) | |mag|  35.2 uT
+[status] t=24s IMURead true=71 false=100 valid=True
+rate  72.5 Hz | r  -118.4 p    -0.1 y    -3.8 | q(-0.512 +0.858 -0.027 +0.018) | |mag|  35.6 uT
+rate  70.7 Hz | r  -118.4 p    -0.2 y    -3.6 | q(-0.512 +0.859 -0.026 +0.018) | |mag|  35.6 uT
+rate  70.7 Hz | r  -118.4 p    -0.3 y    -3.4 | q(-0.511 +0.859 -0.025 +0.018) | |mag|  35.7 uT
+rate  70.7 Hz | r  -118.5 p    -0.3 y    -3.4 | q(-0.511 +0.859 -0.024 +0.018) | |mag|  35.6 uT
+[status] t=25s IMURead true=72 false=97 valid=True
+rate  70.7 Hz | r  -118.5 p    -0.4 y    -3.5 | q(-0.511 +0.859 -0.025 +0.018) | |mag|  35.6 uT
+rate  70.6 Hz | r  -118.5 p    -0.4 y    -3.8 | q(-0.511 +0.859 -0.027 +0.020) | |mag|  35.6 uT
+rate  70.6 Hz | r  -118.5 p    -0.4 y    -3.7 | q(-0.511 +0.859 -0.026 +0.020) | |mag|  36.0 uT
+rate  70.6 Hz | r  -118.5 p    -0.5 y    -3.3 | q(-0.511 +0.859 -0.022 +0.018) | |mag|  35.9 uT
+[status] t=26s IMURead true=72 false=97 valid=True
+rate  70.6 Hz | r  -118.5 p    -0.5 y    -2.8 | q(-0.511 +0.859 -0.018 +0.016) | |mag|  36.0 uT
+rate  72.5 Hz | r  -118.5 p    -0.6 y    -2.2 | q(-0.511 +0.859 -0.014 +0.014) | |mag|  36.6 uT
+rate  72.5 Hz | r  -118.5 p    -0.6 y    -2.4 | q(-0.511 +0.859 -0.015 +0.015) | |mag|  35.8 uT
+rate  72.5 Hz | r  -118.5 p    -0.6 y    -2.6 | q(-0.511 +0.859 -0.017 +0.016) | |mag|  35.3 uT
+[status] t=27s IMURead true=72 false=95 valid=True
+rate  72.5 Hz | r  -118.5 p    -0.6 y    -2.8 | q(-0.511 +0.859 -0.019 +0.017) | |mag|  35.2 uT
+rate  71.0 Hz | r  -118.5 p    -0.6 y    -3.5 | q(-0.511 +0.859 -0.024 +0.020) | |mag|  35.3 uT
+rate  71.0 Hz | r  -118.5 p    -0.6 y    -4.4 | q(-0.511 +0.859 -0.030 +0.024) | |mag|  35.4 uT
+rate  71.0 Hz | r  -118.5 p    -0.5 y    -4.9 | q(-0.511 +0.859 -0.035 +0.026) | |mag|  35.7 uT
+[status] t=28s IMURead true=71 false=100 valid=True
+rate  71.0 Hz | r  -118.4 p    -0.6 y    -4.8 | q(-0.511 +0.858 -0.033 +0.026) | |mag|  34.8 uT
+rate  71.4 Hz | r  -118.4 p    -0.6 y    -4.8 | q(-0.511 +0.858 -0.033 +0.026) | |mag|  35.5 uT
