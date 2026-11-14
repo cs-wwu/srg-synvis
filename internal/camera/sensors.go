@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"os/exec"
 	"time"
 
@@ -15,7 +16,24 @@ import (
 	"github.com/westphae/geomag/pkg/wmm"
 )
 
-const DAMP = 0.9 // Smoothing factor for sensor data
+const DAMP = 0.9 // Smoothing factor for GPS data (position)
+
+// Orientation smoothing time constants, in seconds. Larger = steadier but laggier.
+// Yaw comes from the magnetometer and is much noisier than pitch/roll (which are
+// held by the gyro + accelerometer), so it gets a longer time constant.
+const (
+	YAW_TAU  = 0.40
+	TILT_TAU = 0.12
+)
+
+// Declination changes extremely slowly, so there is no reason to run the full
+// magnetic model on every IMU sample.
+const DECL_REFRESH = 10 * time.Second
+
+// Set to false if mag.D() turns out to already be in radians.
+// Sanity check: around Bellingham, WA the declination is roughly +15 degrees,
+// so a degrees value prints as ~15 and a radians value prints as ~0.26.
+const DECL_IS_DEGREES = true
 
 // SensorManager handles GPS and IMU sensor integration
 type SensorManager struct {
@@ -25,6 +43,11 @@ type SensorManager struct {
 	cancelGPS        context.CancelFunc
 	ctxHat           context.Context
 	cancelHat        context.CancelFunc
+
+	// Cached magnetic declination (radians)
+	decl      float64
+	declTime  time.Time
+	declValid bool
 }
 
 // SetSmoothing allows for motion through space to be discrete or smoothed (continuous)
@@ -114,6 +137,17 @@ func (sm *SensorManager) StartGPS(ctx context.Context) error {
 	}
 }
 
+// wrapPi wraps an angle in radians to (-pi, pi].
+func wrapPi(a float64) float64 {
+	return math.Atan2(math.Sin(a), math.Cos(a))
+}
+
+// lowPassAngle moves oldA toward newA along the shortest arc by a fraction alpha,
+// so angles blend correctly across the +/-pi wraparound.
+func lowPassAngle(newA, oldA, alpha float64) float64 {
+	return wrapPi(oldA + alpha*wrapPi(newA-oldA))
+}
+
 // StartSensors gets yaw, pitch and roll from the sense hat via a pipe
 // and updates the camera orientation indefinitely
 // Runs as a separate goroutine
@@ -141,6 +175,7 @@ func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 
 	first := true
 	var oldYaw, oldRoll, oldPitch float64
+	var last time.Time
 
 	// Read the output from the pipe
 	reader := bufio.NewReader(stdout)
@@ -151,7 +186,10 @@ func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 			break
 		}
 
-		// Parse the sensor data
+		// Parse the sensor data.
+		// NOTE: hat.py prints [yaw, pitch, roll], but this scans the 2nd value into
+		// `roll` and the 3rd into `pitch`. If that is not intentional (e.g. because of
+		// how the hat is mounted), swap &roll and &pitch here and drop the pitch offset below.
 		var yaw, roll, pitch float64
 		n, err := fmt.Sscanf(input, "[%f, %f, %f]", &yaw, &roll, &pitch)
 		if err != nil || n != 3 {
@@ -163,15 +201,23 @@ func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 		// pitch = -pitch
 		pitch = pitch + 3.14159/2
 
-		// Apply magnetic declination correction
+		// Apply magnetic declination correction (cached; see applyMagneticDeclination)
 		if err := sm.applyMagneticDeclination(&yaw); err != nil {
 			log.Printf("Warning: Could not apply magnetic declination: %v", err)
 		}
 
-		// Apply smoothing to reduce sensor noise
+		// Smooth with a time constant so the result does not depend on how fast
+		// samples arrive, and so angles blend correctly across the wraparound.
+		now := time.Now()
 		if !first {
-			yaw, roll, pitch = Smoother64(yaw, oldYaw, roll, oldRoll, pitch, oldPitch)
+			dt := now.Sub(last).Seconds()
+			aYaw := 1 - math.Exp(-dt/YAW_TAU)
+			aTilt := 1 - math.Exp(-dt/TILT_TAU)
+			yaw = lowPassAngle(yaw, oldYaw, aYaw)
+			roll = lowPassAngle(roll, oldRoll, aTilt)
+			pitch = lowPassAngle(pitch, oldPitch, aTilt)
 		}
+		last = now
 		first = false
 
 		// Update camera orientation
@@ -191,8 +237,14 @@ func (sm *SensorManager) StartSensors(ctx context.Context) Mode {
 	return Waiting
 }
 
-// applyMagneticDeclination applies magnetic declination correction to compass heading
+// applyMagneticDeclination applies magnetic declination correction to compass heading.
+// The declination is recomputed at most every DECL_REFRESH and cached in radians.
 func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
+	if sm.declValid && time.Since(sm.declTime) < DECL_REFRESH {
+		*yaw = *yaw + sm.decl
+		return nil
+	}
+
 	pos := sm.camera.Position()
 
 	// Convert world coordinates to GPS for magnetic model
@@ -210,11 +262,17 @@ func (sm *SensorManager) applyMagneticDeclination(yaw *float64) error {
 		return fmt.Errorf("failed to calculate magnetic field: %w", err)
 	}
 
-	// Apply declination correction (magnetic to true heading)
-	*yaw = *yaw + mag.D()
+	d := mag.D()
+	if DECL_IS_DEGREES {
+		d = d * math.Pi / 180.0
+	}
+	sm.decl = d
+	sm.declTime = time.Now()
+	sm.declValid = true
+	log.Printf("Magnetic declination: %.2f deg", d*180.0/math.Pi)
 
-	// log.Printf("Applied magnetic declination: %.2f° at position (%.4f, %.4f)",
-	//	mag.D(), lat, lon)
+	// Apply declination correction (magnetic to true heading)
+	*yaw = *yaw + d
 
 	return nil
 }
