@@ -9,13 +9,6 @@ import (
 	lin "github.com/xlab/linmath"
 )
 
-// NB: This gets cast to a byte slice, so it must have the exact same bytes
-// that the shader expects.
-type RoadVertex struct {
-	Position vec3.T
-	Color    vec3.T
-}
-
 type ObstructionVertex struct {
 	Position vec3.T
 	Color    vec3.T
@@ -34,6 +27,7 @@ type UniformBufferObject struct {
 	Time            float32    // Animation time
 	DisableWarnings float32    // 1.0 = disabled, 0.0 = enabled (match shader)
 	DisableFog      float32
+	ViewportHeight  float32
 }
 
 // creating a byte slice array of size UniformBufferObject
